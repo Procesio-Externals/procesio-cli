@@ -18,7 +18,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - run: uv sync --all-extras
+        with:
+          # Without this the matrix is decoration: uv picks its own interpreter,
+          # every job runs the same one, and the job names claim a coverage the
+          # run does not have.
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --all-extras --python ${{ matrix.python-version }}
       - name: tests
         # Every suite the repo ships, not just the two obvious ones: the
         # dashboard and the MCP bridge carry tests too, and leaving them out
