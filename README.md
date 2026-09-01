@@ -249,10 +249,14 @@ registry. If you add a tool of your own next to `tools/procesio/`, it shows up i
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Short version: this repo is generated from an
-internal monorepo, so a merged change is copied upstream and comes back on the next
-publish. That is invisible to you as a contributor, but it explains why commits here
-arrive in batches.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for how to open an issue or a pull request, and
+for the two rules that come from how this repository is built: don't move files, and
+never commit a `.procesio` export. Short version of the mechanics: this repo is
+generated from an internal monorepo, so a merged change is copied upstream and comes
+back on the next publish. That is invisible to you as a contributor, but it explains
+why commits here arrive in batches.
+
+For a security problem, don't open an issue. See [SECURITY.md](SECURITY.md).
 
 ## License
 

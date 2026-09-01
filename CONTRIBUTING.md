@@ -1,50 +1,102 @@
-# Contributing
+# Contributing to procesio-cli
 
-Issues and pull requests are welcome. One thing is worth knowing before you open one.
+Thanks for helping improve the toolkit. You don't need any permission on this
+repository to suggest a change. Everything below works from a normal GitHub
+account.
 
-## This repo is generated
+## Ways to suggest an update
 
-`procesio-cli` is published from an internal monorepo where the PROCESIO tool and agent are
-developed alongside a larger set of tools. The publication is a filtered copy: the
-files you see here are byte-identical to their upstream counterparts, at the same
-paths, minus what is internal.
+Pick the lightest one that fits.
 
-Two consequences:
+| You want to | Do this |
+| --- | --- |
+| Fix a typo or a wrong sentence in a file | Open the file on GitHub and click the pencil icon. GitHub forks the repository for you and opens a pull request. |
+| Report something that doesn't work | Open a [bug report](../../issues/new/choose). |
+| Ask for a tool, an action, or a behavior | Open a [feature request](../../issues/new/choose). |
+| Ask a question, or float an idea that isn't a request yet | Start a [discussion](../../discussions). |
+| Change code | Fork the repository, push a branch, and open a pull request. |
+| Report a security problem | Don't open an issue. See [SECURITY.md](SECURITY.md). |
 
-- **Commits arrive in batches.** A publish carries whatever changed upstream since the
-  last one, so the history here is coarser than the work that produced it.
-- **A merged PR is copied upstream by hand, once.** Because the paths match, that is a
-  mechanical step rather than a rewrite, and your change comes back verbatim on the
-  next publish. You will occasionally see your own commit re-land with a different
-  hash. Nothing was lost; it took the long way around.
+For a change larger than a few lines, open an issue first. A maintainer tells
+you whether the idea fits before you write the code.
 
-If a PR is merged and then appears to vanish on the next publish, that is a bug in our
-process, not in yours. Open an issue and we will fix the port.
+## Open a pull request
 
-## What makes a change easy to accept
+1. Fork the repository and clone your fork.
+2. Create a branch: `git checkout -b fix-form-dto-parsing`.
+3. Install the dependencies: `uv sync`.
+4. Make your change, and add a test that fails without it.
+5. Run the suite: `uv run pytest`.
+6. Push the branch and open a pull request against `main`.
 
-- **Keep the contract.** Every tool prints exactly one JSON object on stdout and
-  nothing else; errors are `{"error": {"code", "message", "details"}}` with a non-zero
-  exit code. Progress goes to stderr.
-- **Change the manifest in the same commit as the code.** `tool.yaml` is the source of
-  truth for actions, arguments and secrets. A new argument that only exists in the
-  handler is a bug, and the tests will say so.
-- **Regenerate the generated files.** After a manifest change:
-  `python scripts/build-tool-skill.py procesio` and `python scripts/build-router.py`.
-- **Never put a secret in a file.** `scripts/secret_scan.py` runs over the tree and
-  will refuse anything credential-shaped. Secrets belong in the OS store, reached
-  through `tools/_lib/creds.py`.
-- **Add a test that fails without your change.** A test that passes both before and
-  after is documentation, not a test.
+The two commands CI will run on your branch:
 
 ```bash
-python -m pytest tools/procesio agents/procesio -q
-python scripts/secret_scan.py
+uv run pytest tools agents dashboard webplatform -q
+uv run python scripts/secret_scan.py
 ```
 
-## Reporting a platform bug
+Leave **Allow edits by maintainers** checked. A maintainer can then push a small
+correction to your branch instead of asking you for another round.
 
-If the problem is PROCESIO itself rather than this client, an issue here is still a
-fine place to start; we would rather triage it than have you guess. Include the API
-call, the response status, and what you expected. Please redact tokens, workspace ids
-and anything from your own data before pasting.
+Every pull request lands as a single squashed commit, so you don't need to tidy
+your history.
+
+## What a maintainer looks for
+
+- **One concern per pull request.** A refactor mixed into a bug fix takes far
+  longer to review.
+- **A test.** For a platform behavior, a test that captures the behavior is worth
+  more than the fix itself.
+- **Existing paths.** See the next section.
+- **No new dependencies** without a reason in the pull request description. A
+  package imported at module level has to be a base dependency; one imported
+  inside a function may be an extra. CI checks that, and so does the export.
+- **The manifest changes with the code.** `tool.yaml` declares a tool's actions,
+  arguments and secrets, and it is what an assistant reads before running
+  anything. A new argument that exists only in the handler is a bug, and the
+  tests say so. After a manifest change, regenerate what is generated:
+  `python scripts/build-tool-skill.py <tool>` and `python scripts/build-router.py`.
+- **One JSON object on stdout, and nothing else.** Progress goes to stderr;
+  failures print `{"error": {"code", "message", "details"}}` and exit non-zero.
+  Callers parse that.
+
+## Rules that come from how this repository is built
+
+This repository is generated from an internal monorepo, not developed here
+directly. An export tool copies files byte for byte, at identical paths. A
+maintainer ports your merged pull request upstream by mapping its path, and it
+comes back here verbatim on the next publish.
+
+That gives you three rules:
+
+- **Don't move or rename files.** A patch applies in both directions by path
+  alone. A move breaks that, and the change has to be ported by hand.
+- **Don't restructure a file to reformat it.** Same reason.
+- **Expect small gaps.** A few upstream files carry marked regions that the
+  export drops, so a sentence here can refer to something that is not in this
+  tree. If a document points at something you can't find, that's why. Say so in
+  an issue and a maintainer fixes the reference.
+
+## Never commit these
+
+The export refuses to publish a tree that contains any of them, and so does CI.
+
+- `.procesio` platform export files. A platform export serializes Call API
+  credentials inline. Treat every `.procesio` file as a secret, even one from a
+  demo environment.
+- Credentials, tokens, connection strings, and API keys, including in tests and
+  fixtures. Read credentials through the credential store instead.
+- Real workspace GUIDs, environment names, tenant names, or profile names.
+- Personal names and email addresses, including in code comments.
+- Anything identifying a customer: process names, notification bodies, sample
+  payloads taken from a live system.
+
+For an example, invent one. `contoso-demo`, `00000000-0000-0000-0000-000000000000`,
+and `user@example.com` are all fine.
+
+## Licensing
+
+By opening a pull request, you agree that your contribution is licensed under
+the same license as this repository, Apache 2.0, under the terms in section 5 of
+the license. See [LICENSE](LICENSE) and [NOTICE](NOTICE).

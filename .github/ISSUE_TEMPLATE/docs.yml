@@ -1,0 +1,24 @@
+name: Documentation problem
+description: Something in the docs is wrong, missing, or hard to follow.
+labels: ["documentation", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a typo, you don't need an issue. Open the file, click the pencil
+        icon, and GitHub opens a pull request for you.
+
+  - type: input
+    id: where
+    attributes:
+      label: Which file or page
+      placeholder: "README.md, the credentials section"
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong
+    validations:
+      required: true
