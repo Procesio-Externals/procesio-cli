@@ -1,0 +1,253 @@
+{
+ "id": "a32d56f5-8426-5bba-9220-7be7a186a11f",
+ "category": "table",
+ "type": "dynamic-table-row",
+ "configs": [
+  {
+   "id": "15bbaccf-4afb-5dcb-bc57-451e20f20018",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "5283775f-5a46-5ac2-ab1e-f8183a9d175e",
+   "key": "hasVirtualization",
+   "label": "Has virtualization",
+   "tooltip": "Virtualization can increase table display performance.",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true
+  },
+  {
+   "id": "f4c782ef-a45c-585d-909d-e28859469fae",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "DynamicRow",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "499a940e-f9db-597a-b917-f4c4127350f7",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "dynamicRow",
+   "exposed": true
+  },
+  {
+   "id": "25ee3506-4ee9-5b94-93de-1cc571085f16",
+   "key": "childrenIdPerColumn",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": {},
+   "exposed": false,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "3b341ac9-e881-566d-acca-c4da5921a7d6",
+   "key": "hasDetails",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": false
+  },
+  {
+   "id": "3f467755-64f2-5cc6-9103-7e1473afd451",
+   "key": "hasHeader",
+   "label": "Show header",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "9431661b-6b73-544b-b43b-4954cf1de258",
+   "key": "hasIndexColumn",
+   "label": "Add visual row number",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "767d2dcb-17aa-5a33-b2c0-a1ffddadf0f3",
+   "key": "canAdd",
+   "label": "Can add",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "7f04130a-a750-53de-95cd-bfcf60cc8d9d",
+   "key": "canRemove",
+   "label": "Can remove",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "fcf668ed-55a8-5fe9-b539-d44b683e7b44",
+   "key": "addText",
+   "label": "\"Add\" button text",
+   "placeholder": "Add text here",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "input",
+   "value": "+ Add",
+   "exposed": true
+  },
+  {
+   "id": "af4ff56c-7daf-5b1e-ae21-20c71a21d891",
+   "key": "emptyRowText",
+   "label": "Empty row text",
+   "placeholder": "Add text here",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "input",
+   "value": "Row is empty.",
+   "exposed": true
+  },
+  {
+   "id": "f68fcfbc-efb4-590a-9720-10677d8ee349",
+   "key": "tableColumnsSourceType",
+   "label": "Columns definition source type",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "table-columns-source-type",
+   "value": null,
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "a22a7f72-6156-5423-a921-10506ee57bb1",
+   "key": "tableColumnsSourceValue",
+   "label": "Columns definition source value",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "table-columns-source-value",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "e08449c8-b157-585d-8671-dad78fe1e416",
+   "key": "sourceType",
+   "label": "Source type",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-type",
+   "value": null,
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "ba512ee1-6815-51e6-af2e-d8d85ef79990",
+   "key": "sourceValue",
+   "label": "Source value",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-value",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "1b2654e5-7b71-5d80-ac9f-f758c13eee44",
+   "key": "approvalSteps",
+   "label": "",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "approvals",
+   "type": "row-cell-approvals",
+   "value": []
+  },
+  {
+   "id": "00ea6d22-2cdf-52bf-9fe7-20db6d43b6ab",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "fbf6496e-0d46-54e9-90a8-195218717060",
+   "key": "onTableRowAddedEvents",
+   "label": "onRowAdded",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "5c2970e5-a2fd-5e80-b399-fa03856e9564",
+   "key": "onTableRowDeletedEvents",
+   "label": "onRowDeleted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "4ceb87d6-c51e-553b-9261-bcc6e87b31af",
+   "key": "value",
+   "label": "value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "25fbbbee-661d-5c6d-b99a-0dc8f56c4587",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

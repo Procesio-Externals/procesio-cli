@@ -1,0 +1,2 @@
+# framework-map is LF-only: keeps map rebuilds from churning line endings
+* text=auto eol=lf

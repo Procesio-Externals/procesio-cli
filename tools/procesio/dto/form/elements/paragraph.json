@@ -1,0 +1,79 @@
+{
+ "id": "5eebc9c2-ecbb-5017-927f-bbb419a75e51",
+ "category": "structure",
+ "type": "paragraph",
+ "configs": [
+  {
+   "id": "090d724d-2bc4-507b-ad04-0bcd5e0f7203",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "tooltip": "Can be either string or HTML string",
+   "category": "content",
+   "subCategory": "general",
+   "type": "html-code-editor",
+   "value": "Add text here",
+   "exposed": true
+  },
+  {
+   "id": "28962467-d3e3-5c53-8778-c61469493a1a",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "11b83ef5-abd7-5237-a98b-fe0bfe4f473c",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "64020174-d158-5be2-8829-df1f26849652",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Paragraph",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "ef9289e2-2f65-5179-a4f4-29cab8411217",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "paragraph",
+   "exposed": true
+  },
+  {
+   "id": "f360783f-ed5a-5169-a583-b813dd266599",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

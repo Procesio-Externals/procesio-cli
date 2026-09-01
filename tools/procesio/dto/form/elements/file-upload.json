@@ -1,0 +1,196 @@
+{
+ "id": "dc7d5231-d566-5de3-b230-70645231ff73",
+ "category": "fields",
+ "type": "file-upload",
+ "configs": [
+  {
+   "id": "79e0a5af-d3fe-5cbc-83d5-4b5faeb1c123",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "File upload",
+   "exposed": true
+  },
+  {
+   "id": "4b713433-6767-5424-9361-d5c69193554d",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "73cfd2a0-f8bc-51f8-b596-31b7b8ef72cd",
+   "key": "description",
+   "label": "Description",
+   "placeholder": "Add text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "2876735c-cad4-5ffe-8ac6-316595eea15d",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "f0945f8e-d09e-59ea-8e7e-4f30f2503a51",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "d19b9165-f659-55bf-a5d9-5ac7c195814f",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "91bb798d-6fe9-51c3-b93b-034521df2932",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "1483975b-f33a-5c0b-8756-e1c8e8a25938",
+   "key": "value",
+   "label": "Value",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "3a5154ba-8205-51a0-bce2-9ec824e585ac",
+   "key": "additionalFileTypes",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "6bc654d6-eb1e-5dab-9a56-a5df000191f1",
+   "key": "multiple",
+   "label": "Allow multiple files upload",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "39ac8842-8e0c-53a9-a811-b0f906f917e1",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "FileUpload",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "7c2deb32-8dd0-5837-8481-1abde84d77f3",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "file-upload",
+   "exposed": true
+  },
+  {
+   "id": "df71facf-1bc8-5296-a25c-d3be3321f5e4",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "ef327e84-d225-580f-b1c1-b07455c67ad2",
+   "key": "maxFileSize",
+   "label": "Max file size",
+   "placeholder": "Add max size here",
+   "tooltip": "Max size: 500 Mb",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "number-input",
+   "value": 500,
+   "exposed": true
+  },
+  {
+   "id": "00ea3ea1-1ea4-55a6-a359-20cf7095eca6",
+   "key": "allowedFileTypes",
+   "label": "Allowed file types",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "upload-file-type-select",
+   "value": [],
+   "exposed": true
+  },
+  {
+   "id": "4bb24f70-5c95-507f-9fb2-0e6b67974d59",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "79dd2f14-9ca7-57cc-9e46-1f97230994fb",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

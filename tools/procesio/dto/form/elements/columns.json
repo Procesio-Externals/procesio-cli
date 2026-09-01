@@ -1,0 +1,78 @@
+{
+ "id": "fabc80d6-3322-5658-b07e-da10535a40dc",
+ "category": "structure",
+ "type": "columns",
+ "configs": [
+  {
+   "id": "02c70e9c-f2f2-545a-9aaf-e1928a6e193e",
+   "key": "columns",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "column-list",
+   "value": [
+    "",
+    "",
+    "",
+    ""
+   ]
+  },
+  {
+   "id": "55b61600-e98e-56f5-9ba8-aea356ae69a5",
+   "key": "hideLabels",
+   "label": "Hide labels",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "48abe29f-af92-5716-8c35-936b6d07cc54",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "01d534a1-8419-5c21-bb1a-ce25de3ec62e",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Columns",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "b6cbcc3b-6152-545f-9402-e2762eef559d",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "columns",
+   "exposed": true
+  },
+  {
+   "id": "ae701e30-68e5-5ae4-933b-38b2fdbf8648",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

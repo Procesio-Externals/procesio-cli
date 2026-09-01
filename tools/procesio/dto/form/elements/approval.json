@@ -1,0 +1,259 @@
+{
+ "id": "dc5057d1-7bac-5f57-b464-57089ffa4a36",
+ "category": "fields",
+ "type": "approval",
+ "configs": [
+  {
+   "id": "09f55d0d-e541-5f56-892f-18c0931f5ec3",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Approval step",
+   "exposed": true
+  },
+  {
+   "id": "a38f2e9f-cbe1-5c48-ba9d-6229558ddee7",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "7e5c5930-1c7d-54d5-8314-ab28390a9e1c",
+   "key": "description",
+   "label": "Description",
+   "placeholder": "Add text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Please review this submission and approve/reject.",
+   "exposed": true
+  },
+  {
+   "id": "a25cc026-4324-512c-9f16-81773fa820dc",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "1701612b-4ee5-5a15-a17e-ee414514c2c1",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "59e20081-ac77-5378-9a83-ad3099302807",
+   "key": "comment",
+   "label": "Comment",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "e32a20e7-5e43-50df-95e3-6b21a10ab948",
+   "key": "responseDate",
+   "label": "Response date",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "c3038a05-34b7-5232-8f41-f09f18b8d99b",
+   "key": "responseUser",
+   "label": "Response user",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "b9a25636-e5cd-57f9-9bf6-c4100369a34a",
+   "key": "response",
+   "label": "Response",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "70a2a842-0f88-5396-85cc-e632f265ada7",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Approval",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "c321b7b1-1f06-5adc-8bf4-0515020392ff",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "approval",
+   "exposed": true
+  },
+  {
+   "id": "e2c20d67-d165-57cc-b234-b9edccee8c32",
+   "key": "approver",
+   "label": "Approver",
+   "placeholder": "Select name",
+   "category": "content",
+   "subCategory": "approvals",
+   "type": "user-select",
+   "value": ""
+  },
+  {
+   "id": "1092181b-d9bc-55c5-8614-a49350321c8c",
+   "key": "approverReplacement",
+   "label": "Approver replacement",
+   "category": "content",
+   "subCategory": "approvals",
+   "type": "approver-replacement",
+   "value": null
+  },
+  {
+   "id": "83a53e18-ff68-524c-bb53-905c74792658",
+   "key": "additionalApprovers",
+   "label": "",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "1e45aa83-3f52-5fd0-903a-5b74c226af2d",
+   "key": "commentRequiredOnApprove",
+   "label": "Is comment required on approve",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "required-comment",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "8c015e51-ef4d-5679-8c17-6d5a1159509f",
+   "key": "commentRequiredOnReject",
+   "label": "Is comment required on reject",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "6f2c9b03-c4ae-548c-a5e2-141fe1ff3268",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "9e30bc34-e3dd-5ba2-9a1b-d20a7321fb9e",
+   "key": "onBeforeApproveEvents",
+   "label": "onBeforeApprove",
+   "tooltip": "Triggered once Approve button is clicked but before the form is submitted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "08142bb8-6e86-52fa-91fc-75921e8aa04e",
+   "key": "onBeforeRejectEvents",
+   "label": "onBeforeReject",
+   "tooltip": "Triggered once Reject button is clicked but before the form is submitted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "06444609-2c4d-5210-b49e-92389213381e",
+   "key": "onBeforeApprovalSubmitEvents",
+   "label": "onBeforeSubmit",
+   "tooltip": "Triggered once any Approval's button is clicked but before the form is submitted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "fef86e40-fc6c-520c-bd07-6aaab9345173",
+   "key": "onAfterApproveEvents",
+   "label": "onAfterApprove",
+   "tooltip": "Triggered once Approve button is clicked but after the form is submitted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "772caf56-471e-5c4f-97c0-83da94299e23",
+   "key": "onAfterRejectEvents",
+   "label": "onAfterReject",
+   "tooltip": "Triggered once Reject button is clicked but after the form is submitted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "2339b4a5-d535-5d8c-9fdd-a2cef89031d7",
+   "key": "onAfterApprovalSubmitEvents",
+   "label": "onAfterSubmit",
+   "tooltip": "Triggered once any Approval's button is clicked but after the form is submitted",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "56060b99-bbd1-54a7-ad23-1ec50d184bfa",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

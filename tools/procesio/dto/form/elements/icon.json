@@ -1,0 +1,107 @@
+{
+ "id": "68b92623-df05-5880-83bc-8fa477b61bf3",
+ "category": "structure",
+ "type": "icon",
+ "configs": [
+  {
+   "id": "ed273d11-290d-5e33-9c24-54740ddc348b",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "05beb6c8-5385-5166-ae16-6592c8c58e7e",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "fdae531b-45e2-5b63-bbfa-0ee92f1c7268",
+   "key": "icon",
+   "label": "Select icon",
+   "category": "content",
+   "subCategory": "general",
+   "type": "icon-picker",
+   "value": "star_border",
+   "exposed": true
+  },
+  {
+   "id": "8ace4f41-52c0-54a0-8149-b5c7bec26905",
+   "key": "outlined",
+   "label": "Is outlined",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "6c9a432d-e73a-52f0-986d-96b2b3d73853",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "b0732508-ddcb-55a8-aaac-9098ba666c97",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Icon",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "1166b328-8550-53a7-9ef7-f75f09f0cc20",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "icon",
+   "exposed": true
+  },
+  {
+   "id": "813ac8f5-c7d4-540c-a622-0fdd98cddca6",
+   "key": "onClickEvents",
+   "label": "onClick",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "ab9d397a-5c77-5794-9f92-39a45a846e11",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

@@ -1,0 +1,213 @@
+{
+ "id": "692c2088-9097-5ffc-a64d-47f858663f4d",
+ "category": "fields",
+ "type": "textarea",
+ "configs": [
+  {
+   "id": "ea4a2e0e-136e-5910-ac19-23cefe045fa4",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Textarea",
+   "exposed": true
+  },
+  {
+   "id": "4add7686-6c85-5267-bc84-c040077eaea5",
+   "key": "placeholder",
+   "label": "Placeholder",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Single line or multi line text area",
+   "exposed": true
+  },
+  {
+   "id": "7fa7fc91-25c0-5a9b-bde9-111902d10620",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "3f18ce1e-899c-579f-bf8f-78a959ab2cc3",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "c29906d5-2ea0-5da4-9d42-891655a4823d",
+   "key": "rows",
+   "label": "Rows",
+   "placeholder": "Add textarea rows here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "number-input",
+   "value": 4,
+   "exposed": true
+  },
+  {
+   "id": "a2eb7693-ac0a-5329-9914-879768399f30",
+   "key": "defaultValue",
+   "label": "Default value",
+   "placeholder": "Add default value here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "textarea",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "dd7d6dea-ef63-53fd-a690-9f64b69c2ef1",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "6b9e8f09-f0ef-5854-9fd2-d513527427c6",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "629cdeaf-7967-5e9f-80e5-81640dbecc79",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "5d77b1d9-b07d-5cf4-aa0b-750046773bc8",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "6a2a1890-1363-5d87-ad8f-bbc12e5f5621",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Textarea",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "828dce18-ea46-5c35-98eb-336f99c9914c",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "textarea",
+   "exposed": true
+  },
+  {
+   "id": "898ff157-0e88-5c37-941d-8c55d4e2c220",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "807e7681-87f0-525e-b522-12d217e80764",
+   "key": "regex",
+   "label": "Regex",
+   "placeholder": "Add regex for validation here",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "7bae3a4b-f69a-5977-bc39-f4ecd935d6e7",
+   "key": "type",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "textarea"
+  },
+  {
+   "id": "e69b9858-b9c2-57f9-977a-ed2ad0e2794e",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "4a947b5f-af98-52b7-afe8-00162f29685a",
+   "key": "onFocusEvents",
+   "label": "onFocus",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "1aa29a1b-bda4-5b4d-b7ee-00a0a6441388",
+   "key": "onBlurEvents",
+   "label": "onBlur",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "4ae8796c-47d4-581e-ae4b-9696c5bb1991",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

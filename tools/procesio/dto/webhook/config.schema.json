@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PROCESIO Webhook config",
+  "description": "Create/edit a webhook. The payload data model is generated from 'sample' (a representative payload). Attach the webhook to a process to trigger it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "sample"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "sample": {"description": "a representative inbound payload object/array; its shape becomes the webhook data model"},
+    "definition": {"type": "string", "description": "raw JSON definition (alternative to sample)"},
+    "type": {"type": "string", "enum": ["auto", "manual"], "default": "manual"},
+    "hasHeader": {"type": "boolean", "default": false},
+    "hasQuery": {"type": "boolean", "default": false},
+    "payloadIsList": {"type": "boolean"},
+    "customResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": {"type": "string", "enum": ["staticjson", "static", "javascript", "js", "jsonpath"]},
+        "config": {"type": "string"}
+      }
+    }
+  }
+}

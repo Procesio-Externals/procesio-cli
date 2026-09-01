@@ -1,0 +1,279 @@
+{
+ "id": "002dcfbf-cd23-59d8-90da-057e880d1232",
+ "category": "table",
+ "type": "table",
+ "configs": [
+  {
+   "id": "68e59d7b-806d-54a3-b512-0b03955cb78e",
+   "key": "rows",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "row-list",
+   "value": []
+  },
+  {
+   "id": "6d8af6da-049b-5842-bbd0-d26e17e068ed",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "64e2af19-987a-5a6e-8bb9-5fb9596d615e",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "f104ce0f-5a31-5e08-9364-d825b8231931",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "061eec6e-90f3-5cdd-8c12-4732c5ad0616",
+   "key": "emptyTableText",
+   "label": "Empty table text",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Table is empty.",
+   "exposed": true
+  },
+  {
+   "id": "de52109b-97b0-585b-abc2-c2c0bc68baa8",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "11575633-fcf2-52e9-a53e-f7d5381792b8",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Table",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "285b90c4-2bf5-5a2c-a0bd-fb8c0ef6db42",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "table",
+   "exposed": true
+  },
+  {
+   "id": "04e3ddb2-7da8-59d1-a979-3fbd7851934c",
+   "key": "approved",
+   "label": "Approved",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "b001f565-b8d0-5ec5-b48a-7f4ca2d2ad99",
+   "key": "hasHeader",
+   "label": "Show header",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "5a126199-fc4c-5302-8668-a46cf62c944c",
+   "key": "hasIndexColumn",
+   "label": "Add visual row number",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "24aea3e5-c198-54cd-8114-e98a65170b06",
+   "key": "hasPagination",
+   "label": "Show pagination",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "table-pagination",
+   "value": false,
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "3b449089-0c11-5fa4-84ce-ebfbdeea00dd",
+   "key": "page",
+   "label": "Page",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": 1,
+   "exposed": true
+  },
+  {
+   "id": "841a3ceb-a8c9-5cf1-9978-59201b89e8bd",
+   "key": "countPerPage",
+   "label": "Count per page",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": 10,
+   "exposed": true
+  },
+  {
+   "id": "6f124c92-19b6-59a9-adb9-9ca52ecfa364",
+   "key": "totalItemsCount",
+   "label": "Total items count",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "2ece349f-8501-52ca-9248-fac6b9719470",
+   "key": "tableColumnsSourceType",
+   "label": "Columns definition source type",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "table-columns-source-type",
+   "value": "static-list",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "5101d8df-83a0-5a5a-9dd6-7195f963d9ac",
+   "key": "tableColumnsSourceValue",
+   "label": "Columns definition source value",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "table-columns-source-value",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "7f5731a8-d953-5ab3-87df-fb6dd53c2a3f",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "547910d3-717b-5e63-af35-e9a968267aab",
+   "key": "rowDetailsExpandStates",
+   "label": "",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": {},
+   "exposed": false
+  },
+  {
+   "id": "46e38618-f05d-52f0-9a7f-4ae23ae8a92c",
+   "key": "assignee",
+   "label": "Assignee",
+   "placeholder": "Select name",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "user-select",
+   "value": ""
+  },
+  {
+   "id": "13f78c61-ff81-5c43-ba9e-8f21413a5994",
+   "key": "assigneeReplacement",
+   "label": "Assignee replacement",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "assignee-replacement",
+   "value": null
+  },
+  {
+   "id": "cd3ad935-56bf-54bb-9bde-a0642ef8e833",
+   "key": "additionalAssignment",
+   "label": "",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "c7fafa56-5707-594b-bfb3-b015698e21e4",
+   "key": "visibility",
+   "label": "Visibility:",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "rules-visibility",
+   "value": "",
+   "hasTopDivider": true
+  },
+  {
+   "id": "990718c2-70b3-5abb-a029-222002d96410",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "58bf5f5b-0716-5734-8d7c-f5184f4a6480",
+   "key": "onPaginationChangedEvents",
+   "label": "onPaginationChanged",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "25f9d7dd-9cfd-5e1b-8e0c-a7a4ef4e141e",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

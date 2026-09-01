@@ -1,0 +1,32 @@
+{
+  "name": "Reg",
+  "browserTitle": "Register",
+  "type": "general",
+  "elements": [
+    {
+      "type": "heading",
+      "label": "Title"
+    },
+    {
+      "type": "input",
+      "label": "Full Name",
+      "name": "fullName",
+      "required": true,
+      "placeholder": "John"
+    },
+    {
+      "type": "select",
+      "label": "Country",
+      "name": "country",
+      "options": [
+        "RO",
+        "US"
+      ]
+    },
+    {
+      "type": "button",
+      "label": "Submit",
+      "submit": true
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+.env.*
+*.local
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Per-user state: credentials profiles, environment registry, run history.
+# Never versioned - wiping this folder gives you a clean install.
+context-state-knowledge/
+
+# Local scratch.
+outputs/
+scratchpad/

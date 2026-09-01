@@ -1,0 +1,123 @@
+name: sqlserver
+description: Read-only SQL Server queries over pyodbc with named connection profiles. SELECT-only by default (--write to override); returns rows as JSON; schema/table introspection.
+version: 0.1.0
+runtime: python
+entrypoint: main.py
+
+# Secrets are PER-PROFILE and dynamic, so none are declared here.
+# Each profile's password lives in Windows Credential Manager under
+# agents-and-tools:sqlserver:<profile-name> and is read at runtime via
+# tools._lib.creds.get("sqlserver", <profile>). Set one with:
+#   python scripts/set-credential.py sqlserver <profile>
+# Non-secret profile config (server/database/username/driver/tls) lives in
+# this tool's profiles.json — never the password.
+secrets: []
+
+routing:
+  triggers:
+    - run a SQL Server query
+    - query a SQL Server / MSSQL database
+    - read a table from SQL Server
+    - list SQL Server tables or columns
+  primary_action: query
+  example: sqlserver query --profile default --sql "SELECT TOP 10 * FROM dbo.Customer"
+
+actions:
+  - name: profiles
+    description: List configured connection profiles (no passwords).
+    args: []
+    output_schema: '{ "count": N, "profiles": [ {name, server, database, ..., has_password} ] }'
+
+  - name: add-profile
+    description: Store a connection profile (config only; set the password separately via set-credential).
+    args:
+      - {name: name, type: string, required: true, description: Profile name (also the credential name)}
+      - {name: server, type: string, required: true, description: "Host, host\\instance, or fqdn"}
+      - {name: database, type: string, description: "Default database (optional; one profile can serve many DBs - pick per call with --database)"}
+      - {name: username, type: string, description: SQL login (omit for a trusted/Windows connection)}
+      - {name: port, type: integer, description: "TCP port (appended as server,port)"}
+      - {name: driver, type: string, description: ODBC driver name (default = newest ODBC Driver for SQL Server installed on this machine)}
+      - {name: encrypt, type: string, description: Encrypt the connection - yes or no (default yes)}
+      - {name: trust-server-certificate, type: string, description: Trust a self-signed cert - yes or no (default no)}
+      - {name: connect-timeout, type: integer, description: Connect timeout seconds (default 30)}
+      - {name: statement-timeout, type: integer, description: "Statement timeout seconds, 0=unbounded (default 300)"}
+      - {name: overwrite, type: boolean, description: Replace an existing profile}
+    output_schema: '{ "name": "...", "server": "...", "database": "...", "has_password": false, "note": "..." }'
+
+  - name: test-connection
+    description: Connect and return the masked connection string + server version (never the password).
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+    output_schema: '{ "profile": "...", "connection_string": "...PWD=***...", "server_version": "...", "connected": true }'
+
+  - name: query
+    description: Run read-only SQL (SELECT by default; --write allows non-SELECT). Params bound via ? placeholders, never interpolated.
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: sql, type: string, required: true, description: SQL statement}
+      - {name: params, type: string, description: "Parameter values as a JSON array, bound via ? placeholders"}
+      - {name: max-rows, type: integer, description: Cap rows returned (default 1000; 0=unbounded)}
+      - {name: write, type: boolean, description: Allow a non-SELECT/DDL/multi statement (off by default)}
+      - {name: database, type: string, description: Run against this database instead of the profile's}
+      - {name: no-normalize-eol, type: boolean, description: "Keep SQL line endings as-is (default: normalize to CRLF so CREATE/ALTER object definitions store consistent EOLs and SSMS does not flag inconsistent line endings)"}
+    output_schema: '{ "columns": [...], "rows": [ {...} ], "row_count": N, "truncated": false, "write": false, "eol_normalized": true }'
+
+  - name: tables
+    description: List tables and views, optionally restricted to one schema.
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: List tables from this database instead of the profile's}
+      - {name: schema, type: string, description: Restrict to one schema}
+    output_schema: '{ "profile": "...", "count": N, "tables": [ {TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE} ] }'
+
+  - name: columns
+    description: List a table's columns (name, type, nullable, length, default).
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: Read columns from this database instead of the profile's}
+      - {name: table, type: string, required: true, description: Table name (schema.table or table)}
+    output_schema: '{ "profile": "...", "table": "...", "count": N, "columns": [ {COLUMN_NAME, DATA_TYPE, IS_NULLABLE, ...} ] }'
+
+  - name: schema-extract
+    description: Mirror all DB objects to local .sql files (one per object; incremental; read-only).
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: Extract this database instead of the profile's}
+      - {name: out, type: string, description: "Mirror output directory (default ./db-mirror/<profile>)"}
+      - {name: types, type: string, description: "Comma-separated type letters to extract (P,FN,TF,IF,V,TR,U); default all"}
+      - {name: full, type: boolean, description: Wipe the mirror and re-extract everything}
+      - {name: dry-run, type: boolean, description: Report what would change without writing}
+    output_schema: '{ "profile": "...", "database": "...", "out": "...", "written": N, "unchanged": N, "removed": N, "total": N, "by_type": {}, "dry_run": false }'
+
+  - name: schema-diff
+    description: Diff two schema mirrors or live profiles (objects added/removed/changed + unified diffs). Read-only.
+    args:
+      - {name: left, type: string, required: true, description: "Mirror directory OR profile:NAME for the left side"}
+      - {name: right, type: string, required: true, description: "Mirror directory OR profile:NAME for the right side"}
+      - {name: database-left, type: string, description: Database override when --left is a profile}
+      - {name: database-right, type: string, description: Database override when --right is a profile}
+      - {name: types, type: string, description: "Comma-separated type letters to extract for profile sides (P,FN,TF,IF,V,TR,U); default all"}
+      - {name: no-diff-text, type: boolean, description: Only list added/removed/changed names (omit unified diffs)}
+    output_schema: '{ "added": [...], "removed": [...], "changed": [ {relpath, diff} ], "unchanged": N, "identical": false, "summary": {added, removed, changed} }'
+
+  - name: migrate
+    description: List or apply versioned .sql migrations (forward-only; tracking table; apply gated behind --apply). list is read-only and the default.
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: Migrate this database instead of the profile's}
+      - {name: dir, type: string, description: "Migrations directory (default ./db-migrations/<profile>)"}
+      - {name: mode, type: string, description: "list (read-only; default) or apply (writes)"}
+      - {name: dry-run, type: boolean, description: Apply each pending file in a rolled-back transaction (no persist)}
+      - {name: apply, type: boolean, description: "Required confirmation for --mode apply (this writes)"}
+      - {name: accept-drift, type: boolean, description: Proceed with apply even if applied files drifted on disk}
+    output_schema: '{ "profile": "...", "mode": "list", "applied": [...], "pending": [ {migration_id, filename, danger_warnings} ], "drift": [...], "results": [...] }'
+
+requires:
+  - name: odbc-sqlserver
+    kind: driver
+    why: >
+      pyodbc ships in the venv but the Microsoft ODBC driver does not; without it
+      every DB action fails with missing_dependency while the tool still loads.
+    check: >-
+      {python} -c "import pyodbc,sys; sys.exit(0 if [d for d in pyodbc.drivers() if 'SQL Server' in d] else 1)"
+    install: winget install --id Microsoft.msodbcsql.18 -e --silent

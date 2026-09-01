@@ -1,0 +1,125 @@
+{
+ "id": "2d626066-154b-5d5c-8ff7-2b9dcb73dafa",
+ "category": "fields",
+ "type": "button",
+ "configs": [
+  {
+   "id": "a066f0bd-2245-55eb-b034-35f98cb9807d",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Button",
+   "exposed": true
+  },
+  {
+   "id": "94793fff-24f7-5a30-979a-b2dd75efd2cf",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip is displayed on element hover",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "5c6dd02b-a239-5c0c-85af-d9c9a8e3b389",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "5495a3cb-ead7-5711-b262-0c30e05a59a7",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "0c80d650-02b4-5b62-bf2c-ae90564e037e",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "7dfe426c-775a-50fa-b8c3-25761cfc85e9",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Button",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "eaf4da2a-7129-5a93-b5ed-c407c84ac5a6",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "button",
+   "exposed": true
+  },
+  {
+   "id": "ef05d104-3135-5202-93aa-1e93f46f5ef6",
+   "key": "submit",
+   "label": "Submit",
+   "category": "content",
+   "subCategory": "action",
+   "type": "button-submit-toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "632dc7bd-3d31-539c-9af6-7ad70852b56b",
+   "key": "disabledIfFormIsInvalid",
+   "label": "Disabled if form is invalid",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false
+  },
+  {
+   "id": "5c137a8b-8660-5473-b8e9-e4a0a3c9b3c4",
+   "key": "onClickEvents",
+   "label": "onClick",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "f034a459-45a6-5ccf-ad2d-b7396c0fc9cb",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "footer"
+}

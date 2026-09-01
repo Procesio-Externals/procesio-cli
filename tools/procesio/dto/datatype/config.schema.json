@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PROCESIO Data Model (DataType) config",
+  "description": "Minimal config to create/edit a PROCESIO custom data model. The builder expands each attribute into a full DataAttributeDto and wraps it in a CreateDataTypeDto. Primitive types resolve to stable platform ids; 'model' references another data model by name or id; 'attributes' defines an inline nested object.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1, "description": "Internal model name (the JSON key/identifier)."},
+    "displayName": {"type": "string", "description": "UI display name; defaults to name."},
+    "isPublic": {"type": "boolean", "default": true, "description": "Whether the model is public in the workspace."},
+    "fromJson": {"description": "Platform trick: infer the whole model from a JSON sample (object or JSON string) via /api/DataTypes/generate. Overrides attributes."},
+    "attributes": {
+      "type": "array",
+      "description": "The model's fields. Empty is allowed (an empty object model). Omit when using fromJson.",
+      "items": {"$ref": "#/$defs/attribute"}
+    }
+  },
+  "$defs": {
+    "attribute": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "displayName": {"type": "string"},
+        "jsonProperty": {"type": "string", "description": "JSON key this field maps to (defaults to name)."},
+        "isList": {"type": "boolean", "default": false, "description": "Field holds a list/array of the type."},
+        "hidden": {"type": "boolean", "default": false, "description": "Hide the attribute in the model UI."},
+        "isPublic": {"type": "boolean", "default": false, "description": "Mark the attribute public."},
+        "type": {
+          "type": "string",
+          "description": "A primitive type. Exactly one of type|model|attributes per attribute.",
+          "enum": ["boolean", "integer", "float", "double", "string", "datetime", "json", "object", "guid",
+                    "bool", "int", "long", "number", "text", "str", "uuid", "date-time"]
+        },
+        "model": {"type": "string", "description": "Reference another data model by name or id (makes this a nested model field)."},
+        "attributes": {"type": "array", "items": {"$ref": "#/$defs/attribute"}, "description": "Inline nested object — its own fields."}
+      },
+      "oneOf": [
+        {"required": ["type"]},
+        {"required": ["model"]},
+        {"required": ["attributes"]}
+      ]
+    }
+  }
+}

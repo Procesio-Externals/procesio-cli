@@ -1,0 +1,202 @@
+{
+ "id": "399bd584-01c6-5669-81e3-5fb73a8c0417",
+ "category": "structure",
+ "type": "list",
+ "configs": [
+  {
+   "id": "330e45ee-e5a2-5937-8bed-97dc8d63c5a4",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "List",
+   "exposed": true
+  },
+  {
+   "id": "fd207e3d-48e5-5946-95d0-65e19781582e",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "558fb013-b688-5a8b-9e3e-bc5c2a940918",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "d0fb1b6f-e1e0-50d5-9cc3-bf2fd71e5d03",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "0fe86c60-a7c8-576b-b5db-b9e78842d694",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": [],
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "4f97c914-f7df-522a-9563-6124c73a4159",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "List",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "ed54556b-d0e4-5c24-a652-035ae09bc81f",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "list",
+   "exposed": true
+  },
+  {
+   "id": "58a7842c-7f63-560b-b9a0-ddc3af1c6a76",
+   "key": "sourceType",
+   "label": "Source type",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-type",
+   "value": "JSON",
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "f2e66350-001a-5ca5-b530-bda436b2b0ca",
+   "key": "sourceValue",
+   "label": "Source value",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-value",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "3daddac6-cd05-5681-a385-fb138ac9d00f",
+   "key": "multiple",
+   "label": "Add multiple fields",
+   "tooltip": "When activated, stores list elements as objects for enhanced data structure complexity",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "toggle",
+   "value": false,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "7dca5b2f-3afd-59fd-89f6-1b97a461a1fb",
+   "key": "min",
+   "label": "Min",
+   "placeholder": "Add minimum number of items",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "number-input",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "09717a19-1013-5252-a0c2-e329bfb969a7",
+   "key": "max",
+   "label": "Max",
+   "placeholder": "Add maximum number of items",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "number-input",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "09d1de3a-b27a-57c6-ae3a-26f41c94c0da",
+   "key": "canAdd",
+   "label": "Can add",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "toggle",
+   "value": false,
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "fb04225e-4ec3-5458-b85c-cb812f92b4aa",
+   "key": "canRemove",
+   "label": "Can remove",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "1a7b61af-cb11-5731-8f1b-9c3e1409c5da",
+   "key": "addText",
+   "label": "\"Add\" button text",
+   "placeholder": "Add text here",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "input",
+   "value": "+ Add",
+   "exposed": true
+  },
+  {
+   "id": "1b54f82d-f6b9-5c80-b345-5a27c3200ed2",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

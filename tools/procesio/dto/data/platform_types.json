@@ -1,0 +1,182 @@
+{
+  "_note": "Platform data types (primitive + procesio built-in). Stable ids. Fetched live 2026-06-24 from /api/DataTypes/primary and /api/DataTypes/procesio. Regenerate with dto/data/_refresh.py.",
+  "primary": [
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121210",
+      "name": "Boolean",
+      "displayName": "Boolean",
+      "csharpCorrespondent": 10,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121211",
+      "name": "Integer",
+      "displayName": "Integer",
+      "csharpCorrespondent": 20,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121212",
+      "name": "Float",
+      "displayName": "Float",
+      "csharpCorrespondent": 30,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121213",
+      "name": "Double",
+      "displayName": "Double",
+      "csharpCorrespondent": 40,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121214",
+      "name": "String",
+      "displayName": "String",
+      "csharpCorrespondent": 50,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121218",
+      "name": "DateTime",
+      "displayName": "DateTime",
+      "csharpCorrespondent": 90,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121220",
+      "name": "Json",
+      "displayName": "Json",
+      "csharpCorrespondent": 120,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121221",
+      "name": "Object",
+      "displayName": "Object",
+      "csharpCorrespondent": 140,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121222",
+      "name": "Guid",
+      "displayName": "Guid",
+      "csharpCorrespondent": 100,
+      "isDataModel": false
+    }
+  ],
+  "procesio": [
+    {
+      "id": "10c6ac59-3929-49e6-99dc-121212121219",
+      "name": "FileDataModel",
+      "displayName": "File",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "10c6ac59-3929-49e6-99dc-121212121220",
+      "name": "ErrorDataModel",
+      "displayName": "Error",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "10c6ac59-3929-49e6-99dc-121212121221",
+      "name": "SystemDataModel",
+      "displayName": "System variable model",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "7bd4db6d-42c6-4ee3-bd9e-b906c1d93e23",
+      "name": "inboundEmailInformation",
+      "displayName": "InboundEmailInformation",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "62808178-eae9-4916-9ead-c1ba3e4d8281",
+      "name": "correlation",
+      "displayName": "Correlation",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "a09d55c4-c26a-40b3-951d-77c3d4fffe18",
+      "name": "FileContent",
+      "displayName": "FileContent",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "a09d55c4-c26a-40b3-951d-77c3d4fffe19",
+      "name": "FTPFilesInformations",
+      "displayName": "SFTPFilesInformation",
+      "csharpCorrespondent": 0,
+      "isDataModel": true
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121210",
+      "name": "Boolean",
+      "displayName": "Boolean",
+      "csharpCorrespondent": 10,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121211",
+      "name": "Integer",
+      "displayName": "Integer",
+      "csharpCorrespondent": 20,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121212",
+      "name": "Float",
+      "displayName": "Float",
+      "csharpCorrespondent": 30,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121213",
+      "name": "Double",
+      "displayName": "Double",
+      "csharpCorrespondent": 40,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121214",
+      "name": "String",
+      "displayName": "String",
+      "csharpCorrespondent": 50,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121218",
+      "name": "DateTime",
+      "displayName": "DateTime",
+      "csharpCorrespondent": 90,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121220",
+      "name": "Json",
+      "displayName": "Json",
+      "csharpCorrespondent": 120,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121221",
+      "name": "Object",
+      "displayName": "Object",
+      "csharpCorrespondent": 140,
+      "isDataModel": false
+    },
+    {
+      "id": "0317bfee-b2f5-4bde-bfe8-121212121222",
+      "name": "Guid",
+      "displayName": "Guid",
+      "csharpCorrespondent": 100,
+      "isDataModel": false
+    }
+  ]
+}

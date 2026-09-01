@@ -1,0 +1,105 @@
+{
+ "id": "9140c92c-94c1-58a9-a05e-24b2aee17f28",
+ "category": "structure",
+ "type": "step",
+ "configs": [
+  {
+   "id": "5793744f-a0e9-5f67-8536-0711a250c662",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "1b81d442-859c-5709-8a9b-3f2820b9eba5",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "db69cf38-855a-5d22-8346-65fb97971b0a",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "d2b10a4e-090e-532d-8984-052866a64212",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Step",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "d9f2ce1b-50bb-56db-aca7-aed68965ce5d",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "step",
+   "exposed": true
+  },
+  {
+   "id": "1a0113e0-eed5-5739-9909-15023d1d7aa5",
+   "key": "assignee",
+   "label": "Assignee",
+   "placeholder": "Select name",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "user-select",
+   "value": ""
+  },
+  {
+   "id": "656c4d7c-1b65-5516-803e-b0aea4a40fbb",
+   "key": "assigneeReplacement",
+   "label": "Assignee replacement",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "assignee-replacement",
+   "value": null
+  },
+  {
+   "id": "32a9b333-1a53-5d64-be6c-c199ceea88ba",
+   "key": "additionalAssignment",
+   "label": "",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "c2c66cf3-0783-524a-85d9-8d33ea7c12e8",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

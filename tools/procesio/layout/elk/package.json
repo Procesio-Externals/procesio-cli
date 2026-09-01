@@ -1,0 +1,11 @@
+{
+  "name": "procesio-elk-layout",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "elkjs runner for the opt-in ELK 'layered' canvas layout engine (see ../elk_engine.py).",
+  "main": "elk_runner.mjs",
+  "dependencies": {
+    "elkjs": "^0.9.3"
+  }
+}

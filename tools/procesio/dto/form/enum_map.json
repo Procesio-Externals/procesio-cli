@@ -1,0 +1,68 @@
+{
+  "_README": "FALLBACK enum -> string-value map for sync_from_mock.py. The AUTHORITATIVE source is docs_info/form-config-enums.ts (the frontend's real enums, parsed directly); this file is used only if that TS file is absent, and as a manual override for members not in it. ElementType and ElementCategory are NOT here: they are defined inside FormBuilder mock.ts and parsed from it directly (authoritative). The four ElementConfig* enums are imported by the mock from '../config' (not shipped), so their values are resolved here. Members listed below are AUTHORITATIVE (verified against real goldens, or known exceptions). Any member used by the mock but NOT listed here is resolved by the fallback rule and reported as UNVERIFIED -- get the real value from the frontend (see UNVERIFIED-ENUMS-QUESTION.md) and paste it here, then re-run.",
+  "_fallback_rule": "MEMBER_NAME.lower().replace('_','-')  e.g. SOURCE_TYPE -> source-type",
+  "_exceptions_proving_the_rule_is_not_enough": {
+    "READONLY_OR_DISABLED_TOGGLE": "value is 'readonly-or-disabled' (the _TOGGLE suffix is dropped)",
+    "CONTOLS": "frontend enum identifier is misspelled; value is correctly 'controls'"
+  },
+  "ElementConfigCategory": {
+    "CONTENT": "content",
+    "STYLING": "styling"
+  },
+  "ElementConfigEvent": {
+    "REMAP": "REMAP",
+    "EMIT_INPUT": "EMIT_INPUT",
+    "EMIT_ELEMENTS_UPDATE": "EMIT_ELEMENTS_UPDATE"
+  },
+  "ElementConfigSubCategory": {
+    "GENERAL": "general",
+    "VALIDATION": "validation",
+    "EVENTS": "events",
+    "ACTION": "action",
+    "APPROVALS": "approvals",
+    "DATA_SOURCE": "data-source",
+    "TASK_ASSIGNEE": "task-assignee",
+    "CONTOLS": "controls",
+    "RULES": "rules"
+  },
+  "ElementConfigType": {
+    "INPUT": "input",
+    "NUMBER_INPUT": "number-input",
+    "TEXTAREA": "textarea",
+    "SELECT": "select",
+    "TOGGLE": "toggle",
+    "HIDDEN": "hidden",
+    "COPYABLE_INPUT": "copyable-input",
+    "INPUT_TYPE_SELECT": "input-type-select",
+    "READONLY_OR_DISABLED_TOGGLE": "readonly-or-disabled",
+    "FIELD_EVENTS": "field-events",
+    "TEMPLATE_ONLY": "template-only",
+    "BUTTON_SUBMIT_TOGGLE": "button-submit-toggle",
+    "CLEARABLE_SELECT": "clearable-select",
+    "SOURCE_TYPE": "source-type",
+    "SOURCE_VALUE": "source-value",
+    "DATETIME_DEFAULT_VALUE": "datetime-default-value",
+    "DATE_TIME_MODE_SELECT": "date-time-mode-select",
+    "ICON_PICKER": "icon-picker",
+    "DROPDOWN_ITEMS": "dropdown-items",
+    "USER_SELECT": "user-select",
+    "APPROVER_REPLACEMENT": "approver-replacement",
+    "ASSIGNEE_REPLACEMENT": "assignee-replacement",
+    "UPLOAD_FILE_TYPE_SELECT": "upload-file-type-select",
+    "VIEW_FILE_TYPE_SELECT": "view-file-type-select",
+    "VIEWER_TYPE_RADIO": "viewer-type-radio",
+    "URL_OR_FILE": "url-or-file",
+    "URL_TARGET_SELECT": "url-target-select",
+    "OPEN_SIDE_PANEL_BUTTON": "open-side-panel-button",
+    "FUNCTION": "function",
+    "HTML_CODE_EDITOR": "html-code-editor",
+    "COLUMN_LIST": "column-list",
+    "ROW_LIST": "row-list",
+    "TAB_LIST": "tab-list",
+    "ROW_CELL_APPROVALS": "row-cell-approvals",
+    "RULES_VISIBILITY": "rules-visibility",
+    "TABLE_COLUMNS_SOURCE_TYPE": "table-columns-source-type",
+    "TABLE_COLUMNS_SOURCE_VALUE": "table-columns-source-value",
+    "TABLE_PAGINATION": "table-pagination"
+  }
+}

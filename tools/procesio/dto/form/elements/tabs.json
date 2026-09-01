@@ -1,0 +1,114 @@
+{
+ "id": "783e0a04-b9b3-5fe9-98f8-5355a3d69578",
+ "category": "structure",
+ "type": "tabs",
+ "configs": [
+  {
+   "id": "0980e6b6-4701-5865-aa88-37408ef0301a",
+   "key": "tabs",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "tab-list",
+   "value": [
+    "Tab 1",
+    "Tab 2"
+   ]
+  },
+  {
+   "id": "cc8a253b-92e1-529e-a8d7-11363cdb2a2b",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "4a5d76a3-24e5-5aec-970f-5539d1db771d",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Tabs",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "7a444370-e4b2-5253-a031-6d823e693041",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "tabs",
+   "exposed": true
+  },
+  {
+   "id": "0443c4e9-47a8-52fb-ae64-64c3431bd8d6",
+   "key": "assignee",
+   "label": "Assignee",
+   "placeholder": "Select name",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "user-select",
+   "value": ""
+  },
+  {
+   "id": "5d613aa0-d00b-5e87-82ce-ce2c6989d487",
+   "key": "assigneeReplacement",
+   "label": "Assignee replacement",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "assignee-replacement",
+   "value": null
+  },
+  {
+   "id": "9df38a27-51ba-5622-8efe-2194685dbecd",
+   "key": "additionalAssignment",
+   "label": "",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "eb34bf9f-38a6-596e-a0ef-499d32198de4",
+   "key": "activeTabIndex",
+   "label": "Active tab index",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": 0,
+   "exposed": true
+  },
+  {
+   "id": "c507ffc6-75a3-5de6-be38-37a76d8c0711",
+   "key": "onTabChangeEvents",
+   "label": "onTabChange",
+   "tooltip": "$event variable stores the index of the active tab (starting from 0)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "d96a586a-f626-5d2f-8306-c591b172b205",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

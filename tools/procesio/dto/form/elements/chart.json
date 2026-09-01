@@ -1,0 +1,341 @@
+{
+ "id": "8e93ca24-73bc-5bc9-a20d-90325b48a1f2",
+ "category": "fields",
+ "type": "chart",
+ "configs": [
+  {
+   "id": "e51520ae-2c88-5ea1-a403-7f39fed43633",
+   "key": "type",
+   "label": "Chart type",
+   "placeholder": "Select chart type",
+   "category": "content",
+   "subCategory": "general",
+   "type": "select",
+   "value": "bar",
+   "exposed": true
+  },
+  {
+   "id": "8931e5e6-42d4-58ab-bc86-e16878abe93f",
+   "key": "title",
+   "label": "Title",
+   "placeholder": "Add chart title here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Chart",
+   "exposed": true
+  },
+  {
+   "id": "1b203633-8eee-56fa-8008-cb1dced81093",
+   "key": "subtitle",
+   "label": "Subtitle",
+   "placeholder": "Add chart subtitle here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "c619e500-56ea-50f2-b713-f5adb1f984a0",
+   "key": "height",
+   "label": "Height",
+   "placeholder": "Example: 360px",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "360px",
+   "exposed": true
+  },
+  {
+   "id": "bda11ed0-6872-5edf-9557-e72dee7b4125",
+   "key": "categories",
+   "label": "Categories",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "hidden",
+   "value": [],
+   "exposed": true
+  },
+  {
+   "id": "7a7576bc-f6a2-50eb-b6c6-b0321e2845f2",
+   "key": "categoriesSourceType",
+   "label": "Categories source type",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "chart-categories-source-type",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "366843c9-4a62-55eb-9544-15bcb7a59493",
+   "key": "categoriesSourceValue",
+   "label": "Categories source value",
+   "placeholder": [
+    "@bare",
+    "JSON.stringify()"
+   ],
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "chart-categories-source-value",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "8a7a6299-a040-59f5-a13d-592609898d52",
+   "key": "series",
+   "label": "Series",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "hidden",
+   "value": [],
+   "exposed": true
+  },
+  {
+   "id": "039b6a99-163c-5db5-b0bf-468dd0476c93",
+   "key": "seriesSourceType",
+   "label": "Series source type",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "chart-series-source-type",
+   "value": null,
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "cc8641f0-8663-5e91-aa6f-c11c0e0991dd",
+   "key": "seriesSourceValue",
+   "label": "Series source value",
+   "placeholder": [
+    "@bare",
+    "JSON.stringify()"
+   ],
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "chart-series-source-value",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "c5e7602a-9a1d-574e-ab8d-8b1a745b8c33",
+   "key": "colors",
+   "label": "Colors",
+   "placeholder": [
+    "@bare",
+    "JSON.stringify()"
+   ],
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "textarea",
+   "value": [],
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "53e78676-be0e-5d64-bf4e-084db5259478",
+   "key": "xAxisName",
+   "label": "X axis name",
+   "placeholder": "Add X axis name here. Ex: Month",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "93d84098-4e7c-5242-9076-65db041d9cf4",
+   "key": "yAxisName",
+   "label": "Y axis name",
+   "placeholder": "Add Y axis name here. Ex: Amount",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "963a242b-0a56-5a4b-b72f-704dbf531992",
+   "key": "secondaryYAxisName",
+   "label": "Secondary Y axis name",
+   "placeholder": "Add secondary Y axis name here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "811365ae-e0cd-5600-9a27-4e8d294add87",
+   "key": "emptyText",
+   "label": "Empty text",
+   "placeholder": "Add empty state text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "No data available yet.",
+   "exposed": true
+  },
+  {
+   "id": "e9524e5d-e5d0-5ab1-a156-1b6fe5212bfa",
+   "key": "showLegend",
+   "label": "Show legend",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "e36e7052-439a-57e9-a256-e85bdea9bff4",
+   "key": "showTooltip",
+   "label": "Show tooltip",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "aaf2fee6-08b6-538b-9b57-bca7f6b3f5c0",
+   "key": "smooth",
+   "label": "Smooth line",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "700d673e-d9aa-5865-b73c-37e29c91ec6d",
+   "key": "stacked",
+   "label": "Stacked",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "ebaa1195-67a7-5c92-9870-4c896d876c39",
+   "key": "horizontal",
+   "label": "Horizontal",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "eccf6414-8e73-5613-b3d0-2740386fc2a7",
+   "key": "donut",
+   "label": "Donut",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "c934d881-ec74-5e2b-b2af-e8bc52203ea6",
+   "key": "zoomable",
+   "label": "Zoomable",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "44c0c0e6-1542-5143-8b2f-6fd5b1de17fd",
+   "key": "loading",
+   "label": "Loading",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "e79ba0c1-1aab-5fb4-b477-6001f8e7c8c5",
+   "key": "initOptions",
+   "label": "Init options",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": {
+    "renderer": "canvas"
+   },
+   "exposed": true
+  },
+  {
+   "id": "92af2d3a-505e-5b36-b5bd-5ae02fa7f43b",
+   "key": "updateOptions",
+   "label": "Update options",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": {
+    "notMerge": true
+   },
+   "exposed": true
+  },
+  {
+   "id": "a680d779-db5e-5397-82b2-177c6179a768",
+   "key": "optionOverrides",
+   "label": "Option overrides",
+   "placeholder": "Add ECharts option overrides as a JSON object",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "textarea",
+   "value": "{}",
+   "exposed": true
+  },
+  {
+   "id": "00c8f277-fe0b-5bfc-8707-570ebaecb5e4",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "d9f8cf11-1759-5db0-9a74-4b67feb09320",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Chart",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "fa8f8192-3563-54b7-9c9e-76c3a341b674",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "chart",
+   "exposed": true
+  },
+  {
+   "id": "0293676f-9e7c-58d0-b9d9-3fa5fcd3e30f",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

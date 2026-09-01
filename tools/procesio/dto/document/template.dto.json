@@ -1,0 +1,14 @@
+{
+  "_note": "Golden DocumentTemplateDto (POST /api/DocumentTemplate body). Client supplies id (server returns empty on success). body is HTML with <%name%> placeholders (stored RAW — verified live, NOT escaped). documentPageOrientation: 0=portrait, 1=landscape. variables -> DocumentVariableDto {id, dataType, type:10, name, isList, isInput, isOutput}. Captured live 2026-06-24.",
+  "id": "<uuid: doc>",
+  "name": "<name>",
+  "description": null,
+  "body": "<div>Hello <%clientName%></div>",
+  "placeholderDelimiterStart": "<%",
+  "placeholderDelimiterStop": "%>",
+  "documentPageSize": "A4",
+  "documentPageOrientation": 0,
+  "variables": [
+    {"id": "<uuid: var>", "dataType": "0317bfee-b2f5-4bde-bfe8-121212121214", "type": 10, "name": "clientName", "defaultValue": null, "isList": false, "isInput": true, "isOutput": false}
+  ]
+}

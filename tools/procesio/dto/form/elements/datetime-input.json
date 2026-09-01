@@ -1,0 +1,304 @@
+{
+ "id": "ba4f777d-637f-5dd7-a244-03dc7f7e2229",
+ "category": "fields",
+ "type": "datetime-input",
+ "configs": [
+  {
+   "id": "7eceded6-f4f6-54df-a3b2-de2ba10c45ca",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Date-time input",
+   "exposed": true
+  },
+  {
+   "id": "0d85eb2b-1a5f-5ee4-a3b7-27a0cc460d56",
+   "key": "mode",
+   "label": "Mode",
+   "placeholder": "Select mode",
+   "category": "content",
+   "subCategory": "general",
+   "type": "date-time-mode-select",
+   "value": "dateTime",
+   "exposed": true
+  },
+  {
+   "id": "d171e7fc-b0c9-534d-a70f-e82947282a27",
+   "key": "inline",
+   "label": "Inline view",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "81bff597-0662-506a-b4d4-ee00a8836044",
+   "key": "placeholder",
+   "label": "Placeholder",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Input that allows date-time values",
+   "exposed": true
+  },
+  {
+   "id": "c00cd6f8-b834-52e4-8a17-5b55031b9559",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "b5faa621-9d34-5565-aacb-5e7c8e27d26e",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "36eb5171-b7bf-59ad-804b-956a6c2803d6",
+   "key": "defaultValue",
+   "label": "Default value",
+   "placeholder": "Add default value here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "datetime-default-value",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "92d1ef81-f076-5ddb-a0b2-89e4075dd7dc",
+   "key": "minDate",
+   "label": "Min value",
+   "placeholder": "Add min value here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "datetime-min-max-value",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "84e386b3-ae7a-59d7-baa1-bf73d505f1ee",
+   "key": "maxDate",
+   "label": "Max value",
+   "placeholder": "Add max value here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "datetime-min-max-value",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "b76246fe-d510-5c35-8008-55d7dc4be39c",
+   "key": "availableDates",
+   "label": "Available intervals",
+   "placeholder": "Select available intervals",
+   "tooltip": "Available intervals has priority over disabled intervals",
+   "category": "content",
+   "subCategory": "general",
+   "type": "date-time-intervals",
+   "value": [],
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "3c7b8194-d578-5eb8-a233-b34e2462e88b",
+   "key": "disabledDates",
+   "label": "Disabled intervals",
+   "placeholder": "Select disabled intervals",
+   "category": "content",
+   "subCategory": "general",
+   "type": "date-time-intervals",
+   "value": [],
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "b77ab834-72a9-56b4-8a5c-fe06d5ad814c",
+   "key": "minuteInterval",
+   "label": "Minute interval",
+   "placeholder": "Set minute interval",
+   "tooltip": "Applicable only for dateTime and time mode",
+   "category": "content",
+   "subCategory": "general",
+   "type": "number-input",
+   "value": 1,
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "f4298dd8-00c3-5d10-9dd5-7d467807ffdb",
+   "key": "minutesBetweenIntervals",
+   "label": "Minutes between intervals",
+   "placeholder": "Set minutes between intervals",
+   "tooltip": "Defines the offset (in minutes) from the start of each interval. Applicable only for dateTime and time mode",
+   "category": "content",
+   "subCategory": "general",
+   "type": "number-input",
+   "value": 0,
+   "exposed": true
+  },
+  {
+   "id": "0b9c6432-0cc6-571e-a408-ca2e6014c27d",
+   "key": "setNowByDefault",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "84016bb0-2813-56df-b9ad-21eabdb55b3d",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "bc7a0720-6929-51d3-8f74-86c825183046",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "0fd5c10c-2a6f-5e44-9396-6c041a7054aa",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "f6b1b3dc-263a-5b8e-8781-b369300141ed",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "a624f944-d8b2-5003-b4b0-35d4ebf4db19",
+   "key": "clearable",
+   "label": "Clearable",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "f852f3c7-ef47-5c17-8f1a-16ad6aa1559e",
+   "key": "hasNow",
+   "label": "Has \"Today\"/\"Now\" option",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "218e747d-8306-5c67-a82d-ff7b875d9440",
+   "key": "showDisabledTimeOptions",
+   "label": "Show disabled time options",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "ee4a410b-e475-5d92-9f0b-d65d94d58cf3",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "DatetimeInput",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "a5c6fb21-ca03-5a25-bc2d-93419d236113",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "datetime-input",
+   "exposed": true
+  },
+  {
+   "id": "ae557812-4ff2-52b5-a452-db9fc426fc26",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "e9d79d5e-7cc6-5f8b-9db5-528f7d73af86",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "3cef5fd3-c7a0-5c58-b7d7-04d7da32dd58",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

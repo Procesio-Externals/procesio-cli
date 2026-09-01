@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agents &amp; Tools - Setup &amp; Health</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">A&amp;T</span>
+      <div>
+        <h1>Setup &amp; Health Dashboard</h1>
+        <p class="sub" id="basePath">loading...</p>
+      </div>
+    </div>
+    <div class="topactions">
+      <button id="copilotBtn" class="btn ghost" title="Ask the setup copilot (uses your configured LLM)">Copilot</button>
+      <button id="recheckBtn" class="btn" title="Re-run live validation for everything">Re-check all</button>
+      <button id="reloadBtn" class="btn ghost" title="Reload inventory">Refresh</button>
+    </div>
+  </header>
+
+  <section id="intro" class="intro">
+    <div class="intro-main">
+      <strong>This is your setup console.</strong> Each card below is a tool or agent your AI
+      assistant can use - but only once it has the credential or login it needs. Green cards are
+      ready. Fix the amber ones with the buttons on their card, and they turn green.
+    </div>
+    <div class="legend">
+      <span><span class="dot green"></span> ready to use</span>
+      <span><span class="dot amber"></span> needs setup</span>
+      <span><span class="dot red"></span> not working</span>
+    </div>
+  </section>
+
+  <section id="summary" class="summary"></section>
+
+  <div id="freshBanner" class="banner hidden"></div>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="tools">Tools</button>
+    <button class="tab" data-tab="agents">Agents</button>
+    <button class="tab" data-tab="skills">Skills</button>
+    <button class="tab" data-tab="providers">LLM Providers</button>
+    <button class="tab" data-tab="context">Context &amp; State</button>
+  </nav>
+
+  <div class="toolbar" id="toolbar">
+    <input type="search" id="filterInput" placeholder="Filter by name or description...">
+    <label class="chk"><input type="checkbox" id="onlyNeedsSetup"> Show only what needs setup</label>
+  </div>
+
+  <main id="content" class="content"><div class="loading">Loading inventory...</div></main>
+
+  <div id="modalRoot"></div>
+  <div id="toasts" class="toasts"></div>
+
+  <script src="/static/api.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/actions.js"></script>
+  <script src="/static/google.js"></script>
+  <script src="/static/procesio_env.js"></script>
+  <script src="/static/copilot.js"></script>
+</body>
+</html>

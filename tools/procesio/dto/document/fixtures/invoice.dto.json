@@ -1,0 +1,32 @@
+{
+  "id": "00000000-0000-0000-0000-000000000003",
+  "name": "Invoice",
+  "description": null,
+  "body": "&lt;div&gt;Hello &lt;%00000000-0000-0000-0000-000000000001%&gt;, total &lt;%00000000-0000-0000-0000-000000000002%&gt;.&lt;/div&gt;",
+  "placeholderDelimiterStart": "&lt;%",
+  "placeholderDelimiterStop": "%&gt;",
+  "documentPageSize": "A4",
+  "documentPageOrientation": 0,
+  "variables": [
+    {
+      "id": "00000000-0000-0000-0000-000000000001",
+      "dataType": "0317bfee-b2f5-4bde-bfe8-121212121214",
+      "type": 10,
+      "name": "clientName",
+      "defaultValue": null,
+      "isList": false,
+      "isInput": false,
+      "isOutput": false
+    },
+    {
+      "id": "00000000-0000-0000-0000-000000000002",
+      "dataType": "0317bfee-b2f5-4bde-bfe8-121212121213",
+      "type": 10,
+      "name": "total",
+      "defaultValue": null,
+      "isList": false,
+      "isInput": false,
+      "isOutput": false
+    }
+  ]
+}

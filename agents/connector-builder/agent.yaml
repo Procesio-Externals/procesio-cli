@@ -1,0 +1,61 @@
+name: connector-builder
+description: >-
+  Connector-building orchestration agent for PROCESIO. Drives the
+  `connector-builder` tool (the AI Connector Builder REST client at
+  connector-builder.procesio.app) and the `procesio` tool to run the full loop:
+  generate a Custom Action connector from API docs → download the compiled .nupkg
+  → upload it to PROCESIO → test it live → feed failures back to improve the
+  connector (and, for systemic issues, the builder's own knowledge base). It is
+  the executable side of the build→test→improve playbook in this folder and the
+  bridge to the procesio agent's build-and-test playbook. Tool mechanics stay in
+  tools/connector-builder/; methodology lives here.
+version: 0.1.0
+runtime: python
+entrypoint: main.py
+
+# Tools this agent DRIVES (registry-resolved, never hardcoded at call sites).
+# Readiness is derived from this list: connector-builder for the build pipeline,
+# procesio to install + test the produced .nupkg in a real workspace.
+tools:
+  - connector-builder
+  - procesio
+
+routing:
+  triggers:
+    - build a PROCESIO custom action / connector from API docs and test it
+    - drive the AI Connector Builder end to end (gather → plan → generate → compile)
+    - what's the next step for this connector build
+    - upload a generated connector to PROCESIO and improve it from the feedback
+    - how do I run the connector build → test → improve loop
+  primary_action: next-step
+  example: >-
+    connector-builder next-step --build-id <ID>   (checklist: connector-builder
+    checklist; guidance: connector-builder guidance --topic playbook; status:
+    connector-builder status)
+
+actions:
+  - name: status
+    description: Report agent + driven-tool readiness (connector-builder, procesio).
+  - name: guidance
+    description: >-
+      Serve the build→test→improve playbook + PROCESIO interop doctrine from one
+      registry-discoverable place.
+    args:
+      - {name: topic, type: string, default: all, description: "playbook | interop | troubleshooting | boundary | all"}
+  - name: next-step
+    description: >-
+      Recommend the next pipeline action for a build's state. Reads status live
+      with --build-id (drives connector-builder get-build), or classify a given
+      --status / --step-status pair. Includes the hand-off to PROCESIO at deliver.
+    args:
+      - {name: build-id, type: string, description: "Read live status from the connector-builder tool"}
+      - {name: status, type: string, description: "Build overall status (if not using --build-id)"}
+      - {name: step-status, type: string, description: "running | waiting_user (refines the recommendation)"}
+  - name: checklist
+    description: Emit the end-to-end build→upload→test→improve checklist as structured steps.
+    args:
+      - {name: goal, type: string, description: "Optional one-line connector goal to stamp in"}
+
+# No own secret: readiness comes from the tools it drives. The connector-builder
+# API credentials and the PROCESIO credentials belong to those tools.
+secrets: []

@@ -1,0 +1,217 @@
+{
+ "id": "e08acaba-1a4d-51e1-b7b6-bedb2d18ab5d",
+ "category": "fields",
+ "type": "select",
+ "configs": [
+  {
+   "id": "e5b73e96-2cbf-50ea-9f2b-c8bb245197bd",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Select input",
+   "exposed": true
+  },
+  {
+   "id": "62926375-e8f4-58f6-8166-6593ae5311ab",
+   "key": "placeholder",
+   "label": "Placeholder",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Select input",
+   "exposed": true
+  },
+  {
+   "id": "f7f7ebd3-87c4-533d-b5c0-c38d64dfede3",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "2f262f94-2965-5fcd-b98f-41bf38ad75ae",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "9c0c35a9-7f5c-5713-b179-fb810889c6c4",
+   "key": "searchable",
+   "label": "Searchable",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "d00ec075-27cc-567f-b85e-e469635dfb37",
+   "key": "clearable",
+   "label": "Clearable",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "66676fa4-d144-51a9-94ba-864e0a9fc12a",
+   "key": "multiple",
+   "label": "Multiple",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "312aa3af-ec52-5c3e-b44e-4e107a837b2e",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "13cf778e-9599-5fe0-b94e-e72dfb1c3f2c",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "c16df465-8893-5084-b816-ac9370de3d32",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "6768f6fe-7f52-5d02-a9ba-9e237819c6d0",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Select",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "79aca4d8-ffd1-5878-b282-f3bdd9e109c9",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "select",
+   "exposed": true
+  },
+  {
+   "id": "beaae9bf-2e9e-5ada-bff4-63d14e713dd4",
+   "key": "sourceType",
+   "label": "Source type",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-type",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "dceccb15-918a-5312-af3b-12e28e390af3",
+   "key": "sourceValue",
+   "label": "Source value",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-value",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "6ce756e2-1f90-5390-a1c3-6b97868525fb",
+   "key": "defaultValue",
+   "label": "Default value",
+   "placeholder": "Add default value here",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "clearable-select",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "d1421782-70fa-5705-b2c2-50b536400530",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "9441d392-344f-5a20-94a6-3f66b1ae6001",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "71bf3908-d093-5075-80dc-77464cd6b013",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "a3b5bd39-1815-5598-877f-fff19504431d",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

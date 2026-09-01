@@ -1,0 +1,130 @@
+{
+ "id": "6ecf1e05-401c-5d0e-8399-87a6a137ca3c",
+ "category": "fields",
+ "type": "dropdown",
+ "configs": [
+  {
+   "id": "16c01c82-aa93-5e9b-a511-027e9ebd1fbb",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Dropdown",
+   "exposed": true
+  },
+  {
+   "id": "a3824b5b-9107-58e3-a031-de8899525147",
+   "key": "icon",
+   "label": "Icon",
+   "placeholder": "Select icon",
+   "category": "content",
+   "subCategory": "general",
+   "type": "icon-picker",
+   "value": "expand_more",
+   "exposed": true
+  },
+  {
+   "id": "806a995c-88c7-55ad-ab97-468a32ff9ce0",
+   "key": "items",
+   "label": "",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "dropdown-items",
+   "value": [],
+   "hasTopDivider": true
+  },
+  {
+   "id": "7ee1c225-d52d-5c9b-8b67-557c8a695762",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip is displayed on element hover",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "a962440b-4b1a-598b-811e-20087b961c17",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "5eb8e3ee-6c6f-5cb6-b99c-ef8e5de7549e",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "db98d5e0-d8f1-5a01-9383-b6ef746a9944",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "7adf58ba-e95f-5728-be8b-d7371e75b8ae",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Dropdown",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "2dcbb787-639a-5627-82eb-1b1c14cfa5a5",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "dropdown",
+   "exposed": true
+  },
+  {
+   "id": "5e79bab6-f604-56b2-bafe-83233ae4161c",
+   "key": "onClickEvents",
+   "label": "onClick",
+   "tooltip": "$event variable stores the index of the clicked dropdown item (starting from 0)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "6b7fc6df-72b1-5671-8475-70dd7d64f171",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

@@ -1,0 +1,141 @@
+{
+ "id": "26fa63dc-a279-593b-b530-b05a58885559",
+ "category": "fields",
+ "type": "signature-pad",
+ "configs": [
+  {
+   "id": "c374a2bd-5ff6-5083-a329-4e7481fa1a6f",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Signature",
+   "exposed": true
+  },
+  {
+   "id": "781814af-7b69-55bf-9daa-706dbcedd0de",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "8ceaaed0-d0a0-5c75-a42d-462083237d10",
+   "key": "description",
+   "label": "Description",
+   "placeholder": "Add text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "e5b84ebc-f30b-5bcf-a7c3-d905739cee9d",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "51fc93a5-582e-5317-bfda-c4fba5dbb4a5",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "d7394220-8ea2-5aea-af6c-57d53fd638ba",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "fa56e279-dcb8-564b-bcf2-c152f833603e",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "988f72b8-448e-55db-9784-218d633b574f",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "SignaturePad",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "ff4c63ae-95ac-5708-ac49-c9145a44bbfa",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "signature-pad",
+   "exposed": true
+  },
+  {
+   "id": "8d398718-af77-51eb-a34a-d11c7cbcdd9f",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "1bf75f18-918d-5ef4-8d28-43d466067451",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "7a2b3ae9-a619-5bc5-8826-adecd9090d08",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

@@ -1,0 +1,202 @@
+{
+ "id": "6d8859e8-c52e-5a90-9ac9-122e0f0c0476",
+ "category": "fields",
+ "type": "number-input",
+ "configs": [
+  {
+   "id": "95f61a50-caeb-58a8-9a11-3cffff3062ff",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Number input",
+   "exposed": true
+  },
+  {
+   "id": "3f280247-ed94-5911-adec-8c2745516c4f",
+   "key": "placeholder",
+   "label": "Placeholder",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Input that allows numbers only",
+   "exposed": true
+  },
+  {
+   "id": "cc7da7f6-9d18-5924-80fc-855d62477696",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "0517ba11-32df-5f07-bc23-c0b7267ce22e",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "b2f1bb9a-f924-5f0a-af9f-3eb74d2dfdc2",
+   "key": "defaultValue",
+   "label": "Default value",
+   "placeholder": "Add default value here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "number-input",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "9da301e9-920e-5543-b98e-3fdeee7d03d4",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "",
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "0d7d1185-e457-5d1e-b95f-027f5fa8fdee",
+   "key": "type",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "number"
+  },
+  {
+   "id": "2ed32d1b-806f-505e-bae3-f7e7046106f3",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "133d34ce-e877-5572-a530-9972b2be9019",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "3819ce31-6845-577e-aed5-ebb3138f0607",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "db2a693f-976e-5fc7-bb75-a1076f9f8aec",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "NumberInput",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "c19fdaee-e0f9-5573-a3a2-dd6642aaabdb",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "number-input",
+   "exposed": true
+  },
+  {
+   "id": "1147a94a-6e88-5f98-84fc-3de9c8d57633",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "c587b7f6-0ce6-5d86-b993-3f0e891191de",
+   "key": "regex",
+   "label": "Regex",
+   "placeholder": "Add regex for validation here",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "e45f5f32-fe57-5ef2-9634-06f591ab28dd",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "842afa23-5698-5489-8a5a-b8ec2a590605",
+   "key": "onFocusEvents",
+   "label": "onFocus",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "65ad9db5-1e95-5d2a-bb63-57ecc9d68e23",
+   "key": "onBlurEvents",
+   "label": "onBlur",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "21e4ef31-928d-57cb-84a1-6ed2a5f08ac7",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

@@ -1,0 +1,14 @@
+{
+  "_note": "Golden WebhookDto (POST /api/Webhooks body), PascalCase. The DataModel MUST be a webhook-type model (DataModelTypeParam.Webhook=2) from POST /api/Webhooks/generate-data; IsEdited:true and Definition (the sample JSON) are required, else the gateway returns a generic 502. Type: AUTO=0, MANUAL=1 (MANUAL verified live 2026-06-24; AUTO needs different handling). HasHeader/HasQuery only stick if the data model includes header/query sub-models. The server persists a fresh DataModelId on save.",
+  "Id": "<uuid: webhook>",
+  "Name": "<name>",
+  "PayloadIsList": false,
+  "HasHeader": false,
+  "HasQuery": false,
+  "DataModelId": "<generated data model id>",
+  "Type": 1,
+  "Definition": "<sample payload as JSON string>",
+  "IsEdited": true,
+  "DataModel": {"_": "the full webhook-type DataModelDto from generate-data"},
+  "CustomResponseConfig": null
+}

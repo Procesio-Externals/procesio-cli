@@ -1,0 +1,146 @@
+{
+ "id": "c25b4a44-4c36-5df0-9277-0da7fde49828",
+ "category": "structure",
+ "type": "side-panel",
+ "configs": [
+  {
+   "id": "96e96e4a-8116-5fd5-ad3f-7074e300c5b3",
+   "key": "buttonText",
+   "label": "Open side panel button text",
+   "placeholder": "Button text",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Click to open side panel",
+   "exposed": true
+  },
+  {
+   "id": "8f2dbdb3-3868-5dde-bbaa-069cb4cca527",
+   "key": "sidePanelTitle",
+   "label": "Side panel title",
+   "placeholder": "Side panel title",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Title",
+   "exposed": true
+  },
+  {
+   "id": "78f5c2ff-2038-5d3c-a5ae-6b239ecbe833",
+   "key": "hasOverlay",
+   "label": "Has side panel overlay",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "daab9528-3815-5da4-9604-16de80ab4968",
+   "key": "closeOnClickOutside",
+   "label": "Close on click outside",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "bbc10cc4-5d9c-52a7-95af-975c98875ec0",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "9eb2caba-40c8-52d1-adcb-d9761d809bad",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "SidePanel",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "18d4b35f-a8d0-5239-891e-a5df374fe4e6",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "side-panel",
+   "exposed": true
+  },
+  {
+   "id": "c74a709f-ea4b-5294-aa73-f9b852740f1d",
+   "key": "openSidePanelButton",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "open-side-panel-button",
+   "value": "",
+   "hasTopDivider": true
+  },
+  {
+   "id": "14e47d5f-ad67-5010-938b-a652d319e9b0",
+   "key": "open",
+   "label": "open",
+   "category": "content",
+   "subCategory": "general",
+   "type": "function",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "9b32de1f-07f6-5c65-ac28-c806e49afc02",
+   "key": "close",
+   "label": "close",
+   "category": "content",
+   "subCategory": "general",
+   "type": "function",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "a3921595-447f-5b01-bfa3-827a8ea10735",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "f0a3ffa4-e720-5457-ba43-361153ab3840",
+   "key": "onOpenEvents",
+   "label": "onOpen",
+   "tooltip": "Triggered once side panel is opened",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "8e1397a9-8d04-53e1-886c-c1a6dc66a3a2",
+   "key": "onCloseEvents",
+   "label": "onClose",
+   "tooltip": "Triggered once side panel is closed",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

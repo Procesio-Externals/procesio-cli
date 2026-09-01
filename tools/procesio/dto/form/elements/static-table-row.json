@@ -1,0 +1,84 @@
+{
+ "id": "75f39497-e172-5d7b-bfae-90a6ae0bf00e",
+ "category": "table",
+ "type": "static-table-row",
+ "configs": [
+  {
+   "id": "058c232d-8906-54c4-947c-6259d9f5b4b5",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "10e9b9f2-8ccc-5b71-9797-09a467f1decb",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "StaticRow",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "c6cbe826-2780-5f43-b68f-e89ebf1ebe93",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "staticRow",
+   "exposed": true
+  },
+  {
+   "id": "2b291680-d3a5-5cfe-a724-f04a084ec460",
+   "key": "childrenIdPerColumn",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": {},
+   "exposed": false
+  },
+  {
+   "id": "270d61b7-a13a-5e09-a9b7-6e50676f123e",
+   "key": "hasDetails",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": false
+  },
+  {
+   "id": "07ee59a1-56a2-5d8e-95cb-6a71d5f7eaaf",
+   "key": "value",
+   "label": "value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "2f7d431f-9f4c-5e7c-bb08-868089abb3b0",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

@@ -1,0 +1,71 @@
+name: procesio
+description: >-
+  PROCESIO build-and-test agent. Knows how to create use cases, edit resources,
+  and improve implementations on the PROCESIO platform, and enforces the
+  build-and-test discipline: it serves the operating playbook + best practices,
+  emits the rigorous self-test checklist, runs an automatable verify gate against
+  a live process (validate, designer-vs-runtime parity, run + read instance
+  status), and statically audits a process for inefficiency / UX / robustness
+  smells. Methodology lives in this folder; tool mechanics stay in tools/procesio/.
+version: 0.1.0
+runtime: python
+entrypoint: main.py
+
+# Tools this agent DRIVES programmatically (registry-resolved, never hardcoded at
+# call sites). Only procesio today - that is what verify/audit/run actually invoke.
+# The agent also KNOWS web (real-browser form testing) and google-* (deliverables)
+# through the served playbook, but they are NOT listed here until an action drives
+# them: the registry derives agent readiness from this list, so naming an unused
+# tool would make `status` report the agent blocked on secrets it never needs.
+tools:
+  - procesio
+
+routing:
+  triggers:
+    - build a procesio use case
+    - test / verify a procesio process or resource
+    - audit a procesio process for best practices
+    - how should I build / test in procesio
+    - improve a procesio implementation
+  primary_action: verify
+  example: >-
+    procesio verify --process-id <id>   (audit: procesio audit --process-id <id>;
+    guidance: procesio guidance; checklist: procesio checklist)
+
+actions:
+  - name: status
+    description: Report agent + driven-tool readiness (presence + secrets).
+  - name: guidance
+    description: >-
+      Serve the build-and-test playbook + best practices (the agent's knowledge
+      base) from one place.
+    args:
+      - {name: topic, type: string, default: all, description: "playbook | best-practices | visual-organization | datastore | scheduling | environments | boundary | all"}
+  - name: checklist
+    description: Emit the rigorous self-test checklist as structured steps.
+    args:
+      - {name: phase, type: string, description: "filter to one phase: validate | run | forms | webhooks | e2e"}
+      - {name: automatable-only, type: boolean, default: false, description: only steps the verify gate can run}
+  - name: verify
+    description: >-
+      Run the automatable self-test gate against a process: validate, config-parity
+      audit, and with --run execute it and read the real instance status. Lists the
+      manual checks it cannot run.
+    args:
+      - {name: process-id, type: string, required: true, description: process (project) id to verify}
+      - {name: run, type: boolean, default: false, description: actually run the process and read instance status}
+      - {name: payload, type: string, description: input variables as a JSON object (with --run)}
+      - {name: timeout, type: integer, description: secondsTimeOut for the synchronous run}
+      - {name: profile, type: string, description: procesio credential profile to use}
+      - {name: workspace-id, type: string, description: "workspace GUID the process lives in (required whenever it is not the profile's default workspace)"}
+  - name: audit
+    description: >-
+      Static best-practice + correctness audit of a process (action count, slow
+      actions, error handling, inline secrets, designer-vs-runtime parity).
+    args:
+      - {name: process-id, type: string, required: true, description: process (project) id to audit}
+      - {name: profile, type: string, description: procesio credential profile to use}
+      - {name: workspace-id, type: string, description: "workspace GUID the process lives in (required whenever it is not the profile's default workspace)"}
+
+# No own secret: readiness comes from the tools it drives (see `procesio` tool).
+secrets: []

@@ -1,0 +1,126 @@
+{
+ "id": "d6313f0c-a169-5031-9366-6b9c1ed78e9a",
+ "category": "structure",
+ "type": "stepper",
+ "configs": [
+  {
+   "id": "29389df4-0090-5fc8-bb94-719918380201",
+   "key": "steps",
+   "label": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "step-list",
+   "value": [
+    "Step1",
+    "Step2"
+   ]
+  },
+  {
+   "id": "8ae17fd7-3ebf-5a34-b76a-82916715f11b",
+   "key": "next",
+   "label": "Next button text",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Next",
+   "exposed": true
+  },
+  {
+   "id": "f0fba098-6179-5096-b779-e4d999a339c1",
+   "key": "previous",
+   "label": "Previous button text",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Previous",
+   "exposed": true
+  },
+  {
+   "id": "bf1d2f40-3619-5f54-9365-ae8709f435be",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "81473e23-36dd-57aa-8915-230c89aa30f7",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Stepper",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "b6555fad-509d-52f7-811b-d06ffbd2cd80",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "stepper",
+   "exposed": true
+  },
+  {
+   "id": "dee3af28-2abd-5411-9aa1-02500d68e42a",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "a2616d8d-6e75-5680-bbe4-86973fb24c94",
+   "key": "activeStepIndex",
+   "label": "Active step index",
+   "category": "content",
+   "subCategory": "controls",
+   "type": "hidden",
+   "value": 0,
+   "exposed": true
+  },
+  {
+   "id": "68f18471-fd8b-515b-b6d1-a8256a124be0",
+   "key": "onStepChangeEvents",
+   "label": "onStepChange",
+   "tooltip": "$event variable stores the index of the active step (starting from 0)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "3605c63b-07af-5ba3-93ca-e2e0ba03d0ce",
+   "key": "onNextStepEvents",
+   "label": "onNextStep",
+   "tooltip": "$event variable stores the index of the active step (starting from 0)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "29a432fb-01b6-5550-8afe-91c5728dc612",
+   "key": "onPreviousStepEvents",
+   "label": "onPreviousStep",
+   "tooltip": "$event variable stores the index of the active step (starting from 0)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

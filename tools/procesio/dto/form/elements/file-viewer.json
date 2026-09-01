@@ -1,0 +1,169 @@
+{
+ "id": "d2432d42-53f9-5106-baf6-f50eeb540f97",
+ "category": "structure",
+ "type": "file-viewer",
+ "configs": [
+  {
+   "id": "3d6454f2-16e2-53ba-bd9d-e1125f41e066",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "77fa5e48-a230-5497-991b-55f91d6673be",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "fa93e79a-6e2a-5616-9ef8-ac664d35f511",
+   "key": "loadingMessage",
+   "label": "Loading view message",
+   "placeholder": "Add loading message here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Loading...",
+   "exposed": true
+  },
+  {
+   "id": "44fd9a6b-5843-5bf4-b0d6-0237cb1148f0",
+   "key": "message",
+   "label": "Open view message",
+   "placeholder": "Add message here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Click to open",
+   "exposed": true
+  },
+  {
+   "id": "c576d1fb-1981-5d34-abed-d531be2836c8",
+   "key": "emptyViewMessage",
+   "label": "Empty view message",
+   "placeholder": "Add empty view message here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Field source not set",
+   "exposed": true
+  },
+  {
+   "id": "7ce75b6f-fa18-53e7-9a44-1d5cf4cb71bb",
+   "key": "failedViewMessage",
+   "label": "Failed view message",
+   "placeholder": "Add failed view message here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "File is invalid or its loading was failed.",
+   "exposed": true
+  },
+  {
+   "id": "91bb6d00-b0cb-590e-a3e9-ac2d801e6a93",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "97202c58-ae91-52d7-be76-26a503cd033a",
+   "key": "allowedFileTypes",
+   "label": "Allowed file types",
+   "category": "content",
+   "subCategory": "general",
+   "type": "view-file-type-select",
+   "value": [
+    "pdf"
+   ],
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "1da4aab9-6ec8-560e-af8b-de80b75466c0",
+   "key": "src",
+   "label": "src",
+   "placeholder": "Add URL here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "url-or-file",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "f1a23a24-0c6f-53f2-b049-6e69acbe024b",
+   "key": "viewerType",
+   "label": "Viewer type",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "viewer-type-radio",
+   "value": "INLINE",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "83fc0419-97df-58e5-98e6-dc878b81a2c4",
+   "key": "viewerHeadline",
+   "label": "Viewer headline",
+   "placeholder": "Add headline",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "File Viewer",
+   "exposed": true
+  },
+  {
+   "id": "afae8411-6762-5efc-86fe-975657588fb9",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "FileViewer",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "db409f92-5907-57f0-bb45-28755f21de27",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "file-viewer",
+   "exposed": true
+  },
+  {
+   "id": "f62df76d-27dd-520d-be0f-f005bfac918b",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

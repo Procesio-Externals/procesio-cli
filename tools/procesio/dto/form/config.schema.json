@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PROCESIO Form Template config",
+  "description": "Build a form from a list of controls. The builder clones a golden element per control type and overrides label/name/required/options/etc. Renders from elements (no encrypted code needed).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "elements"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "type": {"type": "string", "enum": ["usertask", "general"], "default": "general"},
+    "isPrivate": {"type": "boolean", "default": false, "description": "false = public (designer 'Make form public' = !isPrivate). NOT sufficient on its own: a form containing an approval control (or assignees/approvers) can ONLY be private — the platform disables the toggle regardless of this value."},
+    "publish": {"type": "boolean", "default": true, "description": "Status PUBLISHED(1) vs DRAFT(0)"},
+    "enabled": {"type": "boolean", "default": true, "description": "State on/off"},
+    "browserTitle": {"type": "string"},
+    "hideBranding": {"type": "boolean", "default": false},
+    "assignees": {"type": "array"},
+    "theme": {"type": "object", "description": "form-wide theme {cssVariable: value} overrides, e.g. {\"--c-primary\":\"#0039e3\",\"--p-form\":\"24px\"}. Container elements also accept alignment vars in their per-control style: --fd/--jc/--ai-<section|list-item|column|step|tab|side-panel>"},
+    "dark": {"type": "boolean", "description": "enable dark mode: adds a {light,dark} ModeProperties palette (the 16-var DARK_PALETTE) to the Colors theme group, the shape the form runtime reads"},
+    "themeDark": {"type": "object", "description": "dark-palette {cssVariable: value} overrides on top of the 16-var DARK_PALETTE default (implies dark)"},
+    "css": {"type": "string", "description": "form-level CSS (designer 'Switch to code' CSS tab); AES-encrypted into Data.code"},
+    "javascript": {"type": "string", "description": "form-level JavaScript ('Switch to code' JS tab); AES-encrypted into Data.code"},
+    "code": {"type": "object", "description": "alternative to css/javascript: {\"css\":\"...\",\"javascript\":\"...\"}"},
+    "elements": {"type": "array", "items": {"$ref": "#/$defs/element"}},
+    "chainConfig": {"type": "object", "description": "multi-form 'app' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)"}
+  },
+  "$defs": {
+    "element": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "events": {"type": "array", "description": "control events: each {on: click|input|focus|blur|open|tabchange, do: map|process|js|form|datastore, ...}", "items": {"$ref": "#/$defs/event"}},
+        "assignee": {"type": "string", "description": "task assignee user id (section/tabs/table)"},
+        "assigneeReplacement": {"type": "array"},
+        "approver": {"type": "string", "description": "approval control: approver user id"},
+        "approverReplacement": {"type": "array"},
+        "description": {"type": "string"},
+        "src": {"type": "string"}, "url": {"type": "string"}, "alt": {"type": "string"},
+        "width": {"type": ["integer", "string"]}, "height": {"type": ["integer", "string"]},
+        "type": {"type": "string", "description": "control type: heading, paragraph, input, textarea, number-input, datetime-input, select, dropdown, radiobox, checkbox, button, divider, section, columns, column, image, file-upload, table, tabs, tab, ..."},
+        "label": {"type": "string"},
+        "name": {"type": "string", "description": "field/binding name (defaults to a slug of label). ALSO the query-param key for URL pre-fill: opening the public form at ...?<name>=<value> pre-fills this control (validated live 2026-07-22). Pick a stable, URL-safe name when you want to seed the control from a link."},
+        "placeholder": {"type": "string"},
+        "tooltip": {"type": "string"},
+        "required": {"type": "boolean"},
+        "readonly": {"type": "boolean"},
+        "visible": {"type": "boolean"},
+        "default": {},
+        "defaultValue": {},
+        "rows": {"type": ["integer", "string"]},
+        "mode": {"type": "string"},
+        "multiple": {"type": "boolean"},
+        "submit": {"type": "boolean"},
+        "options": {"type": "array", "description": "for select/radiobox/dropdown: list of strings or {name,value} (static-list shortcut)"},
+        "optionsSource": {"type": "object", "description": "options data source: {type: json|static-list|url, value: <array|string|url>}. json -> sourceType JSON; url -> sourceType URL."},
+        "children": {"type": "array", "items": {"$ref": "#/$defs/element"}, "description": "nested controls for containers (section/columns/tabs)"},
+        "style": {"type": "object", "description": "per-control style overrides {cssVariable: value}, e.g. {\"--h-input\":\"50px\"}. Only vars of the control's CSS group are valid (input/number/datetime/textarea/select use the Input group). For color vars (type css-variable-select) pass a theme color variable like \"--c-neutral--50\", NOT a hex."},
+        "configs": {"type": "object", "description": "advanced: set any element config key by name"}
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["on", "do"],
+      "properties": {
+        "on": {"type": "string", "enum": ["click", "input", "change", "focus", "blur", "hover", "ready", "open", "close", "tabchange", "rowadded", "rowdeleted", "paginated", "stepchange", "nextstep", "previousstep", "beforeapprove", "afterapprove", "beforereject", "afterreject", "beforeapprovalsubmit", "afterapprovalsubmit", "messagesfetch", "messagesent"]},
+        "do": {"type": "string", "enum": ["map", "process", "js", "form", "datastore"]},
+        "processId": {"type": "string"}, "formId": {"type": "string"},
+        "dataStoreId": {"type": "string", "description": "datastore trigger: target data store id"},
+        "operation": {"type": "string", "description": "datastore trigger: READ|ADD|UPDATE|DELETE"},
+        "filters": {"type": "array", "description": "datastore trigger: row filters (not for ADD)"},
+        "code": {"type": "string"}, "syncRun": {"type": "boolean"},
+        "mapLatestTriggerOnly": {"type": "boolean"},
+        "inputs": {"type": "array"}, "outputs": {"type": "array"}, "mapping": {"type": "array"}
+      }
+    }
+  }
+}

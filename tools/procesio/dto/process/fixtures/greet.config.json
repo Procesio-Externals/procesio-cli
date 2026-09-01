@@ -1,0 +1,32 @@
+{
+  "title": "Greet",
+  "description": "demo",
+  "variables": [
+    {
+      "name": "name",
+      "type": "string",
+      "direction": "input",
+      "required": true
+    },
+    {
+      "name": "greeting",
+      "type": "string",
+      "direction": "output"
+    }
+  ],
+  "actions": [
+    {
+      "id": "cc",
+      "action": "Concatenate",
+      "params": {
+        "Input String 1": {
+          "var": "name"
+        },
+        "Input String 2": " - processed",
+        "Result": {
+          "var": "greeting"
+        }
+      }
+    }
+  ]
+}

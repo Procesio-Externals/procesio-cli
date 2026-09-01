@@ -1,0 +1,10 @@
+{
+  "name": "OrderHook",
+  "sample": {
+    "orderId": "abc",
+    "amount": 12.5
+  },
+  "type": "manual",
+  "hasHeader": false,
+  "hasQuery": false
+}
