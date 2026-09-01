@@ -54,6 +54,27 @@ def has(tool: str, secret_name: str) -> bool:
     return _b().get_optional(tool, secret_name) is not None
 
 
+def has_for_report(tool: str, secret_name: str) -> bool:
+    """Presence, for a listing or a view. NEVER raises.
+
+    Use this and only this where the answer decorates output: a `has_password`
+    field, a registry's `ready` flag, a dashboard tile. On a machine with no
+    reachable credential store - a headless Linux box has no session keyring at
+    all - constructing the backend throws, and a reporting call that propagates
+    that takes down the whole listing with it. Unreachable reports False, which
+    is the honest answer to "can I show a credential here": no.
+
+    Do NOT use it where the value is then acted on. `get` and `get_optional`
+    still raise on an unreachable store on purpose, because a store that cannot
+    be read must never be mistaken for a store that is empty; that is how a
+    caller ends up storing a secret again under the wrong key.
+    """
+    try:
+        return has(tool, secret_name)
+    except Exception:  # noqa: BLE001 - see docstring
+        return False
+
+
 def set_secret(tool: str, secret_name: str, value: str) -> None:
     _b().set(tool, secret_name, value)
 

@@ -139,7 +139,7 @@ def providers() -> dict[str, Any]:
             "model": pc.get("model"),
             "auth_style": pc.get("auth_style", "bearer"),
             "config": {k: v for k, v in pc.items() if k != "api_key"},
-            "key_present": creds.has("llm", name),
+            "key_present": creds.has_for_report("llm", name),
             "is_default": name == default,
         })
     return {"default": default, "providers": out}

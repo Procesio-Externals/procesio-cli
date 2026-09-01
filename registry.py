@@ -53,11 +53,20 @@ def hidden_tools() -> set[str]:
 
 def _has_secret(tool_name: str, secret_name: str) -> bool:
     """Check secret presence. Supports `namespace:name` for shared secrets,
-    e.g. `google:oauth-client` -> agents-and-tools:google:oauth-client."""
+    e.g. `google:oauth-client` -> agents-and-tools:google:oauth-client.
+
+    Never raises. Readiness is a REPORT, and a machine with no reachable
+    credential store still has to be able to list what is installed: a headless
+    Linux box has no session keyring at all, so constructing the backend there
+    throws and would otherwise take down the whole registry, the router build and
+    the dashboard with it. Unreachable is reported the same as absent, which is
+    the honest answer to "is this tool ready" - it is not, and the store error
+    says why the moment anyone actually calls creds.get, which still raises.
+    """
     if ":" in secret_name:
         ns, _, name = secret_name.partition(":")
-        return creds.has(ns, name)
-    return creds.has(tool_name, secret_name)
+        return creds.has_for_report(ns, name)
+    return creds.has_for_report(tool_name, secret_name)
 
 
 def _oauth_scope_gap(tool_dir: Path) -> list[str] | None:

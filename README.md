@@ -21,7 +21,7 @@ cd procesio-cli
 uv sync
 ```
 
-The base install is four packages. Everything heavier is an optional extra, pulled
+The base install is six packages. Everything heavier is an optional extra, pulled
 in only if you use the tool that needs it:
 
 ```bash

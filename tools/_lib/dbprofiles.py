@@ -107,7 +107,7 @@ class ProfileStore:
         self._write(data)
         view = dict(clean)
         view["name"] = name
-        view["has_password"] = creds.has(self.tool, name)
+        view["has_password"] = creds.has_for_report(self.tool, name)
         return view
 
     def remove(self, name: str) -> None:
@@ -140,7 +140,7 @@ class ProfileStore:
     def public_view(self, name: str) -> dict:
         """A profile dict safe to return/log: no password, presence flagged."""
         blob = self.get(name)
-        blob["has_password"] = creds.has(self.tool, name)
+        blob["has_password"] = creds.has_for_report(self.tool, name)
         return blob
 
     def list_public(self) -> list[dict]:

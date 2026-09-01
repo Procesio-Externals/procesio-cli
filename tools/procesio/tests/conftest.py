@@ -28,6 +28,12 @@ class FakeCreds:
             raise KeyError(name)
         return v
 
+    def has_for_report(self, tool, name):
+        """The reporting probe. Real one never raises; here presence is the same
+        answer, so the stub stays honest about the contract rather than the
+        implementation."""
+        return self.get_optional(tool, name) is not None
+
     def has(self, tool, name):
         return self.get_optional(tool, name) is not None
 

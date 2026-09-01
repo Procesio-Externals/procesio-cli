@@ -20,7 +20,10 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv sync --all-extras
       - name: tests
-        run: uv run pytest tools agents -q
+        # Every suite the repo ships, not just the two obvious ones: the
+        # dashboard and the MCP bridge carry tests too, and leaving them out
+        # meant a green CI that had never exercised either.
+        run: uv run pytest tools agents dashboard webplatform -q
       - name: no secrets in tracked files
         run: uv run python scripts/secret_scan.py
       - name: generated files are current

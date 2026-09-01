@@ -3964,3 +3964,39 @@ plain form id. One function now answers for every caller and falls back in that 
 as a shape: the configured value wins, the platform's own identifier is the safety net, and the id
 always works. Anything that builds a link calls the function, so an email, a calendar invitation and
 a button cannot spell the same address three ways.
+
+### Creating a Google Meet room takes two things, and one of them is silent
+
+`conferenceData.createRequest` in the event body creates nothing on its own. The request also needs
+**`conferenceDataVersion=1` as a query parameter**; without it the body is accepted, the event is
+created, and the conference is simply not made - no error, no warning, an event that looks correct
+and has nowhere to meet. Both together:
+
+```json
+"conferenceData": { "createRequest": {
+    "requestId": "<a value unique per request and stable across a retry>",
+    "conferenceSolutionKey": { "type": "hangoutsMeet" } } }
+```
+
+The room's address comes back as `hangoutLink` on the response.
+
+### A new SQL column does not reach a Node script until the MODEL has it
+
+This cost two rounds in one afternoon. Adding a column to a stored procedure makes it visible to SQL
+and to nothing else: the flow parses each row into a declared data model, and a script reading
+`row.NewColumn` gets `undefined` while the query plainly returns it. Same for a response object -
+`hangoutLink` was in Google's JSON and absent from the parsed event until the model was told.
+
+`procesio datatype-add-attribute --id <model> --name <column> --data-type string` fixes both. The
+symptom is always the same and always misleading: the data is right everywhere you look, and empty
+where it is used.
+
+### Two smaller ones
+
+**Order of the sweepers is part of the contract.** The confirmation email is the only place a client
+is given a link to join, and it was being sent before the sweeper had created the room - so it went
+out without one, and nothing ever sends a corrected copy. The client's confirmation now waits for
+the room, bounded by a few minutes so a calendar outage delays the email rather than losing it.
+
+**The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
+though they are valid and route normally. Worth knowing before using one as a test address.

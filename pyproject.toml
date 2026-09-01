@@ -9,14 +9,19 @@ dependencies = [
     "pyyaml>=6.0",
     "pydantic>=2.5",
     "keyring>=24.0",
+    # Validates the platform DTOs the procesio tool builds, and the dashboard's
+    # config schemas. Imported at module level, so it is a base dependency.
+    "jsonschema>=4.20",
+    # The form builder ciphers a form's JavaScript and CSS, and imports this at
+    # module level. It also backs AAT_CREDS_BACKEND=encrypted-file, which is a
+    # lazy import and would have been happy as an extra; the eager one decides.
+    "cryptography>=42.0",
 ]
 
 [project.optional-dependencies]
 # Every one of these is imported lazily, at the point of use, so the base install
-# stays at four packages and a missing extra fails with a clear message rather
+# stays at six packages and a missing extra fails with a clear message rather
 # than at import time.
-# Only needed for AAT_CREDS_BACKEND=encrypted-file, the headless credential store.
-encrypted-store = ["cryptography>=42.0"]
 # The web tool: real-browser form testing. Needs the browser binary too:
 #   uv run playwright install chromium
 browser = ["playwright>=1.60.0"]

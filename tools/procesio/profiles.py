@@ -118,7 +118,7 @@ def public_view(blob: dict, name: str) -> dict:
             out[f"has_{k}"] = bool(v)
         else:
             out[k] = v
-    out["has_cached_token"] = creds.has(TOOL, f"token-{name}")
+    out["has_cached_token"] = creds.has_for_report(TOOL, f"token-{name}")
     return out
 
 
