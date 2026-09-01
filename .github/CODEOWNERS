@@ -1,0 +1,10 @@
+# Every pull request gets a review from the maintainers.
+# Replace this team with your real GitHub team before you enable the
+# "require review from Code Owners" rule. Without a matching team the rule
+# has no effect.
+*       @Procesio-Externals/procesio-cli-maintainers
+
+# Narrower ownership, if you want it:
+# /tools/procesio/          @Procesio-Externals/platform-api
+# /tools/connector-builder/ @Procesio-Externals/platform-api
+# /.github/                 @Procesio-Externals/procesio-cli-maintainers

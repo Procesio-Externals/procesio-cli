@@ -47,7 +47,7 @@ Windows, macOS, and Linux are all supported. The test suite runs on all three in
 ## Install
 
 ```bash
-git clone https://github.com/PROCESIO/procesio-cli.git
+git clone https://github.com/Procesio-Externals/procesio-cli.git
 cd procesio-cli
 uv sync
 ```

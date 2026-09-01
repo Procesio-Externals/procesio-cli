@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/Procesio-Externals/procesio-cli/discussions
+    about: Ask how something works, or float an idea that isn't a request yet.
+  - name: Security vulnerability
+    url: https://github.com/Procesio-Externals/procesio-cli/security/advisories/new
+    about: Report privately. Don't open a public issue.
+  - name: PROCESIO platform support
+    url: https://procesio.com
+    about: For the platform itself rather than this toolkit.
