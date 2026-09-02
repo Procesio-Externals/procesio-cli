@@ -201,6 +201,13 @@ def _launch_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--payload", help="JSON payload to send to the webhook")
 
 
+def _toggle_args(p: argparse.ArgumentParser) -> None:
+    _id_args(p, "process (project) id")
+    p.add_argument("--state", required=True, choices=["true", "false"],
+                   help="target state: true activates, false deactivates (sent as the "
+                        "`state` header the endpoint reads; it is a setter, not a toggle)")
+
+
 def _read_active(client, pid: str):
     """The ONLY trustworthy activation read: the `active` field of the list projection.
 
@@ -217,33 +224,47 @@ def _read_active(client, pid: str):
 
 
 def toggle_activation(client, args) -> dict:
-    """Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation).
+    """Set a process's activation state (PATCH /api/Projects/{id}/toggle-activation).
 
-    The PATCH LIES: it answers ``{"value": null, "errors": []}`` whether or not the write
-    landed, and ``GET /api/Projects/{id}.status`` is NOT the activation flag either (see
-    PROCESIO-API-NOTES.md). The only trustworthy read is the ``active`` field of the
-    list-processes projection, so re-read it after the PATCH and report the ACTUAL state
-    instead of the always-success echo. The re-read is best-effort (a process past page 1
-    of a large workspace may be missed): when it cannot confirm, say so rather than imply
-    success. Platform-side this is B-048 cluster 4b — the PATCH should report its outcome.
+    Despite the endpoint's name this is a SETTER, not a toggle. It reads the target
+    state from a `state` REQUEST HEADER - `state: true` activates, `state: false`
+    deactivates - and the header is the only way to say which you want: the path
+    carries the id, the body is `{}`, and nothing else in the request differs between
+    the two directions.
+
+    Called without the header it deactivates every time while answering
+    `{"value": null, "errors": []}`, which is what this action used to do: it looked
+    like an endpoint that could only ever turn things off. It was our omission, not a
+    platform defect. The designer sends the header on both directions, which is how
+    the two behaviours were finally told apart.
+
+    The response is the same either way and reports nothing, so the state is still read
+    back from the list-processes projection - the only trustworthy source for `active`
+    (`GET /api/Projects/{id}.status` is a different field). `changed` compares the two
+    reads rather than trusting the echo, and stays None when the process cannot be
+    found in the projection, because unknown must not read as "did not change".
     """
+    want = str(getattr(args, "state", "") or "").strip().lower()
+    if want not in ("true", "false"):
+        raise UsageError("--state is required and must be true or false: "
+                         "the endpoint sets the state, it does not flip it")
+    target = want == "true"
     before = _read_active(client, args.id)
-    patch = client.request("PATCH", f"/api/Projects/{args.id}/toggle-activation")
+    patch = client.request("PATCH", f"/api/Projects/{args.id}/toggle-activation",
+                           body={}, headers={"state": want})
     active = _read_active(client, args.id)
-    out = {"toggled": bool(before is not None and active is not None and before != active),
-           "id": args.id, "active": active, "active_before": before, "patch_result": patch}
+    out = {"id": args.id, "requested": target, "active": active,
+           "active_before": before, "patch_result": patch,
+           "changed": None if (before is None or active is None) else before != active}
     if active is None:
-        out["toggled"] = None
         out["warning"] = (
             "could not confirm activation from the list-processes projection; the PATCH "
-            "response is NOT a reliable signal (it reports success either way) — verify "
+            "response is NOT a reliable signal (it reports success either way) - verify "
             "in the designer or re-run list-processes and read `active`.")
-    elif before == active:
+    elif active is not target:
         out["warning"] = (
-            f"the endpoint answered success but `active` is still {active}. Measured "
-            "behaviour: this endpoint only ever sets active to FALSE - it deactivates, and "
-            "never activates, whatever its name says. To activate, PUT the process with "
-            "active=true. See PROCESIO-API-NOTES.md.")
+            f"asked for active={target} but the process reads active={active} after the "
+            "call, and the endpoint reported success. Verify in the designer.")
     return out
 
 
@@ -266,13 +287,13 @@ ACTIONS = {
     "form-duplicate": _post_by_id_action("/api/FormTemplate/{id}/duplicate", "form template id", "duplicated"),
     "process-toggle-activation": ActionDef(
         func=toggle_activation,
-        add_args=lambda p: _id_args(p, "process (project) id"), needs_client=True,
-        description="DEACTIVATE a process (PATCH /api/Projects/{id}/toggle-activation). Despite "
-                    "the name it is not a toggle: measured, it only ever sets `active` to FALSE, "
-                    "and answers success either way - including when it changed nothing. To "
-                    "ACTIVATE, PUT the process with active=true. This action reads `active` "
-                    "before and after, reports `toggled` from that comparison rather than from "
-                    "the echo, and warns when nothing changed."),
+        add_args=_toggle_args, needs_client=True,
+        description="Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). "
+                    "--state true|false is REQUIRED: despite its name the endpoint is a setter, "
+                    "and it reads the target from a `state` request header - called without it, it "
+                    "deactivates every time while reporting success. The response says nothing "
+                    "either way, so this reads `active` before and after from the list-processes "
+                    "projection and warns when the result is not what was asked for."),
     # -- verification oracles --
     "process-validate": ActionDef(
         func=validate_process, add_args=lambda p: _id_args(p, "process (project) id"), needs_client=True,

@@ -56,7 +56,7 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [Data Stores in an export pack: measured, after the tool was fixed](PROCESIO-API-NOTES.md#data-stores-in-an-export-pack-measured-after-the-tool-was-fixed)
 - [DataStore error surface — read the code and target BEFORE bisecting](PROCESIO-API-NOTES.md#datastore-error-surface-read-the-code-and-target-before-bisecting)
 - [The known length cap](PROCESIO-API-NOTES.md#the-known-length-cap)
-- [PATCH /api/Projects/{id}/toggle-activation reports success and does not activate](PROCESIO-API-NOTES.md#patch-apiprojectsidtoggle-activation-reports-success-and-does-not-activate)
+- [PATCH /api/Projects/{id}/toggle-activation without its state header — CORRECTED](PROCESIO-API-NOTES.md#patch-apiprojectsidtoggle-activation-without-its-state-header-corrected)
 - [Node action: <%N%> interpolates a variable RAW into the JavaScript source](PROCESIO-API-NOTES.md#node-action-n-interpolates-a-variable-raw-into-the-javascript-source)
 - [Instance status codes](PROCESIO-API-NOTES.md#instance-status-codes)
 - [The script engine's capabilities, MEASURED on Internal-PROD 25-08-2026](PROCESIO-API-NOTES.md#the-script-engines-capabilities-measured-on-internal-prod-25-08-2026)
@@ -75,7 +75,7 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [isValid is a field the caller sets, not one the platform computes](PROCESIO-API-NOTES.md#isvalid-is-a-field-the-caller-sets-not-one-the-platform-computes)
 - [POST /api/Projects/validate answers "valid" for flows the designer refuses to save](PROCESIO-API-NOTES.md#post-apiprojectsvalidate-answers-valid-for-flows-the-designer-refuses-to-save)
 - [A cross-workspace GET is refused as 400, not 404](PROCESIO-API-NOTES.md#a-cross-workspace-get-is-refused-as-400-not-404)
-- [toggle-activation only ever deactivates — it never activates](PROCESIO-API-NOTES.md#toggle-activation-only-ever-deactivates-it-never-activates)
+- [toggle-activation takes the target state in a REQUEST HEADER, not a body](PROCESIO-API-NOTES.md#toggle-activation-takes-the-target-state-in-a-request-header-not-a-body)
 
 ## The Python action
 

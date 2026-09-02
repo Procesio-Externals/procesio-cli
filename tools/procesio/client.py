@@ -101,7 +101,8 @@ class ProcesioClient:
         return len(content)
 
     def _do_http(self, method: str, url: str, params, body,
-                 read_timeout, deadline_at: float | None) -> tuple[int, Any]:
+                 read_timeout, deadline_at: float | None,
+                 extra_headers: dict | None = None) -> tuple[int, Any]:
         """One HTTP round-trip, under the TOTAL wall-clock deadline. `read_timeout`
         is the per-read inactivity guard handed to requests (None = wait
         indefinitely, for a synchronous run). `deadline_at` is an absolute
@@ -111,6 +112,8 @@ class ProcesioClient:
             headers = self._headers()
             if body is not None:
                 headers["Content-Type"] = "application/json"
+            if extra_headers:
+                headers.update({k: str(v) for k, v in extra_headers.items()})
             self._clear_jar()
             t0 = time.monotonic()
             resp = self._session.request(
@@ -139,24 +142,26 @@ class ProcesioClient:
     _REAUTH_STATUSES = frozenset({401, 403})
 
     def _send_once(self, method: str, url: str, params, body, read_timeout,
-                   deadline_at, _retry_on_auth: bool) -> tuple[int, Any]:
+                   deadline_at, _retry_on_auth: bool,
+                   extra_headers: dict | None = None) -> tuple[int, Any]:
         """A single logical attempt: the HTTP round-trip PLUS the one-shot
         re-authentication for userpass. Retries (GET-only) live one layer up, in
         request()."""
         status, parsed = self._do_http(method, url, params, body, read_timeout,
-                                       deadline_at)
+                                       deadline_at, extra_headers)
         if (status in self._REAUTH_STATUSES and _retry_on_auth
                 and self.profile.get("type") == "userpass"):
             auth.reauthenticate(self.name, self.profile, self._session)
             self._clear_jar()
             return self._send_once(method, url, params, body, read_timeout,
-                                   deadline_at, False)
+                                   deadline_at, False, extra_headers)
         return status, parsed
 
     # -- universal request --------------------------------------------------
 
     def request(self, method: str, path: str, *, query: dict | None = None,
                 body: Any = None, _retry_on_auth: bool = True,
+                headers: dict | None = None,
                 read_timeout=reliability.DEFAULT, deadline=reliability.DEFAULT) -> Any:
         """Call any Web-API endpoint. `path` starts with '/api/...'. Returns the
         parsed JSON body on 2xx; raises ProcesioAPIError on a non-2xx, or
@@ -167,6 +172,10 @@ class ProcesioClient:
         statuses / network errors; POST/PUT/PATCH/DELETE are NEVER retried (an
         execution would double-run; a timed-out write may already have applied).
         run-process passes `deadline=None` (exempt) + its own `read_timeout`.
+
+        `headers` adds request headers for the endpoints that take an argument
+        there rather than in the body or the path - toggle-activation reads the
+        target state from a `state` header, and there is no other way to say it.
         """
         import requests  # for its exception types; already a project dependency
 
@@ -187,7 +196,7 @@ class ProcesioClient:
             try:
                 status, parsed = self._send_once(
                     method_u, url, clean, body, read_timeout, deadline_at,
-                    _retry_on_auth)
+                    _retry_on_auth, headers)
             except reliability.DeadlineHit:
                 raise DeadlineExceeded(path, cls, deadline_s or 0.0,
                                        time.monotonic() - start)

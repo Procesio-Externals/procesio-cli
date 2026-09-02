@@ -1626,25 +1626,34 @@ things**: distinguish a malformed request from a forbidden one by whether the er
 names the query field or the workspace, otherwise a permission limit gets recorded as a
 broken call.
 
-### `PATCH /api/Projects/{id}/toggle-activation` is ONE-WAY, and reports success in both directions
+### `PATCH /api/Projects/{id}/toggle-activation` needs a `state` header — CORRECTED
 
-Measured 31/08/2026 on a valid, active process and on a duplicate of one:
+This was recorded on 31/08/2026 as a one-way endpoint that deactivates and will not
+activate, measured over three calls that each answered success and each left `active`
+false. **That reading was wrong, and the correction is worth more than the original
+observation.**
 
-| call | HTTP result | `active` afterwards |
-|---|---|---|
-| toggle an **active, valid** process | success | `true` → `false` ✅ |
-| toggle it back | success | `false` → **`false`** ❌ |
-| toggle an **inactive** duplicate | success | `false` → **`false`** ❌ |
+The endpoint is a **setter**: it takes the target state from a `state` REQUEST HEADER.
+`state: true` activates, `state: false` deactivates. Sent without the header it
+deactivates every time and still answers success, which is exactly the shape the original
+measurement saw. Every call in that test was missing the header, so every call meant
+"deactivate", and three consistent results looked like proof.
 
-It **deactivates and will not activate**, and answers the same either way, so a caller
-that checks only the return value records a state the platform does not hold. Re-ordering
-the call so that no later write could undo it changes nothing.
+It was settled by capturing the designer's own traffic: the same endpoint, the same `{}`
+body, `state: false` and `state: true` on alternating clicks, activating and deactivating
+correctly. The CORS preflight names the header too
+(`access-control-request-headers: content-type,state,workspaceid`).
 
-**Activate through the DEFINITION instead:** read the flow, set `active: true`, and
-`PUT /api/Projects` with the whole body. That takes effect immediately and is readable
-back. The general rule this is an instance of: **a control that refuses is not the same
-as a state that cannot be reached** — when an endpoint declines to produce a state, look
-for another route to it before recording the state as unreachable.
+`PUT /api/Projects` with `active: true` on the whole body also works and remains a valid
+route, but it is no longer the only one.
+
+**The lesson that generalises, and it is not the one recorded the first time.** Three
+consistent measurements of a black box are not evidence about the endpoint; they are
+evidence about the request being sent, which was identical each time. Before concluding a
+platform behaves badly, compare the request against one that is known to work — the
+product's own UI is the reference implementation and its traffic is available for the
+cost of opening DevTools. The original entry drew a rule about unreachable states from
+what was really an unsent header.
 
 ### An ACTIVE process cannot be deleted, and the delete reports failure rather than raising
 
@@ -2959,10 +2968,11 @@ Measured accepted, so do not assume the platform is validating these:
 - a **duplicate store name** — two stores may share a name, so any
   "find the store called X" helper is ambiguous by construction
 
-## `PATCH /api/Projects/{id}/toggle-activation` reports success and does not activate
+## `PATCH /api/Projects/{id}/toggle-activation` without its `state` header — CORRECTED
 
-Measured: a process duplicated with `POST /api/Projects/{id}/duplicate` is
-created **inactive**, and the toggle endpoint does not change that.
+Originally recorded as an endpoint that reports success and does not activate, measured on
+a process duplicated with `POST /api/Projects/{id}/duplicate` (which is created
+**inactive**):
 
 ```
 before  : active=false
@@ -2970,10 +2980,14 @@ PATCH .../toggle-activation  ->  rc 0, {"result":{"value":null,"errors":[]}}
 after   : active=false
 ```
 
-Not the tool wrapper — the raw endpoint behaves identically. `errors` is empty
-and the HTTP status is success, so **nothing in the response indicates the write
-did not land.** This is the mirror of the more familiar failure: here a write
-reports SUCCESS and does not take effect.
+**The endpoint was not at fault: the request was incomplete.** The target state travels in
+a `state` request header, and without it the call means "deactivate" — so it did land, and
+did exactly what it was told. Send `state: true` to activate. See the corrected entry
+above for the full mechanics.
+
+What survives from this entry is the read-back discipline, which is still right: the
+response is `{"value": null, "errors": []}` whichever direction you ask for and whether or
+not anything changed, so it can never confirm the outcome on its own.
 
 ⚠ **`status` on the flow is NOT the activation flag.** `GET /api/Projects/{id}`
 returns `status: 0` for an active process and an inactive one alike. The field
@@ -3190,13 +3204,15 @@ Measured 2026-08-25, on the same workspace, minutes apart:
 | `duplicate-process` | **False** | ⚠ **refused** |
 | `process-create` | **True** | ✅ runs to status 50 |
 
-⚠ **A duplicated process cannot be made runnable through the API.**
-`process-toggle-activation` returns `{"value": null, "errors": []}` — no error —
-**and `active` stays False.** Activation needs the designer.
+⚠ **A duplicate arrives inactive and must be activated explicitly** —
+`process-toggle-activation --state true`, which sets the `state` header the endpoint
+reads. (This entry previously said a duplicate could not be activated through the API at
+all. That was wrong: the calls behind it were sent without the `state` header, so each one
+meant "deactivate". See the corrected toggle-activation entries above.)
 
-**Duplication is a designer convenience, not a provisioning mechanism.** Any
-programmatic path that builds a flow by copying one produces something that
-validates, reports no error anywhere, and cannot be launched.
+**Duplication still is not a drop-in provisioning mechanism** — a copy arrives inactive
+while `process-create` arrives active, so any programmatic path that builds a flow by
+copying one has to activate it as a separate, verified step.
 
 ### ⚠ And the launch refusal names the wrong cause
 
@@ -3260,7 +3276,7 @@ subject than the one the caller asked about.
 | # | what it names | what it actually reports |
 |---|---|---|
 | 1 | a create failure | ⚠ **a 500 naming no field.** Any create failure then has at least two candidate causes and bisection is the only route |
-| 2 | `toggle-activation` succeeded | `{"value": null, "errors": []}` and **nothing was activated** |
+| 2 | `toggle-activation` succeeded | `{"value": null, "errors": []}` — identical whether it activated, deactivated, or changed nothing. It cannot report the outcome, and without a `state` header it always deactivates |
 | 3 | the credential works | ⚠ **only that its `Test endpoint` answered.** Aimed at an open route it passes with a bearer that cannot work |
 | 4 | the process is not valid | ⚠ **the process is INACTIVE.** `process-validate` returns `isValid: true` on the same process; the real cause is only in the `target` string |
 | 5 | the flow config is valid | ⚠ **`Operation` is not checked against its verb list.** A nonsense write verb passes `--dry-run` and fails at runtime |
@@ -4036,10 +4052,13 @@ so blocking a working add would be wrong). Fail-open on any read error; `--force
 the warning.
 
 **Related cluster-4 platform defects, and where each is handled in the tool:**
-- **4b — `PATCH /api/Projects/{id}/toggle-activation` reports success either way** and does
-  not report the real outcome (`GET …/{id}.status` is not the activation flag either). The
-  tool's `process-toggle-activation` now re-reads the `active` field from the list-processes
-  projection after the PATCH and reports THAT, warning when it cannot confirm. See the
+- **4b — NOT a platform defect; our request was incomplete.** The endpoint takes its target
+  state from a `state` REQUEST HEADER (`true` activates, `false` deactivates); sent without
+  it, it deactivates every time, which is what looked like a one-way endpoint. Established by
+  comparing our call against the designer's own traffic. What remains true is only that the
+  response cannot report the outcome — it is `{"value": null, "errors": []}` in every case —
+  so `process-toggle-activation` sends `--state` and still re-reads `active` from the
+  list-processes projection (`GET …/{id}.status` is a different field). See the corrected
   toggle-activation sections above.
 - **4c — NOT a defect; confirmed intended.** A `PUT /api/Projects` that fails validation
   answers 400 and still persists the definition. That is deliberate: unfinished work has to
@@ -4047,10 +4066,20 @@ the warning.
   not the fate of the write. The discipline it leaves behind is unchanged — never read a
   write's echo as the outcome; re-read and reconcile. `put-projects` warns on an empty-body
   success (see the empty-body PUT note); after any process PUT, re-read and verify.
-- **4d — sub-workspace create/delete is lossy** (`POST /api/Workspace` can answer 500 and
-  still create; a "removed" delete still counts against the cap). No clean tool guard; the
-  workspace list is `--include-removed`-aware so soft-deleted rows are visible. Do not quote
-  a numeric workspace cap — the documented `soft/hardLimit` is a time/thread budget.
+- **4d — RE-TESTED. The accounting half reproduces; the create-anyway half does not.**
+  Measured on a master workspace: the active sub-workspace list returns 22, the
+  `--include-removed` list returns 24, and `GET /api/Resources/used/subworkspaces` — the
+  usage view — also returns **24, including both `removed` rows**. So a soft delete does not
+  remove a sub-workspace from resource accounting; two deleted in 2023 were still carried
+  three years later. Separately, `POST /api/Workspace` answers **HTTP 500 with the single
+  body `"Unable to create sub-workspace!"` for every request shape tried** (name key
+  `name` vs `workspace`, with and without `parentId`, with and without the optional fields)
+  and creates nothing — five attempts left both the master's count and the account-wide
+  workspace list unchanged. The older observation that the 500 creates the workspace anyway
+  did NOT reproduce and may be fixed. Whether the opaque 500 IS the cap being enforced is
+  not decidable from outside: the most recent successful creation is the one that brought
+  the including-removed total to exactly 24. Do not quote a numeric workspace cap — the
+  documented `soft/hardLimit` is a time/thread budget, not a workspace count.
 
 ### Adding an input to a SQL action: two ways it silently arrives NULL
 
@@ -4379,29 +4408,151 @@ So a step can only be skipped along with everything that reads it, and if those 
 needed the work has to move rather than be switched off - a second process, triggered when the value
 is actually wanted, with its own copy of the shaping logic.
 
-## ⚠ `toggle-activation` only ever deactivates — it never activates
+## ⚠ `toggle-activation` takes the target state in a REQUEST HEADER, not a body
 
-`PATCH /api/Projects/{id}/toggle-activation` reads as a toggle and is not one. Measured
-across four consecutive calls on one process:
+`PATCH /api/Projects/{id}/toggle-activation` is a **setter**, not a toggle, and the state
+you want goes in a `state` request header:
 
-| starting `active` | response | `active` afterwards |
-| --- | --- | --- |
-| `true` | `{"value": null, "errors": []}` | `false` |
-| `false` | `{"value": null, "errors": []}` | `false` |
-| `false` | `{"value": null, "errors": []}` | `false` |
-| `true` (set by PUT) | `{"value": null, "errors": []}` | `false` |
+| header | effect |
+| --- | --- |
+| `state: true` | activates |
+| `state: false` | deactivates |
 
-It sets `active` to false and answers success either way, including when it changed
-nothing. There is no error, no differing status code, and no field in the response that
-distinguishes the two outcomes.
+Nothing else in the request differs between the two directions: the path carries the id,
+the body is `{}`, and the response is `{"value": null, "errors": []}` either way.
 
-**To activate a process, PUT it with `active: true`** — that field is settable on the
-normal process PUT and stores as sent.
+**Called without the header it deactivates every time, and still answers success.** That is
+what makes this expensive to discover: there is no error, and a caller that reads the
+response cannot tell "deactivated because you asked" from "deactivated because you did not
+say". Measured before the header was known: four consecutive calls on an active process
+left it inactive and reported success each time, which reads exactly like an endpoint that
+can only ever turn things off.
 
-Two reading rules follow. The response is not the outcome, so compare `active` either side
-of the call. And `active` is only trustworthy from the **list-processes projection**;
-`GET /api/Projects/{id}.status` is a different field and is not the activation flag.
+It was found by comparing our request against the designer's own, which sends
+`state: false` and `state: true` on alternating clicks. The preflight names it too -
+`access-control-request-headers: content-type,state,workspaceid`.
 
-`process-toggle-activation` does exactly this: it reads `active` before and after, reports
-`toggled` from the comparison rather than from the echo, and warns when the endpoint
-reported success without changing anything.
+Two rules follow. **Always send `state`.** And because the response reports nothing, read
+`active` back from the **list-processes projection** to confirm; `GET /api/Projects/{id}`
+`.status` is a different field and is not the activation flag.
+
+### The load handler finishing is not the moment the page is painted
+
+A form's load chain ends with a script, and it is tempting to treat that script's last line as "the
+page is ready". It is not. Instrumented, the handler runs **56ms into its own frame with all the
+data already in hand** - the frame is only created once the process has returned - and the platform
+then writes those values into the controls one at a time, redrawing after each. That painting is
+what a person sees as a form filling itself in for several seconds, and all of it happens after the
+handler returned.
+
+So a page that should appear complete has to be revealed on the DRAWING settling, not on the
+handler:
+
+- hide from the stylesheet, keyed on an attribute the page does not have yet;
+- have the load handler set a first attribute when it has the data;
+- have the page-side script count what is drawn (controls holding a value, options, buttons) and
+  reveal only once that count has stopped growing for ~500ms;
+- and cap the wait, because a page that never settles must still become visible.
+
+**Counting alone is not enough on a page whose content arrives in stages.** A booking page briefly
+holds exactly one option and nothing else, long enough to look settled; the reveal has to also
+require that the page has ANSWERED the question it exists for - here, that it is either offering
+times or saying there are none. Pick that condition per page; there is no generic one.
+
+### Test a flow change on a duplicate: it is the only place the error message exists
+
+A change that breaks a flow the page depends on shows up in the page as absence - an empty list, a
+picker with nothing in it - and the page never says why. The same change on a **duplicate**, run
+directly, returns the engine's own message. A merge of two queries that had failed silently in the
+live page reported itself on the copy in one run:
+
+```
+Incorrect syntax near ','. Incorrect syntax near the keyword 'ORDER'.
+```
+
+which named the mistake exactly: the new column had been appended to the END of the statement,
+after `WHERE`, instead of into the SELECT list. Nothing about the page could have told me that.
+
+**A duplicate starts inactive and refuses to launch** (`Flow with id ... is inactive`), and the
+toggle-activation endpoint did not change it. What did: a normal save with both flags set.
+
+```python
+flow["isValid"] = True
+flow["active"] = True          # not in the flow DTO you fetch, but accepted on save
+client.post("/api/Projects/validate", flow); client.put("/api/Projects", flow)
+```
+
+Use the copy to A/B as well - same workspace, same minute, which is the only way to compare on a
+platform whose own variance is larger than what you are measuring. Merging two SQL reads into one
+measured **3.58s vs 3.70s over three runs each: about 125ms, or 3.5%**. Worth knowing before
+spending risk on it: the round trips were not where the time was.
+
+### A control added to a row cannot be pre-filled, and an empty box will overwrite a saved value
+
+A control spliced into a dynamic table row through the API is not part of the row's field model. Three
+consequences, and the third is a data-loss bug rather than a cosmetic one:
+
+- `put('TheControl', value)` DOES land - reading the field back returns the value - but nothing draws
+  it. The model entry and the rendered control are not the same thing.
+- Seeding the row's own store (`row.Actions.TheControl`) when a panel opens is also too late: the
+  control has already taken its displayed value.
+- So the box opens EMPTY over a stored value. If anything mirrors that box into the field a save
+  reads - which is the standard workaround for these controls - the save writes the emptiness back.
+  Every record edited through that panel silently lost the value.
+
+What works is typing into it the way a person would, from page-side code: the panel leaves the stored
+value on the page (`body.setAttribute(...)`), and the guard writes it into the input with the native
+setter plus an `input` event. Two details that cost a cycle each: search EVERY panel, because the page
+holds one per row and picking the first open one lands on the wrong panel; and guard the mirroring
+handler against an empty value (`String(typed).trim() !== ''`), or the first render still wipes it.
+
+### The form runtime's re-render is the slow part, not the flow and not the script
+
+Measured on the same page, at the same moment, opening one side panel:
+
+| how the value was set | when it appeared on screen |
+|---|---|
+| written into the input from page-side code | **151 ms** |
+| assigned to the field model (`field.value = ...`) | **7794 ms** |
+
+The handler itself finishes in milliseconds with all its data - so neither the process nor the
+JavaScript is what anyone is waiting for. What takes the seconds is the platform re-rendering the
+form after the assignments, and it is proportional to the whole form: a panel on a page with six
+tabs, twenty side panels and several tables pays for all of it.
+
+Worth reporting upstream rather than working around forever: a way to set many fields and re-render
+once, and a re-render scoped to the element that changed rather than the whole form, would remove
+most of it. Until then, anything that must appear promptly is typed into the DOM directly.
+
+### One field assignment = one full re-render of the form. Measured.
+
+The seconds a form spends filling itself in are not a debounce, not the flow, and not a network
+call - there is NO network traffic in that window at all. They are the main thread, busy. Measured
+on one page with a long-task observer, opening a side panel:
+
+| what the handler did | long tasks | main thread busy | DOM mutations |
+|---|---|---|---|
+| assigned ONE field | 4 | 1646 ms | 250 |
+| assigned SIX fields | 14 | ~12000 ms | 1471 |
+
+The tasks arrive back to back in chunks of about 1.4-1.8 seconds each - one per assignment. So a
+single `field.value = x` triggers a full re-render of the form, and they queue: six values written
+one after another is eight to twelve seconds before the panel shows the record it was opened for.
+Two hundred and fifty DOM mutations to change one text box says the pass rebuilds nodes rather than
+updating them.
+
+**It is not the amount of data.** Loading ten more table rows into the same form did not change the
+per-render cost (~1.5s either way) - the variance between runs was larger than the effect.
+
+What a form author can do, and it is only ever a reduction:
+
+- **Write fewer values.** Every assignment is a re-render, so a handler should set only fields the
+  platform actually draws from the model, and only where the value differs from what is there.
+- **Move anything that exists purely for a save OUT of the open path** - read it when the button is
+  pressed instead. A carrier written on open costs a full re-render for a value nobody looks at.
+- **Type into the DOM for anything that must appear promptly** (native setter + `input` event):
+  measured at ~150ms against ~1500ms through the model. This only holds for controls the platform
+  does not draw from the model - anything model-bound is overwritten by the next render pass.
+
+The rest belongs upstream: a re-render scoped to the element that changed, and a way to set many
+values and render once, would remove the whole class of problem.

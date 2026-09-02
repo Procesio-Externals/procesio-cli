@@ -146,11 +146,20 @@ the destination workspace. **Because ids are preserved rather than regenerated, 
 input and output maps keep pointing at the right process variables by construction**, which
 is what makes multi-object apps packageable at all.
 
-**`POST /api/Workspace` → `500`, body `"Unable to create sub-workspace!"`, while creating
-the workspace anyway.** The workspace appears in `GET /api/Workspaces` and is usable for
-reads. `DELETE /api/Workspace/{id}` also returns `500` and may or may not delete. Treat the
-500 as "unknown outcome, verify by listing" rather than as a failure, or you will create
-orphans by retrying.
+**`POST /api/Workspace` → `500`, body `"Unable to create sub-workspace!"`.** Originally
+recorded as creating the workspace anyway: it appeared in `GET /api/Workspaces` and was
+usable for reads, and `DELETE /api/Workspace/{id}` also returned `500` with an uncertain
+outcome.
+
+**Re-tested later and the create-anyway behaviour did NOT reproduce.** Five attempts across
+four request shapes all returned the same 500 and created nothing — the master's
+sub-workspace count and the account-wide workspace list were identical before and after. So
+this may be fixed, and the 500 may now be a clean refusal.
+
+The discipline stands either way, because the 500 says nothing about the outcome: **treat it
+as "unknown outcome, verify by listing", never as a failure**, or a retry manufactures
+orphans. Note the message is identical for every input, so it distinguishes nothing — not a
+malformed body, not a permission problem, not a quota.
 
 ---
 
