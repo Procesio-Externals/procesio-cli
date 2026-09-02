@@ -4084,3 +4084,25 @@ candidates by rendered size (`getBoundingClientRect()`), because the create pane
 a control with the same label. Reading the first match writes the create panel's default over
 the user's choice on every save, and the symptom — the value reverting to a constant — looks
 exactly like a save that never received anything.
+
+### A radio list draws each option's record id as the input's `name`
+
+A select/radio control fed from a list of `{name, value}` renders the option's VALUE as the `name`
+attribute of the radio input, not as its `value` (every radio in the group reads `value="on"`).
+That attribute is the only place an option's identity reaches the page, so page-side code that has
+to act per record - a share link, a per-row control, anything keyed to the underlying id - reads it
+there rather than trying to match on the visible text, which is a label and changes.
+
+Painting per-option decoration from page-side code works the same way as everything else here: a
+re-render keeps classes and strips appended nodes, so a node that has to persist is re-added by the
+sweep and its press handled by ONE delegated listener. A handler bound to the button at creation
+belongs to the node that got stripped, and the redrawn button then looks identical and does nothing.
+
+### `navigator.clipboard.writeText` refuses by REJECTING, not by throwing
+
+It needs a secure page and a real user gesture, and when either is missing it returns a promise that
+rejects - a `try/catch` around the call sees nothing. Code that ignores the promise reports success
+while the clipboard is untouched. Await it (or attach both callbacks), fall back to a hidden
+textarea plus `document.execCommand('copy')`, and report only what actually succeeded. A synthetic
+click dispatched from a script is not a user gesture, so an automated test must drive a real press
+to exercise the working path.
