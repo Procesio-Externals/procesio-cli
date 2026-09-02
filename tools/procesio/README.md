@@ -1,9 +1,12 @@
 # procesio
 
-Talk to the **PROCESIO** low-code automation platform (procesio.app / procesio.com)
-over its Web API. Run processes, read instances / workspaces / data-types / the
-action catalog, and reach **every** documented endpoint through a generic
-`request` action.
+Talk to the **PROCESIO** low-code automation platform over its Web API. Run
+processes, read instances / workspaces / data-types / the action catalog, and reach
+**every** documented endpoint through a generic `request` action.
+
+The platform itself is **procesio.app** - that is where workspaces live and what this
+tool points at. procesio.com is the product site and docs.procesio.com the
+documentation; neither is an API host.
 
 ## Capabilities are ACTIONS — list them, don't reimplement
 
