@@ -1,0 +1,2417 @@
+{
+"source": "webapi.procesio.app/swagger/v1.19",
+"openapi": "3.0.1",
+"version": "v1.19",
+"count": 247,
+"endpoints": [
+{
+"method": "GET",
+"path": "/api/Actions",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"actionFilter",
+"getFullAction"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Actions",
+"tag": "Actions",
+"summary": "Permission required: CustomActions.Write",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Actions/category/{category}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"category",
+"getFullAction"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Actions/event",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Actions/event/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Actions/folders",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Actions/folders",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PATCH",
+"path": "/api/Actions/folders/rename",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Actions/folders/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Actions/folders/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Actions/node",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"getFullAction",
+"isCustom"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Actions/restricted",
+"tag": "Actions",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"actionFilter"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Actions/templates/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Actions/templates/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Actions/test",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Actions/test/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Actions/{id}",
+"tag": "Actions",
+"summary": "Permission required: CustomActions.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Actions/{id}",
+"tag": "Actions",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/ApiKey",
+"tag": "ApiKey",
+"summary": "Permission required: ApiKey.Delete",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/ApiKey",
+"tag": "ApiKey",
+"summary": "Permission required: ApiKey.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/ApiKey",
+"tag": "ApiKey",
+"summary": "Permission required: ApiKey.Write",
+"params": [],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/ApiKey/{id}",
+"tag": "ApiKey",
+"summary": "Permission required: ApiKey.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Authentication",
+"tag": "Authentication",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Authentication/logOut",
+"tag": "Authentication",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Authentication/logOut",
+"tag": "Authentication",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Authentication/refreshToken",
+"tag": "Authentication",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Credentials",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Credentials",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Credentials",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Update",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Credentials/accessToken/{id}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Update",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Credentials/authorize/{id}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Update",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/count",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/list/{typeId}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [
+"typeId",
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/list/{typeId}/count",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [
+"typeId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/list/{typeId}/restricted",
+"tag": "Credentials",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"typeId",
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Credentials/test",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Credentials/types",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/types/{id}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Credentials/upload/test",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Update",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Credentials/upload/{credentialsId}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Update",
+"params": [
+"credentialsId"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Credentials/verbs/{templateId}",
+"tag": "Credentials",
+"summary": "Permission required: None",
+"params": [
+"templateId"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Credentials/{id}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/{id}",
+"tag": "Credentials",
+"summary": "Permission required: Credentials.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Credentials/{id}/restricted",
+"tag": "Credentials",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/CustomUrl/FormTemplate",
+"tag": "CustomUrlForm",
+"summary": "Permission required: FormTemplate.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/CustomUrl/FormTemplate",
+"tag": "CustomUrlForm",
+"summary": "Permission required: FormTemplate.Update",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/CustomUrl/FormTemplate/{id}",
+"tag": "CustomUrlForm",
+"summary": "Permission required: FormTemplate.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/CustomUrl/FormTemplate/{id}",
+"tag": "CustomUrlForm",
+"summary": "Permission required: FormTemplate.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
+"tag": "CustomUrlLaunch",
+"summary": "",
+"params": [
+"masterWorkspaceUrl",
+"workspaceUrl",
+"entityUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
+"tag": "CustomUrlLaunch",
+"summary": "",
+"params": [
+"masterWorkspaceUrl",
+"workspaceUrl",
+"entityUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
+"tag": "CustomUrlLaunch",
+"summary": "",
+"params": [
+"masterWorkspaceUrl",
+"workspaceUrl",
+"entityUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
+"tag": "CustomUrlLaunch",
+"summary": "",
+"params": [
+"masterWorkspaceUrl",
+"workspaceUrl",
+"entityUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
+"tag": "CustomUrlLaunch",
+"summary": "",
+"params": [
+"masterWorkspaceUrl",
+"workspaceUrl",
+"entityUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/CustomUrl/MasterWorkspace",
+"tag": "CustomUrlMaster",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/CustomUrl/MasterWorkspace",
+"tag": "CustomUrlMaster",
+"summary": "Permission required: MasterWorkspace.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/CustomUrl/MasterWorkspace",
+"tag": "CustomUrlMaster",
+"summary": "Permission required: MasterWorkspace.Update",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/CustomUrl/MasterWorkspace/{id}",
+"tag": "CustomUrlMaster",
+"summary": "Permission required: MasterWorkspace.Update",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/CustomUrl/Webhook",
+"tag": "CustomUrlWebhook",
+"summary": "Permission required: Webhook.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/CustomUrl/Webhook",
+"tag": "CustomUrlWebhook",
+"summary": "Permission required: Webhook.Update",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/CustomUrl/Webhook/{id}",
+"tag": "CustomUrlWebhook",
+"summary": "Permission required: Webhook.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/CustomUrl/Webhook/{id}",
+"tag": "CustomUrlWebhook",
+"summary": "Permission required: Webhook.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/CustomUrl/Workspace",
+"tag": "CustomUrlWorkspace",
+"summary": "Permission required: Workspace.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/CustomUrl/Workspace",
+"tag": "CustomUrlWorkspace",
+"summary": "Permission required: Workspace.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/CustomUrl/Workspace",
+"tag": "CustomUrlWorkspace",
+"summary": "Permission required: Workspace.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/CustomUrl/Workspace/master",
+"tag": "CustomUrlWorkspace",
+"summary": "Permission required: Workspace.Read",
+"params": [],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/CustomUrl/Workspace/{id}",
+"tag": "CustomUrlWorkspace",
+"summary": "Permission required: Workspace.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataTypes",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Read",
+"params": [
+"addProperties",
+"pageNumber",
+"pageItemCount",
+"includeProcesioEntries",
+"includeExternalEntries",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataTypes",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/DataTypes",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Update",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataTypes/attribute/{rootDataTypeId}",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Update",
+"params": [
+"rootDataTypeId"
+],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/DataTypes/attribute/{rootDataTypeId}",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Update",
+"params": [
+"rootDataTypeId"
+],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/DataTypes/attribute/{rootDataTypeId}/{attributeId}",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Update",
+"params": [
+"rootDataTypeId",
+"attributeId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataTypes/changeToPublic",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Write",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataTypes/clone",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Write",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/count",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Read",
+"params": [
+"includeProcesioEntries",
+"includeExternalEntries"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataTypes/generate",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Write",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataTypes/generate/file",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Write",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/primary",
+"tag": "DataTypes",
+"summary": "Permission required: None",
+"params": [
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/primary/count",
+"tag": "DataTypes",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataTypes/private",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Write",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/procesio",
+"tag": "DataTypes",
+"summary": "Permission required: None",
+"params": [
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/procesio/count",
+"tag": "DataTypes",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/restricted",
+"tag": "DataTypes",
+"summary": "Permission required: None",
+"params": [
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/DataTypes/{id}",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/{id}/{type}",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Read",
+"params": [
+"id",
+"type"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataTypes/{value}",
+"tag": "DataTypes",
+"summary": "Permission required: DataModels.Read",
+"params": [
+"value",
+"displayName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Debugger/instances/{id}/operation",
+"tag": "Debugger",
+"summary": "Permission required: ProcessInstance.Write",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Debugger/instances/{id}/variables",
+"tag": "Debugger",
+"summary": "Permission required: ProcessInstance.Write",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DocumentTemplate",
+"tag": "DocumentTemplate",
+"summary": "Permission required: DocumentDesigner.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DocumentTemplate",
+"tag": "DocumentTemplate",
+"summary": "Permission required: DocumentDesigner.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/DocumentTemplate",
+"tag": "DocumentTemplate",
+"summary": "Permission required: DocumentDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DocumentTemplate/restricted",
+"tag": "DocumentTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/DocumentTemplate/{id}",
+"tag": "DocumentTemplate",
+"summary": "Permission required: DocumentDesigner.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DocumentTemplate/{id}",
+"tag": "DocumentTemplate",
+"summary": "Permission required: DocumentDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DocumentTemplate/{id}/restricted",
+"tag": "DocumentTemplate",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/File/download",
+"tag": "File",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"isArchived"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/File/download/action-event",
+"tag": "File",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/File/download/schedule",
+"tag": "File",
+"summary": "Permission required: Schedule.Read",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/File/download/testAction",
+"tag": "File",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/File/upload/action-event",
+"tag": "File",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/File/upload/flow",
+"tag": "File",
+"summary": "Permission required: ProcessInstance.Write",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/File/upload/schedule",
+"tag": "File",
+"summary": "Permission required: Schedule.Write",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/File/upload/testAction",
+"tag": "File",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Form/download",
+"tag": "FileForm",
+"summary": "Permission required: FormInstance.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Form/upload",
+"tag": "FileForm",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/FormProcess/download",
+"tag": "FileFormProcess",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/FormProcess/{formTemplateId}/{flowInstanceId}/upload",
+"tag": "FileFormProcess",
+"summary": "Permission required: None",
+"params": [
+"formTemplateId",
+"flowInstanceId"
+],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Form",
+"tag": "Form",
+"summary": "Permission required: FormInstance.Delete",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Form",
+"tag": "Form",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Form",
+"tag": "Form",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Form/assigned",
+"tag": "Form",
+"summary": "Permission required: FormInstance.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"awaitingAction"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Form/{id}",
+"tag": "Form",
+"summary": "Permission required: FormInstance.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Form/{id}",
+"tag": "Form",
+"summary": "Permission required: FormInstance.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Form/{pid}/all",
+"tag": "Form",
+"summary": "Permission required: FormInstance.Read",
+"params": [
+"pid",
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Form/{pid}/count",
+"tag": "Form",
+"summary": "Permission required: FormInstance.Read",
+"params": [
+"pid"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/FormApplication",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/FormApplication",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/FormApplication/all",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.None",
+"params": [
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormApplication/all/filter",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.None",
+"params": [
+"state",
+"type"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormApplication/all/{pid}",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.None",
+"params": [
+"pid"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/FormApplication/{id}",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormApplication/{id}",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.None",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/FormApplication/{id}",
+"tag": "FormApplication",
+"summary": "Permission required: FormTemplate.Update",
+"params": [
+"id",
+"state"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Form/chain/{chainId}",
+"tag": "FormChain",
+"summary": "Permission required: FormInstance.Read",
+"params": [
+"chainId"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/Form/chain/{chainId}/{formInstanceId}",
+"tag": "FormChain",
+"summary": "Permission required: FormInstance.Update",
+"params": [
+"chainId",
+"formInstanceId"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Form/chain/{formTemplateId}/all",
+"tag": "FormChain",
+"summary": "Permission required: FormInstance.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"formTemplateId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormProcess/{formTemplateId}/{processTemplateId}",
+"tag": "FormProcess",
+"summary": "Permission required: None",
+"params": [
+"formTemplateId",
+"processTemplateId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/FormProcess/{formTemplateId}/{processTemplateId}/launch",
+"tag": "FormProcess",
+"summary": "Permission required: None",
+"params": [
+"formTemplateId",
+"processTemplateId",
+"runSynchronous",
+"secondsTimeOut"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/FormProcess/{formTemplateId}/{processTemplateId}/publish",
+"tag": "FormProcess",
+"summary": "Permission required: None",
+"params": [
+"formTemplateId",
+"processTemplateId"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/FormProcess/{formTemplateId}/{processTemplateId}/{processInstanceId}/variables",
+"tag": "FormProcess",
+"summary": "Permission required: None",
+"params": [
+"formTemplateId",
+"processTemplateId",
+"processInstanceId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormTemplate",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/FormTemplate",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/FormTemplate",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/FormTemplate/all/basic",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormTemplate/processTemplate/list",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Read",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormTemplate/processTemplate/{id}",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/FormTemplate/{id}",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormTemplate/{id}",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/FormTemplate/{id}",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Update",
+"params": [
+"id",
+"state"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/FormTemplate/{id}/duplicate",
+"tag": "FormTemplate",
+"summary": "Permission required: FormTemplate.Write",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/FormTemplate/{workspaceId}/{id}",
+"tag": "FormTemplate",
+"summary": "Permission required: None",
+"params": [
+"id",
+"workspaceId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Notifications",
+"tag": "Notifications",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/Notifications",
+"tag": "Notifications",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Projects/instances/{id}/dataRetention",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Delete",
+"params": [
+"id",
+"flowTemplateId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects/instances/{id}/launch",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Write",
+"params": [
+"runSynchronous",
+"debugMode",
+"secondsTimeOut",
+"id"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Projects/instances/{id}/output",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id",
+"flowTemplateId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/instances/{id}/status",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id",
+"flowTemplateId",
+"isArchived",
+"getActions",
+"getVariables",
+"getInternalVariables",
+"addExtras"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects/instances/{id}/stop",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Update",
+"params": [
+"id",
+"flowTemplateId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/history",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id",
+"pageNumber",
+"pageItemCount",
+"filter",
+"monthFilter"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/instances",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id",
+"pageNumber",
+"pageItemCount",
+"filterStatus"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/instances/count",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects/{id}/instances/publish",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Write",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/instances/{instanceId}/customResponse",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id",
+"instanceId",
+"isArchived"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/restricted",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects/{id}/run",
+"tag": "ProcessInstance",
+"summary": "Permission required: ProcessInstance.Write",
+"params": [
+"id",
+"runSynchronous",
+"secondsTimeOut"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Projects",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Projects",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Projects/count",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects/notifications",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Projects/notifications/{flowId}",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"flowId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/restricted/schedules",
+"tag": "ProcessTemplate",
+"summary": "Permission required: Schedule.Read",
+"params": [
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Projects/validate",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Projects/{id}",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/Projects/{id}/dataRetention",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Projects/{id}/duplicate",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Write",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/payload",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/restricted/schedules",
+"tag": "ProcessTemplate",
+"summary": "Permission required: Schedule.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/Projects/{id}/toggle-activation",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Update",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Projects/{id}/used",
+"tag": "ProcessTemplate",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/ResourceTrackingConfig",
+"tag": "ResourceTrackingConfig",
+"summary": "Permission required: Workspace.Read",
+"params": [],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/ResourceTrackingConfig/toggle/{enabled}",
+"tag": "ResourceTrackingConfig",
+"summary": "Permission required: Workspace.Admin",
+"params": [
+"enabled"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Resources/analytics/instances/{id}/details",
+"tag": "Resources",
+"summary": "Permission required: ProcessInstance.Read",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Resources/analytics/processes",
+"tag": "Resources",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"startDate",
+"endDate"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Resources/analytics/processes/{id}/details",
+"tag": "Resources",
+"summary": "Permission required: ProcessDesigner.Read",
+"params": [
+"id",
+"startDate",
+"endDate"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Resources/used",
+"tag": "Resources",
+"summary": "Permission required: Workspace.Read",
+"params": [
+"startDate",
+"endDate"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Resources/used/subWorkspaces",
+"tag": "Resources",
+"summary": "Permission required: Workspace.Read",
+"params": [
+"startDate",
+"endDate"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/analytics/executionEnvironment/concurrency",
+"tag": "Resources",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"startDate",
+"endDate",
+"statsType"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/analytics/executionEnvironment/topProcesses",
+"tag": "Resources",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"startDate",
+"endDate",
+"topCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Schedules",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Schedules",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Schedules",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Update",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Schedules/notifications",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Schedules/notifications/{scheduleId}",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Read",
+"params": [
+"scheduleId"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Schedules/{scheduleId}",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Delete",
+"params": [
+"scheduleId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Schedules/{scheduleId}",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Read",
+"params": [
+"scheduleId"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/Schedules/{scheduleId}/status",
+"tag": "Schedules",
+"summary": "Permission required: Schedule.Update",
+"params": [
+"scheduleId",
+"enable"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Subscriptions",
+"tag": "Subscriptions",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Subscriptions/refund/{id}",
+"tag": "Subscriptions",
+"summary": "Permission required: MasterWorkspace.Admin",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Subscriptions/renew/{id}/{state}",
+"tag": "Subscriptions",
+"summary": "Permission required: MasterWorkspace.Admin",
+"params": [
+"id",
+"state"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Subscriptions/{subscriptionId}",
+"tag": "Subscriptions",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"subscriptionId"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/{tinyUrl}",
+"tag": "TinyUrlLaunch",
+"summary": "",
+"params": [
+"tinyUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/{tinyUrl}",
+"tag": "TinyUrlLaunch",
+"summary": "",
+"params": [
+"tinyUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/{tinyUrl}",
+"tag": "TinyUrlLaunch",
+"summary": "",
+"params": [
+"tinyUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/{tinyUrl}",
+"tag": "TinyUrlLaunch",
+"summary": "",
+"params": [
+"tinyUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/{tinyUrl}",
+"tag": "TinyUrlLaunch",
+"summary": "",
+"params": [
+"tinyUrl",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Transport/export",
+"tag": "Transport",
+"summary": "Permission required: Workspace.Admin",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Transport/export-entities",
+"tag": "Transport",
+"summary": "Permission required: Workspace.Admin",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Transport/import",
+"tag": "Transport",
+"summary": "Permission required: Workspace.Admin",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/UserPermissions",
+"tag": "UserPermissions",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/UserPermissions/entities",
+"tag": "UserPermissions",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/UserPermissions/roles",
+"tag": "UserPermissions",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/UserPermissions/userTypes",
+"tag": "UserPermissions",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/UserPermissions/workspace/{workspaceId}/default",
+"tag": "UserPermissions",
+"summary": "Permission required: Workspace.Admin",
+"params": [
+"workspaceId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/UserPermissions/{userId}",
+"tag": "UserPermissions",
+"summary": "Permission required: Workspace.Admin",
+"params": [
+"userId"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/UserPermissions/{userId}",
+"tag": "UserPermissions",
+"summary": "Permission required: Workspace.Admin",
+"params": [
+"userId",
+"targetWorkspace"
+],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/UserPreferences",
+"tag": "UserPreferences",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/UserPreferences",
+"tag": "UserPreferences",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/UserPreferences",
+"tag": "UserPreferences",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Users",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Users/details",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Users/me",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Users/otp/setup",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Users/password/change",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Users/password/forgot",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Users/password/update",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Users/refer-friend",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Users/resendToken",
+"tag": "Users",
+"summary": "Permission required: None",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Webhooks/launch/{id}",
+"tag": "WebhookLaunch",
+"summary": "Permission required: None",
+"params": [
+"id",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Webhooks/launch/{id}",
+"tag": "WebhookLaunch",
+"summary": "Permission required: None",
+"params": [
+"id",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/Webhooks/launch/{id}",
+"tag": "WebhookLaunch",
+"summary": "Permission required: None",
+"params": [
+"id",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Webhooks/launch/{id}",
+"tag": "WebhookLaunch",
+"summary": "Permission required: None",
+"params": [
+"id",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/Webhooks/launch/{id}",
+"tag": "WebhookLaunch",
+"summary": "Permission required: None",
+"params": [
+"id",
+"payload",
+"respondOk"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Webhooks",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Read",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Webhooks",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Webhooks",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Update",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/Webhooks/datamodels/{webhookId}",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Read",
+"params": [
+"webhookId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Webhooks/generate-data",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Write",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Webhooks/listen",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Update",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Webhooks/{webhookId}",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Delete",
+"params": [
+"webhookId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Webhooks/{webhookId}",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Read",
+"params": [
+"webhookId"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Webhooks/{webhookId}/undo",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Update",
+"params": [
+"webhookId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Webhooks/{webhookId}/used",
+"tag": "Webhooks",
+"summary": "Permission required: Webhook.Read",
+"params": [
+"webhookId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Workspace",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Write",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Workspace",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Update",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Workspace/invite",
+"tag": "Workspace",
+"summary": "Permission required: Workspace.Write",
+"params": [
+"targetWorkspace"
+],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/Workspace/invite/{id}",
+"tag": "Workspace",
+"summary": "Permission required: Workspace.Update",
+"params": [
+"id",
+"targetWorkspace"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Workspace/settings/default",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/Workspace/transfer-ownership/{coOwnerId}",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Update",
+"params": [
+"coOwnerId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Workspace/users",
+"tag": "Workspace",
+"summary": "Permission required: Workspace.Write",
+"params": [
+"pageNumber",
+"pageItemCount",
+"targetWorkspace"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Workspace/{parentId}/otp",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"parentId"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/Workspace/{parentId}/otp",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Update",
+"params": [
+"parentId",
+"otpEnabled"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Workspace/{parentId}/subworkspaces",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"parentId",
+"pageNumber",
+"pageItemCount"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Workspace/{parentId}/subworkspaces/{id}",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"parentId",
+"id"
+],
+"body": false
+},
+{
+"method": "DELETE",
+"path": "/api/Workspace/{workspaceToDelete}",
+"tag": "Workspace",
+"summary": "Permission required: MasterWorkspace.Delete",
+"params": [
+"workspaceToDelete"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Workspaces",
+"tag": "Workspace",
+"summary": "Permission required: None",
+"params": [],
+"body": false
+}
+]
+}

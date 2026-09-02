@@ -1,0 +1,25 @@
+{
+  "Id": "00000000-0000-0000-0000-000000000001",
+  "Name": "OrderHook",
+  "PayloadIsList": false,
+  "HasHeader": false,
+  "HasQuery": false,
+  "DataModelId": "dm-1",
+  "Type": 1,
+  "Definition": "{\"orderId\": \"abc\", \"amount\": 12.5}",
+  "IsEdited": true,
+  "DataModel": {
+    "id": "dm-1",
+    "name": "InternalWebhookDto",
+    "isDataModel": true,
+    "type": 2,
+    "attributes": [
+      {
+        "id": "a1",
+        "name": "orderId",
+        "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214"
+      }
+    ]
+  },
+  "CustomResponseConfig": null
+}

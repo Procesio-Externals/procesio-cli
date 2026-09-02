@@ -1,0 +1,77 @@
+{
+ "id": "193aa05e-37c8-55a0-9c22-cc21618483ba",
+ "category": "structure",
+ "type": "column",
+ "configs": [
+  {
+   "id": "ebc28a86-174f-5908-86fe-4d3e5010ba83",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "3facb26d-d1c5-580d-b1c5-4edec2ca6ae7",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "c270f5d8-6100-552a-ae02-5bd7fec77aea",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "19fb04a6-304b-5cc0-b260-3f8eb8596350",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Column",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "a901840e-b1e9-50da-9c80-7fdde8e9dc2b",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "column",
+   "exposed": true
+  },
+  {
+   "id": "2d928585-ff3d-5cdf-97c0-1dd20b15c723",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

@@ -1,0 +1,638 @@
+[
+  {
+    "id": "00000000-0000-0000-0000-000000000002",
+    "type": "heading",
+    "configs": [
+      {
+        "id": "00000000-0000-0000-0000-000000000003",
+        "key": "label",
+        "label": "Label",
+        "placeholder": "Add label here",
+        "tooltip": "Can be either string or HTML string",
+        "category": "content",
+        "subCategory": "general",
+        "type": "html-code-editor",
+        "value": "Title",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000004",
+        "key": "tooltip",
+        "label": "Tooltip",
+        "placeholder": "Add tooltip here",
+        "tooltip": "Tooltip can only be displayed with Label",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000005",
+        "key": "visible",
+        "label": "Visible",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000006",
+        "key": "name",
+        "label": "Name",
+        "placeholder": "Element name",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "Title",
+        "hasTopDivider": true,
+        "exposed": true,
+        "events": [
+          "REMAP",
+          "EMIT_ELEMENTS_UPDATE"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000007",
+        "key": "id",
+        "label": "ID",
+        "placeholder": "Add ID here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "Title",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000008",
+        "key": "style",
+        "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      }
+    ],
+    "section": "header",
+    "category": "structure",
+    "parentId": null
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000009",
+    "category": "fields",
+    "type": "input",
+    "configs": [
+      {
+        "id": "00000000-0000-0000-0000-000000000010",
+        "key": "label",
+        "label": "Label",
+        "placeholder": "Add label here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "Full Name",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000011",
+        "key": "placeholder",
+        "label": "Placeholder",
+        "placeholder": "Add placeholder text here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "John",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000012",
+        "key": "type",
+        "label": "Type",
+        "tooltip": "Type does not impact the entire input behavior. Default browser's behavior can be changed.",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input-type-select",
+        "value": "text",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000013",
+        "key": "tooltip",
+        "label": "Tooltip",
+        "placeholder": "Add tooltip here",
+        "tooltip": "Tooltip can only be displayed with Label",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000014",
+        "key": "info-text",
+        "label": "Info text",
+        "placeholder": "Add info text here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000015",
+        "key": "defaultValue",
+        "label": "Default value",
+        "placeholder": "Add default value here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true,
+        "events": [
+          "REMAP"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000016",
+        "key": "value",
+        "label": "Value",
+        "category": "content",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": "",
+        "exposed": true,
+        "events": [
+          "EMIT_INPUT"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000017",
+        "key": "readonly",
+        "label": "Readonly",
+        "category": "content",
+        "subCategory": "general",
+        "type": "readonly-or-disabled",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000018",
+        "key": "disabled",
+        "label": "Disabled",
+        "category": "content",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000019",
+        "key": "visible",
+        "label": "Visible",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000020",
+        "key": "name",
+        "label": "Name",
+        "placeholder": "Element name",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "fullName",
+        "hasTopDivider": true,
+        "exposed": true,
+        "events": [
+          "REMAP",
+          "EMIT_ELEMENTS_UPDATE"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000021",
+        "key": "id",
+        "label": "ID",
+        "placeholder": "Add ID here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "fullName",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000022",
+        "key": "required",
+        "label": "Required",
+        "category": "content",
+        "subCategory": "validation",
+        "type": "toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000023",
+        "key": "regex",
+        "label": "Regex",
+        "placeholder": "Add regex for validation here",
+        "category": "content",
+        "subCategory": "validation",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000024",
+        "key": "onInputEvents",
+        "label": "onInput",
+        "category": "content",
+        "subCategory": "events",
+        "type": "field-events",
+        "value": null
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000025",
+        "key": "onFocusEvents",
+        "label": "onFocus",
+        "category": "content",
+        "subCategory": "events",
+        "type": "field-events",
+        "value": null
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000026",
+        "key": "onBlurEvents",
+        "label": "onBlur",
+        "category": "content",
+        "subCategory": "events",
+        "type": "field-events",
+        "value": null
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000027",
+        "key": "style",
+        "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      }
+    ],
+    "parentId": null,
+    "section": "body"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000028",
+    "category": "fields",
+    "type": "select",
+    "configs": [
+      {
+        "id": "00000000-0000-0000-0000-000000000029",
+        "key": "label",
+        "label": "Label",
+        "placeholder": "Add label here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "Country",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000030",
+        "key": "placeholder",
+        "label": "Placeholder",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000031",
+        "key": "tooltip",
+        "label": "Tooltip",
+        "placeholder": "Add tooltip here",
+        "tooltip": "Tooltip can only be displayed with Label",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000032",
+        "key": "info-text",
+        "label": "Info text",
+        "placeholder": "Add info text here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000033",
+        "key": "searchable",
+        "label": "Searchable",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000034",
+        "key": "clearable",
+        "label": "Clearable",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000035",
+        "key": "multiple",
+        "label": "Multiple",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": false,
+        "exposed": true,
+        "events": [
+          "EMIT_ELEMENTS_UPDATE"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000036",
+        "key": "readonly",
+        "label": "Readonly",
+        "category": "content",
+        "subCategory": "general",
+        "type": "readonly-or-disabled",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000037",
+        "key": "disabled",
+        "label": "Disabled",
+        "category": "content",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000038",
+        "key": "visible",
+        "label": "Visible",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000039",
+        "key": "name",
+        "label": "Name",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "country",
+        "hasTopDivider": true,
+        "exposed": true,
+        "events": [
+          "REMAP",
+          "EMIT_ELEMENTS_UPDATE"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000040",
+        "key": "id",
+        "label": "ID",
+        "placeholder": "Add ID here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "country",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000041",
+        "key": "sourceType",
+        "label": "Source type",
+        "category": "content",
+        "subCategory": "data-source",
+        "type": "source-type",
+        "value": "static-list",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000042",
+        "key": "sourceValue",
+        "label": "Source value",
+        "category": "content",
+        "subCategory": "data-source",
+        "type": "source-value",
+        "value": [
+          {
+            "name": "RO",
+            "value": "RO"
+          },
+          {
+            "name": "US",
+            "value": "US"
+          }
+        ],
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000043",
+        "key": "defaultValue",
+        "label": "Default value",
+        "placeholder": "Add default value here",
+        "category": "content",
+        "subCategory": "data-source",
+        "type": "clearable-select",
+        "value": null,
+        "exposed": true,
+        "events": [
+          "REMAP"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000044",
+        "key": "value",
+        "label": "Value",
+        "category": "content",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": null,
+        "exposed": true,
+        "events": [
+          "EMIT_INPUT"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000045",
+        "key": "required",
+        "label": "Required",
+        "category": "content",
+        "subCategory": "validation",
+        "type": "toggle",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000046",
+        "key": "onInputEvents",
+        "label": "onInput",
+        "category": "content",
+        "subCategory": "events",
+        "type": "field-events",
+        "value": null
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000047",
+        "key": "style",
+        "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      }
+    ],
+    "parentId": null,
+    "section": "body"
+  },
+  {
+    "id": "00000000-0000-0000-0000-000000000048",
+    "category": "fields",
+    "type": "button",
+    "configs": [
+      {
+        "id": "00000000-0000-0000-0000-000000000049",
+        "key": "label",
+        "label": "Label",
+        "placeholder": "Add label here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "Submit",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000050",
+        "key": "tooltip",
+        "label": "Tooltip",
+        "placeholder": "Add tooltip here",
+        "tooltip": "Tooltip is displayed on element hover",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000051",
+        "key": "info-text",
+        "label": "Info text",
+        "placeholder": "Add info text here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "input",
+        "value": "",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000052",
+        "key": "readonly",
+        "label": "Readonly",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": false,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000053",
+        "key": "visible",
+        "label": "Visible",
+        "category": "content",
+        "subCategory": "general",
+        "type": "toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000054",
+        "key": "name",
+        "label": "Name",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "Submit",
+        "hasTopDivider": true,
+        "exposed": true,
+        "events": [
+          "EMIT_ELEMENTS_UPDATE"
+        ]
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000055",
+        "key": "id",
+        "label": "ID",
+        "placeholder": "Add ID here",
+        "category": "content",
+        "subCategory": "general",
+        "type": "copyable-input",
+        "value": "Submit",
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000056",
+        "key": "submit",
+        "label": "Submit",
+        "category": "content",
+        "subCategory": "action",
+        "type": "button-submit-toggle",
+        "value": true,
+        "exposed": true
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000057",
+        "key": "disabledIfFormIsInvalid",
+        "label": "Disabled if form is invalid",
+        "category": "content",
+        "subCategory": "validation",
+        "type": "toggle",
+        "value": false
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000058",
+        "key": "onClickEvents",
+        "label": "onClick",
+        "category": "content",
+        "subCategory": "events",
+        "type": "field-events",
+        "value": null
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000059",
+        "key": "style",
+        "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      }
+    ],
+    "parentId": null,
+    "section": "footer"
+  }
+]

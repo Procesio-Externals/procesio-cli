@@ -1,0 +1,112 @@
+name: mysql
+description: Read-only MySQL/MariaDB queries over pymysql with named connection profiles. SELECT-only by default (--write to override); returns rows as JSON; schema/table introspection. MySQL has no read-only intent, so the write-guard is the enforcement.
+version: 0.1.0
+runtime: python
+entrypoint: main.py
+
+# Secrets are PER-PROFILE and dynamic, so none are declared here.
+# Each profile's password lives in Windows Credential Manager under
+# agents-and-tools:mysql:<profile-name> and is read at runtime via
+# tools._lib.creds.get("mysql", <profile>). Set one with:
+#   python scripts/set-credential.py mysql <profile>
+# Non-secret profile config (host/database/username/port/charset/tls) lives in
+# this tool's profiles.json — never the password.
+secrets: []
+
+routing:
+  triggers:
+    - run a MySQL query
+    - query a MySQL / MariaDB database
+    - read a table from MySQL
+    - list MySQL tables or columns
+  primary_action: query
+  example: mysql query --profile default --sql "SELECT * FROM issues LIMIT 10"
+
+actions:
+  - name: profiles
+    description: List configured connection profiles (no passwords).
+    args: []
+    output_schema: '{ "count": N, "profiles": [ {name, host, database, ..., has_password} ] }'
+
+  - name: add-profile
+    description: Store a connection profile (config only; set the password separately via set-credential).
+    args:
+      - {name: name, type: string, required: true, description: Profile name (also the credential name)}
+      - {name: host, type: string, required: true, description: MySQL host}
+      - {name: database, type: string, description: Default schema/database}
+      - {name: username, type: string, description: MySQL user (default root)}
+      - {name: port, type: integer, description: TCP port (default 3306)}
+      - {name: charset, type: string, description: Connection charset (default utf8mb4)}
+      - {name: tls, type: string, description: Wrap the socket in TLS - yes or no (default no)}
+      - {name: tls-verify-cert, type: string, description: Verify the server cert chain - yes or no (default no)}
+      - {name: connect-timeout, type: integer, description: Connect timeout seconds (default 30)}
+      - {name: statement-timeout, type: integer, description: "Read/statement timeout seconds, 0=unbounded (default 300)"}
+      - {name: overwrite, type: boolean, description: Replace an existing profile}
+    output_schema: '{ "name": "...", "host": "...", "has_password": false, "note": "..." }'
+
+  - name: test-connection
+    description: Connect and return the masked connection string + server version (never the password).
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+    output_schema: '{ "profile": "...", "connection_string": "mysql://user:***@host...", "server_version": "...", "connected": true }'
+
+  - name: query
+    description: Run read-only SQL (SELECT by default; --write allows non-SELECT). Params bound via %s placeholders, never interpolated.
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: sql, type: string, required: true, description: SQL statement}
+      - {name: params, type: string, description: "Parameter values as a JSON array, bound via %s placeholders"}
+      - {name: max-rows, type: integer, description: Cap rows returned (default 1000; 0=unbounded)}
+      - {name: write, type: boolean, description: Allow a non-SELECT/DDL/multi statement (off by default)}
+      - {name: database, type: string, description: Run against this database instead of the profile's}
+    output_schema: '{ "columns": [...], "rows": [ {...} ], "row_count": N, "truncated": false, "write": false }'
+
+  - name: tables
+    description: List tables and views, optionally restricted to one schema.
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: List tables from this database instead of the profile's}
+      - {name: schema, type: string, description: Restrict to one schema (default the profile's database)}
+    output_schema: '{ "profile": "...", "count": N, "tables": [ {TABLE_SCHEMA, TABLE_NAME, TABLE_TYPE} ] }'
+
+  - name: columns
+    description: List a table's columns (name, type, nullable, key, length, default).
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: Read columns from this database instead of the profile's}
+      - {name: table, type: string, required: true, description: Table name (schema.table or table)}
+    output_schema: '{ "profile": "...", "table": "...", "count": N, "columns": [ {COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_KEY, ...} ] }'
+
+  - name: schema-extract
+    description: "Mirror every object in the database to local .sql files (one per object) under <out>/schema/<Type>/. Read-only and incremental: a re-run with no changes writes nothing."
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: Extract this database instead of the profile's}
+      - {name: out, type: string, description: "Mirror output directory (default ./db-mirror/<profile>)"}
+      - {name: types, type: string, description: "Comma list of object types to include: TABLE,VIEW,PROCEDURE,FUNCTION,TRIGGER,EVENT (default all)"}
+      - {name: full, type: boolean, description: "Wipe and re-extract everything (default: incremental)"}
+      - {name: dry-run, type: boolean, description: Report what would change without writing}
+    output_schema: '{ "profile": "...", "database": "...", "out": "...", "written": N, "unchanged": N, "removed": N, "total": N, "by_type": {}, "dry_run": false }'
+
+  - name: schema-diff
+    description: "Compare two schema sides and report objects added/removed/changed with a unified diff per change. Each side is a mirror directory OR profile:NAME (extracted live to a temp mirror). Read-only end to end."
+    args:
+      - {name: left, type: string, required: true, description: "A mirror directory OR profile:NAME to extract live"}
+      - {name: right, type: string, required: true, description: "A mirror directory OR profile:NAME to extract live"}
+      - {name: database-left, type: string, description: "DB override when --left is a profile"}
+      - {name: database-right, type: string, description: "DB override when --right is a profile"}
+      - {name: types, type: string, description: "Comma list of object types to include when a side is a profile"}
+      - {name: no-diff-text, type: boolean, description: "Suppress per-object unified diff bodies (name lists only)"}
+    output_schema: '{ "left": "...", "right": "...", "added": [], "removed": [], "changed": [ {relpath, diff} ], "unchanged": N, "identical": false, "summary": {added, removed, changed} }'
+
+  - name: migrate
+    description: "Forward-only versioned migration runner. mode=list (default, read-only) shows applied/pending + drift + danger warnings; mode=apply (gated by --apply) runs pending in order, recording each in __schema_migrations. --dry-run wraps each in a rolled-back transaction. DELIMITER caveat: each file runs as a single statement."
+    args:
+      - {name: profile, type: string, required: true, description: Profile name}
+      - {name: database, type: string, description: Migrate this database instead of the profile's}
+      - {name: dir, type: string, description: "Migrations directory (default ./db-migrations/<profile>)"}
+      - {name: mode, type: string, description: "list (read-only, default) or apply (writes)"}
+      - {name: dry-run, type: boolean, description: Apply each pending migration in a rolled-back transaction}
+      - {name: apply, type: boolean, description: "Required confirmation to actually write (with --mode apply)"}
+      - {name: accept-drift, type: boolean, description: Proceed with apply even if applied files changed on disk}
+    output_schema: '{ "profile": "...", "database": "...", "dir": "...", "mode": "list", "applied_count": N, "pending": [ {migration_id, filename, sha256, danger_warnings} ], "drift": [], "applied_results": [] }'

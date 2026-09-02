@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest a tool, an action, or a change in behavior.
+labels: ["enhancement", "needs triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What you're trying to do
+      description: Describe the task, not the solution. What can't you do today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you'd like
+      description: If you have a shape in mind, sketch the command or the API.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you do instead today
+      description: The workaround, if you have one.
+
+  - type: dropdown
+    id: contribute
+    attributes:
+      label: Would you like to build it?
+      options:
+        - "Yes, if a maintainer agrees on the approach"
+        - "No, I'm suggesting it"
+    validations:
+      required: true

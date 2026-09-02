@@ -1,0 +1,174 @@
+{
+ "id": "3a0f536f-60f8-544a-b38c-e5e8b52341f4",
+ "category": "structure",
+ "type": "image",
+ "configs": [
+  {
+   "id": "96d92efa-b59d-5dd6-bc1f-51fa30519f20",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "36babf53-7a09-510f-bba9-58697a2ed3e1",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "a0b65605-3d1a-5148-a98e-24a66b152b22",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "c427482a-0f24-5dd7-97f4-520bce42b781",
+   "key": "src",
+   "label": "Src",
+   "placeholder": "Add URL here",
+   "tooltip": "URL can be defined both as a link or as a Base64 string",
+   "category": "content",
+   "subCategory": "general",
+   "type": "url-or-file",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "778577e4-965a-5368-ae36-a8979770873a",
+   "key": "alt",
+   "label": "Alt",
+   "placeholder": "Add alt here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "aef72b6b-5df5-5f71-83e8-ec50bb0006db",
+   "key": "title",
+   "label": "Title",
+   "placeholder": "Add title here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "2470efc4-5278-5c76-845e-f415d6f2baa3",
+   "key": "width",
+   "label": "Width",
+   "placeholder": "Add width here",
+   "tooltip": "Default: auto; value can be set as a number with an unit (px, in, em, rem, %, etc.), e.g. 200px, 50%, 3em",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "auto",
+   "exposed": true
+  },
+  {
+   "id": "7dfab882-0a4f-5f76-b798-42756a9c7863",
+   "key": "height",
+   "label": "Height",
+   "placeholder": "Add height here",
+   "tooltip": "Default: auto; value can be set as a number with an unit (px, in, em, rem, %, etc.), e.g. 200px, 50%, 3em",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "auto",
+   "exposed": true
+  },
+  {
+   "id": "5f66b45c-c06a-5d30-9851-377b76b56c50",
+   "key": "aspectRatio",
+   "label": "Aspect ratio",
+   "placeholder": "Add aspect ratio here",
+   "tooltip": "Default: auto; value can be set as a number, e.g. 16:9, 1.5/5, 3",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "auto",
+   "exposed": true
+  },
+  {
+   "id": "7b1b3ea2-6eba-5b05-8d2f-448108bcfb0f",
+   "key": "linkUrl",
+   "label": "Link URL",
+   "placeholder": "https://...",
+   "tooltip": "URL to navigate to",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true
+  },
+  {
+   "id": "686f7fb9-7007-5fd4-a05e-d0178f9e6369",
+   "key": "linkUrlTarget",
+   "label": "Link URL target",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "url-target-select",
+   "value": "_blank",
+   "exposed": true
+  },
+  {
+   "id": "27f92eb7-fbe0-5c38-aecb-8de6399c6884",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Image",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "008d442a-c60c-55a3-bd9a-573a5a09e0ff",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "image",
+   "exposed": true
+  },
+  {
+   "id": "2cd7c37b-a24f-5669-88ac-d21a86065979",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

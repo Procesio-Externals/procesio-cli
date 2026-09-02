@@ -1,0 +1,54 @@
+{
+ "id": "e1664f6d-bb64-5514-9ed5-a86e26b5686f",
+ "category": "structure",
+ "type": "divider",
+ "configs": [
+  {
+   "id": "e1df7d83-2e23-5fd9-90d9-97684b73d6f0",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "8af35458-703f-565b-ad1b-10a60bab6214",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Divider",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "50278efc-7860-5c61-af57-7aab77bc8c5a",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "divider",
+   "exposed": true
+  },
+  {
+   "id": "16d9866f-e33d-5a71-90bc-b8eeea5671bd",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

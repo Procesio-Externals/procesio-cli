@@ -1,0 +1,30 @@
+name: xlsx
+description: Read local Excel (.xlsx/.xlsm) workbooks - list sheets, read a sheet as JSON, or dump the whole file to text. No credentials.
+version: 0.1.0
+runtime: python
+entrypoint: main.py
+
+secrets: []
+
+actions:
+  - name: list-sheets
+    description: List a workbook's sheets with row/column counts.
+    args:
+      - {name: path, type: string, required: true, description: Local .xlsx/.xlsm file}
+    output_schema: '{ "path": "...", "sheets": [ {title, rows, columns} ] }'
+
+  - name: read-sheet
+    description: Read one sheet's rows as a JSON 2D array (trailing-empty cells trimmed, empty rows skipped).
+    args:
+      - {name: path, type: string, required: true}
+      - {name: sheet, type: string, description: Sheet name (default first/active)}
+      - {name: max-results, type: integer, description: Cap rows returned}
+    output_schema: '{ "sheet": "...", "rows": [[...]], "truncated": false }'
+
+  - name: dump
+    description: Dump the whole workbook to readable pipe-delimited text.
+    args:
+      - {name: path, type: string, required: true}
+      - {name: save, type: string, description: Write text dump here instead of inline}
+      - {name: max-results, type: integer, description: Cap rows per sheet}
+    output_schema: '{ "text"?: "...", "savedTo"?: "...", "characters": N }'

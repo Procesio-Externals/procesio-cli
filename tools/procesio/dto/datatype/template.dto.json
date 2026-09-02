@@ -1,0 +1,37 @@
+{
+  "_note": "Golden CreateDataTypeDto shape (POST /api/DataTypes body). <PLACEHOLDERS> are filled by builder.py. The server REASSIGNS all Id/ParentDataTypeId values and derives attribute types from DataTypeId, so client ids are positional only. CsharpCorrespondent on the model is 0; on a primitive attribute it mirrors the PrimaryDataType enum (String=50, Integer=20, ...). Captured live 2026-06-24 against 4Export.",
+  "Name": "<name>",
+  "DisplayName": "<displayName>",
+  "IsPublic": true,
+  "Content": {
+    "Id": "<uuid: model>",
+    "Name": "<name>",
+    "DisplayName": "<displayName>",
+    "IsDataModel": true,
+    "IsPrimaryType": false,
+    "IsProcesio": false,
+    "IsPublic": true,
+    "CsharpCorrespondent": 0,
+    "Type": 1,
+    "ParentIds": [],
+    "Attributes": [
+      {
+        "Id": "<uuid: attr>",
+        "DataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+        "ParentDataTypeId": "<uuid: model>",
+        "Name": "<attr name>",
+        "DisplayName": "<attr name>",
+        "DataTypeName": null,
+        "IsDataModel": false,
+        "IsPrimaryType": false,
+        "IsProcesio": false,
+        "IsPublic": false,
+        "CsharpCorrespondent": 50,
+        "Type": 1,
+        "IsList": false,
+        "jsonProperty": "<attr name>",
+        "Attributes": []
+      }
+    ]
+  }
+}

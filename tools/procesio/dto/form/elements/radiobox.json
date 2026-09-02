@@ -1,0 +1,174 @@
+{
+ "id": "358bd578-1d0e-595b-983d-d2b10adb17f7",
+ "category": "fields",
+ "type": "radiobox",
+ "configs": [
+  {
+   "id": "f4579e25-7b0a-5e3d-977b-94eaae8fa84c",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Radio button",
+   "exposed": true
+  },
+  {
+   "id": "18329653-df87-5861-9a18-358b8f03232c",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "6ff95fe6-42cc-5c20-b8a2-8cf3369bbac4",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "29734734-3c79-5aa6-84ed-c93fcb486443",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "0208b349-9ceb-54a7-a82d-2c936e7ccd82",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "7b0818f1-4259-5cab-9c5b-07f430d9720f",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "a8410f51-5c8f-5f51-93fc-2322f7308538",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Radio",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "e1abfc51-f44b-5e32-a622-43d3577d80f3",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "radio",
+   "exposed": true
+  },
+  {
+   "id": "3978c6d2-ace7-5735-8ad5-91e8b71ae05e",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "bfce5071-ffbd-5541-b9a9-36e395b69549",
+   "key": "sourceType",
+   "label": "Source type",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-type",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "4a9f26fe-693d-575c-ba29-e1e5809ac61c",
+   "key": "sourceValue",
+   "label": "Source value",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "source-value",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "a7b76693-e2f7-51a6-9432-54651281ed59",
+   "key": "defaultValue",
+   "label": "Default value",
+   "placeholder": "Add default value here",
+   "category": "content",
+   "subCategory": "data-source",
+   "type": "clearable-select",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "REMAP"
+   ]
+  },
+  {
+   "id": "33ef3afb-90ea-56e4-9e45-9887a458e451",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "d33ff3b5-869a-58b9-8740-52b095f4bc29",
+   "key": "onInputEvents",
+   "label": "onInput",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "a20b21dd-16c1-5493-8956-046d26f3f5a4",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

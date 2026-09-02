@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PROCESIO Document Template config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "body"],
+  "properties": {
+    "name": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "body": {"type": "string", "description": "HTML body; reference variables as <%name%>"},
+    "pageSize": {"type": "string", "default": "A4"},
+    "orientation": {"type": "string", "enum": ["portrait", "landscape"], "default": "portrait"},
+    "placeholderStart": {"type": "string", "default": "<%"},
+    "placeholderStop": {"type": "string", "default": "%>"},
+    "variables": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "type": {"type": "string", "enum": ["boolean", "integer", "float", "double", "string", "datetime", "json", "object", "guid", "bool", "int", "long", "number", "text", "str", "uuid", "date-time"]},
+          "model": {"type": "string"},
+          "isList": {"type": "boolean", "default": false},
+          "isInput": {"type": "boolean", "default": true},
+          "isOutput": {"type": "boolean", "default": false},
+          "default": {}
+        }
+      }
+    }
+  }
+}

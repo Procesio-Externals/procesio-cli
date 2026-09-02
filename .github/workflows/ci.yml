@@ -1,0 +1,36 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    # The credential store is per-OS, so it is tested per-OS. A change that only
+    # works on the maintainer's machine is exactly what this matrix is for.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          # Without this the matrix is decoration: uv picks its own interpreter,
+          # every job runs the same one, and the job names claim a coverage the
+          # run does not have.
+          python-version: ${{ matrix.python-version }}
+      - run: uv sync --all-extras --python ${{ matrix.python-version }}
+      - name: tests
+        # Every suite the repo ships, not just the two obvious ones: the
+        # dashboard and the MCP bridge carry tests too, and leaving them out
+        # meant a green CI that had never exercised either.
+        run: uv run pytest tools agents dashboard webplatform -q
+      - name: no secrets in tracked files
+        run: uv run python scripts/secret_scan.py
+      - name: generated files are current
+        run: |
+          uv run python scripts/build-router.py --check

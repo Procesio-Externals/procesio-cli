@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PROCESIO Process (Flow) config",
+  "description": "Minimal config to build a runnable PROCESIO process. The builder resolves each action against the live action catalog, binds params to the template's properties, auto-injects Start/Stop, and wires ports (linear by default, or via explicit edges).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["title"],
+  "properties": {
+    "title": {"type": "string", "minLength": 1},
+    "description": {"type": "string"},
+    "timeout": {"type": "integer", "minimum": 0, "default": 0},
+    "variables": {"type": "array", "items": {"$ref": "#/$defs/variable"}},
+    "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
+    "edges": {
+      "type": "array",
+      "description": "Explicit wiring between action ids ('start'/'stop' reserved). Omit for a linear chain.",
+      "items": {"$ref": "#/$defs/edge"}
+    },
+    "webhooks": {
+      "type": "array",
+      "description": "Webhook triggers: each {webhookId, variables:[{name, source}]} binds a process variable to the webhook Body/Query/Header.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["webhookId"],
+        "properties": {
+          "webhookId": {"type": "string"},
+          "variables": {"type": "array", "items": {
+            "type": "object", "additionalProperties": false, "required": ["name"],
+            "properties": {"name": {"type": "string"}, "source": {"type": "string", "enum": ["header", "query", "body"]}}}}
+        }
+      }
+    },
+    "customResponse": {"description": "synchronous webhook response: {var: <process var name>} returns that variable's value to the caller (or {value: literal})"},
+    "relayout": {"description": "canvas re-tidy scope on EDIT (create always lays out fully). One of: \"all\" | \"none\" | \"new\" | [actionId,...] | {new:bool, actions:[...], edited:[...]}. Default on edit: place NEW actions only, leave existing actions where they are."},
+    "_webhooks": {"type": "array", "description": "internal: WebhookInstanceDto[] passthrough"},
+    "_customResponse": {"description": "internal: CustomResponseDto"}
+  },
+  "$defs": {
+    "variable": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1},
+        "type": {"type": "string", "enum": ["boolean", "integer", "float", "double", "string", "datetime", "json", "object", "guid", "bool", "int", "long", "number", "text", "str", "uuid", "date-time"]},
+        "model": {"type": "string", "description": "data model name/id (instead of a primitive type)"},
+        "direction": {"type": "string", "enum": ["input", "process", "output"], "default": "process"},
+        "isList": {"type": "boolean", "default": false},
+        "required": {"type": "boolean", "default": false},
+        "isError": {"type": "boolean", "default": false},
+        "default": {}
+      }
+    },
+    "action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "action"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "description": "config-local id used in edges"},
+        "action": {"type": "string", "minLength": 1, "description": "action template name (or id) from the catalog"},
+        "name": {"type": "string", "description": "display name; if omitted it is auto-derived from what the action does (e.g. 'GET /users', 'For each items', a Node's leading comment) and falls back to the template name. Re-evaluated on every build/edit."},
+        "params": {
+          "type": "object",
+          "description": "property label/id -> binding (literal, {value}, {var[,path]}, or {template,vars})",
+          "additionalProperties": {"$ref": "#/$defs/binding"}
+        },
+        "onError": {"type": "string", "description": "action id to route this action's error port to (captures the error in an ErrorDataModel variable)"},
+        "parent": {"type": "string", "description": "id of the For Each action that contains this action (loop body). A For Each cannot be nested directly inside another For Each."},
+        "subprocess": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Call/Trigger Subprocess: target flow id + variable maps. Sub-process var ids are GUIDs (e.g. from read-flow-graph on the target); parent vars resolve by name.",
+          "required": ["target"],
+          "properties": {
+            "target": {"type": "string", "description": "target flow (subprocess) GUID"},
+            "inputs": {"type": "object", "description": "subInputVarId -> parent binding (literal/{value}/{var,path})", "additionalProperties": {"$ref": "#/$defs/binding"}},
+            "outputs": {"type": "object", "description": "parentVarName -> subOutputVarId (GUID)", "additionalProperties": {"type": "string"}}
+          }
+        },
+        "docMap": {"type": "object", "description": "Generate Document: map each document template variable name -> a process variable (name or {var})", "additionalProperties": {"type": ["string", "object"]}},
+        "branches": {
+          "type": "array",
+          "description": "Decisional routing. Regular Decisional: {to, when:[conditions], name?, default}. AI Decisional: {to, condition:'<natural-language>', name?, default} — condition is a plain-English sentence the model evaluates. A non-default case is auto-labelled from its condition (rule-based: 'amount > 1000'; AI: the condition sentence) unless name is given; re-evaluated on every build/edit.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["to"],
+            "properties": {
+              "to": {"type": "string", "description": "target action id"},
+              "default": {"type": "boolean", "description": "the fallback branch"},
+              "when": {"type": "array", "items": {"$ref": "#/$defs/condition"}},
+              "condition": {"type": "string", "description": "AI Decisional only: the natural-language condition for this case"},
+              "name": {"type": "string", "description": "case label shown in the designer (regular OR AI Decisional); default is derived from the case condition, else 'Case N'"}
+            }
+          }
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["left", "op"],
+      "properties": {
+        "left": {"$ref": "#/$defs/operand"},
+        "op": {"type": "string", "description": "EQUALS, DOES_NOT_EQUAL, GREATER_THAN, LESS_THAN, CONTAINS, IS_EMPTY, IS_NOT_EMPTY, IS_TRUE, IS_FALSE, ..."},
+        "right": {"$ref": "#/$defs/operand"},
+        "logic": {"type": "string", "enum": ["and", "or"]}
+      }
+    },
+    "operand": {
+      "anyOf": [
+        {"type": ["string", "number", "boolean", "null"]},
+        {"type": "object", "additionalProperties": false, "properties": {"value": {}}},
+        {"type": "object", "additionalProperties": false, "required": ["var"],
+          "properties": {"var": {"type": "string"}, "path": {"type": "array", "items": {"type": "string"}}}}
+      ]
+    },
+    "binding": {
+      "anyOf": [
+        {"type": ["string", "number", "boolean", "null"]},
+        {"type": "object", "additionalProperties": false, "properties": {"value": {}}},
+        {"type": "object", "additionalProperties": false, "required": ["credential"],
+          "properties": {"credential": {"type": "string", "description": "credential INSTANCE gid for a credentials-typed property (the action's credential template/type is fixed by the catalog)"}}},
+        {"type": "object", "additionalProperties": false, "required": ["var"],
+          "properties": {"var": {"type": "string"}, "path": {"type": "array", "items": {"type": "string"}}}},
+        {"type": "object", "additionalProperties": false, "required": ["template", "vars"],
+          "properties": {"template": {"description": "string OR a JSON object/array with <%i%> placeholders in string leaves"}, "vars": {"type": "array", "items": {"anyOf": [
+            {"type": "string"},
+            {"type": "object", "additionalProperties": false, "required": ["var"],
+              "properties": {"var": {"type": "string"}, "path": {"type": "array", "items": {"type": "string"}}}}
+          ]}}}}
+      ]
+    },
+    "edge": {
+      "oneOf": [
+        {"type": "array", "minItems": 2, "maxItems": 2, "items": {"type": "string"}},
+        {"type": "object", "additionalProperties": false, "required": ["from", "to"],
+          "properties": {"from": {"type": "string"}, "to": {"type": "string"},
+            "Type": {"type": "integer"}, "Config": {"type": "object"}, "Data": {}}}
+      ]
+    }
+  }
+}

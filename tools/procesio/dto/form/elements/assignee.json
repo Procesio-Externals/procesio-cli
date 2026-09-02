@@ -1,0 +1,137 @@
+{
+ "id": "93ed47a0-3bd0-5c56-97bb-275dc4fb1d29",
+ "category": "fields",
+ "type": "assignee",
+ "configs": [
+  {
+   "id": "2e925066-8f3c-54ba-b2b9-9739e11c9b3f",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Dynamic assignee",
+   "exposed": true
+  },
+  {
+   "id": "7c407c92-cd57-5340-a478-8f3dfd139277",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "19b628cb-6274-5064-acac-b0df370b0a38",
+   "key": "info-text",
+   "label": "Info text",
+   "placeholder": "Add info text here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "You can select one or multiple assignee(s).",
+   "exposed": true
+  },
+  {
+   "id": "1fb1af26-4ccc-53a1-9453-4a38398f9000",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "38469e97-57df-517b-9184-6cfc7e8632b1",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Assignee",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "368e6eaa-3529-5118-a6c4-4eebccd567a5",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "assignee",
+   "exposed": true
+  },
+  {
+   "id": "86c620d1-9807-51e9-ae49-45b3f66cc8d2",
+   "key": "used",
+   "label": "",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false
+  },
+  {
+   "id": "20fafacf-c19a-5ad2-85f1-f90701954ab2",
+   "key": "instanceId",
+   "label": "Instance ID",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "1ae1d7f5-fa3d-5265-8e29-e7b2082ef93e",
+   "key": "config",
+   "label": "",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "assignment-config",
+   "type": "assignment-config",
+   "value": null
+  },
+  {
+   "id": "d3a98747-e4a4-509a-9580-4fce976fd292",
+   "key": "required",
+   "label": "Required",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "hidden",
+   "value": true
+  },
+  {
+   "id": "7f70edfb-de91-5e1b-bf47-f58c552b26e4",
+   "key": "value",
+   "label": "Value",
+   "placeholder": "",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "75f1dca3-8b55-59ab-9002-1db7f51801d2",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

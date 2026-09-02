@@ -1,0 +1,317 @@
+{
+  "Id": "00000000-0000-0000-0000-000000000001",
+  "ParentId": null,
+  "Status": 1,
+  "Title": "Greet",
+  "Description": "demo",
+  "IsValid": true,
+  "Active": true,
+  "Timeout": 0,
+  "CurrentActionId": null,
+  "DebugMode": false,
+  "IsNotification": false,
+  "Variables": [
+    {
+      "Id": "00000000-0000-0000-0000-000000000002",
+      "ContextId": null,
+      "DataType": "0317bfee-b2f5-4bde-bfe8-121212121214",
+      "Type": 10,
+      "Name": "name",
+      "DefaultValue": null,
+      "IsList": false,
+      "IsError": false,
+      "IsRequired": true
+    },
+    {
+      "Id": "00000000-0000-0000-0000-000000000003",
+      "ContextId": null,
+      "DataType": "0317bfee-b2f5-4bde-bfe8-121212121214",
+      "Type": 30,
+      "Name": "greeting",
+      "DefaultValue": null,
+      "IsList": false,
+      "IsError": false,
+      "IsRequired": false
+    }
+  ],
+  "Actions": [
+    {
+      "Id": "00000000-0000-0000-0000-000000000005",
+      "FlowId": "00000000-0000-0000-0000-000000000001",
+      "TemplateId": "c0e32108-6e3e-4ab8-96bd-cd61be6edb33",
+      "ParentId": null,
+      "VariableErrorId": null,
+      "Status": 1,
+      "Category": "",
+      "ActionName": "Start",
+      "ActionTemplateName": "Start",
+      "Ports": [
+        {
+          "Id": "00000000-0000-0000-0000-000000000007",
+          "FlowId": "00000000-0000-0000-0000-000000000001",
+          "SourceId": "00000000-0000-0000-0000-000000000000",
+          "DestinationId": "00000000-0000-0000-0000-000000000005",
+          "Type": 0,
+          "State": 1,
+          "Data": {},
+          "Errors": {},
+          "Config": {}
+        },
+        {
+          "Id": "00000000-0000-0000-0000-000000000008",
+          "FlowId": "00000000-0000-0000-0000-000000000001",
+          "SourceId": "00000000-0000-0000-0000-000000000005",
+          "DestinationId": "00000000-0000-0000-0000-000000000004",
+          "Type": 0,
+          "State": 1,
+          "Data": {},
+          "Errors": {},
+          "Config": {}
+        }
+      ],
+      "Parameters": [],
+      "CustomData": {
+        "type": "square",
+        "name": "Start",
+        "icon": "icon-start",
+        "position": {
+          "x": 80.0,
+          "y": 80.0
+        },
+        "configuration": [
+          {
+            "id": "c0e32108-6e3e-4ab8-96bd-cd61be6edb35",
+            "label": "Details",
+            "orderId": 0,
+            "settings": []
+          },
+          {
+            "id": "c0e32108-6e3e-4ab8-96bd-cd61be6edb36",
+            "label": "Input & Output",
+            "orderId": 0,
+            "settings": []
+          }
+        ],
+        "inputPorts": 0,
+        "outputPorts": 1,
+        "wasDropped": true,
+        "areaSize": {
+          "width": 48,
+          "height": 48,
+          "x": 0,
+          "y": 0
+        }
+      },
+      "IsTestable": false,
+      "IsDisabled": false,
+      "BreakPoint": null,
+      "TestValues": null,
+      "ErrorMessage": "",
+      "Events": null
+    },
+    {
+      "Id": "00000000-0000-0000-0000-000000000004",
+      "FlowId": "00000000-0000-0000-0000-000000000001",
+      "TemplateId": "894e02d1-303d-4e52-9ef7-1b3198ee4b53",
+      "ParentId": null,
+      "VariableErrorId": null,
+      "Status": 1,
+      "Category": "",
+      "ActionName": "Concatenate",
+      "ActionTemplateName": "Concatenate",
+      "Ports": [
+        {
+          "Id": "00000000-0000-0000-0000-000000000009",
+          "FlowId": "00000000-0000-0000-0000-000000000001",
+          "SourceId": "00000000-0000-0000-0000-000000000004",
+          "DestinationId": "00000000-0000-0000-0000-000000000006",
+          "Type": 0,
+          "State": 1,
+          "Data": {},
+          "Errors": {},
+          "Config": {}
+        }
+      ],
+      "Parameters": [
+        {
+          "TabPropertyId": "797e45d8-da43-4412-bac4-a3cbdf961b37",
+          "Variable": [
+            {
+              "id": 0,
+              "variableId": "00000000-0000-0000-0000-000000000002",
+              "attribute": null
+            }
+          ],
+          "Value": "<%0%>"
+        },
+        {
+          "TabPropertyId": "117061e7-e531-4340-9cc1-da8f6e13633a",
+          "Variable": [],
+          "Value": " - processed"
+        },
+        {
+          "TabPropertyId": "9cdb4f28-e2e3-4933-ada8-1285f7f635f4",
+          "Variable": [
+            {
+              "id": 1,
+              "variableId": "00000000-0000-0000-0000-000000000003",
+              "attribute": null
+            }
+          ],
+          "Value": "<%1%>"
+        }
+      ],
+      "CustomData": {
+        "type": "square",
+        "name": "Concatenate",
+        "icon": "merge",
+        "position": {
+          "x": 240.0,
+          "y": 80.0
+        },
+        "configuration": [
+          {
+            "id": "5d932fcf-f1b8-41d6-ad8d-bdd9a1ab7504",
+            "label": "Configuration Tab",
+            "orderId": 0,
+            "settings": [
+              {
+                "id": "9cdb4f28-e2e3-4933-ada8-1285f7f635f4",
+                "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+                "label": "Result",
+                "type": "datatype",
+                "language": null,
+                "credentialsTemplateId": null,
+                "value": "00000000-0000-0000-0000-000000000003",
+                "options": null,
+                "isRequired": true,
+                "expects": "string",
+                "isList": false,
+                "direction": 3,
+                "rowId": 3,
+                "columnId": 0,
+                "columnSize": 0,
+                "tooltip": null,
+                "limits": null,
+                "dependencies": [],
+                "events": []
+              },
+              {
+                "id": "797e45d8-da43-4412-bac4-a3cbdf961b37",
+                "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+                "label": "Input String 1",
+                "type": "text",
+                "language": null,
+                "credentialsTemplateId": null,
+                "value": "00000000-0000-0000-0000-000000000002",
+                "options": null,
+                "isRequired": true,
+                "expects": "string",
+                "isList": false,
+                "direction": 1,
+                "rowId": 1,
+                "columnId": 0,
+                "columnSize": 0,
+                "tooltip": null,
+                "limits": null,
+                "dependencies": [],
+                "events": []
+              },
+              {
+                "id": "117061e7-e531-4340-9cc1-da8f6e13633a",
+                "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+                "label": "Input String 2",
+                "type": "text",
+                "language": null,
+                "credentialsTemplateId": null,
+                "value": " - processed",
+                "options": null,
+                "isRequired": true,
+                "expects": "string",
+                "isList": false,
+                "direction": 1,
+                "rowId": 2,
+                "columnId": 0,
+                "columnSize": 0,
+                "tooltip": null,
+                "limits": null,
+                "dependencies": [],
+                "events": []
+              }
+            ]
+          }
+        ],
+        "inputPorts": 1,
+        "outputPorts": 1,
+        "wasDropped": true,
+        "areaSize": {
+          "width": 48,
+          "height": 48,
+          "x": 0,
+          "y": 0
+        }
+      },
+      "IsTestable": true,
+      "IsDisabled": false,
+      "BreakPoint": null,
+      "TestValues": null,
+      "ErrorMessage": "",
+      "Events": null
+    },
+    {
+      "Id": "00000000-0000-0000-0000-000000000006",
+      "FlowId": "00000000-0000-0000-0000-000000000001",
+      "TemplateId": "c0e32108-6e3e-4ab8-96bd-cd61be6edb34",
+      "ParentId": null,
+      "VariableErrorId": null,
+      "Status": 1,
+      "Category": "",
+      "ActionName": "Stop",
+      "ActionTemplateName": "Stop",
+      "Ports": [],
+      "Parameters": [],
+      "CustomData": {
+        "type": "square",
+        "name": "Stop",
+        "icon": "icon-stop",
+        "position": {
+          "x": 400.0,
+          "y": 80.0
+        },
+        "configuration": [
+          {
+            "id": "c0e32108-6e3e-4ab8-96bd-cd61be6edb37",
+            "label": "Details",
+            "orderId": 0,
+            "settings": []
+          },
+          {
+            "id": "c0e32108-6e3e-4ab8-96bd-cd61be6edb38",
+            "label": "Input & Output",
+            "orderId": 0,
+            "settings": []
+          }
+        ],
+        "inputPorts": 1,
+        "outputPorts": 0,
+        "wasDropped": true,
+        "areaSize": {
+          "width": 48,
+          "height": 48,
+          "x": 0,
+          "y": 0
+        }
+      },
+      "IsTestable": false,
+      "IsDisabled": false,
+      "BreakPoint": null,
+      "TestValues": null,
+      "ErrorMessage": "",
+      "Events": null
+    }
+  ],
+  "Webhooks": [],
+  "CustomResponse": null,
+  "DataRetention": null,
+  "CanvasData": null
+}

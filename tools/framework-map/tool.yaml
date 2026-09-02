@@ -1,0 +1,61 @@
+name: framework-map
+description: >-
+  Regenerate the interactive, bilingual (EN default / RO) framework map - a
+  single self-contained HTML file that visualises every tool, agent, skill and
+  action from the live registry (drillable to the argument level), plus the
+  orchestration loop, the who-triggers-what diagram, schedules, the
+  context/state/knowledge store and worked use cases. Built for presenting the
+  Agents-and-Tools framework to a team.
+version: 0.1.0
+runtime: python
+entrypoint: main.py
+
+actions:
+  - name: build
+    description: >-
+      Extract the live registry, compress it, apply the RO catalog translations
+      (falling back to English where a translation is missing), assemble the
+      single-file HTML, and write it. Reports counts, category breakdown, and any
+      catalog strings still awaiting an RO translation.
+    args:
+      - name: out
+        type: string
+        required: false
+        default: framework-map.html
+        description: Output path for the HTML file. Relative paths resolve from the repo root.
+    output_schema: |
+      { "path": "string", "bytes": int, "tools": int, "agents": int,
+        "skills": int, "actions": int, "tool_actions": int, "agent_actions": int,
+        "categories": { "<name>": int }, "uncategorized": ["string"],
+        "ro_untranslated": { "tool_desc": [], "triggers": [], "agent_desc": [],
+                             "skill_desc": [], "category": [] } }
+    examples:
+      - cmd: python scripts/run-tool.py framework-map build
+        output: '{"path": ".../framework-map.html", "bytes": 1280000, "tools": 44, "agents": 8, "skills": 12, "actions": 1500, ...}'
+      - cmd: python scripts/run-tool.py framework-map build --out outputs/map.html
+        output: '{"path": ".../outputs/map.html", "bytes": 1280000, ...}'
+
+  - name: check
+    description: >-
+      Report current counts, the category breakdown, any uncategorized tools, and
+      any catalog strings (tool/agent/skill descriptions, triggers, categories)
+      still missing an RO translation. Writes nothing - use before build to see
+      what a new tool/agent needs.
+    output_schema: |
+      { "tools": int, "agents": int, "skills": int, "actions": int,
+        "categories": {}, "uncategorized": [], "ro_untranslated": {} }
+    examples:
+      - cmd: python scripts/run-tool.py framework-map check
+        output: '{"tools": 44, "agents": 8, "skills": 12, "actions": 1500, "ro_untranslated": {}}'
+
+secrets: []
+
+routing:
+  triggers:
+    - regenerate / rebuild the framework map or the agents-and-tools visualization
+    - update the framework HTML with the new tools / agents / mechanics
+    - refresh the agents and tools diagram / presentation page
+    - which tools or agents changed / still need an RO translation
+    - build the bilingual framework map (EN/RO)
+  primary_action: build
+  example: "framework-map build   (dry-run counts + untranslated: framework-map check)"

@@ -1,0 +1,41 @@
+{
+  "name": "Customer",
+  "displayName": "Customer",
+  "isPublic": true,
+  "attributes": [
+    {
+      "name": "id",
+      "type": "guid"
+    },
+    {
+      "name": "name",
+      "type": "string"
+    },
+    {
+      "name": "age",
+      "type": "integer"
+    },
+    {
+      "name": "tags",
+      "type": "string",
+      "isList": true
+    },
+    {
+      "name": "address",
+      "attributes": [
+        {
+          "name": "city",
+          "type": "string"
+        },
+        {
+          "name": "zip",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "owner",
+      "model": "PersonModel"
+    }
+  ]
+}

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<style>
+  .procesio-eval { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 860px; margin: 0 auto; color: #1a1a1a; }
+  .procesio-eval h2 { color: #0a2540; border-bottom: 3px solid #0066ff; padding-bottom: 8px; }
+  .procesio-eval h3 { color: #0a2540; margin-top: 24px; }
+  .procesio-eval table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+  .procesio-eval th { background: #0a2540; color: #fff; padding: 8px 12px; text-align: left; }
+  .procesio-eval td { padding: 8px 12px; border: 1px solid #ddd; vertical-align: top; }
+  .procesio-eval tr:nth-child(even) td { background: #f7f9fc; }
+  .tag { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 12px; font-weight: 600; margin: 1px; }
+  .tag-e { background: #d4edda; color: #155724; }
+  .tag-l { background: #cce5ff; color: #004085; }
+  .tag-v { background: #fff3cd; color: #856404; }
+  .tag-tl { background: #f8d7da; color: #721c24; }
+  .result-badge { display: inline-block; background: #0066ff; color: white; padding: 6px 18px; border-radius: 20px; font-weight: 700; font-size: 15px; margin-top: 8px; }
+  .procesio-eval ul { padding-left: 20px; }
+  .procesio-eval li { margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="procesio-eval">
+
+  <h2>PROCESIO Use Case Evaluation</h2>
+  <p><strong>Use case:</strong> <!-- USE_CASE_TITLE --></p>
+  <p><!-- BRIEF_SUMMARY --></p>
+
+  <h3>Step 0 — Priority Assessment</h3>
+  <p><!-- CSF_PRIORITY_ASSESSMENT: state which CSF level this use case falls under and why --></p>
+
+  <h3>1. Feasibility Breakdown</h3>
+  <table>
+    <tr>
+      <th>Task</th>
+      <th>PROCESIO Module / Feature</th>
+      <th>Dimension</th>
+      <th>External Tool (if needed)</th>
+    </tr>
+    <!-- REPEAT ROW FOR EACH KEY TASK:
+    <tr>
+      <td><!-- task description --></td>
+      <td><!-- e.g. Process Designer → Call API, Forms & Tasks, Document Designer, on-prem agent --></td>
+      <td><span class="tag tag-e">E</span></td>
+      <td><!-- e.g. OpenAI API, or — if none needed --></td>
+    </tr>
+    -->
+  </table>
+
+  <h3>2. Required External Tools</h3>
+  <ul>
+    <!-- REPEAT FOR EACH EXTERNAL TOOL:
+    <li><strong>Tool name</strong> <span class="tag tag-l">L</span> — integration method (e.g. REST API via Call API)</li>
+    -->
+    <!-- If none: <li>None — fully achievable with native PROCESIO features.</li> -->
+  </ul>
+
+  <h3>3. New Platform Actions / Features Suggested</h3>
+  <ul>
+    <!-- REPEAT IF ANY NEW ACTIONS WOULD HELP:
+    <li><strong>Action name</strong> — description of what it would do and why it would help</li>
+    -->
+    <!-- If none: <li>No new platform actions required for this use case.</li> -->
+  </ul>
+
+  <h3>4. Recommendation</h3>
+  <p><!-- INTEGRATION_PATTERN used (e.g. AI Orchestration, HITL, Event-Driven Pipeline) -->
+  <!-- Narrative: how PROCESIO orchestrates the full solution, what connects where, what the user should do next --></p>
+
+  <h3>Summary</h3>
+  <table>
+    <tr>
+      <th>% Achievable with PROCESIO (+ integrations)</th>
+      <td><strong><!-- 100% or note genuine blocker --></strong></td>
+    </tr>
+    <tr>
+      <th>Required Third-Party Tools</th>
+      <td><!-- comma-separated list, or "None" --></td>
+    </tr>
+    <tr>
+      <th>Dimensions Requiring Third-Party Tools</th>
+      <td>
+        <!-- include only the relevant tags -->
+        <span class="tag tag-e">E</span>
+        <span class="tag tag-l">L</span>
+        <span class="tag tag-v">V</span>
+        <span class="tag tag-tl">T&amp;L</span>
+      </td>
+    </tr>
+    <tr>
+      <th>Integration Pattern</th>
+      <td><!-- pattern name --></td>
+    </tr>
+  </table>
+
+  <div class="result-badge">✓ <!-- FEASIBILITY_RESULT e.g. "100% Achievable" --></div>
+
+</div>
+</body>
+</html>

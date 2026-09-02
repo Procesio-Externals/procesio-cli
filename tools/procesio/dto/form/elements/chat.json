@@ -1,0 +1,199 @@
+{
+ "id": "b4ec3e1e-488c-5ad1-bfe0-3d1af6e556c2",
+ "category": "fields",
+ "type": "chat",
+ "configs": [
+  {
+   "id": "4c523d08-7e08-50cf-a1b7-274aa6733b39",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Chat",
+   "exposed": true
+  },
+  {
+   "id": "32a5db8a-f232-5385-b392-fe3863f42c0b",
+   "key": "height",
+   "label": "Height",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "600px"
+  },
+  {
+   "id": "bb194ad0-ff99-569e-8e56-e51b0adb40d3",
+   "key": "userId",
+   "label": "Current user ID",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "65b99627-885a-58ac-b48f-1c6fb68b711d",
+   "key": "roomId",
+   "label": "Room ID",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true
+  },
+  {
+   "id": "1e2c025a-2b22-561c-aabd-2f523d4ff3e6",
+   "key": "rooms",
+   "label": "Rooms",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "9287acad-10ff-5dcc-934f-fe1c9f724653",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": [],
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "da60f578-baea-5fb6-87f8-3df3d1fd2948",
+   "key": "loading",
+   "label": "Are messages loading",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "34a11cdf-b6d3-5884-9d17-3a32c5a01d90",
+   "key": "typing",
+   "label": "Typing",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "c8d473ed-60e1-5cef-b772-352002602323",
+   "key": "auto-scroll",
+   "label": "Auto scroll",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": {
+    "send": {
+     "new": true,
+     "newAfterScrollUp": true
+    },
+    "receive": {
+     "new": true,
+     "newAfterScrollUp": false
+    }
+   }
+  },
+  {
+   "id": "d408e220-744a-5419-82ed-ecb6dad8e9d6",
+   "key": "responsive-breakpoint",
+   "label": "Responsive breakpoint",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": 900
+  },
+  {
+   "id": "a027b068-2731-5273-8ea6-23d4c8038a61",
+   "key": "theme",
+   "label": "Theme",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": "light"
+  },
+  {
+   "id": "484a94ce-0bee-52f7-8a9f-59c9523e9524",
+   "key": "styles",
+   "label": "Styles",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null
+  },
+  {
+   "id": "72975e07-5961-5356-908e-886bccaec42c",
+   "key": "onReadyEvents",
+   "label": "onReady",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "81516937-ce16-5cf1-8878-0dd9204c10c6",
+   "key": "onMessagesFetchEvents",
+   "label": "onMessagesFetch",
+   "placeholder": "Fired by chat component. May require to set 'messages-loaded' property to true to stop loading state.",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "e7ef546e-0397-5266-b64a-876790a07eda",
+   "key": "onMessageSentEvents",
+   "label": "onMessageSent",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "f69e2359-dad3-5d97-9de1-00dba53d209d",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "a7739d76-7b80-5dbf-9fe4-638c2da0594f",
+   "key": "name",
+   "label": "Name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Chat",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "2cb7e23a-1121-52f2-b2ea-78e66ab7f367",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "chat",
+   "exposed": true
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

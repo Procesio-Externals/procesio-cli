@@ -1,0 +1,11 @@
+# Preserve bytes exactly as published.
+#
+# This tree is a byte-identical copy of files maintained in an internal monorepo,
+# and a patch sent here is ported back to the same path there. End-of-line
+# rewriting on checkout or commit would break that equivalence and would make the
+# publication tool's `diff` report every rewritten file as changed forever, which
+# is how real drift stops being visible.
+#
+# `-text` disables eol conversion without marking anything binary, so GitHub and
+# `git diff` still render normal text diffs.
+* -text

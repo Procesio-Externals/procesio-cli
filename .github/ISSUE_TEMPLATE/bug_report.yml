@@ -1,0 +1,74 @@
+name: Bug report
+description: Something in the toolkit doesn't work.
+labels: ["bug", "needs triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you fill this in: don't paste credentials, `.procesio` export
+        files, real workspace GUIDs, or customer data. Redact them.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you expected, and what you got instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The command you ran, and the steps that lead to it.
+      placeholder: |
+        1. python scripts/run-tool.py procesio ...
+        2. ...
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output or traceback
+      render: shell
+
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool
+      options:
+        - procesio
+        - connector-builder
+        - web
+        - xlsx
+        - sqlserver
+        - mysql
+        - dashboard
+        - framework-map
+        - An agent or a skill
+        - The framework itself
+        - I don't know
+    validations:
+      required: true
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Windows
+        - macOS
+        - Linux desktop
+        - Linux headless
+    validations:
+      required: true
+
+  - type: input
+    id: versions
+    attributes:
+      label: Python version and commit
+      placeholder: "Python 3.12.4, commit a1b2c3d"
+    validations:
+      required: true

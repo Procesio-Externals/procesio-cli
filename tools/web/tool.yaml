@@ -1,0 +1,144 @@
+name: web
+description: >
+  Drive web apps that have NO API via Playwright, reusing SAVED login sessions
+  so we authenticate once and reuse. Sessions are Playwright storageState
+  (cookies + localStorage) per named site, stored gitignored under
+  tools/web/sessions/<name>.json - they hold live auth and are SENSITIVE
+  (never committed, never printed). Other tools and the outreach agent call
+  this whenever they need to connect to a site or do deeper web research.
+  Action-dispatched. No HTTP API; a BrowserDriver abstraction wraps Playwright
+  (imported lazily) so the tool loads even before browsers are installed.
+  BROKER-OWNED SESSIONS: run/get-text/screenshot against a session owned by a
+  serializing broker (whatsapp/ryver/fgo/mirro - tools/_lib/webserialize) are
+  executed INSIDE that broker, serialized with the owning tool's commands, so
+  ad-hoc web commands can't race the profile. --direct bypasses (backup).
+  save-session/delete-session auto-stop the owning broker first.
+version: 0.2.0
+runtime: python
+entrypoint: main.py
+
+# No credentials in Credential Manager: auth lives in saved session files
+# (storageState) under tools/web/sessions/, which are gitignored.
+secrets: []
+
+routing:
+  triggers:
+    - "drive/scrape a website that has no API, using a saved login session; deeper web research"
+  primary_action: run
+  example: "web run --session <name> ...   (read text: web get-text; one-time login: web save-session)"
+
+actions:
+  - name: save-session
+    description: >
+      Interactively capture a login session. Launches a HEADED browser at --url,
+      lets the human log in, then captures storageState to
+      tools/web/sessions/<name>.json. Run once per site. By default it BLOCKS
+      until ENTER is pressed on stdin; an AGENT must instead pass --wait-seconds,
+      because agent stdin is EOF and the ENTER wait would return instantly and
+      save a half-authenticated profile.
+    args:
+      - {name: name, type: string, required: true, description: "Session name (letters/digits/._-); how you reference it later"}
+      - {name: url, type: string, required: true, description: Login URL to open in the headed browser}
+      - {name: channel, type: string, description: "Optional Chromium channel: 'chrome' or 'msedge' (use a real installed browser)"}
+      - {name: persistent, type: boolean, description: "Save a PERSISTENT browser profile (user-data-dir) instead of a storageState snapshot; required for IndexedDB-auth sites like WhatsApp Web"}
+      - {name: wait-seconds, type: integer, description: "Wait this long for the login instead of blocking on ENTER; required when an agent launches the flow"}
+      - {name: wait-until-url-excludes, type: string, description: "With --wait-seconds, finish as soon as the address bar leaves this host (e.g. accounts.google.com)"}
+    output_schema: '{ "session": "...", "path": "tools/web/sessions/<name>.json", "url": "...", "waited_for": "enter|timer|url", "login_detected": true }'
+
+  - name: list-sessions
+    description: List saved sessions (names + metadata only, never contents).
+    output_schema: '{ "sessions": [ {name, bytes, modified, persistent} ], "count": 0, "dir": "..." }'
+
+  - name: delete-session
+    description: >
+      Delete ALL of a saved session's artifacts - the storageState file, the
+      persistent <name>.profile/ directory, and the <name>.cookies.json sidecar.
+      Deleting a session destroys a login that only a human at a browser can
+      re-establish, so this PREVIEWS by default and removes nothing unless
+      --confirm is passed (the unconfirmed call is the dry run).
+    args:
+      - {name: name, type: string, required: true, description: Session name to delete}
+      - {name: confirm, type: boolean, description: "Actually delete; without it the call only previews would_remove"}
+    output_schema: '{ "session": "...", "deleted": true, "existed": true, "removed": ["state","profile","cookies"], "would_remove": ["..."], "confirmation_required": true, "failed": {}, "broker_stopped": "..." }'
+
+  - name: run
+    description: >
+      Load a saved session, optionally navigate to --url, then execute a
+      declarative step list (--actions JSON array or --actions-file). Returns
+      collected outputs. Step schema (each step has a "do"):
+      goto{url,timeout?} | click{selector,timeout?,force?} | fill{selector,text,timeout?} |
+      press{key,selector?} | type{text,selector?,timeout?} | wait{ms} |
+      wait_for{selector,timeout?} | extract_text{selector?,name,timeout?} |
+      extract_attr{selector,attr,name,timeout?} | screenshot{path,full_page?}.
+      'type' drives real keyboard events (canvas grids like Google Sheets where
+      cells aren't DOM); 'wait' is a fixed ms delay (autosave settle).
+      Headless by default; --headed to watch. --hold-seconds keeps a headed
+      browser open after the steps so a HUMAN can review what was staged and
+      click the irreversible control (Submit/Confirm/Send) themselves; an
+      expired hold is still a successful run.
+    args:
+      - {name: session, type: string, required: true, description: Saved session name to load}
+      - {name: url, type: string, description: Optional URL to visit before running the steps}
+      - {name: actions, type: string, description: "Inline JSON array of steps"}
+      - {name: actions-file, type: string, description: "Path to a JSON file containing the steps array"}
+      - {name: headed, type: boolean, default: false, description: "Show the browser window (default headless)"}
+      - {name: channel, type: string, description: "Chromium channel: 'chrome' or 'msedge'"}
+      - {name: hold-seconds, type: integer, description: "After the last step keep the headed browser open up to N seconds for a human to finish the action; requires headed"}
+      - {name: hold-until-selector, type: string, description: "End the hold early once this selector appears; requires hold-seconds"}
+      - {name: hold-until-url-excludes, type: string, description: "End the hold early once the address bar leaves this host; requires hold-seconds"}
+      - {name: direct, type: boolean, default: false, description: "Bypass the owning tool serializing broker and drive the browser in-process (backup; only safe when that broker is stopped)"}
+    output_schema: '{ "session": "...", "results": {"name": "value"}, "screenshots": ["..."], "final_url": "...", "hold": {"held_seconds": 0, "completed": false, "reason": "selector|url|timeout"} }'
+
+  - name: get-text
+    description: "Convenience: load a session, open --url, return visible text (whole page or --selector). For lead/topic research."
+    args:
+      - {name: session, type: string, required: true, description: Saved session name to load}
+      - {name: url, type: string, required: true, description: URL to navigate to}
+      - {name: selector, type: string, description: Optional CSS selector; default reads the whole page body}
+      - {name: wait, type: string, description: Optional selector to await before reading (for SPAs)}
+      - {name: headed, type: boolean, default: false, description: Show the browser window}
+      - {name: channel, type: string, description: "Chromium channel: 'chrome' or 'msedge'"}
+      - {name: direct, type: boolean, default: false, description: "Bypass the owning tool serializing broker and drive the browser in-process (backup; only safe when that broker is stopped)"}
+    output_schema: '{ "session": "...", "url": "...", "selector": null, "text": "...", "final_url": "..." }'
+
+  - name: screenshot
+    description: "Load a session, open --url, save a screenshot to --out."
+    args:
+      - {name: session, type: string, required: true, description: Saved session name to load}
+      - {name: url, type: string, required: true, description: URL to capture}
+      - {name: out, type: string, required: true, description: "Output image path (.png)"}
+      - {name: viewport-only, type: boolean, default: false, description: "Capture only the viewport (default: full page)"}
+      - {name: wait, type: string, description: Optional selector to await first}
+      - {name: headed, type: boolean, default: false, description: Show the browser window}
+      - {name: channel, type: string, description: "Chromium channel: 'chrome' or 'msedge'"}
+      - {name: direct, type: boolean, default: false, description: "Bypass the owning tool serializing broker and drive the browser in-process (backup; only safe when that broker is stopped)"}
+    output_schema: '{ "session": "...", "url": "...", "path": "...", "final_url": "..." }'
+
+  - name: render-pdf
+    description: "Render an HTML string/file to a PDF (session-less, headless Chromium page.pdf)."
+    args:
+      - {name: html, type: string, description: "Inline HTML string to render (exactly one of --html / --html-file)"}
+      - {name: html-file, type: string, description: "Path to an HTML file to render"}
+      - {name: out, type: string, required: true, description: "Output PDF path (.pdf)"}
+      - {name: format, type: string, default: A4, description: "Paper size: A4 (default) / Letter / Legal"}
+    output_schema: '{ "out": "...", "bytes": 12345 }'
+
+examples:
+  - cmd: python scripts/run-tool.py web save-session --name linkedin --url https://www.linkedin.com/login
+    output: '{"session": "linkedin", "path": ".../tools/web/sessions/linkedin.json", "url": "https://www.linkedin.com/login"}'
+  - cmd: python scripts/run-tool.py web list-sessions
+    output: '{"sessions": [{"name": "linkedin", "bytes": 4096, "modified": "2026-06-22T09:00:00"}], "count": 1, "dir": "..."}'
+  - cmd: 'python scripts/run-tool.py web get-text --session linkedin --url https://www.linkedin.com/in/someone --selector main'
+    output: '{"session": "linkedin", "url": "...", "selector": "main", "text": "...", "final_url": "..."}'
+  - cmd: 'python scripts/run-tool.py web run --session linkedin --actions "[{\"do\":\"goto\",\"url\":\"https://www.linkedin.com/feed\"},{\"do\":\"extract_text\",\"selector\":\"h1\",\"name\":\"headline\"}]"'
+    output: '{"session": "linkedin", "results": {"headline": "..."}, "screenshots": [], "final_url": "..."}'
+
+requires:
+  - name: playwright-chromium
+    kind: browser
+    why: >
+      every action that opens a browser. `uv sync` installs the Playwright PACKAGE,
+      not the browser binary - and Playwright is imported lazily, so the tool loads
+      and the tests pass while the first real action fails with browser_error.
+    check: '{python} -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); p.chromium.executable_path; p.stop()"'
+    install: uv run playwright install chromium

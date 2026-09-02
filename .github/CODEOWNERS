@@ -1,0 +1,7 @@
+# Every pull request gets a review from the maintainers.
+*       @Procesio-Externals/maintainers
+
+# Narrower ownership, if you want it:
+# /tools/procesio/          @Procesio-Externals/devs
+# /tools/connector-builder/ @Procesio-Externals/devs
+# /.github/                 @Procesio-Externals/maintainers

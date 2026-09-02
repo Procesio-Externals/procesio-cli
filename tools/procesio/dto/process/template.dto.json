@@ -1,0 +1,32 @@
+{
+  "_note": "Golden FlowRequestDto shape (POST /api/Projects body), PascalCase. The client supplies Id (the gateway persists it and returns empty on success). Variables -> VariableDto; Actions -> ActionDto with CustomData (designer/position) + Parameters (TabPropertyId binding); Ports are edges held on the SOURCE action (plus a null->Start entry edge). Verified live 2026-06-24: validates, persists, runs to STATUS_FINISH. Most fields below are filled by builder.py.",
+  "Id": "<uuid: flow>",
+  "ParentId": null,
+  "Status": 1,
+  "Title": "<title>",
+  "Description": "",
+  "IsValid": true,
+  "Active": true,
+  "Timeout": 0,
+  "CurrentActionId": null,
+  "DebugMode": false,
+  "IsNotification": false,
+  "Variables": [
+    {"Id": "<uuid: var>", "ContextId": null, "DataType": "0317bfee-b2f5-4bde-bfe8-121212121222", "Type": 30, "Name": "result", "DefaultValue": null, "IsList": false, "IsError": false, "IsRequired": false}
+  ],
+  "Actions": [
+    {
+      "Id": "<uuid: action>", "FlowId": "<uuid: flow>", "TemplateId": "<actionId>",
+      "ParentId": null, "VariableErrorId": null, "Status": 1, "Category": "",
+      "ActionName": "Generate GUID", "ActionTemplateName": "Generate GUID",
+      "Ports": [{"Id": "<uuid: port>", "FlowId": "<uuid: flow>", "SourceId": "<src action>", "DestinationId": "<dst action>", "Type": 0, "State": 1, "Data": {}, "Errors": {}, "Config": {}}],
+      "Parameters": [{"TabPropertyId": "<template property id>", "Variable": [{"id": 0, "variableId": "<uuid: var>", "attribute": null}], "Value": "<%0%>"}],
+      "CustomData": {"type": "square", "name": "Generate GUID", "icon": "vpn_key", "position": {"x": 400, "y": 300}, "configuration": [], "inputPorts": 1, "outputPorts": 1, "wasDropped": true, "areaSize": {"width": 48, "height": 48, "x": 0, "y": 0}},
+      "IsTestable": true, "IsDisabled": false, "BreakPoint": null, "TestValues": null, "ErrorMessage": "", "Events": null
+    }
+  ],
+  "Webhooks": [],
+  "CustomResponse": null,
+  "DataRetention": null,
+  "CanvasData": null
+}

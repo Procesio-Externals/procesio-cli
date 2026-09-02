@@ -1,0 +1,16 @@
+{
+  "name": "Invoice",
+  "body": "<div>Hello <%clientName%>, total <%total%>.</div>",
+  "pageSize": "A4",
+  "orientation": "portrait",
+  "variables": [
+    {
+      "name": "clientName",
+      "type": "string"
+    },
+    {
+      "name": "total",
+      "type": "double"
+    }
+  ]
+}

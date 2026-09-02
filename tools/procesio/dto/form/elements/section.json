@@ -1,0 +1,114 @@
+{
+ "id": "92fbe925-a963-5c43-9ba9-b6e2dabed857",
+ "category": "structure",
+ "type": "section",
+ "configs": [
+  {
+   "id": "38d8fe90-a9a4-56dc-9b76-27e8a0f2bcf1",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Section",
+   "exposed": true
+  },
+  {
+   "id": "06b345fb-1c1e-59d8-98c8-ac7c35429179",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "990828ae-95c9-5478-a902-cf8481d920eb",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "dedea409-caf8-5aca-9c95-c754a27b87d6",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "Section",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "5c79dccc-1ab4-5338-86af-881f703ac789",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "section",
+   "exposed": true
+  },
+  {
+   "id": "84077296-187b-5cbc-bc54-4be7e9ccd3e4",
+   "key": "assignee",
+   "label": "Assignee",
+   "placeholder": "Select name",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "user-select",
+   "value": ""
+  },
+  {
+   "id": "cecf1e7d-a1b3-5982-95c7-59913026d034",
+   "key": "assigneeReplacement",
+   "label": "Assignee replacement",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "assignee-replacement",
+   "value": null
+  },
+  {
+   "id": "1be025a0-cf5e-52b4-9b5b-e37b28c42dca",
+   "key": "additionalAssignment",
+   "label": "",
+   "category": "content",
+   "subCategory": "task-assignee",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "c4746a1b-381c-550c-8532-8ca731b1280d",
+   "key": "visibility",
+   "label": "Visibility:",
+   "category": "content",
+   "subCategory": "rules",
+   "type": "rules-visibility",
+   "value": ""
+  },
+  {
+   "id": "03a13074-5abc-539f-9b39-4df3d2e72d03",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

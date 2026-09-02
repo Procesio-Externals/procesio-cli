@@ -1,0 +1,45 @@
+[project]
+name = "procesio-cli"
+version = "0.1.0"
+description = "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant."
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+dependencies = [
+    "requests>=2.31",
+    "pyyaml>=6.0",
+    "pydantic>=2.5",
+    "keyring>=24.0",
+    # Validates the platform DTOs the procesio tool builds, and the dashboard's
+    # config schemas. Imported at module level, so it is a base dependency.
+    "jsonschema>=4.20",
+    # The form builder ciphers a form's JavaScript and CSS, and imports this at
+    # module level. It also backs AAT_CREDS_BACKEND=encrypted-file, which is a
+    # lazy import and would have been happy as an extra; the eager one decides.
+    "cryptography>=42.0",
+]
+
+[project.optional-dependencies]
+# Every one of these is imported lazily, at the point of use, so the base install
+# stays at six packages and a missing extra fails with a clear message rather
+# than at import time.
+# The web tool: real-browser form testing. Needs the browser binary too:
+#   uv run playwright install chromium
+browser = ["playwright>=1.60.0"]
+# Reading .xlsx workbooks.
+excel = ["openpyxl>=3.1"]
+# Querying the databases a SQL action talks to. pyodbc also needs an ODBC driver
+# installed on the machine (msodbcsql18 or similar).
+databases = ["pyodbc>=5.1", "pymysql>=1.1"]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tools", "agents", "dashboard"]
+python_files = ["test_*.py"]
+# importlib import mode: every tool ships its own tests/ package and conftest.py,
+# which collide as `tests.conftest` under the legacy prepend mode.
+addopts = "-q --import-mode=importlib"
