@@ -475,7 +475,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `process-delete` | `--id` | Delete a resource by id (DELETE /api/Projects/{id}). |
 | `process-edit` | `--id` | Edit a PROCESIO process to a desired-state config (--id required). --dry-run to preview the DTO. |
 | `process-fe-validate` | `--id` | Front-end (designer-layer) 'Process Errors' validation on a live process — the client-side check that BLOCKS designer Save but which POST… |
-| `process-toggle-activation` | `--id` | Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation). |
+| `process-toggle-activation` | `--id` | Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation); re-reads and reports the ACTUAL `active` state, because the PATCH reports success… |
 | `process-validate` | `--id` | Validate a process with PROCESIO's own validator (POST /api/Projects/validate). |
 
 ### put

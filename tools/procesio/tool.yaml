@@ -76,7 +76,7 @@ requires:
 
 actions:
 - name: add-credential
-  description: Store a new credential profile (apikey or userpass) in the OS credential store.
+  description: Store a new credential profile (apikey or userpass) in Credential Manager.
   args:
   - name: name
     type: string
@@ -923,6 +923,10 @@ actions:
     type: boolean
     required: false
     description: mark the attribute isPublic
+  - name: force
+    type: boolean
+    required: false
+    description: suppress the store-backing caution (B-048 cluster 4a)
 - name: datatype-change-to-public
   description: Promote a private inner model (from fromJson) to public so it's reusable (POST /api/DataTypes/changeToPublic).
   args:
@@ -2145,7 +2149,7 @@ actions:
     required: true
     description: flow (process) id to lint
 - name: form-add-element
-  description: Add one or more controls to a LIVE form (authoring-config elements), splicing them into Data.elements AND the data model without regenerating what is already there - so every existing field path, and every process map that references one, survives. --parent places them in a container by name or id; --dry-run previews. Returns a `warning` when a control lands inside a table row, where no process map can read it.
+  description: Add one or more controls to a LIVE form (authoring-config elements), splicing them into Data.elements AND the data model without regenerating what is already there - so every existing field path, and every process map that references one, survives. --parent places them in a container by name or id; --dry-run previews.
   args:
   - name: profile
     type: string
@@ -8352,7 +8356,7 @@ actions:
     required: false
     description: also run the back-end validator (POST /api/Projects/validate)
 - name: process-toggle-activation
-  description: Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation).
+  description: Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation); re-reads and reports the ACTUAL `active` state, because the PATCH reports success either way.
   args:
   - name: profile
     type: string

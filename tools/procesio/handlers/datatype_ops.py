@@ -74,11 +74,58 @@ def delete_datatype(client, args) -> dict:
 
 # -- attribute add / edit / delete -------------------------------------------
 
+def _store_built_on_model(client, model_id: str):
+    """Best-effort: the id of a data store whose data-model IS `model_id`, else None.
+
+    B-048 cluster 4a reported that adding an attribute to such a model DESTROYS the store
+    (both POSTs return ok, then columns read `[]` and rows go unreadable). Re-tested on a
+    real from-data-model store (2026-09) it did NOT reproduce, so the caller only WARNS on a
+    match, never refuses. The store's own data-model id (a from-data-model store gets a COPY
+    model, distinct from the source) is what matches here — verified live against
+    `GET /api/DataStore/{id}/data-model`. Fail-OPEN: any read error/unknown shape -> None,
+    so a transient hiccup never even warns.
+    """
+    try:
+        listing = client.get("/api/DataStore") or {}
+    except Exception:  # noqa: BLE001 - advisory guard, never fatal
+        return None
+    stores = listing if isinstance(listing, list) else (
+        listing.get("data") or listing.get("pageItems") or listing.get("items") or [])
+    for s in stores if isinstance(stores, list) else []:
+        sid = (s.get("id") or s.get("dataStoreId")) if isinstance(s, dict) else None
+        if not sid:
+            continue
+        try:
+            dm = client.get(f"/api/DataStore/{sid}/data-model") or {}
+        except Exception:  # noqa: BLE001
+            continue
+        mid = dm.get("id") or dm.get("dataTypeId") or (dm.get("dataModel") or {}).get("id")
+        if mid and str(mid) == str(model_id):
+            return sid
+    return None
+
+
 def add_attribute(client, args) -> dict:
     """Add ONE attribute via POST /api/dataTypes/attribute/{id} — the only path that
     COMPILES the attribute into the runtime model (and inlines a referenced child model
     + links its parentIds). --data-type accepts a primitive name, an existing model name,
-    or a guid; --is-list makes it a list of that type."""
+    or a guid; --is-list makes it a list of that type.
+
+    WARNS (non-blocking) when the model backs a data store: B-048 cluster 4a reported that
+    such an add DESTROYS the store, but re-testing on a real from-data-model store (2026-09)
+    did NOT reproduce it — the store kept its columns and rows — so this is a caution, not a
+    refusal. --force suppresses the warning."""
+    warning = None
+    if not getattr(args, "force", False):
+        store = _store_built_on_model(client, args.id)
+        if store:
+            warning = (
+                f"model {args.id} backs data store {store}. B-048 cluster 4a reported that "
+                f"adding an attribute to a store-backing model DESTROYS the store (columns "
+                f"read [], rows unreadable), but a real from-data-model store re-tested "
+                f"2026-09 SURVIVED this exact add, so treat it as a caution rather than a "
+                f"certainty: re-read the store (datastore-get / get-rows) and confirm its "
+                f"columns and rows afterwards. --force suppresses this warning.")
     dtid = _resolve_data_type(client, args.data_type)
     payload = {"id": None, "name": args.name,
                "displayName": args.display_name or args.name, "dataTypeId": dtid,
@@ -90,8 +137,11 @@ def add_attribute(client, args) -> dict:
         payload["isPublic"] = True
     client.post(f"/api/DataTypes/attribute/{args.id}", payload)
     model = client.get(f"/api/DataTypes/{args.id}")
-    return {"added": True, "model": args.id, "attribute": args.name,
-            "attributes": _attr_summary(model)}
+    out = {"added": True, "model": args.id, "attribute": args.name,
+           "attributes": _attr_summary(model)}
+    if warning:
+        out["warning"] = warning
+    return out
 
 
 def edit_attribute(client, args) -> dict:
@@ -170,6 +220,8 @@ def _add_attr_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--json-property", dest="json_property", help="JSON key (defaults to name)")
     p.add_argument("--hidden", action="store_true")
     p.add_argument("--public", action="store_true", help="mark the attribute isPublic")
+    p.add_argument("--force", action="store_true",
+                   help="suppress the store-backing caution (B-048 cluster 4a)")
 
 
 def _edit_attr_args(p: argparse.ArgumentParser) -> None:

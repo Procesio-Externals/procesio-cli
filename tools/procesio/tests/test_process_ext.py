@@ -225,3 +225,44 @@ def test_edit_without_canvas_leaves_canvasdata_none(monkeypatch):
     c = _CanvasClient(None)                             # live flow has no canvasData
     pb._edit(c, "P1", {"title": "t", "actions": []}, {**_ctx(), "_force": True})
     assert c.put_dto["CanvasData"] is None             # nothing to preserve, no crash
+
+
+# -- input-side template defaults (B-048 cluster 2) --------------------------
+
+def _node_cfg(params):
+    return {"title": "n",
+            "variables": [{"name": "out", "type": "json", "direction": "output"}],
+            "actions": [{"id": "n", "action": "Node", "name": "nd", "params": params}]}
+
+
+def test_node_unbound_timeout_gets_template_default():
+    # An unbound Node Timeout was dropped and the engine ran it as 00:00:00, dying with
+    # "value ('00:00:00') must be greater than '00:00:00'". The builder now materialises
+    # the template default (60), matching what the designer pre-fills. Verified live.
+    dto = pb.build(_node_cfg({"Code": {"template": "return 42;", "vars": []},
+                              "Single Result": {"var": "out"}}), _ctx())
+    node = _by_cid(dto)["nd"]
+    assert "60" in [p.get("Value") for p in node["Parameters"]]
+
+
+def test_bound_input_default_is_not_overridden_or_duplicated():
+    dto = pb.build(_node_cfg({"Code": {"template": "return 1;", "vars": []},
+                              "Timeout": 120, "Single Result": {"var": "out"}}), _ctx())
+    node = _by_cid(dto)["nd"]
+    vals = [p.get("Value") for p in node["Parameters"]]
+    assert 120 in vals and "60" not in vals   # user value kept, default not re-added
+
+
+def test_ensure_input_defaults_subclass_and_skips():
+    tpl = {"name": "X", "configuration": [{"settings": [
+        {"id": "a", "direction": 1, "type": "number", "value": "7"},         # materialise
+        {"id": "b", "direction": 1, "type": "code-editor", "value": "f(){}"},  # skip: code
+        {"id": "c", "direction": 1, "type": "text", "value": ""},            # skip: empty
+        {"id": "d", "direction": 3, "type": "number", "value": "9"},         # skip: output
+        {"id": "e", "direction": 1, "type": "select", "value": "1"},         # materialise
+    ]}]}
+    got = {p["TabPropertyId"]: p["Value"] for p in pb._ensure_input_defaults(tpl, [])}
+    assert got == {"a": "7", "e": "1"}
+    # an already-bound property is never re-materialised
+    got2 = pb._ensure_input_defaults(tpl, [{"TabPropertyId": "a", "Variable": [], "Value": "99"}])
+    assert [p for p in got2 if p["TabPropertyId"] == "a" and p["Value"] == "7"] == []

@@ -201,6 +201,36 @@ def _launch_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--payload", help="JSON payload to send to the webhook")
 
 
+def toggle_activation(client, args) -> dict:
+    """Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation).
+
+    The PATCH LIES: it answers ``{"value": null, "errors": []}`` whether or not the write
+    landed, and ``GET /api/Projects/{id}.status`` is NOT the activation flag either (see
+    PROCESIO-API-NOTES.md). The only trustworthy read is the ``active`` field of the
+    list-processes projection, so re-read it after the PATCH and report the ACTUAL state
+    instead of the always-success echo. The re-read is best-effort (a process past page 1
+    of a large workspace may be missed): when it cannot confirm, say so rather than imply
+    success. Platform-side this is B-048 cluster 4b — the PATCH should report its outcome.
+    """
+    patch = client.request("PATCH", f"/api/Projects/{args.id}/toggle-activation")
+    active = None
+    try:
+        listing = client.get("/api/Projects") or {}
+        row = next((p for p in (listing.get("pageItems") or [])
+                    if str(p.get("id")) == str(args.id)), None)
+        if row is not None:
+            active = row.get("active")
+    except Exception:  # noqa: BLE001 - re-read is advisory; never mask the PATCH itself
+        active = None
+    out = {"toggled": True, "id": args.id, "active": active, "patch_result": patch}
+    if active is None:
+        out["warning"] = (
+            "could not confirm activation from the list-processes projection; the PATCH "
+            "response is NOT a reliable signal (it reports success either way) — verify "
+            "in the designer or re-run list-processes and read `active`.")
+    return out
+
+
 ACTIONS = {
     # -- get by id (parity with get-process) --
     "form-get": _get_action("/api/FormTemplate/{id}", "form template id"),
@@ -219,10 +249,11 @@ ACTIONS = {
     # -- duplicate / activation --
     "form-duplicate": _post_by_id_action("/api/FormTemplate/{id}/duplicate", "form template id", "duplicated"),
     "process-toggle-activation": ActionDef(
-        func=lambda c, a: {"toggled": True, "id": a.id,
-                           "result": c.request("PATCH", f"/api/Projects/{a.id}/toggle-activation")},
+        func=toggle_activation,
         add_args=lambda p: _id_args(p, "process (project) id"), needs_client=True,
-        description="Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation)."),
+        description="Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation); "
+                    "re-reads and reports the ACTUAL `active` state, because the PATCH reports "
+                    "success either way."),
     # -- verification oracles --
     "process-validate": ActionDef(
         func=validate_process, add_args=lambda p: _id_args(p, "process (project) id"), needs_client=True,
