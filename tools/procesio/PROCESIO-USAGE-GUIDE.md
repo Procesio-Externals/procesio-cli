@@ -74,7 +74,7 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [The Data Store side panel, in full (its properties are addressed at TOP level)](PROCESIO-API-NOTES.md#the-data-store-side-panel-in-full-its-properties-are-addressed-at-top-level)
 - [isValid is a field the caller sets, not one the platform computes](PROCESIO-API-NOTES.md#isvalid-is-a-field-the-caller-sets-not-one-the-platform-computes)
 - [POST /api/Projects/validate answers "valid" for flows the designer refuses to save](PROCESIO-API-NOTES.md#post-apiprojectsvalidate-answers-valid-for-flows-the-designer-refuses-to-save)
-- [A cross-workspace GET is refused as 400, not 404](PROCESIO-API-NOTES.md#a-cross-workspace-get-is-refused-as-400-not-404)
+- [Every resource read is workspace-scoped, and the designer URL carries the workspace](PROCESIO-API-NOTES.md#every-resource-read-is-workspace-scoped-and-the-designer-url-carries-the-workspace)
 - [toggle-activation takes the target state in a REQUEST HEADER, not a body](PROCESIO-API-NOTES.md#toggle-activation-takes-the-target-state-in-a-request-header-not-a-body)
 
 ## The Python action

@@ -4362,14 +4362,27 @@ So "the validator passed" is not "the designer would save this". Anything that r
 process health, or stamps `isValid`, needs the front-end checks too. In this repo that is
 `fevalidate.run_fe_validation()`, and `pre_save_validate()` runs FE first, then BE.
 
-## ⚠ A cross-workspace GET is refused as 400, not 404
+## ⚠ Every resource read is workspace-scoped, and the designer URL carries the workspace
 
 `GET /api/Projects/{id}` for a process in a workspace other than the one in the
 `workspaceid` header returns **HTTP 400** with `statusCode: 501` and
 `"User is not authorized for the requested resource."` in the body - not a 404, and not a
 403. A caller that treats 400 as "malformed id" and 404 as "does not exist" will conclude
-the process is gone when it is simply out of scope. Pass the workspace explicitly when the
-resource does not live in the default one.
+the process is gone when it is simply out of scope.
+
+**This is an error path the product itself never reaches, and how it avoids it is the
+useful part.** A designer link is
+`/admin/process/designer/<PROCESS_ID>#<WORKSPACE_ID>` - the fragment after `#` is the
+workspace. Captured from the designer while pasting a link to a process in a different
+workspace: it re-scopes the WHOLE session to the workspace in the fragment first
+(permissions, resource usage, the process list, the datatype catalogue - every call
+carrying the new `workspaceid`), and only then reads the process, with the header already
+matching. It never sends a mismatched request.
+
+So the id alone is not a handle on a process; **the pair (process id, workspace id) is**,
+and any link you were given already contains both. Extract the workspace from the fragment
+rather than hoping the default scope is right, and re-scope before the read - the same
+order the designer uses.
 
 ### What a form's load actually costs, and how to measure it
 
