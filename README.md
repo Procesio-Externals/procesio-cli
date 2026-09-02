@@ -7,8 +7,9 @@ your workspace, store your credentials in your operating system's own secret sto
 and drive processes, forms, documents and custom actions from a terminal, a script, or
 an AI coding assistant.
 
-- Platform: https://procesio.com
-- API and platform docs: https://docs.procesio.com
+- The platform this talks to, where your workspaces live: https://procesio.app
+- API and platform documentation: https://docs.procesio.com
+- About PROCESIO: https://procesio.com
 
 ## Install
 
