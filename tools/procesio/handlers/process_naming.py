@@ -32,6 +32,7 @@ from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import parse_json_arg
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
+from tools.procesio.handlers.fevalidate import run_fe_validation, save_flow
 
 
 def _key(d: dict, *names: str):
@@ -181,11 +182,23 @@ def rename_actions(client, args) -> dict:
         except ProcesioAPIError as e:
             raise UsageError(f"renamed flow failed validation (not saved): {e.details}")
 
+    # Every save stamps the validity mark, this one included. The platform never
+    # computes `isValid` - it stores what the body carries - so a save that passed the
+    # fetched value through would leave a repaired process marked broken, and a rename
+    # or a re-layout is a save like any other. The verdict needs BOTH validators: the
+    # runtime one above answers "valid" for flows the designer refuses.
+    fe = run_fe_validation(client, new_flow)
+    be_ok = validated is not False
     try:
-        client.put("/api/Projects", new_flow)
+        saved = save_flow(client, new_flow, flow_id=args.id, valid=bool(fe["clean"] and be_ok))
     except ProcesioAPIError as e:
         raise UsageError(f"save (PUT) failed for {args.id}: {e.details}")
-    return {"result": {**summary, "validated": validated, "saved": True, "concurrency": guard}}
+    out = {"result": {**summary, "validated": validated, "saved": True, "concurrency": guard}}
+    out["result"]["isValid"] = saved["isValid"]
+    out["result"]["stamped"] = saved["stamped"]
+    if not fe["clean"]:
+        out["result"]["fe"] = fe
+    return out
 
 
 ACTIONS = {

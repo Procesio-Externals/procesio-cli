@@ -8356,7 +8356,7 @@ actions:
     required: false
     description: also run the back-end validator (POST /api/Projects/validate)
 - name: process-toggle-activation
-  description: 'DEACTIVATE a process (PATCH /api/Projects/{id}/toggle-activation). Despite the name it is not a toggle: measured, it only ever sets `active` to FALSE, and answers success either way - including when it changed nothing. To ACTIVATE, PUT the process with active=true. This action reads `active` before and after, reports `toggled` from that comparison rather than from the echo, and warns when nothing changed.'
+  description: 'Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). --state true|false is REQUIRED: despite its name the endpoint is a setter, and it reads the target from a `state` request header - called without it, it deactivates every time while reporting success. The response says nothing either way, so this reads `active` before and after from the list-processes projection and warns when the result is not what was asked for.'
   args:
   - name: profile
     type: string
@@ -8374,6 +8374,10 @@ actions:
     type: string
     required: true
     description: process (project) id
+  - name: state
+    type: string
+    required: true
+    description: 'target state: true activates, false deactivates (sent as the `state` header the endpoint reads; it is a setter, not a toggle)'
 - name: process-validate
   description: Validate a process with PROCESIO's own validator (POST /api/Projects/validate).
   args:

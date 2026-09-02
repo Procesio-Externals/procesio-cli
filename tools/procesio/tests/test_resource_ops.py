@@ -36,37 +36,50 @@ def test_get_delete_list_endpoints():
     assert out == {"count": 2, "items": [{"id": "a"}, {"id": "b"}]}
 
 
-def test_toggle_activation_reads_real_state_not_the_patch_echo():
-    # The PATCH always answers {value:null,errors:[]}; the tool must report the ACTUAL
-    # `active` read back from the list-processes projection (B-048 cluster 4b), and it
-    # reads the state on BOTH sides so "changed" is observed rather than assumed.
+def test_toggle_activation_sends_the_state_header():
+    """The target state travels in a `state` header, not the body or the path.
+
+    Without it the endpoint deactivates every time while answering success, which is
+    what made it look, for a while, like an endpoint that could only turn things off.
+    """
     s = FakeSession(queue=[
-        FakeResp(200, {"pageItems": [{"id": "P1", "active": True}]}),   # before
-        FakeResp(200, {"value": None, "errors": []}),                   # the lying PATCH
-        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # after
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # before
+        FakeResp(200, {"value": None, "errors": []}),                   # the PATCH
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": True}]}),   # after
     ])
-    out = _call("process-toggle-activation", ["--id", "P1"], s)
-    assert s.calls[0]["method"] == "GET" and s.calls[0]["url"].endswith("/api/Projects")
-    assert s.calls[1]["method"] == "PATCH"
-    assert s.calls[1]["url"].endswith("/api/Projects/P1/toggle-activation")
-    assert s.calls[2]["method"] == "GET" and s.calls[2]["url"].endswith("/api/Projects")
-    assert out["toggled"] is True
-    assert out["active_before"] is True and out["active"] is False
+    out = _call("process-toggle-activation", ["--id", "P1", "--state", "true"], s)
+    patch = s.calls[1]
+    assert patch["method"] == "PATCH"
+    assert patch["url"].endswith("/api/Projects/P1/toggle-activation")
+    hdrs = {k.lower(): v for k, v in (patch.get("headers") or {}).items()}
+    assert hdrs.get("state") == "true", "the target state must be sent as the `state` header"
+    assert out["requested"] is True and out["active"] is True and out["changed"] is True
     assert "warning" not in out
 
 
-def test_toggle_activation_does_not_claim_a_flip_that_did_not_happen():
-    """The endpoint only ever deactivates: called on an inactive process it answers
-    success and changes nothing. Reporting that as a toggle is the whole bug."""
+def test_toggle_activation_deactivates_with_state_false():
     s = FakeSession(queue=[
-        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # before
-        FakeResp(200, {"value": None, "errors": []}),                   # "success"
-        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # unchanged
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": True}]}),
+        FakeResp(200, {"value": None, "errors": []}),
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),
     ])
-    out = _call("process-toggle-activation", ["--id", "P1"], s)
-    assert out["toggled"] is False, "nothing moved, so nothing was toggled"
-    assert out["active"] is False
-    assert "only ever sets active to FALSE" in out["warning"]
+    out = _call("process-toggle-activation", ["--id", "P1", "--state", "false"], s)
+    hdrs = {k.lower(): v for k, v in (s.calls[1].get("headers") or {}).items()}
+    assert hdrs.get("state") == "false"
+    assert out["requested"] is False and out["active"] is False and out["changed"] is True
+
+
+def test_toggle_activation_warns_when_the_result_is_not_what_was_asked():
+    """The response is identical in every case, so only the read-back can disagree."""
+    s = FakeSession(queue=[
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),
+        FakeResp(200, {"value": None, "errors": []}),
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # asked true, still false
+    ])
+    out = _call("process-toggle-activation", ["--id", "P1", "--state", "true"], s)
+    assert out["requested"] is True and out["active"] is False
+    assert out["changed"] is False
+    assert "asked for active=True" in out["warning"]
 
 
 def test_toggle_activation_warns_when_it_cannot_confirm():
@@ -75,9 +88,9 @@ def test_toggle_activation_warns_when_it_cannot_confirm():
         FakeResp(200, {"value": None, "errors": []}),
         FakeResp(200, {"pageItems": [{"id": "OTHER", "active": True}]}),
     ])
-    out = _call("process-toggle-activation", ["--id", "P1"], s)
+    out = _call("process-toggle-activation", ["--id", "P1", "--state", "true"], s)
     assert out["active"] is None and "warning" in out
-    assert out["toggled"] is None, "unknown must not read as 'did not toggle'"
+    assert out["changed"] is None, "unknown must not read as 'did not change'"
 
 
 def test_form_duplicate():

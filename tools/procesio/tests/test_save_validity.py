@@ -152,3 +152,25 @@ def test_a_clean_save_still_stamps_valid():
         act("stop", "Stop", "Stop", [])]}
     pb._save_gate(_C(), dto, {})
     assert dto["IsValid"] is True
+
+
+def test_no_process_writer_anywhere_puts_a_flow_without_stamping_it():
+    """The rule is repo-wide, not per-handler: every save decides the mark.
+
+    A rename or a re-layout is a save like any other, and leaving those two as
+    pass-throughs meant the fixed bug could walk back in through the least
+    suspicious door - renaming a node should not be able to file a repaired
+    process as broken.
+
+    process_layout and process_naming are included deliberately. dto/process/builder
+    is not: it stamps in its own save gate, which covers create and edit together.
+    """
+    import pathlib
+    root = pathlib.Path(fevalidate.__file__).resolve().parent
+    for name in ("nodeparams.py", "sqlactions.py", "process_layout.py", "process_naming.py"):
+        src = (root / name).read_text(encoding="utf-8")
+        for bad in ('client.put("/api/Projects", flow)',
+                    'client.put("/api/Projects", new_flow)'):
+            assert bad not in src, (
+                f"{name} PUTs a fetched flow directly; route it through "
+                "fevalidate.save_flow so the mark is stamped and re-read")
