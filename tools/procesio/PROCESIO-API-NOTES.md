@@ -1542,11 +1542,18 @@ html-to-json-parser, xml-js, moment, date-fns, marked, big.js, @faker-js/faker,
 joi, mathjs, csv-parse, papaparse, simple-statistics, luxon, string-similarity,
 qrcode`
 
-**A Node BUILT-IN such as `crypto` is not on it.** Do not assume built-ins
-resolve. Hashing and HMAC are available through **`hash.js`**. Imports are
-CommonJS `require()` only, and the page states plainly that the Node action
-**does not support working with files**. Syntax errors set only the `Error`
-output, leaving the value outputs null.
+**A Node BUILT-IN such as `crypto` is not on that published list** - but it
+resolves anyway. `require('crypto')` and `require('https')` were both proven live
+(see "Node scripting can do outbound HTTPS + crypto" above, and the table in
+[PROCESIO-NODE-MODULE-WHITELIST.md](PROCESIO-NODE-MODULE-WHITELIST.md)). So read
+the published list as what the docs promise, not as what the runtime allows: it
+says nothing about built-ins either way, and its silence is not a negative
+result. `hash.js` remains the documented route for hashing and HMAC, and is the
+safer choice when you want to depend only on what is promised.
+
+Imports are CommonJS `require()` only, and the page states plainly that the Node
+action **does not support working with files**. Syntax errors set only the
+`Error` output, leaving the value outputs null.
 
 ## Fetching the documentation
 
@@ -2581,18 +2588,24 @@ files if both live in the same folder.
 
 Verified live against `PUT /api/Projects` while editing a real flow.
 
-> ### ⚠ A PUT that answered HTTP 400 STILL PERSISTED
+> ### ⚠ A PUT that answers HTTP 400 still persists, and that is by design
 >
 > A definition that fails server-side validation is **written anyway**, and the
 > flow is left live in exactly the invalid shape the error names. Observed with
 > `{"statusCode": 383, "value": "Action has too many input ports.", "target":
-> "Stop: Stop"}` — the tool reported a failure, and the two new actions were in
+> "Stop: Stop"}` — the call reported a failure, and the two new actions were in
 > the definition on the next read.
 >
-> This is the companion to the documented empty-body hazard (O4), where a
-> SUCCESS lies about landing. **Neither the success nor the failure of a
-> `PUT /api/Projects` may be read as the outcome.** Only re-reading the
-> definition settles what is stored.
+> **Storing it is intended, and is not a defect to report.** A process you are
+> still building has to be saveable while it is incomplete, which means an
+> invalid definition must be allowed to persist. The platform treats the save and
+> the verdict as two separate things, and it is right to.
+>
+> What the 400 tells you is the VERDICT, not the fate of the write. So the rule
+> that matters is narrower than "the API lied": **neither the success nor the
+> failure of a `PUT /api/Projects` reports whether it landed.** This is the
+> companion to the empty-body hazard (O4), where a SUCCESS says nothing about
+> landing either. Only re-reading the definition settles what is stored.
 >
 > Practical consequence: an edit routine must **reconcile from whatever state it
 > finds** rather than assume a clean starting point — remove what a previous
@@ -4028,9 +4041,11 @@ the warning.
   tool's `process-toggle-activation` now re-reads the `active` field from the list-processes
   projection after the PATCH and reports THAT, warning when it cannot confirm. See the
   toggle-activation sections above.
-- **4c — a `PUT /api/Projects` that fails validation can answer 400 and still persist** the
-  invalid definition (and stamp a stored `isValid:false` the launcher gates on). Discipline:
-  never trust a write's echo — re-read and reconcile. `put-projects` warns on an empty-body
+- **4c — NOT a defect; confirmed intended.** A `PUT /api/Projects` that fails validation
+  answers 400 and still persists the definition. That is deliberate: unfinished work has to
+  be saveable, so an invalid process must be allowed to store. The 400 carries the verdict,
+  not the fate of the write. The discipline it leaves behind is unchanged — never read a
+  write's echo as the outcome; re-read and reconcile. `put-projects` warns on an empty-body
   success (see the empty-body PUT note); after any process PUT, re-read and verify.
 - **4d — sub-workspace create/delete is lossy** (`POST /api/Workspace` can answer 500 and
   still create; a "removed" delete still counts against the cap). No clean tool guard; the
@@ -4106,3 +4121,287 @@ while the clipboard is untouched. Await it (or attach both callbacks), fall back
 textarea plus `document.execCommand('copy')`, and report only what actually succeeded. A synthetic
 click dispatched from a script is not a user gesture, so an automated test must drive a real press
 to exercise the working path.
+
+### A button's process reads its inputs AS the press is dispatched
+
+A RUN_JAVASCRIPT step placed first in a button's own click chain runs before the RUN_PROCESS step,
+but the process still sends the values the fields held BEFORE the press: the inputs are collected as
+the press is dispatched, not when the process step is reached. The symptom is a save that is always
+one press behind, and does nothing at all the first time.
+
+So anything computed FROM the press (which row was clicked, which direction a control means) has to
+be written before the press lands. `mousedown` is early enough, and it is available to page-side
+code: one delegated listener works out the value and writes it into the field the process reads.
+
+Write it the way a person would - the native setter followed by an `input` event:
+
+```js
+var setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+setter.call(field, value);
+field.dispatchEvent(new Event('input', { bubbles: true }));
+```
+Assigning `field.value` alone leaves the framework's own model untouched, and the old value is what
+gets sent.
+
+**A field the platform does not render cannot be written into this way.** A carrier field for this
+purpose has to stay visible in the manifest and be hidden with CSS (clip it to a pixel) rather than
+with `visible: false`, or there is no input in the page to write to.
+
+### An EXEC argument must be a variable or a literal
+
+`EXEC proc @Param = TRY_CAST(@p7 AS INT)` is a syntax error in T-SQL - an expression is not allowed
+there. Through a SQL action it surfaces as `Incorrect syntax near '@p7'` on the whole action, with
+no indication that the cast is what is wrong. Declare a local first:
+
+```sql
+DECLARE @Pos INT = TRY_CAST(@p7 AS INT);
+EXEC meet.sp_MoveMeetingType @Position = @Pos, @Direction = @p8;
+```
+Worth knowing because a run that fails this way still returns a normal-looking result to whatever
+called it; the error is only in the instance's error list.
+
+### A dynamic table draws scaffolding rows that answer to `tr.pds-c-table--row`
+
+Above and below the records the table renders drag targets ("Drag row before" / "Drag row after")
+and empty spacers, and they match the row selector like any other row. Anything that counts rows -
+a position, a first/last test - has to filter to the rows that actually hold a record (`:scope > td`
+count, or the presence of a control the record rows carry). Counting all of them puts the first
+record at position three, which looks exactly like an off-by-two in the code that reads it.
+
+### Google Calendar: attendees are recorded silently unless `sendUpdates` says otherwise
+
+Adding an `attendees` array to an event creates the invitations but notifies nobody: the guests
+appear on the organiser's event and never hear about it. `sendUpdates=all` on the request is what
+sends them. Same shape of trap as `conferenceDataVersion` for a Meet room - the body is accepted
+either way, and the difference only shows in what does not happen afterwards.
+
+### Field wrappers NEST, so `querySelector('label')` inside one can belong to something else
+
+`.form-builder--element` is not a leaf: the same class wraps a field, the column that holds it, and
+the tab that holds the column. Page-side code that identifies a field by its label with
+`group.querySelector('label')` therefore matches an OUTER wrapper too, because the first label found
+inside it belongs to a control nested somewhere below.
+
+That is harmless while the code only reads. It is not harmless when it writes: a rule meant to clip
+one hidden input to a pixel was applied to a wrapper holding 29 fields, and the whole tab collapsed -
+present in the DOM, readable by script, invisible on screen. Nothing errors, and a functional test
+driving the page through the DOM still passes, which is what makes it worth guarding explicitly:
+
+```js
+if (group.querySelectorAll('.form-builder--element').length) { continue; }   // leaves only
+```
+
+Related: a screenshot is the only check that catches this class of fault. When a page's content is
+there but not drawn, look at it rather than at the DOM.
+
+### The form header reserves a height the title does not fill
+
+Zeroing the paddings on `.form-builder--form-header` does not close the band under the title: the
+header carries a height of its own, and the title sits inside it. `min-height: 0 !important` plus
+`height: auto !important` is what removes the rest.
+
+### A table's columns are sized by `flex-grow`, not by `width`
+
+The rows of a dynamic table are FLEX containers and every header and body cell is a flex item with
+`flex: 25 1 0%`. A `width` on a cell therefore does nothing - not from a stylesheet, not inline, not
+even `!important` - and every column ends up with the same share regardless of what it holds. That
+is why a table can show five columns of empty space next to one that overflows into a horizontal
+scrollbar.
+
+Size the columns by setting a `flex-grow` per column instead; the numbers behave like proportions:
+
+```css
+.my-table th:nth-child(1), .my-table td:nth-child(1) { flex-grow: 16 !important; }  /* name */
+.my-table th:nth-child(2), .my-table td:nth-child(2) { flex-grow: 7  !important; }  /* a number */
+```
+
+Two things that come with it:
+
+- **A flex item does not shrink below its own content** (`min-width: auto`). Without
+  `min-width: 0` on the cells, the columns still add up to more than the container on a narrower
+  window and the last one is pushed out of view. Set it, and let the text wrap instead.
+- **CSS cannot select a table by what its header says**, and these tables carry no id. Have the
+  page-side script add a class to the one it means (it already locates it by header text), then
+  style that class.
+
+Check the computed `display` of a row before sizing any table in this platform: a table element
+whose rows are flex boxes ignores the whole column-width mechanism you would normally reach for.
+
+### A dynamic table can be nested inside another one, and the pair size each other in a loop
+
+A table added to a form is itself drawn inside a host table. The outer one takes its width from its
+content; the inner one takes its width from the outer. Left alone the pair settle on the widest
+arrangement they can find - columns adding up to far more than the card, half of them off the right
+edge - and no per-column share changes it, because the shares only divide a width that is already
+wrong. Forcing a width on the inner table does nothing at all; it is being stretched from outside.
+
+Breaking the loop takes BOTH halves, and either one alone changes nothing:
+
+```css
+table:has(.my-inner-table) { width: 100% !important; table-layout: fixed !important; }
+.my-inner-table { display: block !important; width: 100% !important; }
+```
+The outer table can then no longer be widened by its content, and the inner one fills the width it
+is given rather than asking for the width it wants.
+
+**A table turned into a block needs its groups turned into blocks too.** `thead` and `tbody` keep
+behaving as table groups, and the header row then measures itself instead of filling the table - it
+came out 265px narrower than the body rows, so every heading sat over the wrong column:
+
+```css
+.my-inner-table > thead, .my-inner-table > tbody { display: block !important; width: 100% !important; }
+.my-inner-table thead tr { display: flex !important; width: 100% !important; }
+```
+
+### `overflow-wrap: anywhere` also shrinks a column, which is not what it looks like
+
+The property is usually reached for as "let long text wrap". It does more than that: it declares the
+element's min-content width to be ONE CHARACTER. On a flex column that is an invitation to shrink,
+and the result is headings split as "ACTI ONS" and values as "Cancell ed" in columns that had room.
+
+Use `break-word`, which allows a break only when the word genuinely does not fit and leaves
+min-content alone, and keep `anywhere` for the columns that hold something with no break point of
+its own - an email address, a URL, an id. Headers want neither: `overflow-wrap: normal` plus
+`word-break: normal`, applied to the header cell AND the element inside it, because the value is
+drawn in a span and the property inherits.
+
+### One grid means one column count - unless each section is given its own span
+
+Laying a settings page out as a CSS grid compacts it immediately, but every section then inherits the
+column count of the section with the most fields: the shorter ones end with empty tracks on the
+right, and their fields, squeezed into a share they never needed, wrap their labels mid-phrase.
+
+Give the grid a track count that divides evenly by every layout you want - **60 works for 2, 3, 4 and
+5** - and have the page-side script walk the children, split them at each heading, and give the
+fields of each section the span that fills their row exactly (three fields, span 20). Two details
+that follow from it:
+
+- **Set the spacing as padding on the items, not as `column-gap`.** Fifty-nine gaps between sixty
+  tracks consume the page. Pad each item on one side and pull the container back by the same amount
+  with a negative margin.
+- **Skip anything with no rendered height when counting.** A section holds hidden plumbing fields
+  too, and counting them makes the row come out short.
+
+Narrow screens should ignore the per-section counts entirely - two across, then one - via a media
+query on the span classes, or the exactness that helps on a wide screen turns into unreadably narrow
+columns on a laptop.
+
+## ⚠ `isValid` is a field the caller sets, not one the platform computes
+
+A process carries `isValid`, and the designer shows it as the process's health. It is
+tempting to read it as the platform's own verdict on the flow. It is not. The back end
+**stores whatever the PUT body carries** and never recomputes it.
+
+Measured on a live process, in one sitting:
+
+| what was sent | what the server then held |
+| --- | --- |
+| a correct flow with `isValid: false` in the body | `false` |
+| a flow with a required parameter deleted, `isValid` left at `true` | `true` |
+| a body that omits the field entirely | `true` (the default) |
+
+Three consequences, and each one bit:
+
+* **A save does not clear a stale mark.** Repair a broken process, save it, and it stays
+  flagged broken - because the body you sent was read from the server and carried the old
+  flag. Nothing recomputes it on the way in. Any writer that fetches a flow, edits it and
+  PUTs it back has to set the field itself.
+* **Omitting the field marks broken work valid.** A desired-state save that builds a fresh
+  DTO gets `true` by default, so a deliberately half-finished process is filed as a good
+  one.
+* **Reading back your own validation is not a check.** Validating before the PUT measures
+  the flow you are about to send. It says nothing about what the server kept, and the two
+  genuinely differ. Re-read the process after the save if the answer matters.
+
+The correct value to stamp is the FE+BE verdict, never the runtime validator alone - see
+the next rule for why those two disagree.
+
+In this repo: `fevalidate.save_flow()` stamps and re-reads for the surgical writers, and
+`builder._save_gate()` stamps for every desired-state create/edit.
+
+## ⚠ `POST /api/Projects/validate` answers "valid" for flows the designer refuses to save
+
+The runtime validator checks the runtime layer only. A process the designer marks with a
+red `Please make sure that the action is defined/configured properly` - a required
+parameter left empty - comes back from `/api/Projects/validate` as an **empty 200**, which
+is the API's way of saying valid.
+
+Measured on the same process: designer `REQUIRED` error on `Concatenate - Input String 1`,
+runtime validator `valid: true`.
+
+So "the validator passed" is not "the designer would save this". Anything that reports
+process health, or stamps `isValid`, needs the front-end checks too. In this repo that is
+`fevalidate.run_fe_validation()`, and `pre_save_validate()` runs FE first, then BE.
+
+## ⚠ A cross-workspace GET is refused as 400, not 404
+
+`GET /api/Projects/{id}` for a process in a workspace other than the one in the
+`workspaceid` header returns **HTTP 400** with `statusCode: 501` and
+`"User is not authorized for the requested resource."` in the body - not a 404, and not a
+403. A caller that treats 400 as "malformed id" and 404 as "does not exist" will conclude
+the process is gone when it is simply out of scope. Pass the workspace explicitly when the
+resource does not live in the default one.
+
+### What a form's load actually costs, and how to measure it
+
+Reading a form's load as one number ("it takes twelve seconds") hides where the time goes. The
+browser's own resource timings separate it in one call from the page:
+
+```js
+performance.getEntriesByType('resource')
+  .filter(r => /formProcess|dataTypes|dataStore/.test(r.name))
+  .map(r => ({call: r.name, start: Math.round(r.startTime), dur: Math.round(r.duration)}))
+```
+
+The shape is the same for every form here: fetch the form definition, `dataTypes`, `dataStore`,
+then **`/publish` the load process and `/launch?runSynchronous=true`**. The publish happens on every
+page load, before the launch, and costs a few hundred milliseconds that no change to the flow can
+remove. What IS ours is the launch: it is the load process running its actions one after another.
+
+Two measurement traps, both of which produce numbers that are simply wrong:
+
+- **A hidden or background browser tab is throttled.** The same page measured in a hidden pane put
+  the publish call sixty seconds after the page opened; fronted, it was three. Always measure with
+  the tab visible.
+- **The CLI is not the page.** Timing a process through a command-line launch adds process startup
+  and a polling loop, and on a busy workspace the same flow measured 4s, then 8s, then 50s within a
+  few minutes. Use it for A/B on the SAME minute, never as an absolute.
+
+### A disabled action breaks the script that reads it - at parse time
+
+`isDisabled` on an action is the engine's own skip flag, and it looks like a free way to take a step
+off the path: disable the call, keep everything else. It is not free for whatever consumes its
+output. A Node script receives its inputs as `<%N%>` spliced in as TEXT, so an unbound variable
+leaves `const status = ;` - a syntax error, so the script fails as a whole and its own output is
+empty too. The failure looks nothing like the cause: a select two steps downstream renders empty.
+
+So a step can only be skipped along with everything that reads it, and if those consumers are still
+needed the work has to move rather than be switched off - a second process, triggered when the value
+is actually wanted, with its own copy of the shaping logic.
+
+## ⚠ `toggle-activation` only ever deactivates — it never activates
+
+`PATCH /api/Projects/{id}/toggle-activation` reads as a toggle and is not one. Measured
+across four consecutive calls on one process:
+
+| starting `active` | response | `active` afterwards |
+| --- | --- | --- |
+| `true` | `{"value": null, "errors": []}` | `false` |
+| `false` | `{"value": null, "errors": []}` | `false` |
+| `false` | `{"value": null, "errors": []}` | `false` |
+| `true` (set by PUT) | `{"value": null, "errors": []}` | `false` |
+
+It sets `active` to false and answers success either way, including when it changed
+nothing. There is no error, no differing status code, and no field in the response that
+distinguishes the two outcomes.
+
+**To activate a process, PUT it with `active: true`** — that field is settable on the
+normal process PUT and stores as sent.
+
+Two reading rules follow. The response is not the outcome, so compare `active` either side
+of the call. And `active` is only trustworthy from the **list-processes projection**;
+`GET /api/Projects/{id}.status` is a different field and is not the activation flag.
+
+`process-toggle-activation` does exactly this: it reads `active` before and after, reports
+`toggled` from the comparison rather than from the echo, and warns when the endpoint
+reported success without changing anything.

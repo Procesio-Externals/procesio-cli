@@ -475,7 +475,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `process-delete` | `--id` | Delete a resource by id (DELETE /api/Projects/{id}). |
 | `process-edit` | `--id` | Edit a PROCESIO process to a desired-state config (--id required). --dry-run to preview the DTO. |
 | `process-fe-validate` | `--id` | Front-end (designer-layer) 'Process Errors' validation on a live process — the client-side check that BLOCKS designer Save but which POST… |
-| `process-toggle-activation` | `--id` | Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation); re-reads and reports the ACTUAL `active` state, because the PATCH reports success… |
+| `process-toggle-activation` | `--id` | DEACTIVATE a process (PATCH /api/Projects/{id}/toggle-activation). Despite the name it is not a toggle: measured, it only ever sets `active` to FALSE, and… |
 | `process-validate` | `--id` | Validate a process with PROCESIO's own validator (POST /api/Projects/validate). |
 
 ### put
@@ -587,6 +587,12 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | action | required args | what it does |
 |---|---|---|
 | `update-schedule` | `--payload` | Update a schedule (PUT /api/Schedules) from a JSON --payload; --cron/--timezone sets a crontab recurrence. |
+
+### usage
+
+| action | required args | what it does |
+|---|---|---|
+| `usage-guide` | — | Regenerate PROCESIO-USAGE-GUIDE.md from the rules the notes in this folder mark with a warning sign (offline, deterministic). The guide carries the rule and a… |
 
 ### validate
 

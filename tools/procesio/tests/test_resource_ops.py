@@ -38,25 +38,46 @@ def test_get_delete_list_endpoints():
 
 def test_toggle_activation_reads_real_state_not_the_patch_echo():
     # The PATCH always answers {value:null,errors:[]}; the tool must report the ACTUAL
-    # `active` read back from the list-processes projection (B-048 cluster 4b).
+    # `active` read back from the list-processes projection (B-048 cluster 4b), and it
+    # reads the state on BOTH sides so "changed" is observed rather than assumed.
     s = FakeSession(queue=[
-        FakeResp(200, {"value": None, "errors": []}),                 # the lying PATCH
-        FakeResp(200, {"pageItems": [{"id": "P1", "active": True}]}),  # the truth
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": True}]}),   # before
+        FakeResp(200, {"value": None, "errors": []}),                   # the lying PATCH
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # after
     ])
     out = _call("process-toggle-activation", ["--id", "P1"], s)
-    assert s.calls[0]["method"] == "PATCH"
-    assert s.calls[0]["url"].endswith("/api/Projects/P1/toggle-activation")
-    assert s.calls[1]["method"] == "GET" and s.calls[1]["url"].endswith("/api/Projects")
-    assert out["toggled"] is True and out["active"] is True and "warning" not in out
+    assert s.calls[0]["method"] == "GET" and s.calls[0]["url"].endswith("/api/Projects")
+    assert s.calls[1]["method"] == "PATCH"
+    assert s.calls[1]["url"].endswith("/api/Projects/P1/toggle-activation")
+    assert s.calls[2]["method"] == "GET" and s.calls[2]["url"].endswith("/api/Projects")
+    assert out["toggled"] is True
+    assert out["active_before"] is True and out["active"] is False
+    assert "warning" not in out
+
+
+def test_toggle_activation_does_not_claim_a_flip_that_did_not_happen():
+    """The endpoint only ever deactivates: called on an inactive process it answers
+    success and changes nothing. Reporting that as a toggle is the whole bug."""
+    s = FakeSession(queue=[
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # before
+        FakeResp(200, {"value": None, "errors": []}),                   # "success"
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": False}]}),  # unchanged
+    ])
+    out = _call("process-toggle-activation", ["--id", "P1"], s)
+    assert out["toggled"] is False, "nothing moved, so nothing was toggled"
+    assert out["active"] is False
+    assert "only ever sets active to FALSE" in out["warning"]
 
 
 def test_toggle_activation_warns_when_it_cannot_confirm():
     s = FakeSession(queue=[
-        FakeResp(200, {"value": None, "errors": []}),
         FakeResp(200, {"pageItems": [{"id": "OTHER", "active": True}]}),  # P1 not present
+        FakeResp(200, {"value": None, "errors": []}),
+        FakeResp(200, {"pageItems": [{"id": "OTHER", "active": True}]}),
     ])
     out = _call("process-toggle-activation", ["--id", "P1"], s)
     assert out["active"] is None and "warning" in out
+    assert out["toggled"] is None, "unknown must not read as 'did not toggle'"
 
 
 def test_form_duplicate():

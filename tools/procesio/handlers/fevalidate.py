@@ -176,3 +176,41 @@ ACTIONS = {
                     "reported as (non-blocking) warnings. This same check auto-runs before "
                     "every process-create / process-edit. Add --include-be for the BE layer."),
 }
+
+
+# -- saving a fetched flow ----------------------------------------------------
+
+def save_flow(client, flow: dict, *, flow_id: str, valid: bool) -> dict:
+    """PUT a flow with its validity mark stamped to `valid`, and report what the server KEPT.
+
+    Two measured facts about the platform put this in one place rather than a bare PUT at
+    each call site. Both were established against the live API, not assumed:
+
+    * `isValid` is never computed by the back end. It stores whatever the PUT body
+      carries, and defaults it to TRUE when the body omits the field. So a writer that
+      passes a fetched flow straight through leaves a corrected process marked broken
+      for ever, and one that drops the field marks a broken process valid.
+    * The runtime validator (POST /api/Projects/validate) answers EMPTY - "valid" - for
+      flows the designer refuses to save, so `valid` has to carry the FE+BE verdict the
+      create/edit gate applies, never the runtime answer alone.
+
+    The mark is stamped, never blocked on. Saving a half-built process is deliberate
+    platform behaviour; the point of the mark is to say so truthfully.
+
+    The returned `isValid` is RE-READ after the PUT, because reporting the pre-save
+    measurement describes the flow that was sent rather than the one the platform kept,
+    and those two genuinely differ. A read-back that fails leaves it None with a note:
+    the PUT already landed, so failing the whole call here would misreport a save that
+    succeeded.
+    """
+    flow["isValid"] = bool(valid)
+    out: dict = {"stamped": bool(valid)}
+    client.put("/api/Projects", flow)
+    try:
+        stored = client.get(f"/api/Projects/{flow_id}")
+        f = stored.get("flow", stored) if isinstance(stored, dict) else stored
+        out["isValid"] = f.get("isValid") if isinstance(f, dict) else None
+    except Exception as e:  # noqa: BLE001 - the PUT landed; only the read-back failed
+        out["isValid"] = None
+        out["readback_error"] = str(e)
+    return out
