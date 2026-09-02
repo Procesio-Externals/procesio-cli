@@ -663,6 +663,40 @@ def _ensure_engine_state_properties(template: dict, params: list) -> list:
     return params + extra if extra else params
 
 
+# The input-setting types whose template default the DESIGNER pre-fills and persists,
+# and which are safe to copy verbatim. `code-editor` is deliberately excluded: its
+# default is a placeholder function/script, and an unbound Code is a caller error we
+# do not want to paper over with a no-op body.
+_INPUT_DEFAULT_TYPES = {"check-box", "select", "number", "text"}
+
+
+def _ensure_input_defaults(template: dict, params: list) -> list:
+    """Materialise the INPUT-side (direction 1) template defaults the designer pre-fills.
+
+    When an action is dropped in the designer, every input setting starts at its template
+    default (Node `Timeout` 60, Format DateTime `Language` en-US, Export To CSV `Column
+    delimiter` ",", ...) and that value is PERSISTED on save. The builder only emitted the
+    params the caller bound, so an unbound default-bearing input was DROPPED and the engine
+    then received a zero/empty value — silently wrong, and fatal for `Node`: an unbound
+    `Timeout` runs as 00:00:00 and the action dies with "value ('00:00:00') must be greater
+    than '00:00:00'" (measured live, B-048 cluster 2). Copy the template's own default for
+    any safe scalar input the caller left unbound, so a headless-built node matches a
+    designer-built one. Restricted to check-box/select/number/text with a non-empty default;
+    `code-editor` placeholders and empty defaults are left out. A caller who genuinely wants
+    an input empty binds it to "" explicitly, which lands in `params` and skips this.
+    """
+    have = {p.get("TabPropertyId") for p in params}
+    extra = []
+    for cfg in template.get("configuration") or []:
+        for s in cfg.get("settings") or []:
+            if (s.get("direction") == 1
+                    and s.get("type") in _INPUT_DEFAULT_TYPES
+                    and s.get("id") not in have
+                    and s.get("value") not in (None, "", [], {})):
+                extra.append({"TabPropertyId": s["id"], "Variable": [], "Value": s.get("value")})
+    return params + extra if extra else params
+
+
 def _action_node(aid, template, name, params, x, y, ctx, parent_id=None) -> dict:
     cfg_tree = copy.deepcopy(template.get("configuration", []))
     _apply_values_to_config(cfg_tree, params, ctx, aid)
@@ -847,6 +881,7 @@ def build(config: dict, ctx: dict) -> dict:
         name_entries.append((cid, node_name, derived is not None))
         params = _ensure_sql_bind_property(tpl, params)
         params = _ensure_engine_state_properties(tpl, params)
+        params = _ensure_input_defaults(tpl, params)
         nodes[cid] = _action_node(node_id[cid], tpl, node_name,
                                   params, 100 + 300 * (i + 1), 300, ctx, parent_id)
         if a.get("onError"):            # error port -> handler + capture error variable

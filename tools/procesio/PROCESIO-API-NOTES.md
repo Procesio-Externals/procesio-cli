@@ -4000,3 +4000,87 @@ the room, bounded by a few minutes so a calendar outage delays the email rather 
 
 **The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
 though they are valid and route normally. Worth knowing before using one as a test address.
+
+## `datatype-add-attribute` on a store-backing model: reported destructive, NOT reproduced (B-048 cluster 4a)
+
+B-048 reported that `POST /api/DataTypes/attribute/{modelId}` on the data model a **data
+store** is built on returns 200 for both POSTs and then breaks the store (columns read
+`[]`, rows unreadable). **Re-tested live 2026-09 on a real store and it did NOT reproduce.**
+The setup: create a data model, `POST /api/DataStore/from-data-model` (which gives the store
+its OWN COPY model, a distinct id from the source), populate it, then add an attribute to
+the store's copy model with `--force`. Result: the add landed and the store SURVIVED intact
+- 6 columns, 2 rows still readable. Adding to the SOURCE model likewise left the store
+untouched. So on the current platform, for a from-data-model store, the destruction is not
+reproducible. It may still bite a store made a different way (or the platform fixed it since
+the original measurement); treat it as a caution, not a certainty.
+
+**Tool guard (shipped, non-blocking).** `datatype-add-attribute` detects when the target
+model backs a store - it reads `GET /api/DataStore`, then each store's
+`GET /api/DataStore/{id}/data-model`, and matches that model id against the target (this is
+the store's OWN copy model, confirmed live). On a match it attaches a WARNING advising a
+re-read of the store afterward, but it does NOT refuse (the destruction did not reproduce,
+so blocking a working add would be wrong). Fail-open on any read error; `--force` suppresses
+the warning.
+
+**Related cluster-4 platform defects, and where each is handled in the tool:**
+- **4b — `PATCH /api/Projects/{id}/toggle-activation` reports success either way** and does
+  not report the real outcome (`GET …/{id}.status` is not the activation flag either). The
+  tool's `process-toggle-activation` now re-reads the `active` field from the list-processes
+  projection after the PATCH and reports THAT, warning when it cannot confirm. See the
+  toggle-activation sections above.
+- **4c — a `PUT /api/Projects` that fails validation can answer 400 and still persist** the
+  invalid definition (and stamp a stored `isValid:false` the launcher gates on). Discipline:
+  never trust a write's echo — re-read and reconcile. `put-projects` warns on an empty-body
+  success (see the empty-body PUT note); after any process PUT, re-read and verify.
+- **4d — sub-workspace create/delete is lossy** (`POST /api/Workspace` can answer 500 and
+  still create; a "removed" delete still counts against the cap). No clean tool guard; the
+  workspace list is `--include-removed`-aware so soft-deleted rows are visible. Do not quote
+  a numeric workspace cap — the documented `soft/hardLimit` is a time/thread budget.
+
+### Adding an input to a SQL action: two ways it silently arrives NULL
+
+Extending an existing SQL node (a new `@pN` on the stored procedure, fed by a new process
+variable) fails quietly in two places. Both look identical from outside: the process runs,
+reports success, the statement executes — and the parameter is NULL. Nothing is logged, and
+the procedure's own validation sees only a missing value.
+
+**1. `<%N%>` slots are numbered across the WHOLE action, not per parameter.** The mapping
+array is not the only parameter that carries placeholders: the action's other parameters
+(the ones holding the connection and the command) reference variables through the same
+counter. A row added with the next free id *inside the mapping list* can therefore collide
+with a slot another parameter already owns, and the engine resolves it to that parameter's
+variable. Before adding a row, collect every `<%(\d+)%>` across `action["parameters"]` and
+take a number no one uses:
+
+```python
+used = {int(n) for n in re.findall(r"<%(\d+)%>", json.dumps(action["parameters"]))}
+slot = max(used) + 1          # row["id"], row["source"]["value"], and variable[0]["id"]
+```
+The destination (`p5`, `p6`) is the SQL parameter name and is independent of the slot — they
+do not have to match, and forcing them to match is what causes the collision.
+
+**2. A mapping row copied from a neighbour keeps its `attribute`.** Rows that read a field
+of an object variable carry `"attribute": {"attributeId": …}`. Deep-copied as a template for
+a plain string/number variable, that attribute is preserved, and asking for an attribute of a
+value that has none yields nothing. Set `variable[0]["attribute"] = None` for a scalar.
+
+Symptom in both cases: the procedure's `ISNULL(@New, existing)` keeps the old value, so a save
+appears to work and changes nothing. Worth a one-off probe when a new input misbehaves — have
+the procedure write what it received into a settings row, run the process directly with a known
+value (bypassing the form), and read it back. That separates "the form did not send it" from
+"the process did not deliver it" in one step, which guessing at either end cannot.
+
+### A control added to a table row through the API is invisible to a save
+
+`form-add-element` can place a control inside a dynamic table row, and it renders and works on
+screen — but it is not part of the row's own field model, so a RUN_PROCESS map pointing at its
+path (whether the four-segment own path or the five-segment row path) sends nothing. The fix
+is a field at tab level that carries the value: an `onInput` handler on the row control writes
+it there, and the save reads the carrier. Handlers on such a control DO fire; the row model
+only limits what a *map* can address.
+
+When that handler recovers the value from the DOM rather than the field model, filter the
+candidates by rendered size (`getBoundingClientRect()`), because the create panel usually holds
+a control with the same label. Reading the first match writes the create panel's default over
+the user's choice on every save, and the symptom — the value reverting to a constant — looks
+exactly like a save that never received anything.

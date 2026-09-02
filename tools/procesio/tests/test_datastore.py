@@ -329,3 +329,50 @@ def test_row_reads_use_default_timeout():
     main.dispatch("datastore-get-rows", ["--id", DS],
                   client_builder=_builder(APIKEY, sess))
     assert _last(sess)["timeout"] == 60           # row reads are fast: default read timeout
+
+
+# -- B-048 cluster 4a: add-attribute must not silently destroy a store -------
+
+_MODEL = "22222222-2222-2222-2222-222222222222"
+
+
+def _add_attr(session, extra=None):
+    argv = ["--id", _MODEL, "--name", "x", "--data-type", "string"] + (extra or [])
+    return main.dispatch("datatype-add-attribute", argv,
+                         client_builder=_builder(APIKEY, session))
+
+
+def test_add_attribute_warns_when_model_backs_a_store():
+    # GET /api/DataStore -> one store whose data-model IS the target model: the add still
+    # PROCEEDS (4a did not reproduce live) but carries a caution to verify the store after.
+    s = FakeSession(queue=[
+        FakeResp(200, {"data": [{"id": DS}]}),   # store list
+        FakeResp(200, {"id": _MODEL}),           # its data-model == target
+        FakeResp(200, {}),                       # POST attribute
+        FakeResp(200, {"attributes": []}),       # re-GET model
+    ])
+    out = _add_attr(s)
+    assert out["added"] is True and "warning" in out and DS in out["warning"]
+
+
+def test_add_attribute_proceeds_clean_when_no_store_backs_the_model():
+    # GET /api/DataStore -> empty -> no caution -> POST + re-GET the model.
+    s = FakeSession(queue=[
+        FakeResp(200, {"data": []}),
+        FakeResp(200, {}),                       # POST attribute
+        FakeResp(200, {"attributes": []}),       # re-GET model
+    ])
+    out = _add_attr(s)
+    assert out["added"] is True and "warning" not in out
+    assert any(c["url"].endswith("/api/DataStore") for c in s.calls)
+
+
+def test_add_attribute_force_skips_the_store_check_entirely():
+    # --force -> no /api/DataStore read at all, straight to POST + re-GET.
+    s = FakeSession(queue=[
+        FakeResp(200, {}),                       # POST attribute
+        FakeResp(200, {"attributes": []}),       # re-GET model
+    ])
+    out = _add_attr(s, ["--force"])
+    assert out["added"] is True and "warning" not in out
+    assert not any("/api/DataStore" in c["url"] for c in s.calls)

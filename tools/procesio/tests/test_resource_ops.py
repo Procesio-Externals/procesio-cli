@@ -36,11 +36,30 @@ def test_get_delete_list_endpoints():
     assert out == {"count": 2, "items": [{"id": "a"}, {"id": "b"}]}
 
 
-def test_toggle_activation_and_duplicate():
-    s = FakeSession(queue=[FakeResp(200, {})])
+def test_toggle_activation_reads_real_state_not_the_patch_echo():
+    # The PATCH always answers {value:null,errors:[]}; the tool must report the ACTUAL
+    # `active` read back from the list-processes projection (B-048 cluster 4b).
+    s = FakeSession(queue=[
+        FakeResp(200, {"value": None, "errors": []}),                 # the lying PATCH
+        FakeResp(200, {"pageItems": [{"id": "P1", "active": True}]}),  # the truth
+    ])
     out = _call("process-toggle-activation", ["--id", "P1"], s)
     assert s.calls[0]["method"] == "PATCH"
-    assert s.calls[0]["url"].endswith("/api/Projects/P1/toggle-activation") and out["toggled"] is True
+    assert s.calls[0]["url"].endswith("/api/Projects/P1/toggle-activation")
+    assert s.calls[1]["method"] == "GET" and s.calls[1]["url"].endswith("/api/Projects")
+    assert out["toggled"] is True and out["active"] is True and "warning" not in out
+
+
+def test_toggle_activation_warns_when_it_cannot_confirm():
+    s = FakeSession(queue=[
+        FakeResp(200, {"value": None, "errors": []}),
+        FakeResp(200, {"pageItems": [{"id": "OTHER", "active": True}]}),  # P1 not present
+    ])
+    out = _call("process-toggle-activation", ["--id", "P1"], s)
+    assert out["active"] is None and "warning" in out
+
+
+def test_form_duplicate():
     s = FakeSession(queue=[FakeResp(200, {"id": "new"})])
     out = _call("form-duplicate", ["--id", "F1"], s)
     assert s.calls[0]["method"] == "POST" and s.calls[0]["url"].endswith("/api/FormTemplate/F1/duplicate")
