@@ -20,6 +20,7 @@ from tools.procesio.actiondef import ActionDef
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import sqlparam
 from tools.procesio.handlers.common import add_profile_arg
+from tools.procesio.handlers.fevalidate import run_fe_validation, save_flow
 
 
 def _enabled(node: dict) -> bool:
@@ -97,11 +98,21 @@ def sql_parameterize(client, args) -> dict:
         result["errors"] = errors
         result["put"] = False
         return result
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
     if args.dry_run:
+        result["isValid"] = bool(valid and fe["clean"])
         result["put"] = False
         result["dry_run"] = True
         return result
-    client.put("/api/Projects", flow)
+    # The mark is stamped from the FE+BE verdict and then re-read: the platform stores
+    # whatever the body carries and never computes this field, so passing the fetched
+    # value through would leave a corrected process marked broken.
+    saved = save_flow(client, flow, flow_id=args.id, valid=valid and fe["clean"])
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
     result["put"] = True
     return result
 
@@ -159,11 +170,21 @@ def sql_convert(client, args) -> dict:
         result["put"] = False
         return result
 
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
     if args.dry_run:
+        result["isValid"] = bool(valid and fe["clean"])
         result["put"] = False
         result["dry_run"] = True
         return result
-    client.put("/api/Projects", flow)
+    # The mark is stamped from the FE+BE verdict and then re-read: the platform stores
+    # whatever the body carries and never computes this field, so passing the fetched
+    # value through would leave a corrected process marked broken.
+    saved = save_flow(client, flow, flow_id=args.id, valid=valid and fe["clean"])
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
     result["put"] = True
     return result
 

@@ -1195,10 +1195,22 @@ def _validate(client, dto, ctx):
 def _save_gate(client, dto, ctx):
     """Front-end (designer) + back-end validation gate. Runs before EVERY process
     save (create + edit); raises errors.ValidationBlocked on blocking errors unless
-    ctx['_force']. See handlers/fevalidate.pre_save_validate for the FE->BE order."""
+    ctx['_force']. See handlers/fevalidate.pre_save_validate for the FE->BE order.
+
+    It also STAMPS the verdict onto dto["IsValid"] before returning, which is why it
+    takes the dto rather than just reporting. build() sets that field to a hardcoded
+    True, and the platform never computes it - it stores whatever the body carries. So
+    without the stamp every save asserts the process is valid, and a deliberate --force
+    save of a half-built process is filed as a good one. Both create and edit run this,
+    so stamping here covers every desired-state save from one place.
+    """
     from tools.procesio.handlers.fevalidate import pre_save_validate
-    return pre_save_validate(client, dto, force=bool(ctx.get("_force")),
-                             include_types=not ctx.get("_no_types"))
+    report = pre_save_validate(client, dto, force=bool(ctx.get("_force")),
+                               include_types=not ctx.get("_no_types"))
+    fe_clean = (report.get("fe") or {}).get("clean") is not False
+    be_ok = (report.get("be") or {}).get("valid") is not False
+    dto["IsValid"] = bool(fe_clean and be_ok)
+    return report
 
 
 def _edit_ctx(client, resource_id, config, ctx):

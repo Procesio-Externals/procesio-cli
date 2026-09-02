@@ -8356,7 +8356,7 @@ actions:
     required: false
     description: also run the back-end validator (POST /api/Projects/validate)
 - name: process-toggle-activation
-  description: Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation); re-reads and reports the ACTUAL `active` state, because the PATCH reports success either way.
+  description: 'DEACTIVATE a process (PATCH /api/Projects/{id}/toggle-activation). Despite the name it is not a toggle: measured, it only ever sets `active` to FALSE, and answers success either way - including when it changed nothing. To ACTIVATE, PUT the process with active=true. This action reads `active` before and after, reports `toggled` from that comparison rather than from the echo, and warns when nothing changed.'
   args:
   - name: profile
     type: string
@@ -9476,6 +9476,17 @@ actions:
     type: string
     required: false
     description: human-readable recurrence label (optional)
+- name: usage-guide
+  description: Regenerate PROCESIO-USAGE-GUIDE.md from the rules the notes in this folder mark with a warning sign (offline, deterministic). The guide carries the rule and a link; the explanation stays in the note, so there is one copy of every fact. It ships to the public repo with the rest of the folder. --check reports staleness without writing.
+  args:
+  - name: check
+    type: boolean
+    required: false
+    description: Report whether the guide is out of date; write nothing.
+  - name: out
+    type: string
+    required: false
+    description: Write somewhere other than the tool folder.
 - name: validate-crontab
   description: Preview a crontab expression's next occurrences (POST /api/Schedules/validate-crontab).
   args:

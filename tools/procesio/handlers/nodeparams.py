@@ -26,6 +26,7 @@ from tools.procesio.dto.process.normalize import normalize_designer_layer
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import nodeparam
 from tools.procesio.handlers.common import add_profile_arg
+from tools.procesio.handlers.fevalidate import run_fe_validation, save_flow
 from tools.procesio.handlers.flowlint import _template_sidepanel_ids, lint_flow_dto
 
 
@@ -59,6 +60,55 @@ def _lint(client, flow: dict) -> list[dict]:
         except Exception:  # noqa: BLE001 - unreadable target -> can't assert its contract
             return {}
     return lint_flow_dto(flow, tmpl_sp, target_vars_of)
+
+
+
+def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool = True) -> dict:
+    """The tail every surgical writer shares: validate, lint, then save or say why not.
+
+    One copy, because four call sites held drifted copies of it and a copy is where a
+    fix stops arriving. Two of them disagreed about whether a lint problem blocks.
+
+    `isValid` in the result is the STORED value re-read after the save, not the
+    pre-save measurement. The two differ: the platform keeps whatever the body carries,
+    so a flow that validates clean can still land on a process the server has marked
+    broken unless the mark is stamped. On the paths that write nothing (dry run,
+    blocked, invalid) there is no stored-after value, so it carries the verdict for the
+    patched flow instead - which is the question those paths are asked.
+
+    The blocking rule is unchanged: the runtime validator refuses the PUT, a designer
+    error does not. Saving a half-finished process is intended platform behaviour, and
+    the stamped mark is how the result stays honest about it.
+    """
+    valid, errors = _validate(client, flow)
+    problems = _lint(client, flow)
+    result["lint_problems"] = problems
+    if not valid:                       # never PUT a flow the runtime validator rejects
+        result["isValid"] = False
+        result["errors"] = errors
+        result["put"] = False
+        return result
+    if block_on_lint:
+        blocking = [p for p in problems if p.get("kind") == "CUSTOMDATA_PLACEHOLDER"]
+        if blocking:
+            result["isValid"] = valid
+            result["put"] = False
+            result["blocked_by"] = blocking
+            return result
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
+    if args.dry_run:
+        result["isValid"] = bool(valid and fe["clean"])
+        result["put"] = False
+        result["dry_run"] = True
+        return result
+    saved = save_flow(client, flow, flow_id=args.id, valid=valid and fe["clean"])
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
+    result["put"] = True
+    return result
 
 
 def node_params(client, args) -> dict:
@@ -97,26 +147,7 @@ def node_set_param(client, args) -> dict:
         return result
 
     result["normalized"] = normalize_designer_layer(flow)
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    problems = _lint(client, flow)
-    result["lint_problems"] = problems
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    blocking = [p for p in problems if p.get("kind") == "CUSTOMDATA_PLACEHOLDER"]
-    if blocking:
-        result["put"] = False
-        result["blocked_by"] = blocking
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    client.put("/api/Projects", flow)
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result)
 
 
 def node_delete(client, args) -> dict:
@@ -132,26 +163,7 @@ def node_delete(client, args) -> dict:
         result["put"] = False
         return result
 
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    problems = _lint(client, flow)
-    result["lint_problems"] = problems
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    blocking = [p for p in problems if p.get("kind") == "CUSTOMDATA_PLACEHOLDER"]
-    if blocking:
-        result["put"] = False
-        result["blocked_by"] = blocking
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    client.put("/api/Projects", flow)
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result)
 
 
 def node_replace_text(client, args) -> dict:
@@ -182,26 +194,7 @@ def node_replace_text(client, args) -> dict:
         return result
 
     result["normalized"] = normalize_designer_layer(flow)
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    problems = _lint(client, flow)
-    result["lint_problems"] = problems
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    blocking = [p for p in problems if p.get("kind") == "CUSTOMDATA_PLACEHOLDER"]
-    if blocking:
-        result["put"] = False
-        result["blocked_by"] = blocking
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    client.put("/api/Projects", flow)
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result)
 
 
 def variable_set_type(client, args) -> dict:
@@ -224,20 +217,7 @@ def variable_set_type(client, args) -> dict:
         result["put"] = False
         return result
 
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    result["lint_problems"] = _lint(client, flow)
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    client.put("/api/Projects", flow)
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
 def _params_args(p: argparse.ArgumentParser) -> None:

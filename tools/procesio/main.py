@@ -64,7 +64,7 @@ def collect_actions() -> dict[str, ActionDef]:
     from tools.procesio.handlers import (
         auth_actions, catalog, customaction_ops, datastore_ops, datatype_ops,
         dto_actions, environment_admin, files,
-        flowgraph, form_code, form_element, form_events, form_update, formprocess, generic, layout,
+        flowgraph, form_code, form_element, form_events, form_update, formprocess, generic, layout, usageguide,
         process_layout, process_naming, processes, profile_admin,
         flowlint, fevalidate, nodeparams, resource_ops, schedules, sqlactions, transport,
     )
@@ -93,6 +93,7 @@ def collect_actions() -> dict[str, ActionDef]:
     curated.update(customaction_ops.ACTIONS)
     # Offline structural reader: parse a flow/export into a node/edge graph model.
     curated.update(flowgraph.ACTIONS)
+    curated.update(usageguide.ACTIONS)
     # Offline deterministic canvas auto-layout (re-lay-out a flow; resource map).
     curated.update(layout.ACTIONS)
     # Live process ops that pair with layout: duplicate a process; re-lay-out in place.

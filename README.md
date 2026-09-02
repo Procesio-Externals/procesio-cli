@@ -165,6 +165,24 @@ Treat it as a guard rail against obvious mistakes, not as a sandbox, and add ver
 `agents/_lib/reversibility.py` when you find a gap. Set `AAT_MCP_DENY_IRREVERSIBLE`
 for a headless run where even confirmed actions must be refused.
 
+## The rules that are not obvious
+
+Before you build anything, read
+[`tools/procesio/PROCESIO-USAGE-GUIDE.md`](tools/procesio/PROCESIO-USAGE-GUIDE.md). It
+indexes the platform behaviours that read as failures until you know them, and they all
+share a shape: the call succeeds, the status says finished, nothing is logged, and the
+thing you asked for did not happen. There is no error to search for, so you look in the
+wrong place.
+
+A few of them, so you can judge whether it is worth your time: `<%N%>` in a Node pastes
+the value into the source rather than binding it, so a string becomes a subtraction; the
+Python action returns only what the script PRINTS, so an assignment returns empty; and an
+empty form control bound to a typed variable kills the launch with nothing on screen at
+all.
+
+The guide is generated from the tool's own notes, carries the rule and a link, and the
+reasoning stays in the note. One copy of every fact.
+
 ## The agent
 
 Beyond the raw API tool there is a build-and-test agent that carries the method rather

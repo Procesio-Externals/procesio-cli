@@ -201,6 +201,21 @@ def _launch_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--payload", help="JSON payload to send to the webhook")
 
 
+def _read_active(client, pid: str):
+    """The ONLY trustworthy activation read: the `active` field of the list projection.
+
+    Best-effort by design - a process past page 1 of a large workspace is simply not
+    found, and that has to read as "unknown" rather than "inactive".
+    """
+    try:
+        listing = client.get("/api/Projects") or {}
+        row = next((p for p in (listing.get("pageItems") or [])
+                    if str(p.get("id")) == str(pid)), None)
+        return row.get("active") if row is not None else None
+    except Exception:  # noqa: BLE001 - advisory read; never mask the caller's own call
+        return None
+
+
 def toggle_activation(client, args) -> dict:
     """Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation).
 
@@ -212,22 +227,23 @@ def toggle_activation(client, args) -> dict:
     of a large workspace may be missed): when it cannot confirm, say so rather than imply
     success. Platform-side this is B-048 cluster 4b — the PATCH should report its outcome.
     """
+    before = _read_active(client, args.id)
     patch = client.request("PATCH", f"/api/Projects/{args.id}/toggle-activation")
-    active = None
-    try:
-        listing = client.get("/api/Projects") or {}
-        row = next((p for p in (listing.get("pageItems") or [])
-                    if str(p.get("id")) == str(args.id)), None)
-        if row is not None:
-            active = row.get("active")
-    except Exception:  # noqa: BLE001 - re-read is advisory; never mask the PATCH itself
-        active = None
-    out = {"toggled": True, "id": args.id, "active": active, "patch_result": patch}
+    active = _read_active(client, args.id)
+    out = {"toggled": bool(before is not None and active is not None and before != active),
+           "id": args.id, "active": active, "active_before": before, "patch_result": patch}
     if active is None:
+        out["toggled"] = None
         out["warning"] = (
             "could not confirm activation from the list-processes projection; the PATCH "
             "response is NOT a reliable signal (it reports success either way) — verify "
             "in the designer or re-run list-processes and read `active`.")
+    elif before == active:
+        out["warning"] = (
+            f"the endpoint answered success but `active` is still {active}. Measured "
+            "behaviour: this endpoint only ever sets active to FALSE - it deactivates, and "
+            "never activates, whatever its name says. To activate, PUT the process with "
+            "active=true. See PROCESIO-API-NOTES.md.")
     return out
 
 
@@ -251,9 +267,12 @@ ACTIONS = {
     "process-toggle-activation": ActionDef(
         func=toggle_activation,
         add_args=lambda p: _id_args(p, "process (project) id"), needs_client=True,
-        description="Arm/disarm a process's triggers (PATCH /api/Projects/{id}/toggle-activation); "
-                    "re-reads and reports the ACTUAL `active` state, because the PATCH reports "
-                    "success either way."),
+        description="DEACTIVATE a process (PATCH /api/Projects/{id}/toggle-activation). Despite "
+                    "the name it is not a toggle: measured, it only ever sets `active` to FALSE, "
+                    "and answers success either way - including when it changed nothing. To "
+                    "ACTIVATE, PUT the process with active=true. This action reads `active` "
+                    "before and after, reports `toggled` from that comparison rather than from "
+                    "the echo, and warns when nothing changed."),
     # -- verification oracles --
     "process-validate": ActionDef(
         func=validate_process, add_args=lambda p: _id_args(p, "process (project) id"), needs_client=True,

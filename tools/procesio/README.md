@@ -241,6 +241,26 @@ See [PROCESIO-AUTH-NOTES.md](PROCESIO-AUTH-NOTES.md) for the live-validated auth
 findings (which keys work, the `workspaceid` requirement, the userpass host
 caveat) and the full endpoint inventory.
 
+## Start here: the rules that are not obvious
+
+[**PROCESIO-USAGE-GUIDE.md**](PROCESIO-USAGE-GUIDE.md) indexes every rule the notes in
+this folder mark as one: the places the platform does something defensible that reads
+as a failure until you know it. A call succeeds, the status says finished, nothing is
+logged, and the thing you asked for did not happen.
+
+It is GENERATED from the notes, so it cannot drift from them and it holds no second
+copy of any fact: it carries the rule and a link, and the reasoning stays in the note.
+Regenerate it after changing a note:
+
+```bash
+python scripts/run-tool.py procesio usage-guide          # write
+python scripts/run-tool.py procesio usage-guide --check  # is it stale?
+```
+
+To add a rule to it, mark the section in its note with a `⚠`. That marker is the
+convention the guide reads, and it is applied to three of the twenty notes so far; the
+guide lists the rest by name rather than pretending they hold nothing.
+
 ## Tool notes vs agent guidance
 
 The notes in this folder document **how the tool works and why** (API behaviors,
