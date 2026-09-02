@@ -37,11 +37,43 @@ Credentials never live in a file in this repo. They go into your machine's own s
 Windows Credential Manager, the macOS login Keychain, or the Linux desktop keyring,
 all under the name `agents-and-tools:procesio:<secret>`.
 
+PROCESIO accepts two ways of authenticating, and they are not equivalent. Store either
+one as a named profile:
+
 ```bash
-python scripts/set-credential.py procesio username
-python scripts/set-credential.py procesio password
+# Your user account. Carries everything that account can do.
+python scripts/run-tool.py procesio add-credential --name account --type userpass     --username you@example.com --make-default
+
+# An API key, scoped to one workspace.
+python scripts/run-tool.py procesio add-credential --name qa --type apikey     --workspace-id <workspace-guid>
+
 python scripts/run-tool.py procesio check-auth
 ```
+
+Omit `--password`, `--key` or `--value` and you are prompted without echoing, so the
+secret never reaches your shell history or a process listing. Add
+`--environment <Client>-<ENV>` to bind a profile to a specific installation.
+
+### Which one to use
+
+| | User and password | API key |
+|---|---|---|
+| Reaches | everything the account can reach, across workspaces | one workspace |
+| Needs a workspace GUID | no | yes, its own, and no other will do |
+| Good for | day-to-day building, anything that spans workspaces | CI, a script pinned to one environment, sharing narrow access |
+
+The scoping is enforced by the platform, not by this tool. A workspace-scoped key sends
+three headers: the key name, the key value, and `workspaceid`. Send it without that
+header and the call is a `401`; send it with a **different** workspace's GUID and it is
+also a `401`. So an api-key profile has to be stored with its `workspace_id` to
+authenticate at all. `python scripts/run-tool.py procesio list-workspaces` gives you the
+GUID.
+
+The practical consequence is worth knowing before you pick. A user profile reaches
+endpoints an API key cannot: listing a master workspace's sub-workspaces, for example,
+answers `401` for a key and `200` for a user. Prefer the user account while you are
+building, and reach for a key when you deliberately want to pin something to a single
+workspace.
 
 On a headless machine there is no OS keyring to write to. Pick a store explicitly:
 
@@ -163,6 +195,40 @@ from the live registry. From there you can store credentials straight into your 
 credential store (they never touch a file), edit schema-validated config, see which
 tools are ready and which are missing a secret, and run a tool to check it works.
 Nothing you enter leaves your machine.
+
+## Build a connector from API documentation
+
+Custom actions are the platform's main extension point: they are how a process calls an
+API that PROCESIO does not already speak. `connector-builder` turns API documentation
+into a compiled custom action, so the route from a third-party API to something a
+process can call is a build rather than a C# project.
+
+The builder is a hosted service at
+[connector-builder.procesio.app](https://connector-builder.procesio.app/). Anyone can
+create an account there; you do not need anything from us first. Two things to know
+before you start:
+
+- **You bring your own LLM key.** The build pipeline runs on a model, and it runs on
+  *your* provider account rather than ours. Set it once, in the builder, or from here.
+- **You authenticate either with an `acb_` API key or with the account's email and
+  password.** The key is long-lived and simplest for a script; the login mints a JWT.
+
+```bash
+python scripts/set-credential.py connector-builder api-key      # acb_...
+# or: set-credential.py connector-builder username / password
+
+python scripts/run-tool.py connector-builder set-llm-key --provider anthropic --api-key sk-ant-...
+python scripts/run-tool.py connector-builder create-build --api-url <docs-url>     --user-requirements "what the connector should do"
+```
+
+From there the agent drives the loop rather than you memorising the stages:
+
+```bash
+python scripts/run-agent.py connector-builder next-step --build-id <id>
+```
+
+It answers the builder's clarifying questions, approves the plan, generates, compiles,
+and hands back the `.nupkg` to upload to your workspace.
 
 ## Test the form you just built
 
