@@ -347,6 +347,141 @@ def _build_doc_mapper(template: dict, doc_map: dict, doc_vars: dict, var_ids: di
     return {"TabPropertyId": prop["id"], "Variable": [], "Value": rows}
 
 
+# -- Data Store node: Set Values (data-store-mapper) + Where (data-store-decisional) --
+# The Set Values row reuses the document-mapper source operand but names its target
+# `column` (resolved by NAME). The Where value is a DataStoreQueryFilterGroupDto -- the
+# filter tree shared verbatim with Process-Execution (Domain/Enums/DataStore/Filter).
+_DS_OPERATORS = {
+    "equals": "EQUALS", "eq": "EQUALS", "==": "EQUALS",
+    "notequals": "DOES_NOT_EQUAL", "ne": "DOES_NOT_EQUAL", "!=": "DOES_NOT_EQUAL",
+    "contains": "CONTAINS", "notcontains": "DOES_NOT_CONTAIN",
+    "doesnotcontain": "DOES_NOT_CONTAIN",
+    "greaterthan": "GREATER_THAN", "gt": "GREATER_THAN",
+    "greaterthanorequal": "GREATER_THAN_OR_EQUAL_TO", "gte": "GREATER_THAN_OR_EQUAL_TO",
+    "lessthan": "LESS_THAN", "lt": "LESS_THAN",
+    "lessthanorequal": "LESS_THAN_OR_EQUAL_TO", "lte": "LESS_THAN_OR_EQUAL_TO",
+    "istrue": "IS_TRUE", "isfalse": "IS_FALSE",
+    "isempty": "IS_EMPTY", "isnotempty": "IS_NOT_EMPTY",
+    "belongs": "BELONGS", "notbelongs": "DOES_NOT_BELONG", "doesnotbelong": "DOES_NOT_BELONG",
+}
+_DS_LOGIC = {"and": 1, "or": 2}
+
+
+def _ds_side_property(template: dict, wanted_type: str) -> dict | None:
+    """Find a Data Store side-panel child setting by its control `type`."""
+    for tab in template.get("configuration", []):
+        for s in tab.get("settings", []):
+            if s.get("type") == wanted_type:
+                return s
+            if isinstance(s.get("value"), list):
+                for sub in s["value"]:
+                    if sub.get("type") == wanted_type:
+                        return sub
+    return None
+
+
+def _ds_resolve_operator(raw) -> str:
+    if isinstance(raw, bool):
+        raise UsageError("Data Store Where operator must be an operator name")
+    key = str(raw).strip().lower().replace("_", "").replace(" ", "")
+    if key in _DS_OPERATORS:
+        return _DS_OPERATORS[key]
+    up = str(raw).strip().upper()
+    if up in set(_DS_OPERATORS.values()):        # already a decisional token
+        return up
+    raise UsageError(f"unknown Data Store Where operator {raw!r}; known: "
+                     f"{', '.join(sorted(_DS_OPERATORS))}")
+
+
+def _build_ds_mapper(template: dict, ds_map: dict, var_ids: dict, ctx: dict, counter: list) -> dict:
+    """Data Store `Set Values` (data-store-mapper) for InsertRows/UpdateRows: each entry
+    maps a COLUMN NAME -> a value binding. Runtime row {id, source:{value,variable}, column}.
+    A bare string/number binding is a LITERAL value (unlike docMap, where bare = variable)."""
+    prop = _ds_side_property(template, "data-store-mapper")
+    if prop is None:
+        raise UsageError("this action has no data-store-mapper property "
+                         "(Set Values renders only for a Data Store Insert/Update)")
+    rows = []
+    for i, (col, binding) in enumerate(ds_map.items()):
+        rows.append({"id": i, "source": _operand(binding, var_ids, counter, ctx), "column": col})
+    return {"TabPropertyId": prop["id"], "Variable": [], "Value": rows}
+
+
+def _ds_mapper_config(rows):
+    """data-store-mapper designer rows -- the shape PROCESIO's designer actually stores:
+    {id, left:<columnName>, right:<varId|literal>} (verified against a live export)."""
+    out = []
+    for r in rows or []:
+        src = r.get("source") or {}
+        right = _ref_from_variable(src.get("variable"))
+        if right is None:
+            right = src.get("value")
+        out.append({"id": r.get("id"), "left": r.get("column"), "right": right})
+    return out
+
+
+def _build_ds_where(template: dict, where_spec, var_ids: dict, ctx: dict, counter: list) -> dict:
+    """Data Store `Where` (data-store-decisional) for Select/Update/Delete. The runtime value
+    is a JSON ARRAY of InputDataStoreDecisional (Domain.DTOs.DataStore.Decisional) -- the SAME
+    operand/condition tree a rule `Decisional` uses, NOT the REST filter group. Verified live:
+      [{id:<GUID>, condition:[{id, operator, logicOperator, leftOperator, rightOperator, auxOperator}]}]
+    The element `id` MUST be a GUID (an int there deserializes into a .NET Guid? as null ->
+    'Nullable object must have a value.'). The LEFT operand is the COLUMN (a literal display
+    name); the RIGHT operand is the compared value/variable, whose `<%N%>` binding lives INLINE
+    (the parameter-level `Variable` stays EMPTY, unlike a rule Decisional). `logicOperator`
+    connects a condition to the NEXT one (last condition = 0). Spec forms:
+      [{column, op, value}]                          -> ANDed conditions
+      {logic:'and'|'or', conditions:[{column, op, value}]}
+    `op` is a decisional operator name (equals, notEquals, contains, greaterThan, ...)."""
+    prop = _ds_side_property(template, "data-store-decisional")
+    if prop is None:
+        raise UsageError("this action has no data-store-decisional property "
+                         "(Where renders only for a Data Store Select/Update/Delete)")
+    if isinstance(where_spec, dict):
+        logic = _DS_LOGIC.get(str(where_spec.get("logic", "and")).strip().lower(), 1)
+        conds_spec = where_spec.get("conditions") or where_spec.get("where") or []
+    else:
+        logic = 1
+        conds_spec = where_spec or []
+    n = len(conds_spec)
+    conds = []
+    for j, c in enumerate(conds_spec):
+        if not isinstance(c, dict):
+            raise UsageError("each Data Store Where condition is {column, op, value}")
+        col = c.get("column") or c.get("name")
+        if not col:
+            raise UsageError("each Data Store Where condition needs a 'column' (display name)")
+        op = _ds_resolve_operator(c.get("op", c.get("operator", "equals")))
+        left = {"value": col, "variable": []}
+        right = _operand(c.get("value", ""), var_ids, counter, ctx)
+        conds.append({"id": j, "operator": op,
+                      "logicOperator": (logic if j < n - 1 else 0),
+                      "leftOperator": left, "rightOperator": right, "auxOperator": None})
+    element = {"id": _new_id(ctx), "condition": conds}
+    return {"TabPropertyId": prop["id"], "Variable": [], "Value": [element]}
+
+
+def _ds_where_config(value, ctx):
+    """data-store-decisional designer value -- the shape PROCESIO's designer stores (verified
+    against a live export): [{id, name:'Where', target:'', condition:[{id, uid, operator,
+    leftOperator, rightOperator, auxOperator, logicOperator}]}]. Operands -> designer form via
+    _operand_config; the element `id` is carried over from the runtime element so the two layers
+    agree, and each condition gets a fresh `uid` (a client render key)."""
+    out = []
+    for el in value or []:
+        conds = []
+        for c in el.get("condition") or []:
+            conds.append({
+                "id": c.get("id"), "uid": _new_id(ctx), "operator": c.get("operator"),
+                "leftOperator": _operand_config(c.get("leftOperator")),
+                "rightOperator": _operand_config(c.get("rightOperator")),
+                "auxOperator": {"variable": "", "attribute": {"id": "", "nextAttribute": None}, "value": ""},
+                "logicOperator": c.get("logicOperator", 1),
+            })
+        out.append({"id": el.get("id"), "name": "Where", "target": "", "condition": conds})
+    return out
+
+
 def _is_foreach(a: dict) -> bool:
     return (a.get("action") or "").strip().lower() in ("for each", "foreach")
 
@@ -556,6 +691,10 @@ def _apply_values_to_config(cfg_tree: list, params: list, ctx: dict, aid=None) -
         stype = s.get("type")
         if stype == "document-mapper":
             s["value"] = _docmapper_config(p.get("Value"))
+        elif stype == "data-store-mapper":
+            s["value"] = _ds_mapper_config(p.get("Value"))
+        elif stype == "data-store-decisional":
+            s["value"] = _ds_where_config(p.get("Value"), ctx)
         elif stype == "decisional-case":
             s["value"] = _decisional_cases_config(p.get("Value"), ctx, aid)
         elif stype == "ai-decisional-case":
@@ -577,6 +716,8 @@ def _apply_values_to_config(cfg_tree: list, params: list, ctx: dict, aid=None) -
 
 # value-shapes the designer reads for the bespoke types (used by the build audit)
 _BESPOKE_REQUIRED = {"document-mapper": ("process", "document"),
+                     "data-store-mapper": ("left", "right"),
+                     "data-store-decisional": ("condition",),
                      "decisional-case": ("target", "condition"),
                      "ai-decisional-case": ("target", "condition"),
                      "process-inputs": ("subprocess", "process"),
@@ -856,6 +997,10 @@ def build(config: dict, ctx: dict) -> dict:
         if a.get("docMap"):             # Map Document Data (Generate Document)
             dv = (ctx.get("doc_vars") or {}).get(cid, {})
             params = params + [_build_doc_mapper(tpl, a["docMap"], dv, var_ids, ctx, counter)]
+        if a.get("dsMap"):              # Data Store Set Values (Insert/Update)
+            params = params + [_build_ds_mapper(tpl, a["dsMap"], var_ids, ctx, counter)]
+        if a.get("dsWhere"):            # Data Store Where (Select/Update/Delete)
+            params = params + [_build_ds_where(tpl, a["dsWhere"], var_ids, ctx, counter)]
         if a.get("branches"):           # Decisional routing
             bparams, bports = _build_decisional(tpl, a, node_id, var_ids, ctx)
             params = params + bparams

@@ -85,7 +85,7 @@ _SETTING_TYPE_TO_VALIDATOR = {
     "delay-definition": "delay",
     "map-process-data": "map_process_data",
     "document-mapper": "document_mapper",
-    "data-store-mapper": "document_mapper",
+    "data-store-mapper": "data_store_mapper",
     "data-store-decisional": "data_store_decisional",
     "map-parameters": "map_parameters",
     # "number" and everything else -> default
@@ -706,6 +706,25 @@ def _delay_required(action, setting) -> list[dict]:
     return errors
 
 
+def _data_store_mapper_required(action, setting) -> list[dict]:
+    """Data Store `Set Values` (data-store-mapper) -- each designer row {id, left, right}
+    needs a column (`left`) and a value (`right`). It does NOT reuse the document field, so
+    it must not be validated by _document_mapper_required."""
+    value = _g(setting, "value")
+    if not value or (isinstance(value, list) and len(value) == 0):
+        return []
+    errors: list[dict] = []
+    label = _label(setting)
+    idx = 0
+    for row in (r for r in value if isinstance(r, dict)):
+        if _is_empty(_g(row, "left")) or _is_empty(_g(row, "right")):
+            errors.append(_w("error", "REQUIRED",
+                             "Please make sure that the action is defined/configured properly.",
+                             action, f" - {label} (row {idx + 1})"))
+        idx += 1
+    return errors
+
+
 def _document_mapper_required(action, setting) -> list[dict]:
     """ref §4.11 DocumentMapperValidator."""
     value = _g(setting, "value")
@@ -793,6 +812,7 @@ _REQUIRED_VALIDATORS: dict[str, Callable] = {
     "data_store_decisional": _data_store_decisional_required,
     "delay": _delay_required,
     "document_mapper": _document_mapper_required,
+    "data_store_mapper": _data_store_mapper_required,
     "column_definition": _column_definition_required,
     "map_parameters": _map_row_required,
     "map_process_data": _map_row_required,
