@@ -79,6 +79,8 @@
           }
         },
         "docMap": {"type": "object", "description": "Generate Document: map each document template variable name -> a process variable (name or {var})", "additionalProperties": {"type": ["string", "object"]}},
+        "dsMap": {"type": "object", "description": "Data Store Set Values (InsertRows/UpdateRows): map each COLUMN NAME -> a value binding. A bare string/number is a LITERAL value; use {var} / {var, path} / {value} for the other forms.", "additionalProperties": {"type": ["string", "number", "boolean", "object"]}},
+        "dsWhere": {"description": "Data Store Where (SelectRows/UpdateRows/DeleteRows): conditions as a list [{column, op, value}] combined by AND, or {logic:'and'|'or', conditions:[...]}. op is a QueryOperators name (equals, notEquals, contains, startsWith, greaterThan, lessThan, between, in, isNull, isNotNull, ...) or a numeric value; value is a binding (literal, {var}, {var, path}).", "oneOf": [{"type": "array", "items": {"type": "object"}}, {"type": "object"}]},
         "branches": {
           "type": "array",
           "description": "Decisional routing. Regular Decisional: {to, when:[conditions], name?, default}. AI Decisional: {to, condition:'<natural-language>', name?, default} — condition is a plain-English sentence the model evaluates. A non-default case is auto-labelled from its condition (rule-based: 'amount > 1000'; AI: the condition sentence) unless name is given; re-evaluated on every build/edit.",
