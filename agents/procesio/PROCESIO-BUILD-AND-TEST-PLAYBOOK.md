@@ -51,6 +51,12 @@ Do not repeat it.
 - **A process is called from a form ONLY through a native `RUN_PROCESS` event**, never
   by injected JS. Verify the event is actually bound (`form-get-element-events`), not
   just that JS "should" trigger it.
+- **Author processes through `process-create` / `process-edit`, never a raw
+  `PUT /api/Projects`.** The builder sets validity and the designer-config correctly; a
+  hand-authored flow JSON pushed via `request PUT /api/Projects` lands `isValid:false`
+  and the process will not launch (and hand-setting `isValid:true` only lies about it -
+  `verify --run` still fails because the flow itself is invalid). Build Data Store
+  read/write nodes with the builder's `dsWhere`/`dsMap` config, not by guessing DTOs.
 - **Fix the cause in the generic tool, never patch the use case in the repo.** If a
   capability is missing (e.g. the builder could not author a Data Store node), EXTEND
   the builder with tests - the way `process-create` gained native Data Store authoring -

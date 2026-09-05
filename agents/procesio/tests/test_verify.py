@@ -36,6 +36,19 @@ def test_designer_blank_drops_verdict_to_warn(fake_invoke):
     assert _check(rep, "config-parity-audit")["status"] == "warn"
 
 
+def test_validate_sends_flow_via_body_file_not_inline(fake_invoke):
+    # regression: a large flow passed as inline --body overflows the OS command line
+    # (Windows WinError 206 / POSIX E2BIG) and crashed the gate. The validate call must
+    # use --body-file, never --body.
+    fake_invoke.set("get-process", flow([START, CONFIGURED, STOP]))
+    fake_invoke.set("request", {"result": {"isValid": True}})
+    verifylib.verify_process(fake_invoke, "pid")
+    req = next(c for c in fake_invoke.calls
+               if c[0] == "procesio" and c[1] == "request" and "/api/Projects/validate" in c[2])
+    assert "--body-file" in req[2]
+    assert "--body" not in req[2]
+
+
 def test_datastore_masquerade_hard_fails_the_gate(fake_invoke):
     # a Call-API node named like a cache op is a hard defect (severity fail), so the
     # config-parity check and the whole verdict must be `fail`, not merely `warn`.
