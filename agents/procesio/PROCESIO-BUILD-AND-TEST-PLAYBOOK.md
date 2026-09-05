@@ -29,6 +29,35 @@ points at them, it does not duplicate them.
 7. **Re-verify** - re-run the relevant checklist items on what changed.
 8. **Document & handover** - SOP, trigger order, resource ids. (best practices 7)
 
+## Definition of Done (outranks your own judgement)
+
+Measured failure (a GPT-driven session, 2026-09-05): the agent said "verified / works
+/ done" over and over on FALSE evidence - a PDF existed, a DTO field existed, a call
+returned `ok:true` - while the cache never cached, the button never fired, and the
+report was empty. Nine hours, thirty user turns, because the human was the only oracle.
+Do not repeat it.
+
+- **A build is done only when `verify --process-id <id> --run` returns a passing
+  verdict** - not when you inspected it, not when a file was produced, not when the API
+  accepted the write. `ok:true` proves *acceptance*, never *effect*. If `verify` cannot
+  cover a step (forms/browser/E2E), it lists it in `manual_checks`; run those, do not
+  wave them through.
+- **Clarify before you build.** In the Frame step, ask the questions that pin scope and
+  the load-bearing decisions first - the data source, and especially the **cache
+  mechanism** (native Data Store vs SQL; a cache MUST be a real Data Store / SQL action,
+  never a Call API dressed with a cache icon - `audit` now hard-fails that masquerade).
+  A task you *could* finish without asking finishes better, with fewer wrong-path loops,
+  when the spec is pinned up front.
+- **A process is called from a form ONLY through a native `RUN_PROCESS` event**, never
+  by injected JS. Verify the event is actually bound (`form-get-element-events`), not
+  just that JS "should" trigger it.
+- **Fix the cause in the generic tool, never patch the use case in the repo.** If a
+  capability is missing (e.g. the builder could not author a Data Store node), EXTEND
+  the builder with tests - the way `process-create` gained native Data Store authoring -
+  never drop a `patch_<usecase>.py` into `scripts/`. Use-case artefacts live in a
+  scratch dir; the guard `tests/test_no_usecase_scripts.py` fails the build otherwise
+  (CLAUDE.md Hard rules 5 + 10).
+
 ## Self-test checklist - what "tested" actually means
 
 Each item names the tool and the verified mechanic. Do not skip a layer because the

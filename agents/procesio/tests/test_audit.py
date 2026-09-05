@@ -29,6 +29,26 @@ def test_designer_blank_is_flagged_as_correctness_warn():
     assert all(f["severity"] in ("warn", "fail") for f in cf)
 
 
+def test_datastore_masquerade_flagged_as_fail():
+    # a Call API node NAMED like a cache op is the FX-usecase bug: it never touches
+    # the Data Store, but the process still runs green.
+    masq = action("Call API", name="Cache read")
+    flow = {"Actions": [START, masq, STOP]}
+    cf = audit.correctness_findings(flow)
+    hits = [f for f in cf if f["code"] == "datastore-as-callapi"]
+    assert hits and hits[0]["severity"] == "fail"
+    assert hits[0]["action"] == "Cache read"
+
+
+def test_real_datastore_node_and_plain_callapi_not_flagged():
+    real_cache = action("Data Store", name="Cache read",
+                        params=[{"Value": "x"}], settings=[{"value": "x"}])
+    plain_api = action("Call API", name="Fetch BNR XML",
+                       params=[{"Value": "https://bnr.ro"}], settings=[{"value": "url"}])
+    flow = {"Actions": [START, real_cache, plain_api, STOP]}
+    assert "datastore-as-callapi" not in _codes(audit.correctness_findings(flow))
+
+
 def test_practice_smells_flagged():
     acts = [START, STOP]
     acts += [action("Call API"), action("SQL Server"), action("Decisional")]

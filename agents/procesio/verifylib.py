@@ -141,7 +141,11 @@ def verify_process(invoke: Callable, process_id: str, *, profile: str | None = N
     cf = audit.correctness_findings(flow)
     blocking = [f for f in cf if f["severity"] in ("warn", "fail")]
     if blocking:
-        checks.append(_check("config-parity-audit", "validate", "warn",
+        # a correctness finding marked `fail` (e.g. a Call-API node masquerading as a
+        # Data Store/cache op) is a hard defect, not a smell - fail the gate outright.
+        hard = any(f["severity"] == "fail" for f in blocking)
+        checks.append(_check("config-parity-audit", "validate",
+                             "fail" if hard else "warn",
                              {"findings": blocking}))
     else:
         checks.append(_check("config-parity-audit", "validate", "pass",

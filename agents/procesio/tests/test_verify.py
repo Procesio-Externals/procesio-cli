@@ -36,6 +36,17 @@ def test_designer_blank_drops_verdict_to_warn(fake_invoke):
     assert _check(rep, "config-parity-audit")["status"] == "warn"
 
 
+def test_datastore_masquerade_hard_fails_the_gate(fake_invoke):
+    # a Call-API node named like a cache op is a hard defect (severity fail), so the
+    # config-parity check and the whole verdict must be `fail`, not merely `warn`.
+    masq = action("Call API", name="Cache read")
+    fake_invoke.set("get-process", flow([START, masq, STOP]))
+    fake_invoke.set("request", {"result": {"isValid": True}})
+    rep = verifylib.verify_process(fake_invoke, "pid")
+    assert _check(rep, "config-parity-audit")["status"] == "fail"
+    assert rep["verdict"] == "fail"
+
+
 def test_run_finished_status_50_passes(fake_invoke):
     fake_invoke.set("get-process", flow([START, CONFIGURED, STOP]))
     fake_invoke.set("request", {"result": {"isValid": True}})
