@@ -9,6 +9,8 @@ are returned in `manual_checks` so they cannot be silently skipped.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from typing import Any, Callable
 
 from agents._lib.toolrunner import ToolError
@@ -105,10 +107,17 @@ def verify_process(invoke: Callable, process_id: str, *, profile: str | None = N
     checks.append(_check("fetch", "validate", "pass", {"title": title}))
 
     # 2. validate --------------------------------------------------------------
+    # The flow JSON is often large; send it via a temp file (--body-file), never as an
+    # inline --body argv. A big process overflows the OS command-line limit (Windows
+    # WinError 206 "filename or extension is too long" / POSIX E2BIG), which crashed the
+    # gate on exactly the real processes it must check.
+    bf = tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8")
     try:
+        json.dump(flow, bf, ensure_ascii=False)
+        bf.close()
         vd = invoke("procesio", "request", "--method", "POST",
                     "--path", "/api/Projects/validate",
-                    "--body", json.dumps(flow), *scope)
+                    "--body-file", bf.name, *scope)
         res = vd.get("result")
         errors = None
         if isinstance(res, dict):
@@ -136,6 +145,11 @@ def verify_process(invoke: Callable, process_id: str, *, profile: str | None = N
                                  {"reason": "validate endpoint not callable",
                                   "code": e.code, "message": e.message,
                                   "detail": e.details}))
+    finally:
+        try:
+            os.unlink(bf.name)
+        except OSError:
+            pass
 
     # 3. config parity (gating correctness audit) ------------------------------
     cf = audit.correctness_findings(flow)
