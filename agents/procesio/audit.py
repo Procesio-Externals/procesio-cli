@@ -19,6 +19,12 @@ import json
 import re
 
 _STRUCTURAL = {"start", "stop"}  # no configuration expected (compared lowercased)
+# A node whose human NAME signals a Data Store / cache operation while its action
+# TYPE is 'Call API' is a masquerade: a Call API does NOT touch the Data Store, it
+# just calls an HTTP endpoint (the FX-usecase bug - a Call API node wearing a cache
+# icon). Intent keywords are matched on the action NAME, the type on the template.
+_DATASTORE_INTENT = ("cache", "data store", "datastore")
+_CALLAPI_TEMPLATE = "call api"
 _SLOW_KEYWORDS = ("call api", "sql", "ftp", "decisional",
                   "data store", "mysql", "redis")  # network/DB-bound: count toward speed
 _GUID_RE = re.compile(
@@ -88,9 +94,29 @@ def _f(kind, severity, code, message, citation, action=None) -> dict:
     return out
 
 
+def _datastore_masquerade(flow: dict) -> list[dict]:
+    """A node named like a Data Store/cache op whose TYPE is 'Call API' does not read
+    or write the Data Store - it just calls an endpoint. Hard-fail: the cache never
+    works, which is invisible because the process still 'runs' green (FX-usecase bug)."""
+    out: list[dict] = []
+    for a in _actions(flow):
+        if _is_structural(a):
+            continue
+        if any(k in _name(a).lower() for k in _DATASTORE_INTENT) \
+                and _CALLAPI_TEMPLATE in _template(a).lower():
+            out.append(_f(
+                "correctness", "fail", "datastore-as-callapi",
+                "action is named like a Data Store / cache operation but its type is "
+                "'Call API' - a Call API node does NOT read or write the Data Store. "
+                "Use a native Data Store action (Select/Insert/Update/Delete), not a "
+                "Call API dressed with a cache icon.",
+                "FX-usecase diagnosis; PROCESIO-DATASTORE", _name(a)))
+    return out
+
+
 def correctness_findings(flow: dict) -> list[dict]:
     """Designer-vs-runtime parity checks only (what `verify` gates on)."""
-    findings: list[dict] = []
+    findings: list[dict] = list(_datastore_masquerade(flow))
     for a in _actions(flow):
         if _is_structural(a):
             continue
