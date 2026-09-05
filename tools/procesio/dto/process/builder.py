@@ -982,10 +982,18 @@ def _resolve_subset(relayout, new_cids, all_cids):
 
 
 def _engine_layout(actions, id_of, ctx, config):
-    """Final layout step: run the new layout engine over the assembled actions. On a
-    fresh build (no existing positions) this is a full layout; on an edit it carries the
-    existing positions (already applied to `actions`) and re-tidies only the relayout
-    scope, leaving everyone else byte-stable."""
+    """Final layout step over the assembled actions.
+
+    A FULL layout (a fresh build, or an edit with relayout="all") is routed through
+    `adapter.layout_flow(..., cluster=True)` -- the SAME path as `relayout-process` -- so a
+    newly-built process gets the whole reference arrangement: clustering (long chains fold
+    into stacked shelves = the "stacking" arrangement), the branch-placement conventions
+    (error/default dead-end branches drop perpendicular), fan lanes, and cycle-awareness.
+    Calling the bare `engine.layout` here left `CLUSTER=False` (its default) and skipped
+    every adapter post-pass, so freshly-built processes came out flat / un-stacked.
+
+    A PARTIAL re-tidy (an edit that repositions only a subset) stays on the bare engine in
+    `subset` mode, so every untouched action is left byte-stable."""
     from tools.procesio.layout import engine
     by_id = {a["Id"]: a for a in actions}
     existing = ctx.get("existing_positions")
@@ -994,6 +1002,43 @@ def _engine_layout(actions, id_of, ctx, config):
             a = by_id.get(id_of.get(cid))
             if a and pos and pos.get("x") is not None:
                 a["CustomData"]["position"] = {"x": pos["x"], "y": pos["y"]}
+    if existing is None:
+        subset = None                     # CREATE -> full layout
+    else:
+        new_cids = [c for c in id_of if c not in existing]
+        sub_cids = _resolve_subset(config.get("relayout"), new_cids, list(id_of))
+        subset = None if sub_cids is None else [id_of[c] for c in sub_cids if c in id_of]
+
+    if subset is None:
+        # FULL layout: go through the adapter so clustering + the branch/fan/cycle
+        # conventions apply (bare engine.layout defaults CLUSTER=False). The adapter reads
+        # a flow dict, writes positions/areaSize onto a COPY of the actions, and returns
+        # that bundle; copy the results back onto the real actions by id. The builder's
+        # ports already carry Type=1/Data.isDefault ("error"/"default"), so the branch
+        # conventions fire correctly on a fresh build.
+        from tools.procesio.layout import adapter
+        # Hand the adapter a position-FREE copy so its Start-anchor (built for in-place
+        # relayout of a LIVE process, to keep the user's viewport) is a no-op here: a fresh
+        # build has no viewport to preserve, so the layout normalizes to the canvas margin
+        # (the established fresh-build contract) instead of anchoring to the provisional seed
+        # grid. Arrangement (clustering / branch / fan / cycle conventions) is unaffected --
+        # it is computed from the graph, not from the input positions.
+        probe = [{**a, "CustomData": {k: v for k, v in a["CustomData"].items()
+                                      if k != "position"}} for a in actions]
+        res = adapter.layout_flow({"Actions": probe}, cluster=True)
+        laid = {a["Id"]: a for a in (res["bundle"].get("Actions") or [])}
+        for a in actions:
+            src = laid.get(a["Id"])
+            if src is None:
+                continue
+            cd = src.get("CustomData") or {}
+            if cd.get("position"):
+                a["CustomData"]["position"] = dict(cd["position"])
+            if cd.get("areaSize") is not None:
+                a["CustomData"]["areaSize"] = dict(cd["areaSize"])
+        return
+
+    # PARTIAL re-tidy: reposition only `subset` among fixed neighbours (byte-stable rest).
     enodes = [{"id": a["Id"], "width": a["CustomData"]["areaSize"]["width"],
                "height": a["CustomData"]["areaSize"]["height"], "parent_id": a.get("ParentId"),
                "kind": a["CustomData"]["type"], "position": a["CustomData"]["position"]}
@@ -1001,16 +1046,10 @@ def _engine_layout(actions, id_of, ctx, config):
     eedges = [{"source": p["SourceId"], "dest": p["DestinationId"], "type": p.get("Type", 0)}
               for a in actions for p in a["Ports"]
               if p["SourceId"] != NULL_GUID and p.get("DestinationId")]
-    if existing is None:
-        subset = None                     # CREATE -> full layout
-    else:
-        new_cids = [c for c in id_of if c not in existing]
-        sub_cids = _resolve_subset(config.get("relayout"), new_cids, list(id_of))
-        subset = None if sub_cids is None else [id_of[c] for c in sub_cids if c in id_of]
     res = engine.layout(enodes, eedges, subset=subset)
     parent_of = {a["Id"]: a["ParentId"] for a in actions if a.get("ParentId") in res["areas"]}
     writes = engine.designer_writes(res["positions"], res["areas"], parent_of)
-    targets = set(writes) if subset is None else set(subset)
+    targets = set(subset)
     for a in actions:
         w = writes.get(a["Id"])
         if w and a["Id"] in targets:
