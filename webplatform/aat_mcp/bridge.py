@@ -137,16 +137,24 @@ def _delegate(kind: str, name: str, action: str | None, args: dict | None) -> di
                                        "message": f"host-only {kind} {name!r}: {e}"}}
 
 
-def _compact(entry: dict, kind: str) -> dict:
+def _compact(entry: dict, kind: str, full: bool = False) -> dict:
+    """One capability line for the discovery listing. Default is trimmed to keep the
+    session context small (a 113-entry listing at 240-char descriptions + examples is
+    ~50KB that sits in context all session and pushes weaker-window models toward the
+    context wall); pass full=True for the fuller line. Either way the complete
+    action/arg schema is one `capabilities(name=...)` call away."""
     routing = entry.get("routing") or {}
-    return {
+    desc = entry.get("description") or ""
+    out = {
         "kind": kind,
         "name": entry["name"],
-        "description": (entry.get("description") or "")[:240],
+        "description": desc[:240] if full else desc[:100],
         "primary_action": routing.get("primary_action", ""),
-        "example": routing.get("example", ""),
         "ready": bool(entry.get("ready", True)),
     }
+    if full:
+        out["example"] = routing.get("example", "")
+    return out
 
 
 def _full(entry: dict, kind: str) -> dict:
@@ -212,9 +220,11 @@ def _scan_registry():
     return tools, agents, skills
 
 
-def capabilities(kind: str | None = None, name: str | None = None) -> dict:
-    """No name -> compact list of every ready tool/agent (+ skills), like the
-    router map. With name -> the full action/arg schema for that one capability."""
+def capabilities(kind: str | None = None, name: str | None = None,
+                 full: bool = False) -> dict:
+    """No name -> compact list of every ready tool/agent (+ skills), like the router
+    map (trimmed by default to keep the session context small; full=True for the fuller
+    line). With name -> the full action/arg schema for that one capability."""
     tools, agents, skills = _scan_registry()
 
     if name:
@@ -228,11 +238,11 @@ def capabilities(kind: str | None = None, name: str | None = None) -> dict:
 
     out: list[dict] = []
     if kind in (None, "tool"):
-        out += [_compact(e, "tool") for e in tools if not e.get("error")]
+        out += [_compact(e, "tool", full) for e in tools if not e.get("error")]
     if kind in (None, "agent"):
-        out += [_compact(e, "agent") for e in agents if not e.get("error")]
+        out += [_compact(e, "agent", full) for e in agents if not e.get("error")]
     if kind in (None, "skill"):
-        out += [_compact(e, "skill") for e in skills
+        out += [_compact(e, "skill", full) for e in skills
                 if not e.get("error")]
     return {"count": len(out), "capabilities": out}
 

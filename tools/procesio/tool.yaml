@@ -4390,6 +4390,10 @@ actions:
     type: string
     required: true
     description: process (project) id
+  - name: compact
+    type: boolean
+    required: false
+    description: a structural summary (nodes, edges, variables) instead of the full flow DTO - the full DTO can be tens of KB and bloats a small context; use the default for editing/validation
 - name: get-process-payload
   description: Get a process's input-variable payload shape for run-process.
   args:
@@ -5758,11 +5762,15 @@ actions:
   - name: full
     type: boolean
     required: false
-    description: getFullAction=true
+    description: the FULL raw catalog (getFullAction=true) - ~280KB, opt-in
+  - name: raw
+    type: boolean
+    required: false
+    description: the raw /api/Actions list (large) instead of the compact view
   - name: by-family
     type: boolean
     required: false
-    description: group the catalog by family (control/scripting/data/integration/…)
+    description: (default already groups by family; kept for back-compat)
   - name: family
     type: string
     required: false
@@ -9142,6 +9150,10 @@ actions:
     type: string
     required: false
     description: query params as a JSON object
+  - name: query-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for the query params (use instead of --query to avoid shell JSON-quoting issues)
   - name: body
     type: string
     required: false

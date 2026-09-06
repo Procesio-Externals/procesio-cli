@@ -54,6 +54,9 @@ def _request_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--path", required=True,
                    help="endpoint path, e.g. /api/Projects or /api/Projects/{id}")
     p.add_argument("--query", help="query params as a JSON object")
+    p.add_argument("--query-file", dest="query_file",
+                   help="path to a UTF-8 JSON file for the query params "
+                        "(use instead of --query to avoid shell JSON-quoting issues)")
     p.add_argument("--body", help="request body as JSON (object or array)")
     p.add_argument("--body-file", dest="body_file",
                    help="path to a UTF-8 JSON file for the request body "
@@ -64,7 +67,18 @@ def request(client, args) -> dict:
     method = (args.method or "GET").upper()
     if method not in _METHODS:
         raise UsageError(f"--method must be one of {', '.join(_METHODS)}")
-    query = parse_json_arg(args.query, "query")
+    query_file = getattr(args, "query_file", None)
+    if query_file:
+        if args.query:
+            raise UsageError("pass either --query or --query-file, not both")
+        import json as _json
+        from pathlib import Path as _Path
+        try:
+            query = _json.loads(_Path(query_file).read_text(encoding="utf-8"))
+        except (OSError, ValueError) as e:
+            raise UsageError(f"--query-file could not be read as JSON: {e}") from e
+    else:
+        query = parse_json_arg(args.query, "query")
     if query is not None and not isinstance(query, dict):
         raise UsageError("--query must be a JSON object")
     body_file = getattr(args, "body_file", None)
