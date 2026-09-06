@@ -72,6 +72,9 @@ TOOLS = [
             "properties": {
                 "kind": {"type": "string", "enum": ["tool", "agent", "skill"]},
                 "name": {"type": "string"},
+                "full": {"type": "boolean",
+                         "description": "include the longer description + example per "
+                                        "entry (default false keeps the listing small)"},
             },
         },
     },
@@ -177,7 +180,8 @@ def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
     structured payload the model can read."""
     try:
         if name == "capabilities":
-            return bridge.capabilities(arguments.get("kind"), arguments.get("name")), False
+            return bridge.capabilities(arguments.get("kind"), arguments.get("name"),
+                                       bool(arguments.get("full", False))), False
         if name == "run_tool":
             return _run("tool", arguments, confirmed=False)
         if name == "run_tool_confirmed":

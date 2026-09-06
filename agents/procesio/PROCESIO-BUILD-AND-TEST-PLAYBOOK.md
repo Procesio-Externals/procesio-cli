@@ -55,8 +55,12 @@ Do not repeat it.
   `PUT /api/Projects`.** The builder sets validity and the designer-config correctly; a
   hand-authored flow JSON pushed via `request PUT /api/Projects` lands `isValid:false`
   and the process will not launch (and hand-setting `isValid:true` only lies about it -
-  `verify --run` still fails because the flow itself is invalid). Build Data Store
-  read/write nodes with the builder's `dsWhere`/`dsMap` config, not by guessing DTOs.
+  `verify --run` still fails because the flow itself is invalid). Build the flow through the
+  builder's structured config, never by hand-authoring node/edge DTOs: Data Store read/write
+  nodes via `dsWhere`/`dsMap`, and Decisional routing via the `branches` config - the builder
+  emits the correct `Ports[].Config` (the default branch is the string `"default"`, not a
+  boolean `isDefault`, which the BE rejects with `unexpected character 't'`). Guessing a
+  port/edge DTO is the same trap as guessing a node DTO.
 - **Fix the cause in the generic tool, never patch the use case in the repo.** If a
   capability is missing (e.g. the builder could not author a Data Store node), EXTEND
   the builder with tests - the way `process-create` gained native Data Store authoring -

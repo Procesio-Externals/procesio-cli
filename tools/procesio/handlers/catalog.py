@@ -65,9 +65,12 @@ def list_datatypes(client, args) -> dict:
 def _actions_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--filter", dest="action_filter", help="actionFilter value")
-    p.add_argument("--full", action="store_true", help="getFullAction=true")
+    p.add_argument("--full", action="store_true",
+                   help="the FULL raw catalog (getFullAction=true) - ~280KB, opt-in")
+    p.add_argument("--raw", action="store_true",
+                   help="the raw /api/Actions list (large) instead of the compact view")
     p.add_argument("--by-family", dest="by_family", action="store_true",
-                   help="group the catalog by family (control/scripting/data/integration/…)")
+                   help="(default already groups by family; kept for back-compat)")
     p.add_argument("--family", help="return only one family's actions")
 
 
@@ -75,7 +78,10 @@ def list_actions_catalog(client, args) -> dict:
     q = {"actionFilter": args.action_filter,
          "getFullAction": "true" if args.full else None}
     res = client.get("/api/Actions", q)
-    if not (getattr(args, "by_family", False) or getattr(args, "family", None)):
+    # Default is a COMPACT family-grouped listing (name + desc per action). The full raw
+    # catalog is ~280KB - big enough to strain a small context window on its own - so it
+    # is opt-in via --full / --raw. --family filters the compact view to one family.
+    if args.full or getattr(args, "raw", False):
         return {"result": res}
     items = res.get("actions") if isinstance(res, dict) else res
     items = items if isinstance(items, list) else []

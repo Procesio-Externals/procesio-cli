@@ -41,8 +41,44 @@ def _id_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--id", required=True, help="process (project) id")
 
 
+def _get_process_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--compact", action="store_true",
+                   help="a structural summary (nodes, edges, variables) instead of the "
+                        "full flow DTO - the full DTO can be tens of KB and bloats a "
+                        "small context; use the default for editing/validation")
+
+
+def _ci(d, *keys):
+    if not isinstance(d, dict):
+        return None
+    low = {k.lower(): k for k in d}
+    for k in keys:
+        if k.lower() in low:
+            return d[low[k.lower()]]
+    return None
+
+
 def get_process(client, args) -> dict:
-    return {"result": client.get(f"/api/Projects/{args.id}")}
+    res = client.get(f"/api/Projects/{args.id}")
+    if not getattr(args, "compact", False):
+        return {"result": res}
+    flow = _ci(res, "flow") if isinstance(res, dict) and _ci(res, "flow") else res
+    actions = _ci(flow, "actions") or []
+    nodes = [{"name": _ci(a, "actionName") or _ci(a, "actionTemplateName"),
+              "template": _ci(a, "actionTemplateName")}
+             for a in actions if isinstance(a, dict)]
+    variables = [_ci(v, "name") for v in (_ci(flow, "variables") or [])
+                 if isinstance(v, dict)]
+    ports = _ci(flow, "ports") or _ci(flow, "connections") or []
+    return {"result": {
+        "id": _ci(flow, "id"), "title": _ci(flow, "title") or _ci(flow, "name"),
+        "isValid": _ci(flow, "isValid"),
+        "node_count": len(nodes), "nodes": nodes,
+        "edge_count": len(ports) if isinstance(ports, list) else None,
+        "variables": variables,
+    }}
 
 
 def get_process_payload(client, args) -> dict:
@@ -334,7 +370,7 @@ ACTIONS = {
         description="List processes (GET /api/Projects).",
     ),
     "get-process": ActionDef(
-        func=get_process, add_args=_id_args, needs_client=True,
+        func=get_process, add_args=_get_process_args, needs_client=True,
         description="Get one process by id (GET /api/Projects/{id}).",
     ),
     "get-process-payload": ActionDef(
