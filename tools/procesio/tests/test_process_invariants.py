@@ -133,6 +133,24 @@ def test_decisional_fanout_is_unlimited():
     assert sum(1 for pt in d["Ports"] if pt["SourceId"] == d["Id"]) >= 7
 
 
+def test_decisional_no_duplicate_linear_outgoing_port():
+    # regression: with no explicit `edges` the implicit linear chain (start->...->stop)
+    # must NOT add an outgoing edge from a Decisional - its outgoing routing is its
+    # `branches` only. An extra linear port double-ports the node and the BE rejects it
+    # ("multiple incoming" / "duplicate connection").
+    cfg = {"title": "d", "variables": [{"name": "n", "type": "integer"}],
+           "actions": [
+               {"id": "d", "action": "Decisional",
+                "branches": [{"to": "a", "when": [{"left": {"var": "n"}, "op": "EQUALS", "right": 1}]},
+                             {"to": "b", "default": True}]},
+               {"id": "a", "action": "Generate GUID"},
+               {"id": "b", "action": "Generate GUID"}]}
+    dto = pb.build(cfg, _ctx())          # no `edges` -> chain would have added d->a
+    d = _by_name(dto)["Decisional"]
+    outgoing = [pt for pt in d["Ports"] if pt["SourceId"] == d["Id"]]
+    assert len(outgoing) == 2            # exactly the 2 branches, no linear duplicate
+
+
 def test_subprocess_literal_input_hoisted_to_variable():
     # A LITERAL subprocess input must be hoisted to a synthetic process variable (default =
     # the literal) and the binding rewritten to {var: ...}, so the mapping's parent side is

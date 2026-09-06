@@ -1056,6 +1056,10 @@ def build(config: dict, ctx: dict) -> dict:
     if not edges:
         chain = (["start"] if not has_start else []) + order + (["stop"] if not has_stop else [])
         edges = [[chain[i], chain[i + 1]] for i in range(len(chain) - 1)]
+    # A Decisional's OUTGOING routing is defined entirely by its `branches` (added below),
+    # so it must never also get a linear/explicit outgoing edge - that double-ports the
+    # node and the BE validator rejects it ("multiple incoming"/"duplicate connection").
+    branch_srcs = {cid for cid, _ in branch_ports}
     # entry edge (null -> first node)
     nodes[entry]["Ports"].append(_port(NULL_GUID, node_id[entry], ctx))
     for e in edges:
@@ -1071,6 +1075,8 @@ def build(config: dict, ctx: dict) -> dict:
             raise UsageError(
                 f"edge {frm!r}->{to!r} references an auto Start/Stop that wasn't created "
                 f"(you defined your own Start/Stop action) — wire to your own action id")
+        if frm in branch_srcs:
+            continue  # a Decisional routes only through its branch ports
         nodes[frm]["Ports"].append(_port(node_id[frm], node_id[to], ctx, extra))
     # branch (decisional) ports are defined by the action's `branches`, not edges
     for cid, bports in branch_ports:
