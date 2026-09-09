@@ -2,10 +2,10 @@
 name: sql-server-optimizer
 description: >
   SQL Server T-SQL optimizer for plain SQL and PROCESIO workflows. Rewrites queries, stored
-  procedures, functions, and scripts into faster, cleaner, production-ready code. Detects
-  PROCESIO inline variables and native param-style SQL, converting them correctly. Improves
-  JOIN order, ensures sargability and type safety, forces READ UNCOMMITTED isolation and
-  signature headers on all objects, and outputs a parameter mapping block plus concise notes.
+  procedures, functions, and scripts into faster, production-ready code. Detects PROCESIO
+  inline variables and native param-style SQL, converting them correctly. Improves JOIN
+  order, ensures sargability and type safety, forces READ UNCOMMITTED isolation and
+  signature headers on all objects, and outputs a parameter mapping block plus notes.
 
   ALWAYS use this skill when the user:
   - Pastes any T-SQL, plain or containing PROCESIO variables

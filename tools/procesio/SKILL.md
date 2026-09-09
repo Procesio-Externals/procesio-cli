@@ -1,6 +1,6 @@
 ---
 name: procesio
-description: PROCESIO low-code automation platform (procesio.app/.com). Full 1:1 coverage of the Web API: every endpoint is an action (<method>-<path> names) plus ergonomic shortcuts, a generic `request`, and an `export` (.procesio Transport). Dual auth (API key per-workspace, or username/password cookie session) with a multi-credential profile store; --profile picks the account/key, --workspace-id sets the…
+description: 'PROCESIO low-code automation platform (procesio.app/.com). Full 1:1 coverage of the Web API: every endpoint is an action (<method>-<path> names) plus ergonomic shortcuts, a generic `request`, and an `export` (.procesio Transport). Dual auth (API key per-workspace, or username/password cookie session) with a multi-credential profile store; --profile picks the account/key, --workspace-id sets the…'
 ---
 
 # procesio

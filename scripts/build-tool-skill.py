@@ -25,6 +25,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import yaml
+
 REPO = Path(__file__).resolve().parents[1]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
@@ -52,6 +54,29 @@ def _required_args(action) -> list[str]:
     return [a.name for a in action.args if getattr(a, "required", False)]
 
 
+def _frontmatter(name: str, description: str) -> str:
+    """The YAML frontmatter block, emitted through the dumper.
+
+    NOT an f-string. A manifest description is arbitrary prose and routinely
+    contains a colon followed by a space ("full coverage of the Web API: every
+    endpoint is an action"). In a plain YAML scalar that sequence starts a nested
+    mapping, so the document fails to parse and the file stops being a loadable
+    skill - silently, because nothing here reads it back. It held for 36 of 75
+    tools, and the ones it hit were the well-described ones, since description
+    length correlates with punctuation.
+
+    Dumping guarantees the round-trip: whatever punctuation a description carries,
+    yaml.safe_load returns it. width is set high so a long description stays on one
+    line rather than being folded, which keeps the diff readable.
+    """
+    block = yaml.safe_dump(
+        {"name": name, "description": description},
+        sort_keys=False, allow_unicode=True, width=10 ** 9,
+        default_flow_style=False,
+    ).rstrip("\n")
+    return f"---\n{block}\n---"
+
+
 def render(tool: M.ToolManifest) -> str:
     """The SKILL.md body. Frontmatter first so a skill loader can index it."""
     actions = list(tool.actions)
@@ -65,10 +90,7 @@ def render(tool: M.ToolManifest) -> str:
     example = getattr(routing, "example", None) if routing else None
 
     out: list[str] = []
-    out.append("---")
-    out.append(f"name: {tool.name}")
-    out.append(f"description: {_one_line(tool.description, 400)}")
-    out.append("---")
+    out.append(_frontmatter(tool.name, _one_line(tool.description, 400)))
     out.append("")
     out.append(f"# {tool.name}")
     out.append("")
