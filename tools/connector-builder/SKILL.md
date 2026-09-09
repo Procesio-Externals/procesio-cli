@@ -1,6 +1,6 @@
 ---
 name: connector-builder
-description: AI Connector Builder (connector-builder.procesio.app): turn API documentation into a compiled PROCESIO Custom Action .nupkg connector via an 8-stage LLM pipeline (gather -> clarify -> plan -> generate -> validate -> compile -> fix -> deliver). Drive the whole build lifecycle, read/write generated files, download the .nupkg artifact (to upload to PROCESIO for live testing), inspect logs/telemetry,…
+description: 'AI Connector Builder (connector-builder.procesio.app): turn API documentation into a compiled PROCESIO Custom Action .nupkg connector via an 8-stage LLM pipeline (gather -> clarify -> plan -> generate -> validate -> compile -> fix -> deliver). Drive the whole build lifecycle, read/write generated files, download the .nupkg artifact (to upload to PROCESIO for live testing), inspect logs/telemetry,…'
 ---
 
 # connector-builder
