@@ -50,9 +50,9 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `credential-create` | — | Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO. |
+| `credential-create` | — | Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to… |
 | `credential-delete` | `--id` | Delete a resource by id (DELETE /api/Credentials/{id}). |
-| `credential-edit` | `--id` | Edit a PROCESIO credential to a desired-state config (--id required). --dry-run to preview the DTO. |
+| `credential-edit` | `--id` | Edit a PROCESIO credential (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only… |
 | `credential-get` | `--id` | Get one resource by id (GET /api/Credentials/{id}). |
 | `credential-test` | — | Live-test a credential config without saving it (POST /api/Credentials/test). |
 
@@ -95,10 +95,10 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `datatype-add-attribute` | `--id`, `--name`, `--data-type` | Add one attribute to a model — compiles it; a model-typed attr inlines the child + keeps it reusable. |
 | `datatype-change-to-public` | `--root-id`, `--id` | Promote a private inner model (from fromJson) to public so it's reusable (POST /api/DataTypes/changeToPublic). |
 | `datatype-clone` | `--root-id`, `--id` | Clone an inner data model (POST /api/DataTypes/clone). |
-| `datatype-create` | — | Create a PROCESIO datatype from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO. |
+| `datatype-create` | — | Create a PROCESIO datatype from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill… |
 | `datatype-delete` | `--id` | Delete a data model (DELETE /api/DataTypes/{id}). |
 | `datatype-delete-attribute` | `--id`, `--attribute` | Delete one attribute (DELETE /api/dataTypes/attribute/{id}/{attrId}). |
-| `datatype-edit` | `--id` | Edit a PROCESIO datatype to a desired-state config (--id required). --dry-run to preview the DTO. |
+| `datatype-edit` | `--id` | Edit a PROCESIO datatype (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD… |
 | `datatype-edit-attribute` | `--id`, `--attribute` | Edit one attribute (PUT /api/dataTypes/attribute/{id}). |
 | `datatype-get` | `--id` | Get a data model with its attributes (GET /api/DataTypes/{id}). |
 
@@ -141,9 +141,9 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `document-create` | — | Create a PROCESIO document from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO. |
+| `document-create` | — | Create a PROCESIO document from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill… |
 | `document-delete` | `--id` | Delete a resource by id (DELETE /api/DocumentTemplate/{id}). |
-| `document-edit` | `--id` | Edit a PROCESIO document to a desired-state config (--id required). --dry-run to preview the DTO. |
+| `document-edit` | `--id` | Edit a PROCESIO document (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD… |
 | `document-get` | `--id` | Get one resource by id (GET /api/DocumentTemplate/{id}). |
 | `document-list` | — | List documents (GET /api/DocumentTemplate). |
 
@@ -176,10 +176,10 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | action | required args | what it does |
 |---|---|---|
 | `form-add-element` | `--id` | Add one or more controls to a LIVE form (authoring-config elements), splicing them into Data.elements AND the data model without regenerating what is already… |
-| `form-create` | — | Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO. |
+| `form-create` | — | Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in… |
 | `form-delete` | `--id` | Delete a resource by id (DELETE /api/FormTemplate/{id}). |
 | `form-duplicate` | `--id` | POST /api/FormTemplate/{id}/duplicate. |
-| `form-edit` | `--id` | Edit a PROCESIO form to a desired-state config (--id required). --dry-run to preview the DTO. |
+| `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |
 | `form-get` | `--id` | Get one resource by id (GET /api/FormTemplate/{id}). |
 | `form-get-code` | `--id` | Read a form's global CSS + JavaScript (decrypts Data.code). |
 | `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (id or name). |
@@ -187,7 +187,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-list` | — | List forms (GET /api/FormTemplate/all/basic). |
 | `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). |
 | `form-set-element-config` | `--id`, `--element` | Set one element's plain configs in place (surgical: only that element's config values change, ids preserved; returns the previous values). Event configs go… |
-| `form-set-element-event` | `--id`, `--element`, `--on`, `--action` | Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element's event config changes;… |
+| `form-set-element-event` | `--id`, `--element`, `--on`, `--action` | Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element's event config changes). In a… |
 | `form-update` | `--id` | Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data patch into its Data (and/or override --name/--status/--state/--is-private), then… |
 
 ### get
@@ -471,9 +471,9 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `process-create` | — | Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO. |
+| `process-create` | — | Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill… |
 | `process-delete` | `--id` | Delete a resource by id (DELETE /api/Projects/{id}). |
-| `process-edit` | `--id` | Edit a PROCESIO process to a desired-state config (--id required). --dry-run to preview the DTO. |
+| `process-edit` | `--id` | Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no… |
 | `process-fe-validate` | `--id` | Front-end (designer-layer) 'Process Errors' validation on a live process — the client-side check that BLOCKS designer Save but which POST… |
 | `process-toggle-activation` | `--id`, `--state` | Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). --state true|false is REQUIRED: despite its name the endpoint is a setter, and… |
 | `process-validate` | `--id` | Validate a process with PROCESIO's own validator (POST /api/Projects/validate). |
@@ -616,9 +616,9 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `webhook-create` | — | Create a PROCESIO webhook from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO. |
+| `webhook-create` | — | Create a PROCESIO webhook from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill… |
 | `webhook-delete` | `--id` | Delete a resource by id (DELETE /api/Webhooks/{id}). |
-| `webhook-edit` | `--id` | Edit a PROCESIO webhook to a desired-state config (--id required). --dry-run to preview the DTO. |
+| `webhook-edit` | `--id` | Edit a PROCESIO webhook (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the… |
 | `webhook-get` | `--id` | Get one resource by id (GET /api/Webhooks/{id}). |
 | `webhook-launch` | `--id` | Fire a webhook-triggered process with a payload (POST /api/Webhooks/launch/{id}). |
 

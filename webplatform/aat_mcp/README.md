@@ -14,7 +14,7 @@ Server tool names below; opencode shows them prefixed with the server name (e.g.
 
 | MCP tool | Args | Purpose |
 |---|---|---|
-| `capabilities` | `{kind?, name?}` | no `name`: compact list of every ready tool/agent/skill. With `name`: that capability's full action+arg schema (the `--help` replacement) |
+| `capabilities` | `{kind?, name?, action?, search?}` | discovery, narrowest door first (the `--help` replacement). Nothing: compact list of every ready tool/agent/skill. `search`: matching actions across everything (or inside `name`). `name`+`action`: that one action's arg schema. `name` alone: the full schema, degraded to the action-name index when oversized — see AAT-MCP-NOTES.md |
 | `run_tool` | `{tool, action?, args?}` | run a **reversible** tool action; refuses irreversible ones with `approval_required` |
 | `run_agent` | `{agent, action?, args?}` | run a **reversible** agent action |
 | `run_tool_confirmed` | `{tool, action?, args?}` | run a tool **including irreversible** actions — opencode asks the operator to approve |

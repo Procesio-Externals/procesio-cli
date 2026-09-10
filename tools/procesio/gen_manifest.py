@@ -49,12 +49,19 @@ def _action_args(defn) -> list[dict]:
         if not names:
             continue
         name = names[0][2:]
-        out.append({
+        spec = {
             "name": name,
             "type": _arg_type(action),
             "required": bool(getattr(action, "required", False)),
             "description": (action.help or "").strip(),
-        })
+        }
+        # A structured argument publishes its schema too: `help=` can say an arg takes
+        # JSON, never what belongs in it, so without this a manifest reader has to
+        # discover the shape from validation errors one layer at a time.
+        schema = (getattr(defn, "arg_schemas", None) or {}).get(name)
+        if schema:
+            spec["schema"] = schema
+        out.append(spec)
     return out
 
 
@@ -63,11 +70,15 @@ def build_actions_block() -> list[dict]:
     actions = []
     for name in sorted(main.ACTIONS):
         defn = main.ACTIONS[name]
-        actions.append({
+        entry = {
             "name": name,
             "description": (defn.description or "").strip(),
             "args": _action_args(defn),
-        })
+        }
+        examples = getattr(defn, "examples", None)
+        if examples:
+            entry["examples"] = examples
+        actions.append(entry)
     return actions
 
 

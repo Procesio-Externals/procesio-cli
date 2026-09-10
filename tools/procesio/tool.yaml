@@ -216,7 +216,7 @@ actions:
     required: false
     description: human-readable recurrence label (optional)
 - name: credential-create
-  description: Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO.
+  description: Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.
   args:
   - name: profile
     type: string
@@ -234,6 +234,39 @@ actions:
     type: string
     required: false
     description: resource config as a JSON object
+    schema: &id001
+      $schema: https://json-schema.org/draft/2020-12/schema
+      title: PROCESIO Credential config
+      description: Create/edit a credential instance for a connection template. 'template' is the type name (e.g. 'REST API', 'Outbound e-mail (SMTP)', 'SQL'); 'properties' maps property labels to values (select/radio option NAMES are accepted and resolved to their value).
+      type: object
+      additionalProperties: false
+      required:
+      - template
+      - name
+      - properties
+      properties:
+        template:
+          type: string
+          minLength: 1
+          description: credential template/type name
+        name:
+          type: string
+          minLength: 1
+          description: instance name
+        description:
+          type: string
+        properties:
+          type: object
+          description: property label (or id) -> value (secrets included here). A value may be an array (e.g. an OAuth2 'Scopes' pills list) or object for structured properties.
+          minProperties: 1
+          additionalProperties:
+            type:
+            - string
+            - number
+            - boolean
+            - 'null'
+            - array
+            - object
   - name: config-file
     type: string
     required: false
@@ -250,6 +283,15 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: &id002
+  - template: REST API
+    name: GitHub
+    description: public
+    properties:
+      URL: https://api.github.com
+      Authentication method: No authentication
+      Method: GET
+      Test endpoint: /zen
 - name: credential-delete
   description: Delete a resource by id (DELETE /api/Credentials/{id}).
   args:
@@ -270,7 +312,7 @@ actions:
     required: true
     description: credential id
 - name: credential-edit
-  description: Edit a PROCESIO credential to a desired-state config (--id required). --dry-run to preview the DTO.
+  description: 'Edit a PROCESIO credential (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the fields you want to change. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
   args:
   - name: profile
     type: string
@@ -292,6 +334,7 @@ actions:
     type: string
     required: false
     description: desired-state config as a JSON object
+    schema: *id001
   - name: config-file
     type: string
     required: false
@@ -300,6 +343,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: allow-remove
+    type: boolean
+    required: false
+    description: permit this desired-state config to REMOVE actions/variables the live resource has (refused by default)
   - name: force
     type: boolean
     required: false
@@ -308,6 +355,7 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: *id002
 - name: credential-get
   description: Get one resource by id (GET /api/Credentials/{id}).
   args:
@@ -974,7 +1022,7 @@ actions:
     required: true
     description: inner model id to promote/clone
 - name: datatype-create
-  description: Create a PROCESIO datatype from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO.
+  description: 'Create a PROCESIO datatype from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of attributes in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
   args:
   - name: profile
     type: string
@@ -992,6 +1040,96 @@ actions:
     type: string
     required: false
     description: resource config as a JSON object
+    schema: &id003
+      $schema: https://json-schema.org/draft/2020-12/schema
+      title: PROCESIO Data Model (DataType) config
+      description: Minimal config to create/edit a PROCESIO custom data model. The builder expands each attribute into a full DataAttributeDto and wraps it in a CreateDataTypeDto. Primitive types resolve to stable platform ids; 'model' references another data model by name or id; 'attributes' defines an inline nested object.
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          minLength: 1
+          description: Internal model name (the JSON key/identifier).
+        displayName:
+          type: string
+          description: UI display name; defaults to name.
+        isPublic:
+          type: boolean
+          default: true
+          description: Whether the model is public in the workspace.
+        fromJson:
+          description: 'Platform trick: infer the whole model from a JSON sample (object or JSON string) via /api/DataTypes/generate. Overrides attributes.'
+        attributes:
+          type: array
+          description: The model's fields. Empty is allowed (an empty object model). Omit when using fromJson.
+          items:
+            $ref: '#/$defs/attribute'
+      $defs:
+        attribute:
+          type: object
+          additionalProperties: false
+          required:
+          - name
+          properties:
+            name:
+              type: string
+              minLength: 1
+            displayName:
+              type: string
+            jsonProperty:
+              type: string
+              description: JSON key this field maps to (defaults to name).
+            isList:
+              type: boolean
+              default: false
+              description: Field holds a list/array of the type.
+            hidden:
+              type: boolean
+              default: false
+              description: Hide the attribute in the model UI.
+            isPublic:
+              type: boolean
+              default: false
+              description: Mark the attribute public.
+            type:
+              type: string
+              description: A primitive type. Exactly one of type|model|attributes per attribute.
+              enum:
+              - boolean
+              - integer
+              - float
+              - double
+              - string
+              - datetime
+              - json
+              - object
+              - guid
+              - bool
+              - int
+              - long
+              - number
+              - text
+              - str
+              - uuid
+              - date-time
+            model:
+              type: string
+              description: Reference another data model by name or id (makes this a nested model field).
+            attributes:
+              type: array
+              items:
+                $ref: '#/$defs/attribute'
+              description: Inline nested object — its own fields.
+          oneOf:
+          - required:
+            - type
+          - required:
+            - model
+          - required:
+            - attributes
   - name: config-file
     type: string
     required: false
@@ -1008,6 +1146,28 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: &id004
+  - name: Customer
+    displayName: Customer
+    isPublic: true
+    attributes:
+    - name: id
+      type: guid
+    - name: name
+      type: string
+    - name: age
+      type: integer
+    - name: tags
+      type: string
+      isList: true
+    - name: address
+      attributes:
+      - name: city
+        type: string
+      - name: zip
+        type: string
+    - name: owner
+      model: PersonModel
 - name: datatype-delete
   description: Delete a data model (DELETE /api/DataTypes/{id}).
   args:
@@ -1051,7 +1211,7 @@ actions:
     required: true
     description: attribute id or current name
 - name: datatype-edit
-  description: Edit a PROCESIO datatype to a desired-state config (--id required). --dry-run to preview the DTO.
+  description: 'Edit a PROCESIO datatype (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD or change one item, GET the datatype, append yours to the matching list (attributes), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
   args:
   - name: profile
     type: string
@@ -1073,6 +1233,7 @@ actions:
     type: string
     required: false
     description: desired-state config as a JSON object
+    schema: *id003
   - name: config-file
     type: string
     required: false
@@ -1081,6 +1242,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: allow-remove
+    type: boolean
+    required: false
+    description: permit this desired-state config to REMOVE actions/variables the live resource has (refused by default)
   - name: force
     type: boolean
     required: false
@@ -1089,6 +1254,7 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: *id004
 - name: datatype-edit-attribute
   description: Edit one attribute (PUT /api/dataTypes/attribute/{id}).
   args:
@@ -1882,7 +2048,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: document-create
-  description: Create a PROCESIO document from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO.
+  description: 'Create a PROCESIO document from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
   args:
   - name: profile
     type: string
@@ -1900,6 +2066,81 @@ actions:
     type: string
     required: false
     description: resource config as a JSON object
+    schema: &id005
+      $schema: https://json-schema.org/draft/2020-12/schema
+      title: PROCESIO Document Template config
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - body
+      properties:
+        name:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        body:
+          type: string
+          description: HTML body; reference variables as <%name%>
+        pageSize:
+          type: string
+          default: A4
+        orientation:
+          type: string
+          enum:
+          - portrait
+          - landscape
+          default: portrait
+        placeholderStart:
+          type: string
+          default: <%
+        placeholderStop:
+          type: string
+          default: '%>'
+        variables:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - name
+            properties:
+              name:
+                type: string
+                minLength: 1
+              type:
+                type: string
+                enum:
+                - boolean
+                - integer
+                - float
+                - double
+                - string
+                - datetime
+                - json
+                - object
+                - guid
+                - bool
+                - int
+                - long
+                - number
+                - text
+                - str
+                - uuid
+                - date-time
+              model:
+                type: string
+              isList:
+                type: boolean
+                default: false
+              isInput:
+                type: boolean
+                default: true
+              isOutput:
+                type: boolean
+                default: false
+              default: {}
   - name: config-file
     type: string
     required: false
@@ -1916,6 +2157,16 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: &id006
+  - name: Invoice
+    body: <div>Hello <%clientName%>, total <%total%>.</div>
+    pageSize: A4
+    orientation: portrait
+    variables:
+    - name: clientName
+      type: string
+    - name: total
+      type: double
 - name: document-delete
   description: Delete a resource by id (DELETE /api/DocumentTemplate/{id}).
   args:
@@ -1936,7 +2187,7 @@ actions:
     required: true
     description: document template id
 - name: document-edit
-  description: Edit a PROCESIO document to a desired-state config (--id required). --dry-run to preview the DTO.
+  description: 'Edit a PROCESIO document (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD or change one item, GET the document, append yours to the matching list (variables), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
   args:
   - name: profile
     type: string
@@ -1958,6 +2209,7 @@ actions:
     type: string
     required: false
     description: desired-state config as a JSON object
+    schema: *id005
   - name: config-file
     type: string
     required: false
@@ -1966,6 +2218,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: allow-remove
+    type: boolean
+    required: false
+    description: permit this desired-state config to REMOVE actions/variables the live resource has (refused by default)
   - name: force
     type: boolean
     required: false
@@ -1974,6 +2230,7 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: *id006
 - name: document-get
   description: Get one resource by id (GET /api/DocumentTemplate/{id}).
   args:
@@ -2188,7 +2445,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-create
-  description: Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO.
+  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
   args:
   - name: profile
     type: string
@@ -2206,6 +2463,219 @@ actions:
     type: string
     required: false
     description: resource config as a JSON object
+    schema: &id007
+      $schema: https://json-schema.org/draft/2020-12/schema
+      title: PROCESIO Form Template config
+      description: Build a form from a list of controls. The builder clones a golden element per control type and overrides label/name/required/options/etc. Renders from elements (no encrypted code needed).
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - elements
+      properties:
+        name:
+          type: string
+          minLength: 1
+        type:
+          type: string
+          enum:
+          - usertask
+          - general
+          default: general
+        isPrivate:
+          type: boolean
+          default: false
+          description: 'false = public (designer ''Make form public'' = !isPrivate). NOT sufficient on its own: a form containing an approval control (or assignees/approvers) can ONLY be private — the platform disables the toggle regardless of this value.'
+        publish:
+          type: boolean
+          default: true
+          description: Status PUBLISHED(1) vs DRAFT(0)
+        enabled:
+          type: boolean
+          default: true
+          description: State on/off
+        browserTitle:
+          type: string
+        hideBranding:
+          type: boolean
+          default: false
+        assignees:
+          type: array
+        theme:
+          type: object
+          description: 'form-wide theme {cssVariable: value} overrides, e.g. {"--c-primary":"#0039e3","--p-form":"24px"}. Container elements also accept alignment vars in their per-control style: --fd/--jc/--ai-<section|list-item|column|step|tab|side-panel>'
+        dark:
+          type: boolean
+          description: 'enable dark mode: adds a {light,dark} ModeProperties palette (the 16-var DARK_PALETTE) to the Colors theme group, the shape the form runtime reads'
+        themeDark:
+          type: object
+          description: 'dark-palette {cssVariable: value} overrides on top of the 16-var DARK_PALETTE default (implies dark)'
+        css:
+          type: string
+          description: form-level CSS (designer 'Switch to code' CSS tab); AES-encrypted into Data.code
+        javascript:
+          type: string
+          description: form-level JavaScript ('Switch to code' JS tab); AES-encrypted into Data.code
+        code:
+          type: object
+          description: 'alternative to css/javascript: {"css":"...","javascript":"..."}'
+        elements:
+          type: array
+          items:
+            $ref: '#/$defs/element'
+        chainConfig:
+          type: object
+          description: 'multi-form ''app'' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)'
+      $defs:
+        element:
+          type: object
+          required:
+          - type
+          properties:
+            events:
+              type: array
+              description: 'control events: each {on: click|input|focus|blur|open|tabchange, do: map|process|js|form|datastore, ...}'
+              items:
+                $ref: '#/$defs/event'
+            assignee:
+              type: string
+              description: task assignee user id (section/tabs/table)
+            assigneeReplacement:
+              type: array
+            approver:
+              type: string
+              description: 'approval control: approver user id'
+            approverReplacement:
+              type: array
+            description:
+              type: string
+            src:
+              type: string
+            url:
+              type: string
+            alt:
+              type: string
+            width:
+              type:
+              - integer
+              - string
+            height:
+              type:
+              - integer
+              - string
+            type:
+              type: string
+              description: 'control type: heading, paragraph, input, textarea, number-input, datetime-input, select, dropdown, radiobox, checkbox, button, divider, section, columns, column, image, file-upload, table, tabs, tab, ...'
+            label:
+              type: string
+            name:
+              type: string
+              description: 'field/binding name (defaults to a slug of label). ALSO the query-param key for URL pre-fill: opening the public form at ...?<name>=<value> pre-fills this control (validated live 2026-07-22). Pick a stable, URL-safe name when you want to seed the control from a link.'
+            placeholder:
+              type: string
+            tooltip:
+              type: string
+            required:
+              type: boolean
+            readonly:
+              type: boolean
+            visible:
+              type: boolean
+            default: {}
+            defaultValue: {}
+            rows:
+              type:
+              - integer
+              - string
+            mode:
+              type: string
+            multiple:
+              type: boolean
+            submit:
+              type: boolean
+            options:
+              type: array
+              description: 'for select/radiobox/dropdown: list of strings or {name,value} (static-list shortcut)'
+            optionsSource:
+              type: object
+              description: 'options data source: {type: json|static-list|url, value: <array|string|url>}. json -> sourceType JSON; url -> sourceType URL.'
+            children:
+              type: array
+              items:
+                $ref: '#/$defs/element'
+              description: nested controls for containers (section/columns/tabs)
+            style:
+              type: object
+              description: 'per-control style overrides {cssVariable: value}, e.g. {"--h-input":"50px"}. Only vars of the control''s CSS group are valid (input/number/datetime/textarea/select use the Input group). For color vars (type css-variable-select) pass a theme color variable like "--c-neutral--50", NOT a hex.'
+            configs:
+              type: object
+              description: 'advanced: set any element config key by name'
+        event:
+          type: object
+          required:
+          - 'on'
+          - do
+          properties:
+            'on':
+              type: string
+              enum:
+              - click
+              - input
+              - change
+              - focus
+              - blur
+              - hover
+              - ready
+              - open
+              - close
+              - tabchange
+              - rowadded
+              - rowdeleted
+              - paginated
+              - stepchange
+              - nextstep
+              - previousstep
+              - beforeapprove
+              - afterapprove
+              - beforereject
+              - afterreject
+              - beforeapprovalsubmit
+              - afterapprovalsubmit
+              - messagesfetch
+              - messagesent
+            do:
+              type: string
+              enum:
+              - map
+              - process
+              - js
+              - form
+              - datastore
+            processId:
+              type: string
+            formId:
+              type: string
+            dataStoreId:
+              type: string
+              description: 'datastore trigger: target data store id'
+            operation:
+              type: string
+              description: 'datastore trigger: READ|ADD|UPDATE|DELETE'
+            filters:
+              type: array
+              description: 'datastore trigger: row filters (not for ADD)'
+            code:
+              type: string
+            syncRun:
+              type: boolean
+            mapLatestTriggerOnly:
+              type: boolean
+            inputs:
+              type: array
+            outputs:
+              type: array
+            mapping:
+              type: array
   - name: config-file
     type: string
     required: false
@@ -2222,6 +2692,27 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: &id008
+  - name: Reg
+    browserTitle: Register
+    type: general
+    elements:
+    - type: heading
+      label: Title
+    - type: input
+      label: Full Name
+      name: fullName
+      required: true
+      placeholder: John
+    - type: select
+      label: Country
+      name: country
+      options:
+      - RO
+      - US
+    - type: button
+      label: Submit
+      submit: true
 - name: form-delete
   description: Delete a resource by id (DELETE /api/FormTemplate/{id}).
   args:
@@ -2261,7 +2752,7 @@ actions:
     required: true
     description: form template id
 - name: form-edit
-  description: Edit a PROCESIO form to a desired-state config (--id required). --dry-run to preview the DTO.
+  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO.'
   args:
   - name: profile
     type: string
@@ -2283,6 +2774,7 @@ actions:
     type: string
     required: false
     description: desired-state config as a JSON object
+    schema: *id007
   - name: config-file
     type: string
     required: false
@@ -2291,6 +2783,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: allow-remove
+    type: boolean
+    required: false
+    description: permit this desired-state config to REMOVE actions/variables the live resource has (refused by default)
   - name: force
     type: boolean
     required: false
@@ -2299,6 +2795,7 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: *id008
 - name: form-get
   description: Get one resource by id (GET /api/FormTemplate/{id}).
   args:
@@ -2493,7 +2990,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-set-element-event
-  description: 'Wire one element''s trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element''s event config changes; process-variable names in inputMap/outputMap are resolved to guids; a DataStore op takes --data-store-id + --operation).'
+  description: 'Wire one element''s trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element''s event config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take NAMES: left = a process variable name, right = a form FIELD name - each is resolved to the id/value-path the runtime needs. Do NOT hand-build the form value path; if you pass one it is CHECKED against the live form and refused when wrong, because a wrong path is saved without any error and the control then launches nothing. A DataStore op takes --data-store-id + --operation.'
   args:
   - name: profile
     type: string
@@ -8244,7 +8741,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: process-create
-  description: Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO.
+  description: 'Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables, actions, edges, webhooks in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
   args:
   - name: profile
     type: string
@@ -8262,6 +8759,337 @@ actions:
     type: string
     required: false
     description: resource config as a JSON object
+    schema: &id009
+      $schema: https://json-schema.org/draft/2020-12/schema
+      title: PROCESIO Process (Flow) config
+      description: Minimal config to build a runnable PROCESIO process. The builder resolves each action against the live action catalog, binds params to the template's properties, auto-injects Start/Stop, and wires ports (linear by default, or via explicit edges).
+      type: object
+      additionalProperties: false
+      required:
+      - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+        description:
+          type: string
+        timeout:
+          type: integer
+          minimum: 0
+          default: 0
+        variables:
+          type: array
+          items:
+            $ref: '#/$defs/variable'
+        actions:
+          type: array
+          items:
+            $ref: '#/$defs/action'
+        edges:
+          type: array
+          description: Explicit wiring between action ids ('start'/'stop' reserved). Omit for a linear chain.
+          items:
+            $ref: '#/$defs/edge'
+        webhooks:
+          type: array
+          description: 'Webhook triggers: each {webhookId, variables:[{name, source}]} binds a process variable to the webhook Body/Query/Header.'
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - webhookId
+            properties:
+              webhookId:
+                type: string
+              variables:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required:
+                  - name
+                  properties:
+                    name:
+                      type: string
+                    source:
+                      type: string
+                      enum:
+                      - header
+                      - query
+                      - body
+        customResponse:
+          description: 'synchronous webhook response: {var: <process var name>} returns that variable''s value to the caller (or {value: literal})'
+        relayout:
+          description: 'canvas re-tidy scope on EDIT (create always lays out fully). One of: "all" | "none" | "new" | [actionId,...] | {new:bool, actions:[...], edited:[...]}. Default on edit: place NEW actions only, leave existing actions where they are.'
+        _webhooks:
+          type: array
+          description: 'internal: WebhookInstanceDto[] passthrough'
+        _customResponse:
+          description: 'internal: CustomResponseDto'
+      $defs:
+        variable:
+          type: object
+          additionalProperties: false
+          required:
+          - name
+          properties:
+            name:
+              type: string
+              minLength: 1
+            type:
+              type: string
+              enum:
+              - boolean
+              - integer
+              - float
+              - double
+              - string
+              - datetime
+              - json
+              - object
+              - guid
+              - bool
+              - int
+              - long
+              - number
+              - text
+              - str
+              - uuid
+              - date-time
+            model:
+              type: string
+              description: data model name/id (instead of a primitive type)
+            direction:
+              type: string
+              enum:
+              - input
+              - process
+              - output
+              default: process
+            isList:
+              type: boolean
+              default: false
+            required:
+              type: boolean
+              default: false
+            isError:
+              type: boolean
+              default: false
+            default: {}
+        action:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - action
+          properties:
+            id:
+              type: string
+              minLength: 1
+              description: config-local id used in edges
+            action:
+              type: string
+              minLength: 1
+              description: action template name (or id) from the catalog
+            name:
+              type: string
+              description: display name; if omitted it is auto-derived from what the action does (e.g. 'GET /users', 'For each items', a Node's leading comment) and falls back to the template name. Re-evaluated on every build/edit.
+            params:
+              type: object
+              description: property label/id -> binding (literal, {value}, {var[,path]}, or {template,vars})
+              additionalProperties:
+                $ref: '#/$defs/binding'
+            onError:
+              type: string
+              description: action id to route this action's error port to (captures the error in an ErrorDataModel variable)
+            parent:
+              type: string
+              description: id of the For Each action that contains this action (loop body). A For Each cannot be nested directly inside another For Each.
+            subprocess:
+              type: object
+              additionalProperties: false
+              description: 'Call/Trigger Subprocess: target flow id + variable maps. Sub-process var ids are GUIDs (e.g. from read-flow-graph on the target); parent vars resolve by name.'
+              required:
+              - target
+              properties:
+                target:
+                  type: string
+                  description: target flow (subprocess) GUID
+                inputs:
+                  type: object
+                  description: subInputVarId -> parent binding (literal/{value}/{var,path})
+                  additionalProperties:
+                    $ref: '#/$defs/binding'
+                outputs:
+                  type: object
+                  description: parentVarName -> subOutputVarId (GUID)
+                  additionalProperties:
+                    type: string
+            docMap:
+              type: object
+              description: 'Generate Document: map each document template variable name -> a process variable (name or {var})'
+              additionalProperties:
+                type:
+                - string
+                - object
+            dsMap:
+              type: object
+              description: 'Data Store Set Values (InsertRows/UpdateRows): map each COLUMN NAME -> a value binding. A bare string/number is a LITERAL value; use {var} / {var, path} / {value} for the other forms.'
+              additionalProperties:
+                type:
+                - string
+                - number
+                - boolean
+                - object
+            dsWhere:
+              description: 'Data Store Where (SelectRows/UpdateRows/DeleteRows): conditions as a list [{column, op, value}] combined by AND, or {logic:''and''|''or'', conditions:[...]}. op is a QueryOperators name (equals, notEquals, contains, startsWith, greaterThan, lessThan, between, in, isNull, isNotNull, ...) or a numeric value; value is a binding (literal, {var}, {var, path}).'
+              oneOf:
+              - type: array
+                items:
+                  type: object
+              - type: object
+            branches:
+              type: array
+              description: 'Decisional routing. Regular Decisional: {to, when:[conditions], name?, default}. AI Decisional: {to, condition:''<natural-language>'', name?, default} — condition is a plain-English sentence the model evaluates. A non-default case is auto-labelled from its condition (rule-based: ''amount > 1000''; AI: the condition sentence) unless name is given; re-evaluated on every build/edit.'
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                - to
+                properties:
+                  to:
+                    type: string
+                    description: target action id
+                  default:
+                    type: boolean
+                    description: the fallback branch
+                  when:
+                    type: array
+                    items:
+                      $ref: '#/$defs/condition'
+                  condition:
+                    type: string
+                    description: 'AI Decisional only: the natural-language condition for this case'
+                  name:
+                    type: string
+                    description: case label shown in the designer (regular OR AI Decisional); default is derived from the case condition, else 'Case N'
+        condition:
+          type: object
+          additionalProperties: false
+          required:
+          - left
+          - op
+          properties:
+            left:
+              $ref: '#/$defs/operand'
+            op:
+              type: string
+              description: EQUALS, DOES_NOT_EQUAL, GREATER_THAN, LESS_THAN, CONTAINS, IS_EMPTY, IS_NOT_EMPTY, IS_TRUE, IS_FALSE, ...
+            right:
+              $ref: '#/$defs/operand'
+            logic:
+              type: string
+              enum:
+              - and
+              - or
+        operand:
+          anyOf:
+          - type:
+            - string
+            - number
+            - boolean
+            - 'null'
+          - type: object
+            additionalProperties: false
+            properties:
+              value: {}
+          - type: object
+            additionalProperties: false
+            required:
+            - var
+            properties:
+              var:
+                type: string
+              path:
+                type: array
+                items:
+                  type: string
+        binding:
+          anyOf:
+          - type:
+            - string
+            - number
+            - boolean
+            - 'null'
+          - type: object
+            additionalProperties: false
+            properties:
+              value: {}
+          - type: object
+            additionalProperties: false
+            required:
+            - credential
+            properties:
+              credential:
+                type: string
+                description: credential INSTANCE gid for a credentials-typed property (the action's credential template/type is fixed by the catalog)
+          - type: object
+            additionalProperties: false
+            required:
+            - var
+            properties:
+              var:
+                type: string
+              path:
+                type: array
+                items:
+                  type: string
+          - type: object
+            additionalProperties: false
+            required:
+            - template
+            - vars
+            properties:
+              template:
+                description: string OR a JSON object/array with <%i%> placeholders in string leaves
+              vars:
+                type: array
+                items:
+                  anyOf:
+                  - type: string
+                  - type: object
+                    additionalProperties: false
+                    required:
+                    - var
+                    properties:
+                      var:
+                        type: string
+                      path:
+                        type: array
+                        items:
+                          type: string
+        edge:
+          oneOf:
+          - type: array
+            minItems: 2
+            maxItems: 2
+            items:
+              type: string
+          - type: object
+            additionalProperties: false
+            required:
+            - from
+            - to
+            properties:
+              from:
+                type: string
+              to:
+                type: string
+              Type:
+                type: integer
+              Config:
+                type: object
+              Data: {}
   - name: config-file
     type: string
     required: false
@@ -8278,6 +9106,26 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: &id010
+  - title: Greet
+    description: demo
+    variables:
+    - name: name
+      type: string
+      direction: input
+      required: true
+    - name: greeting
+      type: string
+      direction: output
+    actions:
+    - id: cc
+      action: Concatenate
+      params:
+        Input String 1:
+          var: name
+        Input String 2: ' - processed'
+        Result:
+          var: greeting
 - name: process-delete
   description: Delete a resource by id (DELETE /api/Projects/{id}).
   args:
@@ -8298,7 +9146,7 @@ actions:
     required: true
     description: process (project) id
 - name: process-edit
-  description: Edit a PROCESIO process to a desired-state config (--id required). --dry-run to preview the DTO.
+  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
   args:
   - name: profile
     type: string
@@ -8320,6 +9168,7 @@ actions:
     type: string
     required: false
     description: desired-state config as a JSON object
+    schema: *id009
   - name: config-file
     type: string
     required: false
@@ -8328,6 +9177,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: allow-remove
+    type: boolean
+    required: false
+    description: permit this desired-state config to REMOVE actions/variables the live resource has (refused by default)
   - name: force
     type: boolean
     required: false
@@ -8336,6 +9189,7 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: *id010
 - name: process-fe-validate
   description: 'Front-end (designer-layer) ''Process Errors'' validation on a live process — the client-side check that BLOCKS designer Save but which POST /api/Projects/validate does NOT catch: unconnected actions, missing Start/Stop, empty node names, required-empty fields, leftover placeholders, bad number/integer values, out-of-range limits, duplicate/primitive-named variables, and unmapped required subprocess inputs. clean=true when no blocking errors. Data-type mismatches are reported as (non-blocking) warnings. This same check auto-runs before every process-create / process-edit. Add --include-be for the BE layer.'
   args:
@@ -9589,7 +10443,7 @@ actions:
     required: false
     description: which flow when the bundle has more than one
 - name: webhook-create
-  description: Create a PROCESIO webhook from a validated config (build->validate->POST->re-GET). --dry-run to preview the DTO.
+  description: Create a PROCESIO webhook from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.
   args:
   - name: profile
     type: string
@@ -9607,6 +10461,52 @@ actions:
     type: string
     required: false
     description: resource config as a JSON object
+    schema: &id011
+      $schema: https://json-schema.org/draft/2020-12/schema
+      title: PROCESIO Webhook config
+      description: Create/edit a webhook. The payload data model is generated from 'sample' (a representative payload). Attach the webhook to a process to trigger it.
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - sample
+      properties:
+        name:
+          type: string
+          minLength: 1
+        sample:
+          description: a representative inbound payload object/array; its shape becomes the webhook data model
+        definition:
+          type: string
+          description: raw JSON definition (alternative to sample)
+        type:
+          type: string
+          enum:
+          - auto
+          - manual
+          default: manual
+        hasHeader:
+          type: boolean
+          default: false
+        hasQuery:
+          type: boolean
+          default: false
+        payloadIsList:
+          type: boolean
+        customResponse:
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+              enum:
+              - staticjson
+              - static
+              - javascript
+              - js
+              - jsonpath
+            config:
+              type: string
   - name: config-file
     type: string
     required: false
@@ -9623,6 +10523,14 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: &id012
+  - name: OrderHook
+    sample:
+      orderId: abc
+      amount: 12.5
+    type: manual
+    hasHeader: false
+    hasQuery: false
 - name: webhook-delete
   description: Delete a resource by id (DELETE /api/Webhooks/{id}).
   args:
@@ -9643,7 +10551,7 @@ actions:
     required: true
     description: webhook id
 - name: webhook-edit
-  description: Edit a PROCESIO webhook to a desired-state config (--id required). --dry-run to preview the DTO.
+  description: 'Edit a PROCESIO webhook (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the fields you want to change. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
   args:
   - name: profile
     type: string
@@ -9665,6 +10573,7 @@ actions:
     type: string
     required: false
     description: desired-state config as a JSON object
+    schema: *id011
   - name: config-file
     type: string
     required: false
@@ -9673,6 +10582,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: allow-remove
+    type: boolean
+    required: false
+    description: permit this desired-state config to REMOVE actions/variables the live resource has (refused by default)
   - name: force
     type: boolean
     required: false
@@ -9681,6 +10594,7 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  examples: *id012
 - name: webhook-get
   description: Get one resource by id (GET /api/Webhooks/{id}).
   args:

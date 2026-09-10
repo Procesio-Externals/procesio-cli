@@ -13,6 +13,7 @@ import json
 import pytest
 
 from tools.procesio import main
+from tools.procesio.dto.form import fieldpath
 from tools.procesio.client import ProcesioClient
 from tools.procesio.errors import UsageError
 from tools.procesio.tests.conftest import FakeResp, FakeSession
@@ -26,6 +27,13 @@ def _call(action, argv, session):
         client_builder=lambda prof: ProcesioClient(profile=APIKEY, name="t", session=session))
 
 
+NS = fieldpath.FIELDS_NS
+
+# A realistic live form: every value-bearing control carries the `value` config whose id is
+# the fourth segment of that field's path. The earlier fixture omitted them and mapped to
+# invented strings like "root.upload.val", which passed only because nothing checked — the
+# same permissiveness that let five autonomous builds write a path the platform accepts and
+# the runtime ignores.
 def _form(event_value=None):
     return {
         "id": "F1", "name": "Some form", "isPrivate": False, "type": 1, "status": 1,
@@ -35,20 +43,32 @@ def _form(event_value=None):
             "elements": [
                 {"id": "E1", "type": "file-upload", "configs": [
                     {"key": "name", "value": "doccipf"},
+                    {"key": "value", "id": "vc-E1"},
                     {"key": "onInputEvents", "value": event_value},
                 ]},
-                {"id": "E2", "type": "input", "configs": [{"key": "name", "value": "nume"}]},
+                {"id": "E2", "type": "input", "configs": [
+                    {"key": "name", "value": "nume"},
+                    {"key": "value", "id": "vc-E2"},
+                ]},
             ],
         },
     }
 
 
+def _live(form):
+    return fieldpath.LiveForm(form)
+
+
+PATH_E1 = f"dm.{NS}.E1.vc-E1"
+PATH_E2 = f"dm.{NS}.E2.vc-E2"
+
 _PROCESS = {"flow": {"id": "P1", "variables": [
     {"id": "v-file", "name": "fisier"}, {"id": "v-nume", "name": "nume_extras"}]}}
 
+# Mapped by field NAME — the calling convention the action now resolves for you.
 _CFG = {"processId": "P1",
-        "inputMap": [{"left": "fisier", "right": "root.upload.val"}],
-        "outputMap": [{"left": "nume_extras", "right": "root.nume.val"}]}
+        "inputMap": [{"left": "fisier", "right": "doccipf"}],
+        "outputMap": [{"left": "nume_extras", "right": "nume"}]}
 
 
 def test_variable_names_resolve_to_guids_and_only_that_element_changes():
@@ -69,8 +89,11 @@ def test_variable_names_resolve_to_guids_and_only_that_element_changes():
         "value": "v-file", "isList": False, "path": {}}          # NAME -> GUID
     assert ev["config"]["outputMap"][0]["left"] == {
         "value": "v-nume", "isList": False, "path": {}}
+    # The form side is resolved too: a field NAME becomes its four-segment value path.
     assert ev["config"]["inputMap"][0]["right"] == {
-        "value": "root.upload.val", "isList": False, "path": None}
+        "value": PATH_E1, "isList": False, "path": None}
+    assert ev["config"]["outputMap"][0]["right"] == {
+        "value": PATH_E2, "isList": False, "path": None}
     assert ev["config"]["syncRun"] is True
     # the canonical RUN_PROCESS keys the designer needs are backfilled from a minimal config
     assert ev["config"]["areConditionsConfigured"] is True
@@ -79,7 +102,8 @@ def test_variable_names_resolve_to_guids_and_only_that_element_changes():
 
 
 def test_unknown_variable_name_fails_before_any_write():
-    bad = {"processId": "P1", "inputMap": [{"left": "nu_exista", "right": "x"}], "outputMap": []}
+    bad = {"processId": "P1", "inputMap": [{"left": "nu_exista", "right": "doccipf"}],
+           "outputMap": []}
     s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS)])
     with pytest.raises(UsageError, match="neither a variable id nor a variable name"):
         _call("form-set-element-event",
@@ -169,7 +193,7 @@ def test_map_rows_use_the_designers_object_shape_and_survive_a_round_trip():
     already = {"processId": "P1",
                "inputMap": [{"id": 0,
                              "left": {"value": "v-file", "isList": False, "path": {}},
-                             "right": {"value": "p", "isList": False, "path": None}}],
+                             "right": {"value": PATH_E1, "isList": False, "path": None}}],
                "outputMap": []}
     s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS), FakeResp(200, {})])
     _call("form-set-element-event",
@@ -178,7 +202,7 @@ def test_map_rows_use_the_designers_object_shape_and_survive_a_round_trip():
     row = [c for c in s.calls[-1]["json"]["Data"]["elements"][0]["configs"]
            if c["key"] == "onInputEvents"][0]["value"]["events"][0]["config"]["inputMap"][0]
     assert row["left"] == {"value": "v-file", "isList": False, "path": {}}
-    assert row["right"] == {"value": "p", "isList": False, "path": None}
+    assert row["right"] == {"value": PATH_E1, "isList": False, "path": None}
 
 
 # -- RUN_DATA_STORE_OPERATION (DataStore form trigger) ----------------------
@@ -231,3 +255,122 @@ def test_builder_trigger_datastore_branch():
     assert got["config"]["dataStoreId"] == "D1"
     assert got["config"]["inputMap"] == [{"id": 0, "left": "page", "right": "root.p.val"}]
     assert got["config"]["areFiltersConfigured"] is True
+
+
+# -- the form side of a map row: resolved, or refused -----------------------
+#
+# A wrong value path is the one mistake nothing downstream reports: the API answers
+# `updated: true`, the designer renders the mapping, and clicking the control launches
+# nothing. Measured across five autonomous builds, every one wrote
+# `root.fields.<elementId>.value` — the NAMES from the guide's tree diagram substituted for
+# the ids printed beside them. Since the platform will not object, the write is the last
+# place the mistake can be caught.
+
+def test_an_invented_value_path_is_refused_before_any_write():
+    bad = {"processId": "P1",
+           "inputMap": [{"left": "fisier", "right": "root.fields.E1.value"}],
+           "outputMap": []}
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS)])
+    with pytest.raises(UsageError) as e:
+        _call("form-set-element-event",
+              ["--id", "F1", "--element", "doccipf", "--on", "input",
+               "--action", "RUN_PROCESS", "--config", json.dumps(bad)], s)
+    assert all(c["method"] == "GET" for c in s.calls), "nothing may be written"
+    msg = str(e.value)
+    assert "segment 1 'root'" in msg and "segment 2 'fields'" in msg
+    assert PATH_E1 in msg, "the message must carry the correct path"
+    assert "doccipf" in msg, "…and the field name that would have worked"
+
+
+def test_a_correct_value_path_passes_through_untouched():
+    """Back-compat for a caller that builds the path itself — but on validity, not on
+    the presence of dots."""
+    ok = {"processId": "P1",
+          "inputMap": [{"left": "fisier", "right": PATH_E1}], "outputMap": []}
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS), FakeResp(200, {})])
+    _call("form-set-element-event",
+          ["--id", "F1", "--element", "doccipf", "--on", "input",
+           "--action", "RUN_PROCESS", "--config", json.dumps(ok)], s)
+    row = [c for c in s.calls[-1]["json"]["Data"]["elements"][0]["configs"]
+           if c["key"] == "onInputEvents"][0]["value"]["events"][0]["config"]["inputMap"][0]
+    assert row["right"]["value"] == PATH_E1
+
+
+def test_a_value_config_id_borrowed_from_another_element_is_refused():
+    """The subtle one: four id-shaped segments, correct root and namespace, but the value
+    id belongs to a DIFFERENT element. Nothing downstream notices."""
+    crossed = {"processId": "P1",
+               "inputMap": [{"left": "fisier", "right": f"dm.{NS}.E1.vc-E2"}],
+               "outputMap": []}
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS)])
+    with pytest.raises(UsageError, match="must be that element's own"):
+        _call("form-set-element-event",
+              ["--id", "F1", "--element", "doccipf", "--on", "input",
+               "--action", "RUN_PROCESS", "--config", json.dumps(crossed)], s)
+    assert all(c["method"] == "GET" for c in s.calls)
+
+
+def test_a_path_pointing_at_no_element_of_this_form_is_refused():
+    stray = {"processId": "P1",
+             "inputMap": [{"left": "fisier", "right": f"dm.{NS}.E9.vc-E9"}], "outputMap": []}
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS)])
+    with pytest.raises(UsageError, match="is not an element on this form"):
+        _call("form-set-element-event",
+              ["--id", "F1", "--element", "doccipf", "--on", "input",
+               "--action", "RUN_PROCESS", "--config", json.dumps(stray)], s)
+
+
+def test_neither_a_field_name_nor_a_path_lists_the_fields():
+    junk = {"processId": "P1",
+            "inputMap": [{"left": "fisier", "right": "campul-meu"}], "outputMap": []}
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, _PROCESS)])
+    with pytest.raises(UsageError) as e:
+        _call("form-set-element-event",
+              ["--id", "F1", "--element", "doccipf", "--on", "input",
+               "--action", "RUN_PROCESS", "--config", json.dumps(junk)], s)
+    assert "doccipf" in str(e.value) and "nume" in str(e.value)
+
+
+def test_a_control_that_holds_no_value_cannot_be_mapped():
+    form = _form()
+    form["data"]["elements"].append(
+        {"id": "E3", "type": "heading", "configs": [{"key": "name", "value": "titlu"}]})
+    cfg = {"processId": "P1",
+           "inputMap": [{"left": "fisier", "right": "titlu"}], "outputMap": []}
+    s = FakeSession(queue=[FakeResp(200, form), FakeResp(200, _PROCESS)])
+    with pytest.raises(UsageError) as e:
+        _call("form-set-element-event",
+              ["--id", "F1", "--element", "doccipf", "--on", "input",
+               "--action", "RUN_PROCESS", "--config", json.dumps(cfg)], s)
+    # The name IS on the form, so the refusal says why that control cannot hold a value —
+    # more use than a generic "not a field" would be.
+    assert "has no 'value' config" in str(e.value) and "heading" in str(e.value)
+    # …and it is not offered as a destination anywhere.
+    assert "titlu" not in _live(form).field_names()
+
+
+def test_a_file_viewer_maps_through_its_src_config():
+    """The one control whose value config is not named `value` — kept in the shared rule so
+    the builder and this action cannot disagree about it."""
+    form = _form()
+    form["data"]["elements"].append(
+        {"id": "E4", "type": "file-viewer", "configs": [
+            {"key": "name", "value": "previzualizare"}, {"key": "src", "id": "vc-E4"}]})
+    cfg = {"processId": "P1", "inputMap": [],
+           "outputMap": [{"left": "nume_extras", "right": "previzualizare"}]}
+    s = FakeSession(queue=[FakeResp(200, form), FakeResp(200, _PROCESS), FakeResp(200, {})])
+    _call("form-set-element-event",
+          ["--id", "F1", "--element", "doccipf", "--on", "input",
+           "--action", "RUN_PROCESS", "--config", json.dumps(cfg)], s)
+    row = [c for c in s.calls[-1]["json"]["Data"]["elements"][0]["configs"]
+           if c["key"] == "onInputEvents"][0]["value"]["events"][0]["config"]["outputMap"][0]
+    assert row["right"]["value"] == f"dm.{NS}.E4.vc-E4"
+
+
+def test_the_builder_and_the_event_editor_share_one_path_rule():
+    """Two places produce these paths. A second copy of the rule would be a rule nothing
+    enforces, and the platform accepts a wrong path without any error."""
+    from tools.procesio.dto.form import builder
+    assert builder._FIELDS_NS is fieldpath.FIELDS_NS
+    assert builder._value_key is fieldpath.value_key
+    assert builder._VALUE_CONFIG_KEY is fieldpath.VALUE_CONFIG_KEY

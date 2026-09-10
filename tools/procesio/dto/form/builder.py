@@ -27,6 +27,7 @@ import uuid
 from functools import lru_cache
 from pathlib import Path
 
+from tools.procesio.dto.form import fieldpath
 from tools.procesio.dto.framework import Component
 from tools.procesio.errors import UsageError
 
@@ -205,7 +206,7 @@ def _apply_element_style(spec: dict, el_type: str, configs: list, ctx) -> None:
     _set_config(configs, "style", items, ctx)
 
 
-_FIELDS_NS = "11223344-5566-7788-99aa-aabbccddeeff"  # platform "fields" container id (constant across forms)
+_FIELDS_NS = fieldpath.FIELDS_NS   # platform "fields" container id (constant across forms)
 
 
 def _map_rows(rows, ctx) -> list:
@@ -380,12 +381,12 @@ def _config_value(el: dict, key: str):
 # _VALUE_TYPE already types file-viewer as File — so without this the control gets a
 # data-model attribute but no field path, and an outputMap row targeting it silently
 # keeps the raw field name instead of resolving to a value path.
-_VALUE_CONFIG_KEY = {"file-viewer": "src"}
-
-
-def _value_key(el_type) -> str:
-    """The config key that holds this control's field value."""
-    return _VALUE_CONFIG_KEY.get(el_type, "value")
+#
+# Shared with the surgical event editor (handlers/form_events.py), which has to CHECK the
+# same paths against a live form: one rule, one place. Two copies would be a rule nothing
+# enforces, and a wrong value path is accepted by the platform without any error at all.
+_VALUE_CONFIG_KEY = fieldpath.VALUE_CONFIG_KEY
+_value_key = fieldpath.value_key
 
 
 _SKIP_OVERRIDE = {"type", "name", "options", "children", "configs", "events",
@@ -428,8 +429,8 @@ def _build_element(spec: dict, ctx: dict, out: list) -> dict:
         # in the process-designer trigger-map "Form variable" selector.
         vaid = val_cfg["id"]
         ctx.setdefault("value_attr_ids", {})[el["id"]] = vaid
-        ctx.setdefault("field_paths", {})[field] = (
-            f'{ctx["dm_root_id"]}.{_FIELDS_NS}.{el["id"]}.{vaid}')
+        ctx.setdefault("field_paths", {})[field] = fieldpath.build(
+            ctx["dm_root_id"], el["id"], vaid)
     for ck, cv in spec.items():
         if ck in _SKIP_OVERRIDE:
             continue
@@ -823,4 +824,6 @@ COMPONENT = Component(
     extract_id=_extract_id,
     prepare_ctx=_prepare_ctx,
     edit=_edit,
+    patch_action="form-update",
+    add_action="form-add-element",
 )

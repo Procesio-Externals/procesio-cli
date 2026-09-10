@@ -147,12 +147,17 @@ def list_tools() -> list[dict[str, Any]]:
             "tier": m.tier,
             "path": str(m.path),
             "entrypoint": m.entrypoint,
-            "args": [a.model_dump() for a in m.args],
+            "args": [a.model_dump(by_alias=True) for a in m.args],
             "actions": [
+                # examples/output_schema ride along when a manifest declares them: they
+                # are what makes a structured argument usable without trial and error,
+                # and a consumer that only sees name/description/args cannot recover them.
                 {
                     "name": a.name,
                     "description": a.description,
-                    "args": [arg.model_dump() for arg in a.args],
+                    "args": [arg.model_dump(by_alias=True) for arg in a.args],
+                    **({"examples": a.examples} if a.examples else {}),
+                    **({"output_schema": a.output_schema} if a.output_schema else {}),
                 }
                 for a in m.actions
             ],
@@ -246,7 +251,9 @@ def list_agents(tool_index: dict[str, dict] | None = None) -> list[dict[str, Any
             "tool_status": tool_status,
             "actions": [
                 {"name": a.name, "description": a.description,
-                 "args": [arg.model_dump() for arg in a.args]}
+                 "args": [arg.model_dump(by_alias=True) for arg in a.args],
+                 **({"examples": a.examples} if a.examples else {}),
+                 **({"output_schema": a.output_schema} if a.output_schema else {})}
                 for a in m.actions
             ],
             "secrets": [s.model_dump() for s in m.secrets],

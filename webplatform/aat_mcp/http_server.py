@@ -85,6 +85,11 @@ def _make_handler(token: str | None):
             # for this request only, so the tool subprocess runs as that user.
             uid = self.headers.get("X-AAT-User") or None
             _utok = server.bridge.set_user(uid)
+            # Same rule for the managed-turn flag: it comes from the CALLER's config (the worker sets
+            # it on every turn it drives), never from the JSON-RPC body, so the model cannot clear it
+            # to unlock a competing orchestration loop.
+            _mtok = server.bridge.set_managed_turn(
+                (self.headers.get("X-AAT-Managed-Turn") or "").strip().lower() in ("1", "true", "yes"))
             try:
                 batch = msg if isinstance(msg, list) else [msg]
                 responses = []
@@ -98,6 +103,7 @@ def _make_handler(token: str | None):
                     if resp is not None:
                         responses.append(resp)
             finally:
+                server.bridge.reset_managed_turn(_mtok)
                 server.bridge.reset_user(_utok)
 
             if not responses:

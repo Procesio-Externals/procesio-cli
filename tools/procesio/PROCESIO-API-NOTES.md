@@ -1587,6 +1587,20 @@ The same shape applies to any PROCESIO desired-state action (`credential-edit`,
 exists precisely because it deep-merges a patch instead of rebuilding, and it is
 the safer choice when only one field should move.
 
+**Say it in the action's own description, not only here.** A caller that reaches the
+tool through the manifest never opens this file, and the word "desired-state" in a
+one-line description does not carry its consequence: an agent holding the arg schema
+still assumes some add / insert / append call exists for putting ONE item in, searches
+for it, finds nothing, and eventually learns the rule by tripping the removal guard.
+Measured over one 19-item build, that rediscovery was **69% of all tool calls**, repeated
+from scratch in every planner step, against 18% for the same goal done in one turn. The
+description now spells out the operational form — *there is no add/insert/append; GET,
+append to the list, send the whole config back; omission removes* — and the same
+sentence is what makes a keyword search for "add node" land on `process-edit`.
+Generalizes: **an action description must state what the semantics OBLIGE the caller to
+do, not name the semantics.** Naming them is only searchable by someone who already
+knows the answer.
+
 ## Capacity is measured in TIME, not in execution environments (2026-08-30)
 
 Nothing a workspace-scoped account can reach states a **reserved execution-environment
