@@ -16,14 +16,23 @@ Verified routes + methods (Web-API, tag Schedules; perms in parens):
   project list   GET    /api/Projects/{id}/restricted/schedules      (Schedule.Read)
 
 The create/update body shape is captured in PROCESIO-API-NOTES.md (Hard rule 6).
+Security: literal ``processInputs`` are persisted and returned by schedule reads.
+The curated handler preserves the raw DTO by default for backward-compatible
+round-tripping and offers ``get-schedule --redact-process-inputs`` for evidence and
+diagnostics. Read SCHEDULE-INPUT-SECURITY-NOTES.md before storing authentication
+material there or capturing a raw schedule result.
 """
 from __future__ import annotations
 
 import argparse
+from typing import Any
 
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import parse_json_arg
 from tools.procesio.handlers.common import add_paging_args, add_profile_arg
+
+
+_REDACTED = "[REDACTED]"
 
 
 # -- list / get -------------------------------------------------------------
@@ -45,8 +54,54 @@ def _id_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--id", required=True, help="schedule id (scheduleId)")
 
 
+def _get_args(p: argparse.ArgumentParser) -> None:
+    _id_args(p)
+    p.add_argument(
+        "--redact-process-inputs",
+        action="store_true",
+        help="replace every returned processInputs[].value with [REDACTED]",
+    )
+
+
+def _redact_process_inputs(value: Any) -> Any:
+    """Copy a schedule DTO while masking literal process-input values.
+
+    Both camelCase live DTOs and PascalCase export-like shapes are handled. Other
+    fields stay byte-for-byte equivalent at the JSON-value level so the result is
+    useful for structural diagnostics without exposing a stored secret.
+    """
+    if isinstance(value, list):
+        return [_redact_process_inputs(item) for item in value]
+    if not isinstance(value, dict):
+        return value
+
+    result: dict[str, Any] = {}
+    for key, item in value.items():
+        if key.casefold() != "processinputs" or not isinstance(item, list):
+            result[key] = _redact_process_inputs(item)
+            continue
+
+        rows: list[Any] = []
+        for row in item:
+            if not isinstance(row, dict):
+                rows.append(_REDACTED if row is not None else None)
+                continue
+            clean: dict[str, Any] = {}
+            for row_key, row_value in row.items():
+                if row_key.casefold() == "value" and row_value is not None:
+                    clean[row_key] = _REDACTED
+                else:
+                    clean[row_key] = _redact_process_inputs(row_value)
+            rows.append(clean)
+        result[key] = rows
+    return result
+
+
 def get_schedule(client, args) -> dict:
-    return {"result": client.get(f"/api/Schedules/{args.id}")}
+    result = client.get(f"/api/Schedules/{args.id}")
+    if args.redact_process_inputs:
+        result = _redact_process_inputs(result)
+    return {"result": result}
 
 
 # -- create / update / delete ----------------------------------------------
@@ -191,8 +246,8 @@ ACTIONS = {
         description="List schedules (GET /api/Schedules).",
     ),
     "get-schedule": ActionDef(
-        func=get_schedule, add_args=_id_args, needs_client=True,
-        description="Get one schedule by id (GET /api/Schedules/{id}).",
+        func=get_schedule, add_args=_get_args, needs_client=True,
+        description="Get one schedule by id; use --redact-process-inputs for safe evidence.",
     ),
     "create-schedule": ActionDef(
         func=create_schedule, add_args=_payload_args, needs_client=True,

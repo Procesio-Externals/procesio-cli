@@ -4993,7 +4993,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-schedule
-  description: Get one schedule by id (GET /api/Schedules/{id}).
+  description: Get one schedule by id; use --redact-process-inputs for safe evidence.
   args:
   - name: profile
     type: string
@@ -5011,6 +5011,10 @@ actions:
     type: string
     required: true
     description: schedule id (scheduleId)
+  - name: redact-process-inputs
+    type: boolean
+    required: false
+    description: replace every returned processInputs[].value with [REDACTED]
 - name: get-schedule-notifications
   description: Get a schedule's notifications (GET /api/Schedules/notifications/{id}).
   args:
