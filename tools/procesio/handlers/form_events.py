@@ -34,6 +34,10 @@ from tools.procesio.handlers.form_code import _fetch, build_put_body
 # two drift, and a wrong event type is silently accepted by the API.
 from tools.procesio.dto.form.builder import _EVENT_KEY, _EVENT_TYPE  # noqa: E402
 
+# The value-path rule itself is shared with the builder, so the action that CHECKS a path and
+# the one that WRITES one cannot disagree.
+from tools.procesio.dto.form import fieldpath  # noqa: E402
+
 ACTIONS_ALLOWED = ("RUN_PROCESS", "RUN_JAVASCRIPT", "RUN_DATA_STORE_OPERATION")
 
 # EventAction.RUN_DATA_STORE_OPERATION (ui-builder model/config/events/index.ts): a
@@ -144,13 +148,21 @@ def _plain(value):
     return value.get("value") if isinstance(value, dict) else value
 
 
-def _resolve_maps(config: dict, client) -> dict:
-    """Turn any process-variable NAME on the left of a map into its GUID, and put
-    both sides into the designer's object shape."""
+def _resolve_maps(config: dict, client, form: dict | None = None) -> dict:
+    """Turn a map's two sides into the designer's object shape, resolving BOTH.
+
+    Left is a process variable: a NAME becomes its GUID. Right is a form field, and it used
+    to pass through untouched — which is why every caller that guessed the value-path format
+    wrote a row the platform accepted, the designer rendered, and the control silently
+    ignored. With `form` given, the right side is resolved the same way as the left: a field
+    NAME is built into its value path, a path is CHECKED against the live form, and anything
+    else is refused before a single byte is written.
+    """
     pid = config.get("processId")
     if not pid:
         raise UsageError("RUN_PROCESS config needs a 'processId'")
     names = _process_vars(client, pid)
+    live = fieldpath.LiveForm(form) if form is not None else None
     by_id = {v.get("id"): v for v in names.values() if v.get("id")}
     out = dict(config)
     for side in ("inputMap", "outputMap"):
@@ -171,9 +183,11 @@ def _resolve_maps(config: dict, client) -> dict:
             # Both sides of a row describe the SAME value, so one list-ness governs the pair: the
             # form variable on the right holds whatever the process variable on the left produced.
             is_list = _is_list_of(row.get("left"), variable) or _is_list_of(row.get("right"), variable)
+            right = _plain(row.get("right"))
+            if live is not None:
+                right = live.resolve(right, f"{side} row {i}")
             row["left"] = _slot(left, True, _path_of(row.get("left")), is_list)
-            row["right"] = _slot(_plain(row.get("right")), False,
-                                 _path_of(row.get("right")), is_list)
+            row["right"] = _slot(right, False, _path_of(row.get("right")), is_list)
             row["id"] = row.get("id", i)
             fixed.append(row)
         out[side] = fixed
@@ -207,7 +221,9 @@ def set_element_event(client, args) -> dict:
     element = _find_element(elements, args.element)
 
     if action == "RUN_PROCESS":
-        ev_config = _resolve_maps(ev_config, client)   # fails loudly before any write
+        # `form` is the live DTO fetched above: passing it is what lets the form side of each
+        # row be resolved and checked, not merely copied.
+        ev_config = _resolve_maps(ev_config, client, form)   # fails loudly before any write
         # Backfill the canonical RUN_PROCESS config the DTO builder always emits, so a
         # hand-written minimal {processId, inputMap, outputMap} renders configured in the
         # designer and launches — the designer reads these keys and a missing
@@ -360,7 +376,12 @@ ACTIONS = {
         func=set_element_event, add_args=_set_args, needs_client=True,
         description="Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / "
                     "RUN_DATA_STORE_OPERATION in place (surgical: only that element's event "
-                    "config changes; process-variable names in inputMap/outputMap are "
-                    "resolved to guids; a DataStore op takes --data-store-id + --operation).",
+                    "config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take "
+                    "NAMES: left = a process variable name, right = a form FIELD name - each "
+                    "is resolved to the id/value-path the runtime needs. Do NOT hand-build "
+                    "the form value path; if you pass one it is CHECKED against the live form "
+                    "and refused when wrong, because a wrong path is saved without any error "
+                    "and the control then launches nothing. A DataStore op takes "
+                    "--data-store-id + --operation.",
     ),
 }

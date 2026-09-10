@@ -40,6 +40,48 @@ in `webplatform/spike/opencode.json`:
   back as `{content:[{type:text,text:<json>}], isError:true}` so the model can read
   the error.
 
+## Capability discovery — why it is narrow
+
+A big tool's full schema is not a large answer, it is NO answer. `procesio` alone is
+~369 KB / 379 actions; an MCP client truncates that to a single-line JSON file, and
+then `read` (offset/limit sees one line), `grep` (ripgrep refuses a record over 64 KB)
+and `bash` (permission-gated) all fail on it. The turn is spent and the model has
+nothing. Measured on real autonomous runs: **27% of all tool calls were the model
+guessing argument names**, e.g. the same action retried with four different spellings
+(`--name`, `--title`, `--datastore_name`, `--workspace_id`) when the manifest said
+`--payload`.
+
+So `capabilities` answers narrowest-first:
+
+| call | returns | size (procesio) |
+|---|---|---|
+| `{}` | compact tool/agent/skill list | small |
+| `{search}` | matching ACTIONS, name+description only | ~0.3 KB |
+| `{name, action}` | that action's args + the literal call shape | ~1–2 KB |
+| `{name}` | full schema, **or** the action-name index if oversized | 11 KB (was 369 KB) |
+
+Three rules that matter when touching this:
+
+- **The degrade is a mechanism, not advice.** The prompt used to carry "NEVER call
+  `aat_capabilities` with a name"; transcripts show the model ignoring it and burning
+  the turn exactly as described above. Over `AAT_CAPABILITIES_MAX_BYTES` (default
+  40 000) the payload becomes the action index plus a pointer to `action=`/`search=`.
+  It keys off SIZE, not a tool list, so it covers every tool that grows.
+- **Usage errors answer themselves** (`server._usage_help`). On `unknown action` /
+  `unrecognized arguments` / `arguments are required`, the failure carries a `schema`
+  field with the valid arg names, or `did_you_mean` for the action. The framework
+  already held the answer at that moment; it just never said it. One choke point,
+  every tool, no per-tool change. Remote errors (HTTP 4xx/5xx) are NOT enriched —
+  those are real feedback, not naming problems.
+- **Suggestions must survive word order and plurals.** A model writes
+  `credential-list` for `list-credentials`; edit distance alone ranks those far apart,
+  so `_suggest` compares singularized WORD SETS first and only then falls back to
+  `difflib`.
+
+Argument names are returned verbatim from the manifest (`workspace-id`, hyphenated).
+Returning the literal spelling is what stops the snake_case guessing — do not
+normalize or prettify them.
+
 ## Mechanics / gotchas
 
 - **Naming:** the parent dir is `webplatform/`, NOT `platform/` — a top-level

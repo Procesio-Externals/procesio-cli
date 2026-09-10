@@ -38,9 +38,11 @@ actions:
   - name: guidance
     description: >-
       Serve the build-and-test playbook + best practices (the agent's knowledge
-      base) from one place.
+      base) from one place. Building a FORM is a separate discipline: start at
+      topic=forms (the index) and load the one chapter you need - the form
+      chapters are deliberately NOT in topic=all, because the guide is ~100 KB.
     args:
-      - {name: topic, type: string, default: all, description: "playbook | best-practices | visual-organization | datastore | scheduling | environments | boundary | all"}
+      - {name: topic, type: string, default: all, description: "processes: playbook | best-practices | visual-organization | datastore | scheduling | environments | reliability | boundary | all. forms: forms (index, start here) | forms-anatomy (elements + the field VALUE PATH) | forms-process (RUN_PROCESS event, inputMap/outputMap row shape) | forms-interaction | forms-code | forms-dom | forms-motion | forms-deploy | forms-pitfalls"}
   - name: checklist
     description: Emit the rigorous self-test checklist as structured steps.
     args:

@@ -26,6 +26,8 @@ or to confirm a rotation without ever moving the secret itself.
 from __future__ import annotations
 
 import argparse
+import base64
+import binascii
 import hashlib
 import json
 import math
@@ -102,6 +104,41 @@ RULES: list[tuple[str, re.Pattern[bytes], bool]] = [
 IDENTIFIER_ONLY = {"twilio-account-sid", "aws-access-key-id"}
 
 
+# A run of base64 / base64url characters long enough to wrap a credential.
+# Kept well above incidental identifiers (a GUID is 32 hex + dashes) so we do
+# not try to decode every high-entropy token in a workflow export.
+MIN_B64_RUN = 40
+_B64_RUN = re.compile(rb"[A-Za-z0-9+/_\-]{%d,}={0,2}" % MIN_B64_RUN)
+
+# How many base64 layers to peel. A Kubernetes dockerconfigjson Secret buries
+# the token two layers down: the `.dockerconfigjson` value is base64 of a JSON
+# doc whose `auth` field is itself base64 of `user:token`. Three peels reach it
+# with a layer to spare, and bound the work on a large export.
+MAX_DECODE_DEPTH = 3
+
+
+def _try_b64_decode(run: bytes) -> bytes | None:
+    """Decode a base64 / base64url run, or None if it is not really base64.
+
+    Only returns a decode that is overwhelmingly printable: a wrapped
+    credential (and the JSON or `user:token` around it) is text, whereas a
+    random high-entropy identifier that merely looks base64-shaped decodes to
+    binary noise not worth recursing into.
+    """
+    body = run.rstrip(b"=").replace(b"-", b"+").replace(b"_", b"/")
+    body += b"=" * ((-len(body)) % 4)
+    try:
+        decoded = base64.b64decode(body, validate=True)
+    except (binascii.Error, ValueError):
+        return None
+    if len(decoded) < 3:
+        return None
+    printable = sum(1 for b in decoded if b in (9, 10, 13) or 32 <= b <= 126)
+    if printable / len(decoded) < 0.85:
+        return None
+    return decoded
+
+
 def shannon_entropy(data: str) -> float:
     """Bits of entropy per character."""
     if not data:
@@ -160,8 +197,16 @@ def _decode(raw: bytes) -> str:
     return raw.decode("utf-8", "replace")
 
 
-def scan_bytes(blob: bytes, path: str, base_offset: int = 0) -> list[Finding]:
-    """Apply every rule to one chunk of bytes."""
+def scan_bytes(
+    blob: bytes, path: str, base_offset: int = 0, _depth: int = 0
+) -> list[Finding]:
+    """Apply every rule to one chunk of bytes, then to base64-wrapped payloads.
+
+    A Kubernetes `dockerconfigjson` Secret hides its registry token two base64
+    layers deep, so the literal rules never see it on the raw bytes. After the
+    direct pass, decode any long base64 run and re-scan the result, down to
+    MAX_DECODE_DEPTH layers.
+    """
     findings: list[Finding] = []
     for rule_name, pattern, entropy_gated in RULES:
         for match in pattern.finditer(blob):
@@ -196,6 +241,17 @@ def scan_bytes(blob: bytes, path: str, base_offset: int = 0) -> list[Finding]:
                     severity=severity,
                 )
             )
+
+    if _depth < MAX_DECODE_DEPTH:
+        for run in _B64_RUN.finditer(blob):
+            decoded = _try_b64_decode(run.group(0))
+            if decoded is None:
+                continue
+            for nested in scan_bytes(decoded, path, 0, _depth + 1):
+                # Byte offsets inside a decoded blob do not map back to the
+                # file; pin the finding to the wrapper run the reviewer scrubs.
+                nested.offset = base_offset + run.start()
+                findings.append(nested)
     return findings
 
 

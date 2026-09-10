@@ -28,7 +28,7 @@ from pathlib import Path
 from tools.procesio.dto import refdata
 from tools.procesio.dto.framework import Component
 from tools.procesio.dto.process import naming
-from tools.procesio.errors import UsageError
+from tools.procesio.errors import RemovalBlocked, UsageError
 
 DIR = Path(__file__).resolve().parent
 _CATALOG = DIR.parent / "data" / "action_catalog.json"
@@ -1382,6 +1382,77 @@ def _validate(client, dto, ctx):
     return {"valid": not res, "detail": res}
 
 
+def _names(items, *keys):
+    """Trimmed, non-empty names off a live-flow or DTO list, tolerating both casings."""
+    out = []
+    for it in items or []:
+        if not isinstance(it, dict):
+            continue
+        for k in keys:
+            v = it.get(k)
+            if isinstance(v, str) and v.strip():
+                out.append(v.strip())
+                break
+    return out
+
+
+def _removal_gate(dto, ctx):
+    """Refuse a desired-state save that would DROP actions or variables the live flow has.
+
+    A desired-state config replaces the definition, so anything it omits is deleted. The
+    payload cannot say whether that was meant: a config with 4 actions against a live flow
+    of 13 looks identical whether the author intended to remove 9 or had lost track of the
+    flow. So this does not judge the removal - it makes the consequence visible BEFORE it
+    is paid, and asks for a statement of intent (--allow-remove).
+
+    Why it is worth a gate: a write here is not recoverable, and both writers delete
+    silently. `PUT /api/Projects` persists even when it answers HTTP 400 (by design - an
+    unfinished process must be saveable), and the validation gate only asks whether the
+    RESULT is valid, which a truncated flow usually still is. Seen live: an incomplete
+    write cut a 13-action flow to 2, and the next step - reading that state and rebuilding
+    from a partial picture - dropped 8 more variables.
+    """
+    if ctx.get("_allow_remove"):
+        return
+    flow = ctx.get("_live_flow") or {}
+    live_actions = flow.get("actions") or flow.get("Actions") or []
+    live_vars = flow.get("variables") or flow.get("Variables") or []
+
+    # Error ports are generated, not authored: they come and go with their owning action.
+    # Keep SOURCE order - the list is read by a human or a model deciding whether the
+    # removal matches intent, and a set would reshuffle it differently on every run.
+    live_var_names = [
+        (v.get("name") or v.get("Name") or "").strip()
+        for v in live_vars
+        if isinstance(v, dict) and (v.get("name") or v.get("Name"))
+        and not (v.get("isError") or v.get("IsError"))]
+
+    kept_actions = set(_names(dto.get("Actions"), "Name", "name", "ActionName", "actionName"))
+    kept_vars = set(_names(dto.get("Variables"), "Name", "name"))
+
+    gone_actions = [n for n in dict.fromkeys(
+        _names(live_actions, "name", "Name", "actionName", "ActionName"))
+        if n not in kept_actions]
+    gone_vars = [n for n in dict.fromkeys(live_var_names) if n not in kept_vars]
+
+    if not gone_actions and not gone_vars:
+        return
+
+    parts = []
+    if gone_actions:
+        parts.append(f"{len(gone_actions)} action(s): " + ", ".join(gone_actions[:12])
+                     + ("…" if len(gone_actions) > 12 else ""))
+    if gone_vars:
+        parts.append(f"{len(gone_vars)} variable(s): " + ", ".join(gone_vars[:12])
+                     + ("…" if len(gone_vars) > 12 else ""))
+    raise RemovalBlocked(
+        "refusing to write: this config omits items the live process has, so saving it "
+        "would REMOVE them - " + "; ".join(parts)
+        + ". Re-read the process and include them, or pass --allow-remove if the removal "
+          "is intended.",
+        {"actions": gone_actions, "variables": gone_vars})
+
+
 def _save_gate(client, dto, ctx):
     """Front-end (designer) + back-end validation gate. Runs before EVERY process
     save (create + edit); raises errors.ValidationBlocked on blocking errors unless
@@ -1456,6 +1527,7 @@ def _edit(client, resource_id, config, ctx):
         live_canvas = flow.get("CanvasData")
     if live_canvas is not None:
         dto["CanvasData"] = live_canvas
+    _removal_gate(dto, ctx)
     _save_gate(client, dto, ctx)
     client.put("/api/Projects", dto)
     return client.get(f"/api/Projects/{resource_id}")

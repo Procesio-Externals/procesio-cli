@@ -61,17 +61,25 @@ TOOLS = [
     {
         "name": "capabilities",
         "description": (
-            "List AAT capabilities. No args -> a compact list of every ready "
-            "tool/agent/skill (name, description, primary_action). Pass name=<tool "
-            "or agent> to get that capability's full action+arg schema - use this "
-            "INSTEAD of running a tool with --help. Optional kind filter: "
-            "tool|agent|skill."
+            "Discover AAT capabilities. No args -> a compact list of every ready "
+            "tool/agent/skill (name, description, primary_action). "
+            "search='<keywords>' -> find the right ACTION by keyword across every "
+            "tool/agent (add name= to search within one). name=<tool or agent> + "
+            "action=<action> -> that one action's full argument schema; use this "
+            "INSTEAD of guessing flags or running --help. name= alone returns the "
+            "whole schema, but for a large tool that is automatically reduced to "
+            "the action-name index - so prefer search= or action=. Optional kind "
+            "filter: tool|agent|skill."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "kind": {"type": "string", "enum": ["tool", "agent", "skill"]},
-                "name": {"type": "string"},
+                "name": {"type": "string", "description": "tool or agent name"},
+                "action": {"type": "string",
+                           "description": "one action of `name` - returns just its arg schema"},
+                "search": {"type": "string",
+                           "description": "keywords to find a matching action"},
                 "full": {"type": "boolean",
                          "description": "include the longer description + example per "
                                         "entry (default false keeps the listing small)"},
@@ -102,10 +110,13 @@ TOOLS = [
     {
         "name": "run_agent",
         "description": (
-            "Run a registered AAT agent for a REVERSIBLE action. Route every "
-            "substantive request first with agent='orchestrator', action='intake', "
-            "args={'request': '<the ask>'} (per AGENTS.md). Irreversible agent "
-            "actions are refused here - use run_agent_confirmed."
+            "Run a registered AAT agent for a REVERSIBLE action. In an interactive "
+            "session, route a substantive request first with agent='orchestrator', "
+            "action='intake', args={'request': '<the ask>'} (per AGENTS.md). If you "
+            "were told you are already inside one step of an externally-managed plan, "
+            "do NOT route or plan - act directly; 'orchestrator drive' is refused "
+            "there because it would start a second orchestration loop. Irreversible "
+            "agent actions are refused here - use run_agent_confirmed."
         ),
         "inputSchema": _RUN_AGENT_SCHEMA,
     },
@@ -169,10 +180,37 @@ def _run(kind: str, arguments: dict, confirmed: bool) -> tuple[dict, bool]:
         # bad action/args or a transient tool error).
         res = dict(res)
         res["hint"] = (f"This {kind} call failed - it does NOT mean you lack access. "
-                       f"Call capabilities with name='{target}' to see its valid actions "
-                       f"and required args, then retry run_{kind}. Do NOT fall back to bash.")
+                       f"Call capabilities with name='{target}' and action='{action}' "
+                       f"(or search='<keywords>') to see the valid args, then retry "
+                       f"run_{kind}. Do NOT fall back to bash.")
+        schema = _usage_help(kind, target, action, res)
+        if schema:
+            res["schema"] = schema
         return res, True
     return res, False
+
+
+# A usage failure is a naming failure: a flag spelled `workspace_id` instead of
+# `workspace-id`, an invented action, or a required arg the caller probed for by
+# calling the action empty. The framework already knows the right answer at this
+# exact moment - it just never said it, so the model guessed again (measured: the
+# same action retried with four different arg spellings). Answering here fixes it
+# for every tool at once, with no per-tool change.
+_USAGE_MARKERS = ("unknown action", "unrecognized arguments",
+                  "arguments are required", "invalid choice")
+
+
+def _usage_help(kind: str, target: str, action: str | None, res: dict) -> dict | None:
+    """Attach the valid action/arg names when a call failed on USAGE, not on the
+    remote system. Never raises - enrichment must not turn into a second error."""
+    err = res.get("error") or {}
+    message = str(err.get("message") or "")
+    if not any(marker in message for marker in _USAGE_MARKERS):
+        return None
+    try:
+        return bridge.action_help(target, action, kind)
+    except Exception:  # noqa: BLE001 - best effort; the original error still stands
+        return None
 
 
 def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
@@ -181,6 +219,8 @@ def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
     try:
         if name == "capabilities":
             return bridge.capabilities(arguments.get("kind"), arguments.get("name"),
+                                       arguments.get("action"),
+                                       arguments.get("search"),
                                        bool(arguments.get("full", False))), False
         if name == "run_tool":
             return _run("tool", arguments, confirmed=False)

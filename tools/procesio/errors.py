@@ -35,6 +35,22 @@ class ProcesioAPIError(Exception):
         self.details = details or {}
 
 
+class RemovalBlocked(Exception):
+    """A desired-state save was blocked because it would REMOVE actions or variables
+    that exist on the live resource. Carries what would disappear so the caller can see
+    it before paying for it. Maps to 'removal_blocked', exit code 2. Intentional
+    removals pass --allow-remove.
+
+    Separate from ValidationBlocked on purpose: --force answers "save it even though it
+    is invalid", which is a different question from "yes, delete those". A half-built
+    process is a legitimate thing to force-save WITHOUT wanting to drop anything.
+    """
+
+    def __init__(self, message: str, removed: dict | None = None):
+        super().__init__(message)
+        self.removed = removed or {}
+
+
 class ValidationBlocked(Exception):
     """A save was blocked because front-end (designer) and/or back-end validation found
     errors. Carries the full report so the caller can see exactly what to fix. Maps to
@@ -119,6 +135,8 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
         return "invalid_argument", str(exc), {}, 2
     if isinstance(exc, ValidationBlocked):
         return "validation_failed", str(exc), exc.report, 2
+    if isinstance(exc, RemovalBlocked):
+        return "removal_blocked", str(exc), exc.removed, 2
     if isinstance(exc, DeadlineExceeded):
         return "deadline_exceeded", str(exc), {
             "kind": "deadline",

@@ -34,6 +34,16 @@ class Component:
     validate: Callable[[Any, Any, dict], Any] | None = None  # oracle (client, dto, ctx) -> resp|None
     save_gate: Callable[[Any, Any, dict], Any] | None = None  # pre-save gate (client, dto, ctx) -> report; raises on block
     edit_ctx: Callable[[Any, Any, dict, dict], dict] | None = None  # (client, id, config, ctx) -> ctx enriched from the LIVE resource
+    # Name of a PATCH-style action for this component, when one exists (it deep-merges
+    # instead of rebuilding). `<name>-edit` truthfully says there is no add/insert call,
+    # and a caller that reads only that will rebuild the whole definition to move one
+    # field - correct, but needlessly destructive when a patch would do. Declared rather
+    # than guessed from the action name, so a component without one says nothing.
+    patch_action: str = ""
+    # Name of an action that SPLICES one item into a live resource, when one exists.
+    # Same reason as patch_action: "there is no add/insert call" is the right thing to
+    # say for a component that has none, and a lie for one that does.
+    add_action: str = ""
 
     @property
     def schema_path(self) -> Path:

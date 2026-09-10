@@ -9,13 +9,21 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class ArgSpec(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
 
     name: str
     type: Literal["string", "integer", "number", "boolean", "array", "object"] = "string"
     required: bool = False
     description: str = ""
     default: Any = None
+    # JSON Schema for an arg that carries a STRUCTURED payload (a config, a DTO). A
+    # one-line `help=` can say an arg takes "a JSON object" but not what has to be in
+    # it, so a caller that only has the manifest has to reverse-engineer the shape from
+    # validation errors, one layer per attempt. Populate it from the schema the tool
+    # already validates against, never a hand-written copy, so the two cannot drift.
+    # Aliased: the manifest key stays `schema`, but a field literally named `schema`
+    # shadows BaseModel.schema() and pydantic warns on every import.
+    json_schema: dict | None = Field(default=None, alias="schema")
 
 
 class SecretSpec(BaseModel):
