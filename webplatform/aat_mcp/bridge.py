@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextvars
 import json
 import os
+import re
 import sys
 import time
 import urllib.error
@@ -27,6 +28,7 @@ if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
 import registry  # noqa: E402
+from tools._lib.skill_resources import read_text_resource, resource_index  # noqa: E402
 from dashboard.server import runner  # noqa: E402  (shared shell-to-script bridge)
 from tools._lib import accounting  # noqa: E402  (per-work-unit accounting seam, P0.0-05)
 
@@ -228,13 +230,11 @@ def capabilities(kind: str | None = None, name: str | None = None,
     tools, agents, skills = _scan_registry()
 
     if name:
-        for e in tools:
-            if e.get("name") == name:
-                return {"capability": _full(e, "tool")}
-        for e in agents:
-            if e.get("name") == name:
-                return {"capability": _full(e, "agent")}
-        raise KeyError(f"no tool or agent named {name!r}")
+        for entry_kind, entries in (("tool", tools), ("agent", agents), ("skill", skills)):
+            for entry in entries:
+                if entry.get("name") == name:
+                    return {"capability": _full(entry, entry_kind)}
+        raise KeyError(f"no tool, agent, or skill named {name!r}")
 
     out: list[dict] = []
     if kind in (None, "tool"):
@@ -245,6 +245,88 @@ def capabilities(kind: str | None = None, name: str | None = None,
         out += [_compact(e, "skill", full) for e in skills
                 if not e.get("error")]
     return {"count": len(out), "capabilities": out}
+
+
+_SEARCH_TOKEN = re.compile(r"[a-z0-9][a-z0-9._+-]*", re.IGNORECASE)
+
+
+def _search_tokens(value: str) -> list[str]:
+    return [token.lower() for token in _SEARCH_TOKEN.findall(value or "")]
+
+
+def _search_score(query: str, text: str) -> int:
+    query_norm = " ".join(_search_tokens(query))
+    text_norm = " ".join(_search_tokens(text))
+    if not query_norm or not text_norm:
+        return 0
+    score = 25 if query_norm in text_norm else 0
+    for token in set(query_norm.split()):
+        if token in text_norm.split():
+            score += 4
+        elif token in text_norm:
+            score += 1
+    return score
+
+
+def search_capabilities(query: str, kind: str | None = None,
+                        name: str | None = None, limit: int = 10) -> dict:
+    """Search capability and action metadata without returning the whole registry."""
+    query = str(query or "").strip()
+    if not query:
+        raise ValueError("query is required")
+    if kind not in (None, "tool", "agent", "skill"):
+        raise ValueError("kind must be tool, agent, or skill")
+    limit = max(1, min(int(limit or 10), 50))
+    tools, agents, skills = _scan_registry()
+    results: list[dict[str, Any]] = []
+
+    for entry_kind, entries in (("tool", tools), ("agent", agents), ("skill", skills)):
+        if kind and entry_kind != kind:
+            continue
+        for entry in entries:
+            if entry.get("error") or (name and entry.get("name") != name):
+                continue
+            routing = entry.get("routing") or {}
+            base_text = " ".join([
+                entry.get("name", ""), entry.get("description", ""),
+                " ".join(routing.get("triggers") or []),
+            ])
+            base_score = _search_score(query, base_text)
+            if base_score:
+                results.append({
+                    "kind": entry_kind,
+                    "name": entry["name"],
+                    "action": None,
+                    "description": (entry.get("description") or "")[:320],
+                    "score": base_score,
+                    "ready": bool(entry.get("ready", True)),
+                })
+            if entry_kind == "skill":
+                continue
+            for action in entry.get("actions") or []:
+                args = action.get("args") or []
+                action_text = " ".join([
+                    entry.get("name", ""), action.get("name", ""),
+                    action.get("description", ""),
+                    " ".join(arg.get("name", "") for arg in args),
+                ])
+                action_score = _search_score(query, action_text)
+                if not action_score:
+                    continue
+                results.append({
+                    "kind": entry_kind,
+                    "name": entry["name"],
+                    "action": action["name"],
+                    "description": (action.get("description") or "")[:320],
+                    "required_args": [arg["name"] for arg in args if arg.get("required")],
+                    "score": action_score + 2,
+                    "ready": bool(entry.get("ready", True)),
+                })
+
+    results.sort(key=lambda row: (-row["score"], row["kind"], row["name"], row.get("action") or ""))
+    total = len(results)
+    return {"query": query, "total_matches": total, "count": min(total, limit),
+            "results": results[:limit]}
 
 
 def run_tool(tool: str, action: str | None, args: dict[str, Any] | None) -> dict:
@@ -277,8 +359,14 @@ def run_agent(agent: str, action: str | None, args: dict[str, Any] | None) -> di
 
 
 def get_skill(name: str) -> dict:
-    """Return a skill's full markdown (model-decided skill loading — the substitute
-    for harness auto-trigger; see spec 04)."""
-    m = registry.get_skill(name)  # raises KeyError if unknown
-    md = (m.path / "SKILL.md").read_text(encoding="utf-8")
-    return {"name": name, "content": md}
+    """Return a skill's markdown plus a metadata-only bundled-resource index."""
+    manifest = registry.get_skill(name)
+    markdown = (manifest.path / "SKILL.md").read_text(encoding="utf-8")
+    return {"name": manifest.name, "content": markdown,
+            "resources": resource_index(manifest.path)}
+
+
+def get_skill_resource(name: str, path: str) -> dict:
+    """Return one safe UTF-8 resource below references/, scripts/, or assets/."""
+    manifest = registry.get_skill(name)
+    return {"name": manifest.name, "resource": read_text_resource(manifest.path, path)}

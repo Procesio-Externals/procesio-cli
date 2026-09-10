@@ -297,8 +297,15 @@ def list_skills() -> list[dict[str, Any]]:
             "name": m.name,
             "description": m.description,
             "version": m.version,
+            "tier": m.tier,
             "path": str(m.path),
             "routing": m.routing.model_dump() if m.routing else None,
+            "owner": m.owner or None,
+            "last_verified": m.last_verified.isoformat() if m.last_verified else None,
+            "baseline_version": m.baseline_version or None,
+            "eval_suite": m.eval_suite or None,
+            "source_policy": m.source_policy,
+            "readiness": "ready",
             "ready": True,
         }
         # Non-fatal hygiene signal: folder name should match the manifest name.

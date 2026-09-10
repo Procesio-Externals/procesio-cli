@@ -1,6 +1,7 @@
 """Tool and agent manifest loading + validation."""
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
@@ -251,7 +252,13 @@ class SkillManifest(BaseModel):
     name: str
     description: str
     version: str = "0.1.0"
+    tier: Literal["official", "template", "custom"] = "template"
     routing: RoutingSpec | None = None
+    owner: str = ""
+    last_verified: date | None = None
+    baseline_version: str = ""
+    eval_suite: str = ""
+    source_policy: Literal["generated", "timestamped", "static"] | None = None
     # path is filled by the loader; not part of the frontmatter
     path: Path | None = None
 

@@ -61,17 +61,17 @@ TOOLS = [
     {
         "name": "capabilities",
         "description": (
-            "List AAT capabilities. No args -> a compact list of every ready "
-            "tool/agent/skill (name, description, primary_action). Pass name=<tool "
-            "or agent> to get that capability's full action+arg schema - use this "
-            "INSTEAD of running a tool with --help. Optional kind filter: "
-            "tool|agent|skill."
+            "List AAT capabilities. No args returns a compact list. Pass name to "
+            "get one tool, agent, or skill's full schema. Pass query for bounded "
+            "search across capability, action, and argument metadata."
         ),
         "inputSchema": {
             "type": "object",
             "properties": {
                 "kind": {"type": "string", "enum": ["tool", "agent", "skill"]},
                 "name": {"type": "string"},
+                "query": {"type": "string"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50, "default": 10},
                 "full": {"type": "boolean",
                          "description": "include the longer description + example per "
                                         "entry (default false keeps the listing small)"},
@@ -119,10 +119,16 @@ TOOLS = [
     },
     {
         "name": "get_skill",
-        "description": "Fetch a registered skill's full markdown content by name.",
+        "description": (
+            "Fetch a registered skill's SKILL.md plus resource index. To retrieve one "
+            "resource, pass a path returned by that index in the optional resource field."
+        ),
         "inputSchema": {
             "type": "object",
-            "properties": {"name": {"type": "string"}},
+            "properties": {
+                "name": {"type": "string"},
+                "resource": {"type": "string"},
+            },
             "required": ["name"],
         },
     },
@@ -180,6 +186,11 @@ def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
     structured payload the model can read."""
     try:
         if name == "capabilities":
+            if "query" in arguments:
+                return bridge.search_capabilities(
+                    arguments["query"], arguments.get("kind"), arguments.get("name"),
+                    arguments.get("limit", 10)
+                ), False
             return bridge.capabilities(arguments.get("kind"), arguments.get("name"),
                                        bool(arguments.get("full", False))), False
         if name == "run_tool":
@@ -193,6 +204,8 @@ def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
         if name == "get_skill":
             if not arguments.get("name"):
                 return {"error": "get_skill requires 'name'"}, True
+            if "resource" in arguments:
+                return bridge.get_skill_resource(arguments["name"], arguments["resource"]), False
             return bridge.get_skill(arguments["name"]), False
         return {"error": f"unknown tool: {name}"}, True
     except KeyError as e:
