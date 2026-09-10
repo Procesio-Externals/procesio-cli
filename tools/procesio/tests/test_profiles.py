@@ -87,7 +87,10 @@ def test_apikey_secrets_are_prompted_when_flags_are_omitted(monkeypatch):
 
     def fake_getpass(prompt):
         asked.append(prompt)
-        return {"API key NAME: ": "KN", "API key VALUE: ": "KV"}[prompt]
+        return {
+            "PROCESIO Key Handle: ": "KN",
+            "PROCESIO API key value (shown once): ": "KV",
+        }[prompt]
 
     monkeypatch.setattr(profile_admin.getpass, "getpass", fake_getpass)
     saved = {}
@@ -101,7 +104,10 @@ def test_apikey_secrets_are_prompted_when_flags_are_omitted(monkeypatch):
         web_base=None, auth_base=None, make_default=False)
     out = profile_admin.add_credential(args)
 
-    assert asked == ["API key NAME: ", "API key VALUE: "]
+    assert asked == [
+        "PROCESIO Key Handle: ",
+        "PROCESIO API key value (shown once): ",
+    ]
     assert saved["blob"]["key"] == "KN" and saved["blob"]["value"] == "KV"
     # The returned view must never carry the secret back out.
     assert "KV" not in json.dumps(out)
