@@ -126,11 +126,11 @@ tools rather than one per action:
 
 | tool | what it does |
 |---|---|
-| `capabilities` | list tools, agents and skills, or one capability's full argument schema |
+| `capabilities` | list capabilities, inspect one schema, or search metadata with `query` and `limit` (1–50) |
 | `run_tool` | run a tool with structured JSON arguments |
 | `run_agent` | run an agent |
 | `run_tool_confirmed`, `run_agent_confirmed` | the same, including irreversible actions |
-| `get_skill` | fetch a skill's markdown |
+| `get_skill` | fetch a skill's markdown and resource index, or one file with optional `resource` |
 
 Because it reads the registry, a tool you add next to `tools/procesio/` appears in
 your assistant immediately, with its argument schema, and you write no integration
@@ -301,6 +301,21 @@ An agent carries method rather than mechanics. Run one with
 
 Knowledge an AI assistant loads on its own from the description; there is nothing to
 run. `python scripts/get-skill.py <name> --content` prints one.
+
+Load only what the task needs:
+
+```bash
+python scripts/list-skills.py --json
+python scripts/get-skill.py sql-server-optimizer --index
+python scripts/get-skill.py sql-server-optimizer --resource references/scripts/export-indexes.sql
+```
+
+Metadata-only lookup remains the default; `--content` retains the body and legacy
+reference/script/asset lists. `--index` adds file sizes and media types without
+reading resource content. MCP `get_skill` retains `name` and `content`; pass a path
+from its index as `resource` to fetch just that file. Resources must be UTF-8 text,
+at most 512,000 bytes, under `references/`, `scripts/`, or `assets/`; traversal and
+symlink escape are rejected. Scripts are returned as text, never executed.
 
 | Skill | What it covers |
 |---|---|
