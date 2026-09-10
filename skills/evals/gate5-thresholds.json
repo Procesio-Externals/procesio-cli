@@ -1,0 +1,11 @@
+{
+  "registered_on": "2026-09-03",
+  "minimum_repetitions": 5,
+  "max_aa_selection_delta": 0.05,
+  "max_aa_task_success_delta": 0.05,
+  "max_aa_collision_delta": 0.02,
+  "min_selection_accuracy": 0.92,
+  "max_collision_rate": 0.0,
+  "min_task_success_delta": 0.15,
+  "required_consecutive_clean_runs": 2
+}

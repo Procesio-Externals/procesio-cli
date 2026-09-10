@@ -105,7 +105,10 @@ Claude **auto-triggers** these from their descriptions — do NOT run-tool them.
 
 **Registered in this project** — run `python scripts/list-skills.py` (`skills/<name>/`):
 
-- **procesio-expert** — You are a PROCESIO expert → `get-skill.py procesio-expert`
-- **sql-server-optimizer** — SQL Server T-SQL optimizer for plain SQL and PROCESIO workflows → `get-skill.py sql-server-optimizer`
+- **agent-skill-engineer** — create, update, split, merge, refactor, or audit an Agent Skill or SKILL.md package; optimize skill descriptions, routing boundaries, progressive disclosure, context cost, or safety; design fixed-rubric skill evaluations, baselines, A/A noise checks, A/B comparisons, or field trials → `get-skill.py agent-skill-engineer`
+- **procesio-cli** — operate or troubleshoot a PROCESIO workspace through the CLI or MCP; create, edit, run, validate, audit, export, import, schedule, trigger, test, or verify a PROCESIO resource; inspect a PROCESIO process instance, form, document, webhook, credential, data model, or custom action → `get-skill.py procesio-cli`
+- **procesio-cli-maintainer** — change or review the procesio-cli repository source, manifests, tools, agents, MCP, registry, CI, or tests; add an action or capability while preserving JSON, credentials, routing, generation, and reversibility contracts; integrate an already-designed Agent Skill into repository generation, translations, governance, or release controls → `get-skill.py procesio-cli-maintainer`
+- **procesio-platform-advisor** — assess PROCESIO product fit, feasibility, architecture, pricing, sizing, or compliance; compare PROCESIO with another automation or integration platform; decide which processes to automate without changing a workspace → `get-skill.py procesio-platform-advisor`
+- **sql-server-optimizer** — analyze or optimize SQL Server T-SQL, execution plans, indexes, logical reads, blocking, or parameter sniffing; review SQL used in a PROCESIO Execute Query or Execute Command action; replace unsafe PROCESIO inline SQL variables with native typed parameters → `get-skill.py sql-server-optimizer`
 
 <!-- CAPABILITY-ROUTER:END -->
