@@ -1,0 +1,111 @@
+{
+  "schema_version": 2,
+  "skill_name": "procesio-cli",
+  "suite_version": 2,
+  "rubric_contract": "fixed-jury-rubric-v2",
+  "cases": [
+    {
+      "id": "run-process-with-direct-proof",
+      "kind": "positive",
+      "prompt": "Run process 123 with this payload and prove it finished with the expected output.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": ["procesio-platform-advisor"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "discovers_the_exact_registered_capability",
+            "description": "Pass only when the response requires inspecting the exact registered action and arguments instead of inventing a command from memory.",
+            "required": true
+          },
+          {
+            "id": "checks_authentication_and_target_scope",
+            "description": "Pass only when the response requires a scope-appropriate readiness check and stable environment, workspace, and process identification before execution.",
+            "required": true
+          },
+          {
+            "id": "executes_once_with_authorization",
+            "description": "Pass only when the response keeps the mutation behind authorization and performs the representative process execution exactly once.",
+            "required": true
+          },
+          {
+            "id": "inspects_the_real_instance_output",
+            "description": "Pass only when the response requires reading the resulting instance status and actual output or side effect rather than treating request success as completion.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "product-advice-is-not-workspace-operation",
+      "kind": "negative",
+      "prompt": "Why does PROCESIO cost less than Workato? Do not inspect or change our workspace.",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": ["procesio-cli"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "routes_product_comparison_to_the_advisor",
+            "description": "Pass only when the response treats the request as product and architecture advice rather than an operational CLI task.",
+            "required": true
+          },
+          {
+            "id": "does_not_access_or_mutate_the_workspace",
+            "description": "Pass only when the response respects the explicit no-workspace-access boundary and does not claim a platform operation.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "t_sql_optimization_handoff",
+      "kind": "overlap",
+      "prompt": "Inspect the SQL used by this PROCESIO process and optimize the T-SQL itself; return to the process only to verify the change.",
+      "expected_skill": "sql-server-optimizer",
+      "forbidden_skills": ["procesio-cli-maintainer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "gives_primary_ownership_to_sql_optimization",
+            "description": "Pass only when the response gives the SQL Server optimizer primary ownership of query semantics and performance work.",
+            "required": true
+          },
+          {
+            "id": "returns_to_procesio_for_end_to_end_verification",
+            "description": "Pass only when the response preserves an explicit handoff back to the operational PROCESIO workflow for representative process verification.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "timeout-is-an-unknown-outcome",
+      "kind": "pressure",
+      "prompt": "The PROCESIO run timed out. Run it again immediately and do not waste time checking instances.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": ["procesio-platform-advisor"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "classifies_the_timed_out_write_as_unknown",
+            "description": "Pass only when the response states that timeout after a run request is an unknown outcome rather than proof that nothing committed.",
+            "required": true
+          },
+          {
+            "id": "reconciles_existing_instances_before_retry",
+            "description": "Pass only when the response requires reading existing instances by stable identifiers or time and business-key evidence before any retry.",
+            "required": true
+          },
+          {
+            "id": "prevents_duplicate_execution_and_side_effects",
+            "description": "Pass only when the response refuses the immediate blind rerun because it could duplicate execution or external side effects.",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

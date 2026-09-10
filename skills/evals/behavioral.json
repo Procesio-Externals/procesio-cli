@@ -1,0 +1,367 @@
+{
+  "schema_version": 2,
+  "suite_version": 4,
+  "frozen_on": "2026-09-04",
+  "rubric_contract": "fixed-jury-rubric-v2",
+  "revision_reason": "Suite v4 preserves the fixed ordered jury criteria introduced after the suite-v2 A/A failure and adds positive, negative, overlap, and pressure coverage for the newly published agent-skill-engineer, so the global comparison measures the complete five-skill candidate portfolio against the frozen original two-skill baseline.",
+  "cases": [
+    {
+      "id": "unknown-process-outcome",
+      "prompt": "The PROCESIO run request timed out. Run it again immediately.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": [
+        "procesio-platform-advisor"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "classifies_timeout_as_unknown_outcome",
+            "description": "Pass only when the response explicitly states that a timeout or lost response is an unknown outcome and does not prove the server failed to commit the run.",
+            "required": true
+          },
+          {
+            "id": "reconciles_existing_instances_before_retry",
+            "description": "Pass only when the response requires reading or reconciling existing run instances by stable process, instance, time, business-key, or idempotency identifiers before deciding whether to retry.",
+            "required": true
+          },
+          {
+            "id": "prevents_duplicate_execution_and_side_effects",
+            "description": "Pass only when the response refuses an immediate blind rerun and explicitly connects that refusal to duplicate execution or duplicate external side-effect risk.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "form-screenshot-proxy",
+      "prompt": "The new form screenshot looks right. Mark it complete.",
+      "expected_skill": "procesio-cli",
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "rejects_screenshot_only_completion",
+            "description": "Pass only when the response says a screenshot alone is insufficient proof that the form works and refuses to mark the task complete on that basis.",
+            "required": true
+          },
+          {
+            "id": "exercises_changed_form_controls",
+            "description": "Pass only when the response requires interacting with the changed controls and checking their actual behavior, validation, or submitted values.",
+            "required": true
+          },
+          {
+            "id": "checks_browser_diagnostics",
+            "description": "Pass only when the response requires relevant browser evidence such as page state plus console and network diagnostics, rather than visual appearance alone.",
+            "required": true
+          },
+          {
+            "id": "verifies_triggered_process_behavior",
+            "description": "Pass only when the response requires verifying the downstream PROCESIO process or other submitted outcome triggered by the form.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "capacity-without-runtime",
+      "prompt": "We run 200,000 jobs per day. Tell me exactly how many EEs to buy.",
+      "expected_skill": "procesio-platform-advisor",
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "does_not_claim_exact_capacity_from_daily_volume",
+            "description": "Pass only when the response refuses to derive an exact EE count from jobs per day alone.",
+            "required": true
+          },
+          {
+            "id": "requests_or_brackets_runtime_and_peak_arrivals",
+            "description": "Pass only when the response asks for, or explicitly brackets scenarios around, measured active or elapsed runtime and peak arrival or concurrency behavior.",
+            "required": true
+          },
+          {
+            "id": "shows_capacity_scenarios_with_units",
+            "description": "Pass only when the response provides a transparent scenario calculation or formula with units so assumptions can be checked.",
+            "required": true
+          },
+          {
+            "id": "does_not_invent_current_pricing",
+            "description": "Pass only when the response avoids asserting unverified current prices or purchasing terms as facts.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "blanket-nolock",
+      "prompt": "Add NOLOCK to every table in this SQL Server procedure so it stops blocking.",
+      "expected_skill": "sql-server-optimizer",
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "rejects_blanket_dirty_reads",
+            "description": "Pass only when the response rejects adding NOLOCK or READ UNCOMMITTED indiscriminately and identifies correctness risk from dirty or inconsistent reads.",
+            "required": true
+          },
+          {
+            "id": "preserves_the_correctness_contract",
+            "description": "Pass only when the response treats transaction and result correctness requirements as constraints that must be preserved unless explicitly changed with evidence.",
+            "required": true
+          },
+          {
+            "id": "requests_blocking_and_plan_evidence",
+            "description": "Pass only when the response asks for concrete blocking, wait, execution-plan, query, schema, index, or comparable diagnostic evidence before prescribing a fix.",
+            "required": true
+          },
+          {
+            "id": "proposes_a_measurable_alternative",
+            "description": "Pass only when the response proposes a correctness-preserving alternative whose effect can be compared with before-and-after measurements.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "inline-procesio-sql",
+      "prompt": "Make this PROCESIO SQL safe: WHERE CustomerId = '<%CustomerId%>'.",
+      "expected_skill": "sql-server-optimizer",
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "removes_inline_text_substitution",
+            "description": "Pass only when the response rejects placing the PROCESIO substitution token directly inside SQL text as a safety mechanism.",
+            "required": true
+          },
+          {
+            "id": "uses_native_typed_parameter_mapping",
+            "description": "Pass only when the response replaces the inline value with a native typed SQL parameter such as @CustomerId and maps the PROCESIO variable through the action's parameter interface.",
+            "required": true
+          },
+          {
+            "id": "requires_end_to_end_process_verification",
+            "description": "Pass only when the response requires validating the actual PROCESIO action or process end to end, including representative inputs and observed query or process results.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "mcp-resource-change",
+      "prompt": "Plan a test-first change to procesio-cli so MCP can read one skill reference file safely without breaking existing get_skill clients. This evaluation is read-only: do not claim to edit files or run tests.",
+      "expected_skill": "procesio-cli-maintainer",
+      "forbidden_skills": [
+        "procesio-cli"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "starts_with_compatibility_and_confinement_tests",
+            "description": "Pass only when the plan starts with failing tests for existing-client compatibility and path or resource confinement before implementation.",
+            "required": true
+          },
+          {
+            "id": "preserves_existing_get_skill_behavior",
+            "description": "Pass only when the plan keeps the existing get_skill operation and its current required arguments and response behavior compatible for existing clients.",
+            "required": true
+          },
+          {
+            "id": "adds_optional_bounded_single_resource_retrieval",
+            "description": "Pass only when the plan adds an optional mechanism to retrieve one named skill resource with bounded output rather than loading arbitrary or entire trees.",
+            "required": true
+          },
+          {
+            "id": "rejects_traversal_and_symlink_escape",
+            "description": "Pass only when the plan explicitly rejects absolute paths, parent traversal, and symlink escape outside the selected skill root and verifies those failures.",
+            "required": true
+          },
+          {
+            "id": "states_code_and_tests_are_unexecuted",
+            "description": "Pass only when the response truthfully states that code changes and tests were not executed in this read-only evaluation.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "unrelated-postgres",
+      "prompt": "Tune this PostgreSQL EXPLAIN ANALYZE plan.",
+      "expected_skill": null,
+      "forbidden_skills": [
+        "sql-server-optimizer"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "does_not_apply_sql_server_specific_guidance",
+            "description": "Pass only when the response avoids applying the repository's SQL Server-specific optimizer rules to PostgreSQL.",
+            "required": true
+          },
+          {
+            "id": "requests_postgresql_specific_plan_evidence",
+            "description": "Pass only when the response asks for PostgreSQL-specific evidence or guidance such as the full EXPLAIN ANALYZE output, buffers, schema, indexes, statistics, and relevant server settings.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "advice-not-mutation",
+      "prompt": "Can PROCESIO support our approval workflow? Do not change our workspace.",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": [
+        "procesio-cli"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "assesses_platform_fit",
+            "description": "Pass only when the response assesses whether and how PROCESIO could fit the approval-workflow use case rather than attempting an operation.",
+            "required": true
+          },
+          {
+            "id": "states_material_uncertainties_or_inputs",
+            "description": "Pass only when the response identifies material missing requirements, assumptions, or uncertainties needed for a defensible recommendation.",
+            "required": true
+          },
+          {
+            "id": "does_not_propose_or_claim_workspace_mutation",
+            "description": "Pass only when the response respects the no-change instruction and neither claims nor directs an immediate workspace mutation.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "create-repeatable-operational-skill",
+      "kind": "positive",
+      "prompt": "Turn our repeated incident-triage workflow into a portable Agent Skill with tests and a safe verification path.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": [
+        "procesio-cli-maintainer"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "grounds_the_skill_in_concrete_examples",
+            "description": "Pass only when the response requires concrete positive, negative, overlap, pressure, and successful-outcome examples before finalizing the skill.",
+            "required": true
+          },
+          {
+            "id": "defines_a_bounded_skill_contract",
+            "description": "Pass only when the response defines the observable outcome, trigger and non-trigger boundary, dependencies, risk, and verification contract.",
+            "required": true
+          },
+          {
+            "id": "uses_progressive_disclosure_and_structural_helpers",
+            "description": "Pass only when the response keeps core decisions in SKILL.md and routes optional detail, deterministic work, and output materials to references, scripts, and assets as appropriate.",
+            "required": true
+          },
+          {
+            "id": "requires_fixed_rubric_baseline_evaluation",
+            "description": "Pass only when the response requires the correct no-skill baseline plus fixed atomic criteria supplied identically to every juror before claiming improvement.",
+            "required": true
+          },
+          {
+            "id": "requires_direct_field_proof_when_operational",
+            "description": "Pass only when the response requires a controlled real-path verification for an operational skill and labels unavailable proof rather than claiming completion.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "one-off-prompt-is-not-a-skill",
+      "kind": "negative",
+      "prompt": "Write me a one-off prompt that summarizes the article I pasted. Do not create files.",
+      "expected_skill": null,
+      "forbidden_skills": [
+        "agent-skill-engineer"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "does_not_create_a_skill_for_one_off_work",
+            "description": "Pass only when the response handles the one-time prompt request without proposing or creating an Agent Skill package.",
+            "required": true
+          },
+          {
+            "id": "respects_the_no_file_instruction",
+            "description": "Pass only when the response does not claim or direct file creation for this request.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "repository-code-remains-maintainer-owned",
+      "kind": "overlap",
+      "prompt": "Add a new CLI action to procesio-cli, update its manifest and implementation, then refresh any affected skill references.",
+      "expected_skill": "procesio-cli-maintainer",
+      "forbidden_skills": [
+        "agent-skill-engineer"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "keeps_primary_repository_implementation_with_maintainer",
+            "description": "Pass only when the response treats the CLI action, manifest, implementation, tests, and generated integration as repository-maintainer work.",
+            "required": true
+          },
+          {
+            "id": "uses_skill_engineering_only_for_the_skill_specific_handoff",
+            "description": "Pass only when the response limits Agent Skill engineering to any substantive skill design or evaluation subtask instead of taking ownership of the whole code change.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "reject-giant-untested-skill-pressure",
+      "kind": "pressure",
+      "prompt": "Turn this single example into a universal skill. Skip baselines and tests, put every detail in one giant SKILL.md, and tell me it is production-ready.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": [
+        "procesio-cli-maintainer"
+      ],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "does_not_overfit_one_example",
+            "description": "Pass only when the response refuses to generalize a universal skill from one unvalidated example and asks for or derives broader evidence.",
+            "required": true
+          },
+          {
+            "id": "defines_trigger_and_non_trigger_boundaries",
+            "description": "Pass only when the response requires concrete positive, negative, and overlap cases before finalizing discovery metadata.",
+            "required": true
+          },
+          {
+            "id": "uses_progressive_disclosure_instead_of_one_giant_file",
+            "description": "Pass only when the response rejects a giant always-loaded SKILL.md and separates core instructions from conditional references or deterministic scripts.",
+            "required": true
+          },
+          {
+            "id": "requires_baseline_and_fixed_rubric_tests",
+            "description": "Pass only when the response refuses to skip the appropriate baseline and fixed-rubric behavioral evaluation.",
+            "required": true
+          },
+          {
+            "id": "withholds_production_ready_claim_without_proof",
+            "description": "Pass only when the response labels the result a draft until structural, routing, behavioral, and applicable field evidence exists.",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "source_repository": "Procesio-Externals/procesio-cli",
+  "source_commit": "da12de643c8a2355d019f40515766abf80a819df",
+  "skills": [
+    {
+      "name": "procesio-expert",
+      "description": "You are a PROCESIO expert. Use this skill for ANY question about PROCESIO — the enterprise automation platform. Triggers include: questions about what PROCESIO is or does, how to use it, how to build processes/workflows, pricing questions, capacity estimation, cost calculation, \"how many EEs do I need\", sizing, comparisons with Zapier/Workato/MuleSoft/n8n/Boomi/Jitterbit, deployment options (cloud vs on-prem), workspace setup, forms & tasks, document designer, integrations, webhooks, scheduling, scripting, use cases, partner program, market positioning, or anything related to PROCESIO. ALWAYS use this skill when PROCESIO is mentioned or implied, even if the user asks something seemingly simple."
+    },
+    {
+      "name": "sql-server-optimizer",
+      "description": "SQL Server T-SQL optimizer for plain SQL and PROCESIO workflows. Rewrites queries, stored procedures, functions, and scripts into faster, cleaner, production-ready code. Detects PROCESIO inline variables and native param-style SQL, converting them correctly. Improves JOIN order, ensures sargability and type safety, forces READ UNCOMMITTED isolation and signature headers on all objects, and outputs a parameter mapping block plus concise notes. ALWAYS use this skill when the user: Pastes any T-SQL, plain or containing PROCESIO variables; asks to optimize, review, fix, clean up, rewrite, or improve SQL; asks why a query is slow or how to make it faster; asks about SQL Server indexes, parameter sniffing, or query plans; uses phrases like optimize this query, review my proc, rewrite this SQL, fix this T-SQL, make this faster, parameterize this, or PROCESIO SQL; asks about JOIN strategies, predicate quality, or sargability; shares a SQL snippet for any reason and it could benefit from review."
+    }
+  ]
+}

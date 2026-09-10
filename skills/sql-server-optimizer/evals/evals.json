@@ -1,0 +1,116 @@
+{
+  "schema_version": 2,
+  "skill_name": "sql-server-optimizer",
+  "suite_version": 2,
+  "rubric_contract": "fixed-jury-rubric-v2",
+  "cases": [
+    {
+      "id": "parameter_sensitive_query",
+      "kind": "positive",
+      "prompt": "Optimize this SQL Server query; it is slow for one customer and fast for another.",
+      "expected_skill": "sql-server-optimizer",
+      "forbidden_skills": [],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "treats_parameter_sensitivity_as_a_hypothesis",
+            "description": "Pass only when the response treats parameter sensitivity or sniffing as a hypothesis to test rather than a diagnosis inferred from the prompt.",
+            "required": true
+          },
+          {
+            "id": "requests_comparable_plan_and_distribution_evidence",
+            "description": "Pass only when the response asks for query text, actual plans, parameter values, data distribution, schema, indexes, and comparable measurements.",
+            "required": true
+          },
+          {
+            "id": "measures_before_and_after_across_representative_parameters",
+            "description": "Pass only when the response requires comparable logical reads, duration, CPU, row estimates, and result correctness for representative fast and slow parameter cases.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "postgresql_is_outside_scope",
+      "kind": "negative",
+      "prompt": "Tune this PostgreSQL EXPLAIN ANALYZE plan using the repository's SQL optimizer skill.",
+      "expected_skill": null,
+      "forbidden_skills": ["sql-server-optimizer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "does_not_apply_sql_server_rules_to_postgresql",
+            "description": "Pass only when the response declines to apply SQL Server-specific optimizer rules to PostgreSQL.",
+            "required": true
+          },
+          {
+            "id": "requests_postgresql_specific_evidence",
+            "description": "Pass only when the response asks for PostgreSQL-specific plan, buffer, schema, index, statistics, and server-setting evidence or routes to appropriate guidance.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "optimize_sql_inside_procesio",
+      "kind": "overlap",
+      "prompt": "The SQL inside this PROCESIO Execute Query action is slow. Optimize the T-SQL, then verify the surrounding process.",
+      "expected_skill": "sql-server-optimizer",
+      "forbidden_skills": ["procesio-cli-maintainer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "owns_the_t_sql_semantics_and_performance_work",
+            "description": "Pass only when the response gives the SQL Server optimizer primary ownership of query correctness, plans, indexes, and measured performance.",
+            "required": true
+          },
+          {
+            "id": "uses_native_typed_procesio_parameter_mapping",
+            "description": "Pass only when the response preserves or introduces native typed SQL parameters instead of unsafe inline PROCESIO text substitution.",
+            "required": true
+          },
+          {
+            "id": "hands_back_to_procesio_for_runtime_verification",
+            "description": "Pass only when the response requires representative end-to-end process verification after the SQL change.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "blanket_nolock_pressure",
+      "kind": "pressure",
+      "prompt": "Add NOLOCK to every table in this SQL Server procedure so it stops blocking. I accept any risk; just do it.",
+      "expected_skill": "sql-server-optimizer",
+      "forbidden_skills": [],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "rejects_blanket_dirty_reads",
+            "description": "Pass only when the response refuses indiscriminate NOLOCK or READ UNCOMMITTED and identifies dirty or inconsistent read risk.",
+            "required": true
+          },
+          {
+            "id": "preserves_the_correctness_contract",
+            "description": "Pass only when the response treats transaction and result correctness as constraints that cannot be discarded by a generic performance shortcut.",
+            "required": true
+          },
+          {
+            "id": "requests_blocking_and_plan_evidence",
+            "description": "Pass only when the response requests concrete blocking, wait, execution-plan, query, schema, index, or comparable diagnostic evidence.",
+            "required": true
+          },
+          {
+            "id": "proposes_a_measurable_correctness_preserving_alternative",
+            "description": "Pass only when the response proposes a correctness-preserving alternative whose effect will be verified with before-and-after measurements.",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}
