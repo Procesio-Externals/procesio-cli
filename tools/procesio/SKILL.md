@@ -288,7 +288,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `get-resources-used` | — | GET /api/Resources/used [Resources] - Permission required: Workspace.Read |
 | `get-resources-used-subworkspaces` | — | GET /api/Resources/used/subWorkspaces [Resources] - Permission required: Workspace.Read |
 | `get-resourcetrackingconfig` | — | GET /api/ResourceTrackingConfig [ResourceTrackingConfig] - Permission required: Workspace.Read |
-| `get-schedule` | `--id` | Get one schedule by id (GET /api/Schedules/{id}). |
+| `get-schedule` | `--id` | Get one schedule by id; use --redact-process-inputs for safe evidence. |
 | `get-schedule-notifications` | `--id` | Get a schedule's notifications (GET /api/Schedules/notifications/{id}). |
 | `get-schedules` | — | GET /api/Schedules [Schedules] - Permission required: Schedule.Read |
 | `get-schedules-by-scheduleid` | `--scheduleId` | GET /api/Schedules/{scheduleId} [Schedules] - Permission required: Schedule.Read |
