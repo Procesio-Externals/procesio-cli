@@ -28,6 +28,7 @@ if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
 import registry  # noqa: E402
+from tools._lib.skill_resources import read_text_resource, resource_index  # noqa: E402
 from dashboard.server import runner  # noqa: E402  (shared shell-to-script bridge)
 from tools._lib import accounting  # noqa: E402  (per-work-unit accounting seam, P0.0-05)
 
@@ -687,8 +688,18 @@ def run_agent(agent: str, action: str | None, args: dict[str, Any] | None) -> di
 
 
 def get_skill(name: str) -> dict:
-    """Return a skill's full markdown (model-decided skill loading — the substitute
-    for harness auto-trigger; see spec 04)."""
+    """Return a skill's full markdown plus a metadata-only bundled-resource index
+    (model-decided skill loading — the substitute for harness auto-trigger; see spec 04).
+    A remote MCP client has no filesystem, so the index is how it discovers a skill's
+    references/scripts/assets; fetch one on demand with get_skill_resource."""
     m = registry.get_skill(name)  # raises KeyError if unknown
     md = (m.path / "SKILL.md").read_text(encoding="utf-8")
-    return {"name": name, "content": md}
+    return {"name": m.name, "content": md, "resources": resource_index(m.path)}
+
+
+def get_skill_resource(name: str, path: str) -> dict:
+    """Return one safe UTF-8 resource below references/, scripts/, or assets/ of a skill.
+    The path must come from get_skill's resource index; traversal, symlink escape, a
+    non-text file and an oversized file are all rejected (see tools/_lib/skill_resources)."""
+    m = registry.get_skill(name)  # raises KeyError if unknown
+    return {"name": m.name, "resource": read_text_resource(m.path, path)}
