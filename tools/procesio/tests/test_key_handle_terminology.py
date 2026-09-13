@@ -33,7 +33,7 @@ def test_add_credential_prompts_for_key_handle_then_value(store, monkeypatch):
     )
 
     assert prompts == [
-        "PROCESIO Key Handle: ",
+        "PROCESIO API key name: ",
         "PROCESIO API key value (shown once): ",
     ]
     stored = profiles.get_profile("workspace-key")

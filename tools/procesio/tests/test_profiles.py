@@ -88,7 +88,7 @@ def test_apikey_secrets_are_prompted_when_flags_are_omitted(monkeypatch):
     def fake_getpass(prompt):
         asked.append(prompt)
         return {
-            "PROCESIO Key Handle: ": "KN",
+            "PROCESIO API key name: ": "KN",
             "PROCESIO API key value (shown once): ": "KV",
         }[prompt]
 
@@ -105,7 +105,7 @@ def test_apikey_secrets_are_prompted_when_flags_are_omitted(monkeypatch):
     out = profile_admin.add_credential(args)
 
     assert asked == [
-        "PROCESIO Key Handle: ",
+        "PROCESIO API key name: ",
         "PROCESIO API key value (shown once): ",
     ]
     assert saved["blob"]["key"] == "KN" and saved["blob"]["value"] == "KV"
