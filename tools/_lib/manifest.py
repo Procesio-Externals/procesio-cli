@@ -254,6 +254,11 @@ class SkillManifest(BaseModel):
 
     An optional `routing:` block lets a skill curate its Capability-Router line,
     exactly like a tool. When absent, the router falls back to the description.
+
+    Skills that opt into the governance discipline also carry `owner`,
+    `last_verified`, `baseline_version`, `eval_suite`, and `source_policy`
+    (the marker `check-skill-governance.py` scopes on). Imported/portable skills
+    omit them and default; `extra="ignore"` keeps any other native key portable.
     """
     model_config = ConfigDict(extra="ignore")
 

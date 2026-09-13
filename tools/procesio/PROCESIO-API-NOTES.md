@@ -4041,6 +4041,16 @@ is given a link to join, and it was being sent before the sweeper had created th
 out without one, and nothing ever sends a corrected copy. The client's confirmation now waits for
 the room, bounded by a few minutes so a calendar outage delays the email rather than losing it.
 
+**A gate applied to one row of a pair sends the other row twice.** The same sweeper emits two
+rows per booking (organiser copy, client copy) and only the client's row writes the "sent" stamp,
+so the pair is retried whole if the organiser send fails. Adding the wait-for-the-room gate to the
+CLIENT row alone broke that: on a tick where the room is not there yet, the organiser row is
+returned and sent, the client row is withheld, nothing is stamped - and the next tick sends the
+organiser row again, this time with the link. Symptom: the organiser gets the same booking twice,
+exactly one sweep interval apart, and only the second copy carries the join link. Rule: when one
+row of a group carries the stamp, every row of that group must sit behind the same gate, so they
+leave on the same tick and the stamp covers all of them.
+
 **The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
 though they are valid and route normally. Worth knowing before using one as a test address.
 
