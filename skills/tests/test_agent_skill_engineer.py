@@ -40,6 +40,25 @@ def _frontmatter(path: Path) -> dict:
     return value
 
 
+def _governed_skill_mds() -> list[Path]:
+    """Skill manuals that opt into the governance/eval discipline (the
+    `source_policy` marker). The strict audit and the fixed-rubric contract apply
+    to the governed portfolio; a fuller tree (AAT) also hosts imported/portable
+    skills that never signed up for them. In procesio-cli, whose skills/ IS the
+    portfolio, this is every skill."""
+    out: list[Path] = []
+    for skill_md in sorted((ROOT / "skills").glob("*/SKILL.md")):
+        if skill_md.parent.name.startswith("_") or skill_md.parent.name == "tests":
+            continue
+        try:
+            frontmatter = _frontmatter(skill_md)
+        except Exception:  # noqa: BLE001 - a broken skill is validate-skills' job
+            continue
+        if frontmatter.get("source_policy"):
+            out.append(skill_md)
+    return out
+
+
 def test_meta_skill_passes_its_deterministic_audit():
     report = AUDIT.audit_skill(SKILL_ROOT)
 
@@ -49,7 +68,7 @@ def test_meta_skill_passes_its_deterministic_audit():
     assert report["quality_score"] == 100
 
 
-@pytest.mark.parametrize("skill_md", sorted((ROOT / "skills").glob("*/SKILL.md")),
+@pytest.mark.parametrize("skill_md", _governed_skill_mds(),
                          ids=lambda path: path.parent.name)
 def test_every_published_skill_passes_strict_audit(skill_md):
     report = AUDIT.audit_skill(skill_md.parent)
@@ -198,7 +217,7 @@ def test_every_published_skill_uses_fixed_atomic_eval_rubrics():
     criterion_id = AUDIT.CRITERION_RE
     case_kinds = AUDIT.CASE_KINDS
 
-    for skill_md in sorted((ROOT / "skills").glob("*/SKILL.md")):
+    for skill_md in _governed_skill_mds():
         frontmatter = _frontmatter(skill_md)
         suite_path = skill_md.parent / frontmatter["eval_suite"]
         suite = json.loads(suite_path.read_text(encoding="utf-8"))

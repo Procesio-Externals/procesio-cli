@@ -1,10 +1,47 @@
 #!/usr/bin/env python3
 """Validate registered Agent Skills and their repository integrations.
 
-The validator enforces what prose cannot: portable frontmatter, bounded skill
-bodies, resolvable bundled resources, shallow resource layout, and command
-examples that name real tools, agents, actions, and arguments. A baseline file
-may temporarily waive known findings; it never hides new findings.
+WHAT THIS ENFORCES
+------------------
+Two guards in one script, dispatched by where a SKILL.md lives.
+
+`skills/*/SKILL.md` (hand-written skills) get the full check: portable
+frontmatter, a name that matches its folder, a bounded body, resolvable bundled
+resources, shallow resource layout, and command examples that name real tools,
+agents, actions, and arguments. A `--baseline` file may temporarily waive known
+findings; it never hides new ones.
+
+`tools/*/SKILL.md` and `agents/*/SKILL.md` (GENERATED manuals) get only the
+loadability check: the frontmatter must parse and carry a name and description
+within the length caps. The stricter skill rules are deliberately NOT applied to
+them, because a generated manual legitimately declares a manifest name that can
+differ from its folder and a body far longer than a hand-written skill. This is
+the read-back the generated-manual pipeline never had: the generator built its
+YAML frontmatter by string interpolation, so any manifest description carrying a
+colon-space ended the key and produced a document no loader could read. It held
+for roughly half the manuals in the tree and hit the best-described tools first.
+
+HOOK CONTRACT
+-------------
+`scripts/hook-lib.sh :: hook_run_skill_validate` calls this as
+`validate-skills.py --staged` and keys on the exit code: 0 pass, 1 block, 2
+could-not-run (nothing checked, so nothing cleared). The staged set is
+VCS-aware, exactly like `scripts/secret_scan.py`: git's staged set where there
+is a `.git`, SVN's locally-modified set otherwise, because this repo is
+published through both.
+
+Spec: https://agentskills.io/specification
+
+Usage:
+  python scripts/validate-skills.py                 # the whole tree
+  python scripts/validate-skills.py --staged        # only changed SKILL.md (hook path)
+  python scripts/validate-skills.py path/to/SKILL.md ...
+  python scripts/validate-skills.py --json          # machine-readable report
+
+Exit codes:
+  0  clean
+  1  at least one blocking finding
+  2  could not run (bad usage, unreadable tree, unenumerable staged set)
 """
 from __future__ import annotations
 
@@ -12,13 +49,18 @@ import argparse
 import fnmatch
 import json
 import re
+import subprocess
 import sys
 from dataclasses import asdict, dataclass
 from datetime import date
 from pathlib import Path, PurePosixPath
 from typing import Any, Iterable
 
-import yaml
+try:
+    import yaml
+except ImportError:  # pragma: no cover - environment problem, not a finding
+    print("validate-skills: PyYAML is not installed - nothing checked.", file=sys.stderr)
+    raise SystemExit(2)
 
 REPO = Path(__file__).resolve().parents[1]
 DEFAULT_SKILLS = REPO / "skills"
@@ -36,8 +78,11 @@ _OPTION_RE = re.compile(r"--([a-z0-9][a-z0-9-]*)", re.IGNORECASE)
 _ALLOWED_FRONTMATTER = {
     "name", "description", "version", "compatibility", "license", "allowed-tools",
     "disable-model-invocation", "argument-hint", "routing", "metadata", "owner",
-    "last_verified", "baseline_version", "eval_suite", "source_policy",
+    "last_verified", "baseline_version", "eval_suite", "source_policy", "tier",
 }
+
+MAX_NAME = 64
+MAX_DESCRIPTION = 1024
 
 
 @dataclass(frozen=True, order=True)
@@ -186,7 +231,7 @@ def validate_skill(skill_md: Path, repo: Path,
     skill = name or folder_name
     if not name:
         findings.append(_finding("missing-name", skill, "SKILL.md", "frontmatter name is required"))
-    elif not _NAME_RE.fullmatch(name) or len(name) > 64:
+    elif not _NAME_RE.fullmatch(name) or len(name) > MAX_NAME:
         findings.append(_finding("invalid-name", skill, "SKILL.md",
                                  "name must be <=64 lowercase letters, digits, and hyphens"))
     if name and name != folder_name:
@@ -195,7 +240,7 @@ def validate_skill(skill_md: Path, repo: Path,
     if not description:
         findings.append(_finding("missing-description", skill, "SKILL.md",
                                  "frontmatter description is required"))
-    elif len(description) > 1024:
+    elif len(description) > MAX_DESCRIPTION:
         findings.append(_finding("description-too-long", skill, "SKILL.md",
                                  f"description is {len(description)} characters; maximum is 1024"))
     body_lines = len(body.splitlines())
@@ -252,6 +297,39 @@ def validate_skill(skill_md: Path, repo: Path,
     return sorted(set(findings))
 
 
+def loadability(skill_md: Path, repo: Path) -> list[Finding]:
+    """The generated-manual guard: the file must parse and carry a name and
+    description within the caps. Deliberately no folder/name, body-length, or
+    resource rules - a generated manual legitimately breaks those."""
+    try:
+        rel = skill_md.relative_to(repo).as_posix()
+    except ValueError:
+        rel = skill_md.name
+    folder = skill_md.parent.name
+    try:
+        frontmatter, _ = _split_frontmatter(skill_md)
+    except (OSError, UnicodeError, yaml.YAMLError, ValueError) as exc:
+        return [_finding("invalid-frontmatter", folder, rel, str(exc))]
+    findings: list[Finding] = []
+    name = str(frontmatter.get("name") or "").strip()
+    description = str(frontmatter.get("description") or "").strip()
+    skill = name or folder
+    if not name:
+        findings.append(_finding("missing-name", skill, rel, "frontmatter name is required"))
+    elif len(name) > MAX_NAME:
+        findings.append(_finding("invalid-name", skill, rel,
+                                 f"name is {len(name)} chars, limit {MAX_NAME}"))
+    if not description:
+        findings.append(_finding("missing-description", skill, rel,
+                                 "frontmatter description is required"))
+    elif len(description) > MAX_DESCRIPTION:
+        over = len(description) - MAX_DESCRIPTION
+        findings.append(_finding("description-too-long", skill, rel,
+                                 f"description is {len(description)} chars, limit "
+                                 f"{MAX_DESCRIPTION} (over by {over})"))
+    return findings
+
+
 def validate_repo(skills_root: Path = DEFAULT_SKILLS, repo: Path = REPO) -> list[Finding]:
     capabilities = _load_capabilities(repo)
     findings: list[Finding] = []
@@ -263,6 +341,95 @@ def validate_repo(skills_root: Path = DEFAULT_SKILLS, repo: Path = REPO) -> list
         findings.append(_finding("no-skills", "<repository>", skills_root,
                                  "no skills/*/SKILL.md files found"))
     return sorted(set(findings))
+
+
+def _is_skill_path(path: Path, repo: Path) -> bool:
+    try:
+        parts = path.resolve().relative_to(repo.resolve()).parts
+    except ValueError:
+        return "skills" in path.parts
+    return bool(parts) and parts[0] == "skills"
+
+
+def governed_folders(skills_root: Path) -> set[str]:
+    """Skill folders that opt into the governance/eval discipline, by the
+    `source_policy` marker. The full rubric (folder/name, body length, resolvable
+    and shallow resources, resolvable command examples) is authored for these.
+    Imported/portable skills and generated tool manuals omit the marker and get
+    only the loadability guard, so a legitimate imported skill - one that runs
+    long, references a repo file outside its own folder, or ships nested fonts -
+    is not blocked by a rubric it was never written to. In procesio-cli, whose
+    `skills/` IS the portfolio, every skill is governed and the two coincide."""
+    names: set[str] = set()
+    for skill_md in sorted(skills_root.glob("*/SKILL.md")):
+        if skill_md.parent.name.startswith("_") or skill_md.parent.name == "tests":
+            continue
+        try:
+            frontmatter, _ = _split_frontmatter(skill_md)
+        except (OSError, UnicodeError, yaml.YAMLError, ValueError):
+            continue
+        if frontmatter.get("source_policy"):
+            names.add(skill_md.parent.name)
+    return names
+
+
+def check_path(path: Path, repo: Path,
+               capabilities: dict[str, dict[str, dict[str, set[str]]]],
+               governed: set[str]) -> list[Finding]:
+    """Dispatch one SKILL.md: the full skill rubric for a governed skill, the
+    loadability guard for an imported skill or a generated manual (tools/, agents/)."""
+    if _is_skill_path(path, repo) and path.parent.name in governed:
+        return validate_skill(path, repo, capabilities)
+    return loadability(path, repo)
+
+
+def _all_manual_files(repo: Path) -> list[Path]:
+    manuals: list[Path] = []
+    for folder in ("tools", "agents"):
+        root = repo / folder
+        if root.exists():
+            manuals += [p for p in sorted(root.glob("*/SKILL.md"))
+                        if not p.parent.name.startswith("_")]
+    return manuals
+
+
+def _changed_skill_files(repo: Path) -> list[Path]:
+    """The SKILL.md files this commit would carry, VCS-aware (git staged set, or
+    SVN locally-modified set). A path that no longer exists (a delete) is skipped."""
+    is_git = (repo / ".git").exists()
+    if is_git:
+        cmd = ["git", "-C", str(repo), "diff", "--cached", "--name-only", "--diff-filter=ACM"]
+    else:
+        cmd = ["svn", "status", str(repo)]
+    try:
+        raw = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                             timeout=120).stdout
+    except Exception as exc:  # noqa: BLE001 - cannot enumerate means cannot clear
+        print(f"validate-skills: could not list changed files ({exc}).", file=sys.stderr)
+        raise SystemExit(2)
+
+    out: list[str] = []
+    for line in raw.splitlines():
+        line = line.rstrip()
+        if not line:
+            continue
+        if is_git:
+            path = line
+        else:
+            if line[:1] not in ("A", "M"):
+                continue
+            path = line[1:].strip()
+        if path.replace("\\", "/").endswith("SKILL.md"):
+            out.append(path)
+
+    files: list[Path] = []
+    for p in out:
+        candidate = Path(p)
+        if not candidate.is_absolute():
+            candidate = repo / p
+        if candidate.exists():
+            files.append(candidate)
+    return sorted(set(files))
 
 
 def _load_waivers(path: Path | None) -> list[dict[str, str]]:
@@ -284,7 +451,10 @@ def _waived(finding: Finding, waivers: Iterable[dict[str, str]]) -> bool:
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description="Validate registered Agent Skills.")
+    parser.add_argument("paths", nargs="*", help="SKILL.md files (default: the whole tree)")
+    parser.add_argument("--staged", action="store_true",
+                        help="check only the SKILL.md files this commit would carry")
     parser.add_argument("--skills-root", type=Path, default=DEFAULT_SKILLS)
     parser.add_argument("--repo", type=Path, default=REPO)
     parser.add_argument("--baseline", type=Path,
@@ -296,8 +466,39 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    findings = validate_repo(args.skills_root, args.repo)
-    waivers = _load_waivers(args.baseline)
+    repo = args.repo
+    capabilities = _load_capabilities(repo)
+    governed = governed_folders(args.skills_root)
+
+    if args.paths:
+        files = [Path(p) if Path(p).is_absolute() else repo / p for p in args.paths]
+        findings = [f for path in files for f in check_path(path, repo, capabilities, governed)]
+    elif args.staged:
+        files = _changed_skill_files(repo)
+        if not files:
+            print("validate-skills: no SKILL.md in scope - nothing to check.")
+            return 0
+        findings = [f for path in files for f in check_path(path, repo, capabilities, governed)]
+    else:
+        findings = []
+        skill_files = sorted(args.skills_root.glob("*/SKILL.md"))
+        for skill_md in skill_files:
+            if skill_md.parent.name.startswith("_") or skill_md.parent.name == "tests":
+                continue
+            findings.extend(check_path(skill_md, repo, capabilities, governed))
+        if not skill_files:
+            findings.append(_finding("no-skills", "<repository>", args.skills_root,
+                                     "no skills/*/SKILL.md files found"))
+        for manual in _all_manual_files(repo):
+            findings.extend(loadability(manual, repo))
+
+    findings = sorted(set(findings))
+    try:
+        waivers = _load_waivers(args.baseline)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(f"validate-skills: could not read baseline ({exc}).", file=sys.stderr)
+        return 2
+
     rows = []
     blocking = []
     for finding in findings:
@@ -307,15 +508,16 @@ def main(argv: list[str] | None = None) -> int:
         if not waived and (finding.severity == "error" or args.strict_warnings):
             blocking.append(row)
 
-    report = {
-        "schema_version": 1,
-        "skills_root": str(args.skills_root),
-        "finding_count": len(rows),
-        "blocking_count": len(blocking),
-        "findings": rows,
-    }
     if args.json:
+        report = {
+            "schema_version": 1,
+            "finding_count": len(rows),
+            "blocking_count": len(blocking),
+            "findings": rows,
+        }
         print(json.dumps(report, indent=2, sort_keys=True))
+    elif not rows:
+        print("validate-skills: clean")
     else:
         for row in rows:
             marker = "WAIVED" if row["waived"] else row["severity"].upper()

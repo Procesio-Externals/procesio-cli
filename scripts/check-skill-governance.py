@@ -37,6 +37,12 @@ def check_skills(skills_root: Path, *, max_age_days: int | None = None,
             findings.append({"skill": skill_md.parent.name, "code": "invalid-skill",
                              "message": str(exc)})
             continue
+        # Governance is opt-in via `source_policy`. A repo like procesio-cli whose
+        # skills/ IS the portfolio governs every skill; a framework like AAT also
+        # hosts imported/portable skills that never signed up for owner/freshness/
+        # eval-suite discipline, and forcing that metadata on them would be wrong.
+        if not manifest.source_policy:
+            continue
         required = {
             "owner": manifest.owner,
             "last_verified": manifest.last_verified,
@@ -145,9 +151,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args(argv)
     findings = check_skills(args.skills_root, max_age_days=args.max_age_days)
-    findings += check_status(args.status_file,
-                             require_release_eligible=args.require_release_eligible,
-                             verify_snapshot=args.verify_snapshot, skills_root=args.skills_root)
+    # The release ledger (gates.json) is optional: the governance metadata lint
+    # above stands on its own. Only check the release state when a ledger exists,
+    # or when the caller explicitly asked to (so an intended check still fails
+    # loudly on a missing ledger rather than passing silently).
+    if args.status_file.exists() or args.require_release_eligible or args.verify_snapshot:
+        findings += check_status(args.status_file,
+                                 require_release_eligible=args.require_release_eligible,
+                                 verify_snapshot=args.verify_snapshot, skills_root=args.skills_root)
     report = {"finding_count": len(findings), "findings": findings,
               "release_check": args.require_release_eligible}
     if args.json:

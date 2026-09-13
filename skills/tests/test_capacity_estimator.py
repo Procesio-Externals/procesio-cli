@@ -68,7 +68,12 @@ def test_overflow_is_a_validation_error():
         module().estimate(dict(payload(), executions=10 ** 308, mean_occupied_seconds=10 ** 308))
 
 
-@pytest.mark.parametrize("content,code", [("not json", 1), ("[]", 1), (" " * 65537, 1), (None, 0)])
+# Explicit short ids: without them pytest derives the id from the param value, so
+# the 65537-space case puts a 64 KB string into the PYTEST_CURRENT_TEST env var and
+# Windows rejects it (env vars cap at 32767 chars). The content still reaches the CLI
+# via a file, so the test behavior is unchanged.
+@pytest.mark.parametrize("content,code", [("not json", 1), ("[]", 1), (" " * 65537, 1), (None, 0)],
+                         ids=["not-json", "empty-array", "overlong-input", "valid"])
 def test_real_cli_has_one_json_result_and_no_traceback(tmp_path, content, code):
     source = tmp_path / "input.json"
     source.write_text(json.dumps(payload()) if content is None else content)

@@ -4,7 +4,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 import pytest
 
@@ -32,16 +32,25 @@ def snapshot(tmp_path):
         "evals/gate5-thresholds.json": "{}\n",
         "evals/gates.json": "{}\n",
     }.items():
-        (tmp_path / "skills" / name).write_text(value, encoding="utf-8")
+        # write_bytes, not write_text: on Windows write_text translates \n to
+        # \r\n, but git (autocrlf) stores an LF blob, so the working tree would
+        # then diverge from the committed bytes skill_release digests. The Linux
+        # author's write_text already yields LF; this keeps parity cross-platform.
+        (tmp_path / "skills" / name).write_bytes(value.encode("utf-8"))
     git(tmp_path, "add", "skills")
-    git(tmp_path, "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
+    git(tmp_path, "-c", "user.name=Test", "-c", "user.email=test@example.com",
         "commit", "-qm", "fixture")
     commit = git(tmp_path, "rev-parse", "HEAD").decode().strip()
+    # Order by PurePosixPath, matching skill_release._digest (and the Linux
+    # series launcher that produced the committed fingerprints). sorted(Path.rglob)
+    # is platform-dependent: WindowsPath sorts case-insensitively, so a mixed-case
+    # name like SKILL.md lands in a different slot and the digest diverges from the
+    # canonical one on Windows.
+    contents = {p.relative_to(tmp_path / "skills").as_posix(): p.read_bytes()
+                for p in (tmp_path / "skills").rglob("*") if p.is_file()}
     digest = hashlib.sha256()
-    for path in sorted((tmp_path / "skills").rglob("*")):
-        if path.is_file():
-            digest.update(path.relative_to(tmp_path / "skills").as_posix().encode())
-            digest.update(b"\0" + path.read_bytes() + b"\0")
+    for name in sorted(contents, key=PurePosixPath):
+        digest.update(name.encode("utf-8") + b"\0" + contents[name] + b"\0")
     return tmp_path, commit, digest.hexdigest()
 
 

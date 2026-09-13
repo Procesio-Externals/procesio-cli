@@ -50,6 +50,8 @@ Read:
 - `scripts/estimate_capacity.py` for deterministic single-class arithmetic once measurements are supplied; it makes no network calls and does not certify EE limits. Read the sizing reference for its JSON input contract.
 - `references/freshness-policy.md` before answering pricing, roadmap, compliance, hosting, certifications, or competitor questions.
 
+
+
 ## Answer shape
 
 ### Decision
