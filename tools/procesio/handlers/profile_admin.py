@@ -20,8 +20,8 @@ from tools.procesio.errors import UsageError
 def _add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--name", required=True, help="profile name, e.g. 'personal'")
     p.add_argument("--type", required=True, choices=["apikey", "userpass"])
-    # apikey fields. The PROCESIO UI labels the `key` header value "Key Handle";
-    # keep --key for backward compatibility, but use the product term at prompts.
+    # apikey fields. PROCESIO's docs call these the API "key name" and "key value";
+    # keep --key/--value for compatibility, but use the product wording at prompts.
     p.add_argument("--key", help="apikey: the key NAME header value (omit to be prompted without echoing)")
     p.add_argument("--value", help="apikey: the key VALUE header value (omit to be prompted without echoing)")
     p.add_argument("--workspace-id", dest="workspace_id",
@@ -76,7 +76,7 @@ def _secret_arg(value, label: str, flag: str):
 def add_credential(args) -> dict:
     blob: dict = {"type": args.type}
     if args.type == "apikey":
-        blob["key"] = _secret_arg(args.key, "PROCESIO Key Handle", "--key")
+        blob["key"] = _secret_arg(args.key, "PROCESIO API key name", "--key")
         blob["value"] = _secret_arg(
             args.value, "PROCESIO API key value (shown once)", "--value"
         )
