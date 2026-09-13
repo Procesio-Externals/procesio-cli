@@ -49,23 +49,28 @@ def test_optional_fields_are_advertised_without_new_tools():
     assert "search" in schemas["capabilities"]["properties"]
 
 
-def test_real_installed_skill_and_nested_sql_resource():
+def test_real_installed_skill_and_sql_script_resource():
     response = _call("get_skill", {"name": "sql-server-optimizer"})
     assert response["result"]["isError"] is False
     skill = _payload(response)
     root = bridge.registry.get_skill("sql-server-optimizer").path
     assert skill["content"] == (root / "SKILL.md").read_text(encoding="utf-8")
-    path = "references/scripts/export-indexes.sql"
-    assert path in skill["resources"]["references"]
+    # The SQL exporters live directly under scripts/ (the portfolio migration moved
+    # them out of the deprecated references/scripts/ nesting), so they surface in the
+    # scripts category and retrieve cleanly.
+    path = "scripts/export-indexes.sql"
+    assert path in skill["resources"]["scripts"]
     result = _call("get_skill", {"name": "sql-server-optimizer", "resource": path})
     assert result["result"]["isError"] is False
     assert _payload(result)["resource"]["content"] == (root / path).read_text(encoding="utf-8")
     assert "content" not in _payload(result)
-    legacy_path = "references/scripts/export-tables.sql"
-    assert legacy_path in skill["resources"]["references"]
-    rejected = _call("get_skill", {"name": "sql-server-optimizer", "resource": legacy_path})
-    assert rejected["result"]["isError"] is True
-    assert "not UTF-8" in _payload(rejected)["error"]
+    # export-tables.sql was converted to UTF-8 in the same migration, so it now reads
+    # back cleanly too; UTF-8 rejection is covered by the tmp-fixture test below.
+    tables = "scripts/export-tables.sql"
+    assert tables in skill["resources"]["scripts"]
+    ok = _call("get_skill", {"name": "sql-server-optimizer", "resource": tables})
+    assert ok["result"]["isError"] is False
+    assert _payload(ok)["resource"]["content"] == (root / tables).read_text(encoding="utf-8")
 
 
 def test_real_resource_rejections_at_protocol_boundary(monkeypatch, tmp_path):
