@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "as_of": "2026-09-10",
+  "evidence_role": "standalone_portfolio_extraction_not_historical_release",
+  "release_eligible": false,
+  "release_blockers": [
+    "Maintainer agreement to the proposed expert-skill retirement and SQL helper path migration is required before merge.",
+    "These extracted and publication-adjusted skill packages have no matched current behavioral A/A, A/B, transfer or complete native field qualification. Historical baseline metadata is not qualification of these bytes.",
+    "The optimizer helper does not enforce one-shot terminal final-test custody. External custody is required; repeated reports cannot establish untouched-test acceptance.",
+    "Legacy SQL exporters are broad inspection aids, not complete or replayable backups; unsupported index families and missing module definitions need separately scoped implementation work.",
+    "Skill instructions do not repair incomplete MCP execution gating, verifier prerequisites or runtime confidentiality boundaries. Independently enforce approval, effect reconciliation and proof before operations."
+  ],
+  "gates": [
+    {"id": 0, "name": "measurement-contract", "status": "infrastructure-complete", "evidence": ["skills/evals/routing.json", "skills/evals/behavioral.json", "skills/PORTFOLIO.md"]},
+    {"id": 1, "name": "structural-validation", "status": "infrastructure-complete", "evidence": ["scripts/validate-skills.py", "skills/agent-skill-engineer/scripts/audit_skill.py", "skills/tests/test_agent_skill_engineer.py"]},
+    {"id": 2, "name": "progressive-disclosure", "status": "infrastructure-complete", "evidence": ["skills/agent-skill-engineer/references/authoring-standard.md", "skills/tests/test_validate_skills.py"]},
+    {"id": 3, "name": "bounded-skill-portfolio", "status": "infrastructure-complete", "evidence": ["scripts/evaluate-skill-routing.py", "skills/tests/test_skill_routing.py"]},
+    {"id": 4, "name": "operational-playbooks", "status": "infrastructure-complete", "evidence": ["skills/procesio-cli/evals/workflows.json", "skills/tests/test_operational_playbooks.py"]},
+    {"id": 5, "name": "behavioral-retuning", "status": "blocked", "evidence": ["skills/PORTFOLIO.md", "skills/evals/portfolio-package-fingerprints.json"]},
+    {"id": 6, "name": "release-and-maintenance-controls", "status": "infrastructure-complete", "evidence": ["scripts/check-skill-governance.py", "tools/_lib/skill_release.py", "skills/tests/test_skill_release_binding.py", "skills/tests/test_portfolio_publication.py", ".github/workflows/ci.yml"]}
+  ]
+}

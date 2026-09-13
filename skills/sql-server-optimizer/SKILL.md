@@ -1,172 +1,86 @@
 ---
 name: sql-server-optimizer
-description: >
-  SQL Server T-SQL optimizer for plain SQL and PROCESIO workflows. Rewrites queries, stored
-  procedures, functions, and scripts into faster, production-ready code. Detects PROCESIO
-  inline variables and native param-style SQL, converting them correctly. Improves JOIN
-  order, ensures sargability and type safety, forces READ UNCOMMITTED isolation and
-  signature headers on all objects, and outputs a parameter mapping block plus notes.
-
-  ALWAYS use this skill when the user:
-  - Pastes any T-SQL, plain or containing PROCESIO variables
-  - Asks to optimize, review, fix, clean up, rewrite, or improve SQL
-  - Asks why a query is slow or how to make it faster
-  - Asks about SQL Server indexes, parameter sniffing, or query plans
-  - Uses phrases like "optimize this query", "review my proc", "rewrite this SQL",
-    "fix this T-SQL", "make this faster", "parameterize this", or "PROCESIO SQL"
-  - Asks about JOIN strategies, predicate quality, or sargability
-  - Shares a SQL snippet for any reason and it could benefit from review
+description: >-
+  Analyze and optimize SQL Server T-SQL, including SQL executed by PROCESIO. Use when
+  reviewing a query, procedure, function, execution plan, index strategy, sargability,
+  parameter sniffing, implicit conversions, logical reads, blocking, reporting-query
+  performance, result semantics, isolation safety, or PROCESIO inline/native SQL
+  parameters; do not use for PostgreSQL, MySQL, or repository maintenance.
+version: 1.0.1
+owner: database engineering
+last_verified: 2026-09-05
+baseline_version: da12de643c8a2355d019f40515766abf80a819df
+eval_suite: evals/evals.json
+source_policy: static
+routing:
+  triggers:
+    - analyze or optimize SQL Server T-SQL, execution plans, indexes, logical reads, blocking, or parameter sniffing
+    - review SQL used in a PROCESIO Execute Query or Execute Command action
+    - replace unsafe PROCESIO inline SQL variables with native typed parameters
+  primary_action: analyze
+  example: get-skill.py sql-server-optimizer --content
 ---
 
-# SQL Server Optimizer
+# Optimize SQL Server with evidence
 
-## Step 0 — Assess Database Context
+Optimize **measured bottlenecks while preserving semantics**. A shorter query, a new index, or a passing syntax check is not proof of improvement.
 
-Before classifying the query, assess whether schema context would improve the optimization.
+## Boundary
 
-Schema context enables: accurate type checking, correct JOIN ordering, precise index
-suggestions with real column names, and validation of implicit conversions. Without it,
-the optimizer proceeds on assumptions and can only give generic Notes.
+- PostgreSQL, MySQL, Oracle, or generic database design without SQL Server: do not use this skill.
+- Operating the surrounding PROCESIO process belongs to `procesio-cli`; this skill owns the T-SQL analysis.
+- Authoring or evaluating this skill belongs to `agent-skill-engineer`; repository code and skill integration belong to `procesio-cli-maintainer`.
 
-Three export scripts are available in `references/scripts/`. Each targets a different
-information layer:
+## Required workflow
 
-| Script | Use when |
-|--------|---------|
-| `export-tables.sql` | Table structure, column types, constraints — always the first script to request |
-| `export-indexes.sql` | Index coverage, covering indexes, filtered indexes — request whenever indexes are relevant |
-| `export-procs-and-functions.sql` | Existing proc/function definitions — request when the query calls or is part of a proc/function |
+1. **Define correctness.** Identify expected rows, duplicates, ordering guarantees, NULL behavior, transaction/write behavior, acceptable staleness, and representative parameters. Preserve these unless the user explicitly changes them.
+2. **Establish context.** Before acquisition, approve the server/database, object scope, confidential definitions, output destination and recipients. Collect only relevant table/column types, keys, current indexes, compatibility level, row counts/distribution, and called object definitions. Prefer bounded metadata queries through the registered `sqlserver` tool. The bundled read-only exporters scan the whole current database, not just relevant objects, and retrieve all visible definitions of their module classes; use the gate in `references/db-context.md`, not automatic execution.
+3. **Capture a baseline.** Prefer actual execution plan plus `SET STATISTICS IO, TIME ON` on representative parameters. For production, use safe existing telemetry when an ad-hoc execution would be risky.
+4. **Find the dominant bottleneck.** Examples: scan caused by a non-sargable predicate, cardinality error, spill, lookup amplification, implicit conversion, blocking, parameter sensitivity, or excessive result width.
+5. **Change one lever.** Rewrite one predicate/join/aggregation, adjust parameter handling, or propose one index. Keep speculative alternatives separate.
+6. **Re-measure.** Compare logical reads, CPU, elapsed time, rows, spills, memory grant, and plan shape under the same conditions and more than one representative parameter set when sensitivity matters.
+7. **Verify semantics and concurrency.** Compare result sets or invariants and review lock/isolation implications. Reject a faster result that is wrong, stale beyond the requirement, or more dangerous under concurrency.
 
-**Ask the user to run the relevant scripts when:**
-- The query references tables or columns whose structure is unknown
-- 3+ JOINs are present and selectivity order cannot be confidently inferred
-- Index recommendations are requested or sargability issues are suspected
-- Type mismatches or implicit conversions are suspected
-- The user reports unexpected query behavior or plan regression
-- The query calls scalar UDFs, TVFs, or other procs
+Tuning permission is not deployment permission. Default to analysis and candidate SQL; require explicit approval of the target and side effects before DDL, DML, procedure execution, production measurement, or isolation/cache changes. Apply the execution and unknown-outcome rules in `references/db-context.md` before collecting a new plan or measurement.
 
-**Skip asking when:**
-- The query is simple (1–2 tables, obvious structure, no type ambiguity)
-- The user has provided table definitions inline or schema is clear from context
-- The user says SSMS access is unavailable
+Read `references/db-context.md`, then the relevant mode:
 
-**In agentic environments** (CoWork + database connector): execute all relevant scripts
-directly. Run `export-tables.sql` and `export-indexes.sql` first, then
-`export-procs-and-functions.sql` only if needed. See `references/db-context.md` for
-the full agentic workflow and how to parse each output.
+- `references/procesio-mode.md` for PROCESIO SQL actions and parameter mapping.
+- `references/generic-mode.md` for standalone queries, procedures, and functions.
+- `references/sql-rules.md` for evidence-driven rewrite and index checks.
 
-**How to ask the user** (adapt tone to context):
-> "To give you the most accurate optimization, I need the structure and index coverage of the
-> tables involved. Could you run two scripts on the target database and share the output?
->
-> **How for each script:** Open SSMS → paste and run the script → click the **Messages** tab
-> (not Results) → select all (Ctrl+A), copy, paste into a `.txt` file → share it here.
->
-> Scripts needed: `export-tables.sql` + `export-indexes.sql`
-> (also `export-procs-and-functions.sql` if the query references stored procedures or functions)"
+When metadata cannot be queried through the registered tool, request an approved, bounded safe projection. The legacy inspection-only helpers `scripts/export-tables.sql`, `scripts/export-indexes.sql`, and `scripts/export-procs-and-functions.sql` require pre-acquisition scope/confidentiality approval for whole-database extraction; post-read redaction is not that gate. Table export includes trigger definitions, with server-wide triggers disabled unless separately approved and explicitly opted in. The index helper does not correctly serialize all index types: do not automatically run it on mixed/unsupported types or execute its generated DDL. Review the qualification blockers in `references/db-context.md` before using any exporter; inspect protected output for sensitive literals before sharing.
 
-See `references/db-context.md` for the full guide: per-script trigger conditions, Romanian
-user instructions, and how to use each output once provided.
+## Isolation and correctness rule
 
----
+**Never add `READ UNCOMMITTED` or `NOLOCK` as a generic performance optimization.** They permit dirty and internally inconsistent observations and do not solve the underlying access-path or blocking design. Preserve the existing isolation level unless the workload's consistency contract is explicit and the user authorizes a change. Consider row-versioning or transaction/query design only after measuring the actual blocking problem.
 
-## Step 1 — Detect Mode
+Do not add boilerplate signature headers, hints, forced join order, recompilation, indexes, or parameterization merely because a template says so. Every change must have a reason tied to evidence or a clearly labeled hypothesis.
 
-Classify the input using this decision tree:
+## PROCESIO parameter rule
 
-**Does the SQL contain `<%VarName%>` tokens?**
-→ Yes → **Mode A1** (PROCESIO inline variable injection)
+Native typed parameter mapping is the preferred boundary. Inline `<%Variable%>` substitution is text generation, not parameterization. Do not claim that wrapping an inline token in `DECLARE` removes injection or typing risk. Rewrite the SQL to native `@parameter` placeholders and provide the exact mapping the PROCESIO action must configure. When native mapping is unavailable, state the residual risk and require the platform's exact escaping/serialization contract before proposing a fallback.
 
-**Does the user say this SQL runs inside a PROCESIO Execute Query or Execute Command action,
-OR does the SQL have `@paramName` style params with no DECLARE block (mapped via PROCESIO Parameters config tab)?**
-→ Yes → **Mode A2** (PROCESIO native parameter mapping)
+## Output contract
 
-**Otherwise** (plain T-SQL: literals, stored procs, functions, scripts, standalone queries)
-→ **Mode B** (Generic SQL)
+### Verdict
+Name the dominant issue and whether a measured optimization is possible with the supplied evidence.
 
-> When in doubt about PROCESIO context, ask the user: "Is this query used inside a PROCESIO Execute Query or Execute Command action?"
+### Context and assumptions
+List schema/plan/parameter facts received and what is missing.
 
-Read the appropriate reference file:
-- Mode A1 or A2 → `references/procesio-mode.md`
-- Mode B → `references/generic-mode.md`
+### Proposed SQL or index
+Provide the smallest defensible change. Preserve the original when evidence is insufficient.
 
-Always also read `references/sql-rules.md` — shared optimization rules apply to all modes.
+### PROCESIO parameter mapping
+When applicable, list `@parameter → process variable`, SQL type, nullability, and required action configuration.
 
----
+### Before/after evidence
+Show comparable metrics or a reproducible measurement plan. Never fabricate a gain.
 
-## Step 2 — Output Format
+### Correctness and operational risks
+State result-set, transaction, isolation, deployment, rollback, and plan-variance risks.
 
-**All modes use the same SQL comment wrapper format.** Do not deviate.
+## Completion verification
 
-```
-/*Optimized SQL:*/
-<final SQL>
-
-/* Parameter Mapping:
-@p_Name (type) -> original source / purpose
-...
-
-Notes:
-- <bullet>
-*/
-```
-
-If no parameterization applies:
-```
-/* Parameter Mapping:
-- None (no changes)
-*/
-```
-
-> Notes: 1–5 bullets for Mode A1/A2, 1–7 bullets for Mode B.
-> Parameter Mapping block is always present, even if empty. Never omit it.
-
----
-
-## Step 3 — Apply Rules
-
-1. Run the mode-specific rules from the reference file.
-2. Run the shared SQL optimization rules from `references/sql-rules.md`.
-3. Run the universal object rules below (apply to ALL modes, ALL SQL object types).
-4. Verify against the checklist in the reference file before outputting.
-
----
-
-## Universal Object Rules (ALL modes)
-
-These apply regardless of mode whenever the SQL contains or produces a stored procedure or function.
-
-### Signature header — always required
-Every stored procedure and function must have this header comment block:
-```sql
--- =============================================
--- Author:      <Author,,Name>
--- Create date: <Create Date,,>
--- Description: <Description,,>
--- =============================================
-```
-If the input already has it, keep it. If missing, add it.
-
-### Isolation level — always required
-Every stored procedure and function body must begin with:
-```sql
-SET NOCOUNT ON
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
-```
-Both lines, in that order, no exceptions. If already present, keep. If missing, add.
-
-> Note in Notes: READ UNCOMMITTED allows dirty reads — acceptable for reporting/read-heavy queries. If the proc performs writes or transactional logic, flag this explicitly and suggest the user evaluate whether stricter isolation is needed.
-
----
-
-## Reference Files
-
-| File | Purpose |
-|------|---------|
-| `references/procesio-mode.md` | Modes A1 + A2: PROCESIO injection patterns, constraints, checklist, examples |
-| `references/generic-mode.md` | Mode B: literal parameterization, proc/function templates, checklist, examples |
-| `references/sql-rules.md` | Shared: JOIN strategy, WHERE quality, aggregation, anti-patterns, DML patterns |
-| `references/db-context.md` | Schema export guide: when to request each script, how to run, how to use output, agentic workflow |
-| `references/scripts/export-tables.sql` | Read-only: exports all tables, columns, types, constraints, triggers |
-| `references/scripts/export-indexes.sql` | Read-only: exports all non-constraint indexes with key/include columns, filter clauses, type, fill factor |
-| `references/scripts/export-procs-and-functions.sql` | Read-only: exports all stored procedures and user-defined functions |
+Do not say “optimized” unless there is before/after evidence and semantic verification. Without a runnable database, label the result **candidate rewrite** and name the exact tests needed.

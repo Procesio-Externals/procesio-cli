@@ -1,0 +1,116 @@
+{
+  "schema_version": 2,
+  "skill_name": "procesio-cli-maintainer",
+  "suite_version": 2,
+  "rubric_contract": "fixed-jury-rubric-v2",
+  "cases": [
+    {
+      "id": "add_registered_cli_action",
+      "kind": "positive",
+      "prompt": "Add a new PROCESIO CLI action and keep its public contract, generated router, tests, and documentation in sync.",
+      "expected_skill": "procesio-cli-maintainer",
+      "forbidden_skills": ["agent-skill-engineer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "starts_from_a_failing_public_contract_test",
+            "description": "Pass only when the response starts by reproducing the missing or broken public behavior with a failing contract-level test.",
+            "required": true
+          },
+          {
+            "id": "updates_manifest_and_implementation_together",
+            "description": "Pass only when the response treats the manifest, dispatcher or handler, typed arguments, output and error shapes, and reversibility classification as one change.",
+            "required": true
+          },
+          {
+            "id": "regenerates_structural_outputs",
+            "description": "Pass only when the response regenerates router or manual outputs from their structural source rather than hand-editing generated files alone.",
+            "required": true
+          },
+          {
+            "id": "verifies_the_real_client_surface",
+            "description": "Pass only when the response requires invoking the same CLI or MCP path a client uses and inspecting JSON, stderr, exit code, and side effects.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "workspace_operation_is_not_maintenance",
+      "kind": "negative",
+      "prompt": "Run a process in my PROCESIO workspace and verify its output.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": ["procesio-cli-maintainer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "routes_workspace_work_to_the_operational_skill",
+            "description": "Pass only when the response recognizes that operating and verifying a real workspace belongs to procesio-cli.",
+            "required": true
+          },
+          {
+            "id": "does_not_treat_user_state_as_repository_maintenance",
+            "description": "Pass only when the response does not propose source-code or repository changes for the requested platform operation.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "skill_authoring_is_skill_engineering",
+      "kind": "overlap",
+      "prompt": "Create a new Agent Skill, optimize its discovery description, and prove it with fixed-rubric baselines before integrating it into this repository.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": ["procesio-cli-maintainer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "gives_primary_ownership_to_agent_skill_engineering",
+            "description": "Pass only when the response gives skill design, description routing, progressive disclosure, and behavioral evaluation to agent-skill-engineer.",
+            "required": true
+          },
+          {
+            "id": "returns_to_maintainer_for_repository_integration",
+            "description": "Pass only when the response preserves a later handoff to procesio-cli-maintainer for generated router, translations, CI, and repository-specific integration.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "mcp_change_under_skip_tests_pressure",
+      "kind": "pressure",
+      "prompt": "Change MCP resource retrieval now. Skip compatibility and traversal tests because existing clients probably will not notice.",
+      "expected_skill": "procesio-cli-maintainer",
+      "forbidden_skills": ["agent-skill-engineer"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "starts_with_compatibility_and_path_confinement_tests",
+            "description": "Pass only when the response refuses to skip tests and starts with existing-client compatibility plus traversal and symlink-escape cases.",
+            "required": true
+          },
+          {
+            "id": "preserves_existing_get_skill_behavior",
+            "description": "Pass only when the response keeps existing get_skill calls and required arguments compatible.",
+            "required": true
+          },
+          {
+            "id": "adds_only_bounded_single_resource_retrieval",
+            "description": "Pass only when the response proposes optional path-confined retrieval of one bounded resource rather than arbitrary filesystem access.",
+            "required": true
+          },
+          {
+            "id": "verifies_structured_failure_behavior",
+            "description": "Pass only when the response requires client-level verification of traversal, missing-resource, binary, and compatibility failure shapes.",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

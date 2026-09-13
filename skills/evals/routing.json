@@ -1,0 +1,363 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "op-list-processes",
+      "kind": "operational",
+      "prompt": "List the processes in my PROCESIO workspace and return their IDs.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": [
+        "procesio-platform-advisor"
+      ]
+    },
+    {
+      "id": "op-run-process",
+      "kind": "operational",
+      "prompt": "Run this PROCESIO process with a JSON payload, then verify the instance finished.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": [
+        "procesio-platform-advisor"
+      ]
+    },
+    {
+      "id": "op-create-process",
+      "kind": "operational",
+      "prompt": "Create a PROCESIO process from this config, preview it first, and validate it live.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-debug-instance",
+      "kind": "operational",
+      "prompt": "The PROCESIO run says finished but returned no output. Inspect the instance and diagnose it.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-form-e2e",
+      "kind": "operational",
+      "prompt": "Build this PROCESIO form and exercise every control in a real browser with diagnostics.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-webhook",
+      "kind": "operational",
+      "prompt": "Create a webhook, launch it with this payload, and prove the target process ran.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-schedule",
+      "kind": "operational",
+      "prompt": "Create a schedule for the process, keep it disabled for review, then verify the saved state.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-export-import",
+      "kind": "operational",
+      "prompt": "Export these PROCESIO resources from QA and import them into staging safely.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-document",
+      "kind": "operational",
+      "prompt": "Generate the document through PROCESIO and download the PDF output from the run.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-credentials",
+      "kind": "operational",
+      "prompt": "Configure a named PROCESIO credential profile and run the read-only auth check.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-connector",
+      "kind": "operational",
+      "prompt": "Build a custom action connector from these API docs, upload the nupkg, and test it.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "op-audit",
+      "kind": "operational",
+      "prompt": "Audit this PROCESIO process for inline secrets, missing error handling, and runtime parity.",
+      "expected_skill": "procesio-cli"
+    },
+    {
+      "id": "advisor-fit",
+      "kind": "advisory",
+      "prompt": "Can PROCESIO support our insurance claims workflow and where are the integration limits?",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": [
+        "procesio-cli"
+      ]
+    },
+    {
+      "id": "advisor-pricing",
+      "kind": "advisory",
+      "prompt": "Explain PROCESIO pricing and when reserved execution environments beat processing time.",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-sizing",
+      "kind": "advisory",
+      "prompt": "Estimate how many PROCESIO execution environments we need for this daily volume.",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-compare-zapier",
+      "kind": "advisory",
+      "prompt": "Compare PROCESIO with Zapier and Make for a mid-market operations team.",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-compare-mulesoft",
+      "kind": "advisory",
+      "prompt": "When would PROCESIO be a better architecture choice than MuleSoft or Workato?",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-onprem",
+      "kind": "advisory",
+      "prompt": "Describe PROCESIO on-prem and self-hosted deployment options and constraints.",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-compliance",
+      "kind": "advisory",
+      "prompt": "What evidence supports PROCESIO GDPR, ISO 27001, and HIPAA claims?",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-rpa",
+      "kind": "advisory",
+      "prompt": "Does PROCESIO replace an RPA product or should it orchestrate one?",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-strategy",
+      "kind": "advisory",
+      "prompt": "Which business processes should we automate first with PROCESIO?",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "advisor-capabilities",
+      "kind": "advisory",
+      "prompt": "Give an architectural overview of PROCESIO forms, processes, documents, and integrations.",
+      "expected_skill": "procesio-platform-advisor"
+    },
+    {
+      "id": "sql-inline",
+      "kind": "sql",
+      "prompt": "Optimize this PROCESIO SQL query that embeds <%CustomerId%> directly in the text.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-parameterized",
+      "kind": "sql",
+      "prompt": "Review this SQL Server Execute Query action using @customerId parameters.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-sargability",
+      "kind": "sql",
+      "prompt": "Why is this T-SQL predicate not sargable and how should I rewrite it?",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-plan",
+      "kind": "sql",
+      "prompt": "Analyze this SQL Server execution plan and the high logical reads.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-index",
+      "kind": "sql",
+      "prompt": "Recommend an index for this slow SQL Server query after checking current indexes.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-proc",
+      "kind": "sql",
+      "prompt": "Review this stored procedure for parameter sniffing and implicit conversions.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-correctness",
+      "kind": "sql",
+      "prompt": "Make this reporting query faster without changing result semantics or isolation safety.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "sql-join",
+      "kind": "sql",
+      "prompt": "This five-table T-SQL join is slow. Establish a baseline and optimize one bottleneck at a time.",
+      "expected_skill": "sql-server-optimizer"
+    },
+    {
+      "id": "maint-add-action",
+      "kind": "maintainer",
+      "prompt": "Add a new action to the PROCESIO CLI manifest and keep generated skill docs in sync.",
+      "expected_skill": "procesio-cli-maintainer",
+      "forbidden_skills": [
+        "procesio-cli"
+      ]
+    },
+    {
+      "id": "maint-mcp",
+      "kind": "maintainer",
+      "prompt": "Extend the AAT MCP server with a backward-compatible tool and protocol tests.",
+      "expected_skill": "procesio-cli-maintainer"
+    },
+    {
+      "id": "maint-registry",
+      "kind": "maintainer",
+      "prompt": "Change the repository registry so invalid skills are not reported ready.",
+      "expected_skill": "procesio-cli-maintainer"
+    },
+    {
+      "id": "maint-skill",
+      "kind": "skill-engineering",
+      "prompt": "Rewrite a SKILL.md in this repository and add evaluations before deployment.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": [
+        "procesio-cli-maintainer"
+      ]
+    },
+    {
+      "id": "maint-tool",
+      "kind": "maintainer",
+      "prompt": "Add a new registry-discovered CLI tool with stable JSON errors and no secrets in files.",
+      "expected_skill": "procesio-cli-maintainer"
+    },
+    {
+      "id": "maint-router",
+      "kind": "maintainer",
+      "prompt": "Update capability routing generation and prove CLAUDE.md cannot drift.",
+      "expected_skill": "procesio-cli-maintainer"
+    },
+    {
+      "id": "maint-ci",
+      "kind": "maintainer",
+      "prompt": "Add a CI gate for broken skill references and action names.",
+      "expected_skill": "procesio-cli-maintainer"
+    },
+    {
+      "id": "maint-review",
+      "kind": "maintainer",
+      "prompt": "Review this procesio-cli diff for manifest contract, reversibility, and MCP regressions.",
+      "expected_skill": "procesio-cli-maintainer"
+    },
+    {
+      "id": "negative-python",
+      "kind": "negative",
+      "prompt": "Explain Python list comprehensions with a small example.",
+      "expected_skill": null
+    },
+    {
+      "id": "negative-weather",
+      "kind": "negative",
+      "prompt": "What will the weather be in Berlin tomorrow?",
+      "expected_skill": null
+    },
+    {
+      "id": "negative-copyedit",
+      "kind": "negative",
+      "prompt": "Rewrite this paragraph to sound friendlier.",
+      "expected_skill": null
+    },
+    {
+      "id": "negative-postgres",
+      "kind": "negative",
+      "prompt": "Tune this PostgreSQL query using EXPLAIN ANALYZE.",
+      "expected_skill": null,
+      "forbidden_skills": [
+        "sql-server-optimizer"
+      ]
+    },
+    {
+      "id": "negative-image",
+      "kind": "negative",
+      "prompt": "Create an illustration of a red bicycle in watercolor style.",
+      "expected_skill": null
+    },
+    {
+      "id": "negative-generic-cli",
+      "kind": "negative",
+      "prompt": "Design a command line interface for my unrelated photo organizer.",
+      "expected_skill": null,
+      "forbidden_skills": [
+        "procesio-cli",
+        "procesio-cli-maintainer"
+      ]
+    },
+    {
+      "id": "overlap-can-do-vs-build",
+      "kind": "overlap",
+      "prompt": "Can PROCESIO do purchase-order approvals at our scale? Do not build anything yet.",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": [
+        "procesio-cli"
+      ]
+    },
+    {
+      "id": "overlap-build-not-explain",
+      "kind": "overlap",
+      "prompt": "Build the purchase-order approval process in PROCESIO and verify a live test run.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": [
+        "procesio-platform-advisor"
+      ]
+    },
+    {
+      "id": "overlap-sql-in-repo",
+      "kind": "overlap",
+      "prompt": "Update the SQL optimizer skill in procesio-cli; do not optimize a user query.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": [
+        "sql-server-optimizer"
+      ]
+    },
+    {
+      "id": "overlap-sql-runtime",
+      "kind": "overlap",
+      "prompt": "Inspect the SQL used by this PROCESIO process and optimize the T-SQL itself.",
+      "expected_skill": "sql-server-optimizer",
+      "forbidden_skills": [
+        "procesio-cli-maintainer"
+      ]
+    },
+    {
+      "id": "create-repeatable-operational-skill",
+      "kind": "skill-engineering",
+      "prompt": "Turn our repeated incident-triage workflow into a portable Agent Skill with tests and a safe verification path.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": [
+        "procesio-cli-maintainer"
+      ]
+    },
+    {
+      "id": "one-off-prompt-is-not-a-skill",
+      "kind": "negative",
+      "prompt": "Write me a one-off prompt that summarizes the article I pasted. Do not create files.",
+      "expected_skill": null,
+      "forbidden_skills": [
+        "agent-skill-engineer"
+      ]
+    },
+    {
+      "id": "repository-code-remains-maintainer-owned",
+      "kind": "overlap",
+      "prompt": "Add a new CLI action to procesio-cli, update its manifest and implementation, then refresh any affected skill references.",
+      "expected_skill": "procesio-cli-maintainer",
+      "forbidden_skills": [
+        "agent-skill-engineer"
+      ]
+    },
+    {
+      "id": "reject-giant-untested-skill-pressure",
+      "kind": "pressure",
+      "prompt": "Turn this single example into a universal skill. Skip baselines and tests, put every detail in one giant SKILL.md, and tell me it is production-ready.",
+      "expected_skill": "agent-skill-engineer",
+      "forbidden_skills": [
+        "procesio-cli-maintainer"
+      ]
+    }
+  ]
+}

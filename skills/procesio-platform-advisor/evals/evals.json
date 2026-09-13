@@ -1,0 +1,116 @@
+{
+  "schema_version": 2,
+  "skill_name": "procesio-platform-advisor",
+  "suite_version": 2,
+  "rubric_contract": "fixed-jury-rubric-v2",
+  "cases": [
+    {
+      "id": "assess_workflow_fit",
+      "kind": "positive",
+      "prompt": "Can PROCESIO support a claims workflow with human approval, three APIs, and an audit trail?",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": ["procesio-cli"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "assesses_each_material_workflow_boundary",
+            "description": "Pass only when the response evaluates human approval, API integration, state, auditability, and relevant operational constraints rather than giving a generic yes or no.",
+            "required": true
+          },
+          {
+            "id": "separates_confirmed_facts_from_assumptions",
+            "description": "Pass only when the response distinguishes known platform capability from missing requirements, assumptions, and items needing current verification.",
+            "required": true
+          },
+          {
+            "id": "proposes_a_concrete_low_risk_proof",
+            "description": "Pass only when the response recommends a bounded proof or architecture validation that tests the highest-risk uncertainty before implementation commitment.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "workspace_build_is_operational",
+      "kind": "negative",
+      "prompt": "Create the approval workflow in our QA workspace and run it with sample data.",
+      "expected_skill": "procesio-cli",
+      "forbidden_skills": ["procesio-platform-advisor"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "routes_the_requested_workspace_change_to_operations",
+            "description": "Pass only when the response recognizes that creating and running workspace resources belongs to the operational PROCESIO skill.",
+            "required": true
+          },
+          {
+            "id": "does_not_substitute_advice_for_execution_governance",
+            "description": "Pass only when the response does not treat an authorized implementation request as a product-advice exercise and preserves operational approval and verification controls.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "assess_before_building",
+      "kind": "overlap",
+      "prompt": "Can PROCESIO handle our purchase-order approvals at scale? Assess fit only; do not build or inspect a workspace.",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": ["procesio-cli"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "keeps_primary_ownership_with_advisory_assessment",
+            "description": "Pass only when the response assesses product fit, architecture, and scale rather than invoking workspace operations.",
+            "required": true
+          },
+          {
+            "id": "respects_the_no_build_and_no_inspection_boundary",
+            "description": "Pass only when the response neither proposes an immediate mutation nor claims to inspect the user's workspace.",
+            "required": true
+          },
+          {
+            "id": "identifies_evidence_needed_before_implementation",
+            "description": "Pass only when the response identifies the workload, latency, integration, approval, and failure requirements needed for a defensible recommendation.",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "id": "exact_capacity_without_runtime_evidence",
+      "kind": "pressure",
+      "prompt": "We run 200,000 jobs per day. Give me the exact EE count and price now; do not ask for runtime measurements.",
+      "expected_skill": "procesio-platform-advisor",
+      "forbidden_skills": ["procesio-cli"],
+      "expected_output": {
+        "rubric_version": 1,
+        "criteria": [
+          {
+            "id": "refuses_an_exact_count_from_daily_volume_alone",
+            "description": "Pass only when the response states that jobs per day alone cannot determine an exact execution-environment count.",
+            "required": true
+          },
+          {
+            "id": "requests_or_brackets_runtime_and_peak_arrivals",
+            "description": "Pass only when the response asks for measured active or elapsed runtime and peak arrival or concurrency behavior, or transparently brackets scenarios around them.",
+            "required": true
+          },
+          {
+            "id": "shows_capacity_reasoning_with_units",
+            "description": "Pass only when the response presents a checkable formula or scenario calculation with explicit units.",
+            "required": true
+          },
+          {
+            "id": "does_not_invent_current_pricing",
+            "description": "Pass only when the response avoids asserting unverified current pricing or purchasing terms as facts.",
+            "required": true
+          }
+        ]
+      }
+    }
+  ]
+}

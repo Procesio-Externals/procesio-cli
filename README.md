@@ -299,13 +299,31 @@ An agent carries method rather than mechanics. Run one with
 
 ### Skills
 
-Knowledge an AI assistant loads on its own from the description; there is nothing to
-run. `python scripts/get-skill.py <name> --content` prints one.
+Five complementary instruction packages for coding agents, not five mandatory
+workflow stages. An Agent Skills-compatible client loads `SKILL.md` and reads its
+relative references as needed. No new CLI action or MCP extension is required to
+use them. The existing `python scripts/get-skill.py <name> --content` is optional.
 
 | Skill | What it covers |
 |---|---|
-| `procesio-expert` | Platform knowledge: capabilities, use cases, feasibility evaluation, implementation practice. |
-| `sql-server-optimizer` | Reviews the T-SQL a process runs. Inlining flow variables into SQL text is both injection-prone and the wrong action configuration, and this is what catches it. |
+| [`procesio-cli`](skills/procesio-cli/SKILL.md) | Approved PROCESIO operations, debugging and direct outcome verification. |
+| [`procesio-platform-advisor`](skills/procesio-platform-advisor/SKILL.md) | Product fit, architecture, pricing and evidence-based capacity sizing. |
+| [`sql-server-optimizer`](skills/sql-server-optimizer/SKILL.md) | Measured SQL Server tuning with semantic, isolation and parameter safety. |
+| [`procesio-cli-maintainer`](skills/procesio-cli-maintainer/SKILL.md) | Repository changes, manifests, tests and generated integration. |
+| [`agent-skill-engineer`](skills/agent-skill-engineer/SKILL.md) | Skill authoring, auditing, fixed-rubric evaluation and bounded improvement. |
+
+Each package includes conditional references and development cases; applicable
+packages also bundle local audit, scaffold, optimizer, capacity or SQL helpers.
+Read the package before running a helper. Python helpers require Python 3.11+;
+`audit_skill.py` also needs PyYAML. Repository dev dependencies include pytest.
+Operations still require a configured CLI/source checkout and explicit approvals.
+
+**Migration proposal, not a release:** these packages replace `procesio-expert`
+and relocate SQL helpers from `references/scripts/` to `scripts/`. Maintainers
+must approve that exception to the export-path contract before merging. See
+[portfolio qualification and migration](skills/PORTFOLIO.md) for exact paths,
+local gates, preserved historical metadata and unresolved proof. Current
+[release eligibility](skills/evals/gates.json) remains **false**.
 
 ### Two components that are not tools
 
