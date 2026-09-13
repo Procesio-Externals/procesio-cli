@@ -54,6 +54,69 @@ def test_get_schedule_uses_id_in_path():
     assert c["url"].endswith("/api/Schedules/S1")
 
 
+def test_get_schedule_preserves_process_inputs_by_default():
+    payload = {"id": "S1", "processInputs": [{"id": "V1", "value": "clear"}]}
+    sess = FakeSession(queue=[FakeResp(200, payload)])
+
+    out = main.dispatch("get-schedule", ["--id", "S1"],
+                        client_builder=_builder(APIKEY, sess))
+
+    assert out["result"]["processInputs"][0]["value"] == "clear"
+
+
+def test_get_schedule_can_redact_process_inputs_without_losing_structure():
+    payload = {
+        "id": "S1",
+        "processInputs": [
+            {"id": "V1", "value": "clear", "type": 0},
+            {"id": "V2", "value": None, "type": 0},
+        ],
+        "nested": {"ProcessInputs": [{"Id": "V3", "Value": "also-clear"}]},
+    }
+    sess = FakeSession(queue=[FakeResp(200, payload)])
+
+    out = main.dispatch(
+        "get-schedule",
+        ["--id", "S1", "--redact-process-inputs"],
+        client_builder=_builder(APIKEY, sess),
+    )["result"]
+
+    assert out["id"] == "S1"
+    assert out["processInputs"] == [
+        {"id": "V1", "value": "[REDACTED]", "type": 0},
+        {"id": "V2", "value": None, "type": 0},
+    ]
+    assert out["nested"]["ProcessInputs"][0] == {
+        "Id": "V3",
+        "Value": "[REDACTED]",
+    }
+    assert payload["processInputs"][0]["value"] == "clear"
+
+
+@pytest.mark.parametrize("value", [False, 0, "", {"nested": "synthetic-value"}, ["synthetic-value"]])
+def test_redaction_masks_entire_non_null_value_without_mutating_source(value):
+    payload = {"ProcessInputs": [{"Id": "V1", "Value": value}], "name": "example"}
+    sess = FakeSession(queue=[FakeResp(200, payload)])
+    result = main.dispatch(
+        "get-schedule", ["--id", "S1", "--redact-process-inputs"],
+        client_builder=_builder(APIKEY, sess),
+    )["result"]
+    assert result == {"ProcessInputs": [{"Id": "V1", "Value": "[REDACTED]"}], "name": "example"}
+    assert payload["ProcessInputs"][0]["Value"] == value
+
+
+def test_projection_does_not_claim_arbitrary_field_sanitization():
+    payload = {"processInputs": ["synthetic-value", None, {"id": "V1"}],
+               "unrelated": "visible-metadata"}
+    sess = FakeSession(queue=[FakeResp(200, payload)])
+    result = main.dispatch(
+        "get-schedule", ["--id", "S1", "--redact-process-inputs"],
+        client_builder=_builder(APIKEY, sess),
+    )["result"]
+    assert result == {"processInputs": ["[REDACTED]", None, {"id": "V1"}],
+                      "unrelated": "visible-metadata"}
+
+
 def test_get_schedule_requires_id():
     with pytest.raises(errors.UsageError):
         main.dispatch("get-schedule", [], client_builder=_builder(APIKEY, FakeSession()))
