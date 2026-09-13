@@ -34,9 +34,25 @@ to fire the flow when the URL is called.
 
 ## Triggering a process
 
-Attach the webhook to a flow via the flow's `Webhooks[]` (`WebhookInstanceDto`),
-binding webhook payload fields to the flow's input variables; activate the flow;
-then `POST /api/Webhooks/launch/{id}` fires a process instance.
+Attach the webhook to a flow via the flow's `Webhooks[]` (`WebhookInstanceDto`) and
+bind the generated webhook payload as **one model object** to a compatible model-typed
+process input. The current `WebhookVariableDto` attachment carries the process
+`variableId` and `variableType`; it does not provide a field-by-field mapping table
+that fans the body into several primitive inputs.
+
+For a retained process whose public contract is primitive inputs, use a bounded adapter
+process:
+
+1. accept one input typed to the generated webhook model;
+2. extract its attributes deterministically into plain process variables;
+3. synchronously call the retained process through those plain variables;
+4. bind all scripting/action errors;
+5. detach/delete a temporary adapter together with the webhook when the drill ends.
+
+A webhook attached directly to several primitive inputs can create a never-started
+instance even though the webhook DTO and process validation look correct. Prove one
+real launch by reconciling the target/child instance tree and the final business-key
+side effect; do not infer mapping success from attachment alone.
 
 ## AUTO vs MANUAL (verified live 2026-06-24)
 
@@ -70,3 +86,7 @@ RUN_PROCESS trigger with `syncRun:true`. It's also stored on the instance
 
 - `HasHeader`/`HasQuery` only persist if the data model includes header/query
   sub-models — a body-only sample resets them to false.
+- One webhook launch can create an adapter instance, a retained child-process instance,
+  and further nested instances. Count the complete causal tree in execution budgets.
+- After an ambiguous launch response, reconcile by webhook ID, stable business key,
+  and launch window; never resend blindly.
