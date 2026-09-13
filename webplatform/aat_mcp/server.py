@@ -130,10 +130,17 @@ TOOLS = [
     },
     {
         "name": "get_skill",
-        "description": "Fetch a registered skill's full markdown content by name.",
+        "description": (
+            "Fetch a registered skill's SKILL.md plus a metadata-only resource index. "
+            "To retrieve one bundled resource, pass a path from that index in the "
+            "optional resource field."
+        ),
         "inputSchema": {
             "type": "object",
-            "properties": {"name": {"type": "string"}},
+            "properties": {
+                "name": {"type": "string"},
+                "resource": {"type": "string"},
+            },
             "required": ["name"],
         },
     },
@@ -233,6 +240,8 @@ def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
         if name == "get_skill":
             if not arguments.get("name"):
                 return {"error": "get_skill requires 'name'"}, True
+            if "resource" in arguments:
+                return bridge.get_skill_resource(arguments["name"], arguments["resource"]), False
             return bridge.get_skill(arguments["name"]), False
         return {"error": f"unknown tool: {name}"}, True
     except KeyError as e:
