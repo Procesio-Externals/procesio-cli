@@ -6592,6 +6592,49 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+- name: node-bind-var
+  description: 'Bind a process variable into one node parameter''s value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable (repeatable); optional --find/--replace turns a mistyped literal token (e.g. a text ''<%firstName%>'' that never resolves) into ''<%0%>'' in the same write. The value''s placeholder set must equal the bound set. Regenerates the designer layer -> validate + flow-lint -> PUT. --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: node
+    type: string
+    required: true
+    description: node actionName (canvas label) or id
+  - name: property
+    type: string
+    required: true
+    description: parameter's designer label (e.g. 'Body') or its tabPropertyId
+  - name: bind
+    type: string
+    required: true
+    description: 'INDEX=variable: bind the value''s <%%N%%> placeholder N to a process variable (name or id). Repeatable. The value''s placeholder set must equal the bound set.'
+  - name: find
+    type: string
+    required: false
+    description: optional exact literal to replace in the value first (e.g. a mistyped literal '<%%firstName%%>' token)
+  - name: replace
+    type: string
+    required: false
+    description: replacement for --find (e.g. '<%%0%%>'); empty to delete it
+  - name: dry-run
+    type: boolean
+    required: false
+    description: patch + normalize + validate but do not PUT
 - name: node-delete
   description: 'Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) -> validate + flow-lint -> PUT. Refuses Start/Stop and a node with more than one outgoing port. --dry-run previews; variables are left alone.'
   args:
