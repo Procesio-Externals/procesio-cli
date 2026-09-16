@@ -4593,3 +4593,45 @@ What a form author can do, and it is only ever a reduction:
 
 The rest belongs upstream: a re-render scoped to the element that changed, and a way to set many
 values and render once, would remove the whole class of problem.
+
+## Repointing an event-driven flow, and renaming a duplicate (variable-set-default / process-rename)
+
+Two surgical actions on the same safe pipeline as node-set-param (fetch flow -> patch in place ->
+BE validate + designer flow-lint -> PUT; --dry-run stops before the PUT, an invalid flow is never
+written). Both live in handlers/nodeparams.py with pure logic in flowmodel/nodeparam.py.
+
+- **A flow that drives an external resource keeps the resource id in a PROCESS (type 20) variable's
+  `defaultValue`, not in a node parameter.** The node that consumes it references it as a `<%N%>`
+  placeholder, so the literal id appears ONLY on the variable, and none of the node-* tools reach it
+  (they sweep node params/settings). Changing which resource the flow acts on - a calendar event id,
+  a folder, a base url - is therefore a variable-default edit: `variable-set-default --variable X
+  --value ...` (`--json` for a non-string default). It is NOT a contract change (unlike retyping),
+  so it is allowed on input/output variables too. There is no desired-state rebuild involved, which
+  matters because a full process-edit rebuild risks corrupting structured settings (decisional-case,
+  extract/map params, a Call API body) the config round-trip does not preserve.
+
+- **`duplicate-process` lands the copy DEACTIVATED** (`active=false`), whatever the source was. An
+  inactive process RUNS NOTHING - a form or webhook trigger fires into the void, validate is clean,
+  and the workspace list is the only place the state shows - so a "duplicated to reuse" copy is a
+  silent no-op until `process-toggle-activation --id <copy> --state true` turns it on. `save_flow`
+  (the surgical-edit gate) preserves `active` faithfully, so editing the copy never fixes it. The
+  duplicate-process result now carries `active`/`status` and a note when it is off; always activate
+  and confirm `active=true` in list-processes before calling a duplicated flow done.
+
+- **`duplicate-process` and `form-duplicate` land as '... (Copy)'.** The DTO PUT path has no
+  title-rename, so `process-rename --title ...` sets the flow title through the same gate. Safe by
+  construction: the title is cosmetic, everything wires by id (same reasoning as rename-actions).
+
+- **When a form triggers a process, the RUN_PROCESS inputMap's right-side value path is rooted at the
+  form's `dataModel.id`, not the form template id.** A duplicated form inherits the SOURCE form's
+  dataModel id, so the path root can differ from the new form's own id (and can even look like an
+  unrelated form's id). Never hand-build that path: pass field NAMES to form-set-element-event and
+  let it resolve against the live form (left = process variable name/id, right = form field name).
+
+- **A reusable event flow hardcodes the whole event in its Call API PATCH body** (summary, start/end,
+  location, description, attendees=`<%N%>`), so every run REWRITES those fields on the event. When
+  repointing to a new event, rewrite that body too (node-replace-text on the exact literals), or the
+  first run reverts the event to the old details. The body's date carried an explicit +00:00 offset
+  next to `timeZone: Europe/Bucharest`; Google uses the absolute instant, so convert local->UTC (or
+  write the local offset) when moving the date.
+

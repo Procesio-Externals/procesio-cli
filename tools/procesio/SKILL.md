@@ -151,7 +151,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `duplicate-process` | `--id` | Duplicate a process (POST /api/Projects/{id}/duplicate) and return the copy's id + designer URL (found by diffing the workspace's project list).… |
+| `duplicate-process` | `--id` | Duplicate a process (POST /api/Projects/{id}/duplicate) and return the copy's id + designer URL (found by diffing the workspace's project list). The copy lands… |
 
 ### export
 
@@ -475,6 +475,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `process-delete` | `--id` | Delete a resource by id (DELETE /api/Projects/{id}). |
 | `process-edit` | `--id` | Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no… |
 | `process-fe-validate` | `--id` | Front-end (designer-layer) 'Process Errors' validation on a live process — the client-side check that BLOCKS designer Save but which POST… |
+| `process-rename` | `--id`, `--title` | Rename a live process (its title) -> validate + flow-lint -> PUT. The title is cosmetic (wiring is by id), so this is the safe way to give a '... (Copy)' from… |
 | `process-toggle-activation` | `--id`, `--state` | Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). --state true|false is REQUIRED: despite its name the endpoint is a setter, and… |
 | `process-validate` | `--id` | Validate a process with PROCESIO's own validator (POST /api/Projects/validate). |
 
@@ -604,6 +605,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `variable-set-default` | `--id`, `--variable`, `--value` | Set ONE variable's defaultValue on a live process -> validate + flow-lint -> PUT. A process (20) variable's default is its initial runtime value, so this is… |
 | `variable-set-type` | `--id`, `--variable`, `--data-type` | Retype one variable of a live process (dataType, optionally isList) -> validate + flow-lint -> PUT. Refuses an input/output variable without… |
 
 ### verify

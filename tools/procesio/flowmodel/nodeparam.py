@@ -254,6 +254,35 @@ def set_variable_type(flow: dict, var: dict, data_type: str, *,
             "direction": VAR_DIRECTION.get(direction, direction)}
 
 
+def set_variable_default(flow: dict, var: dict, value) -> dict:
+    """Set one flow variable's defaultValue in place. Returns {changed, before, after}.
+
+    A variable default lives only on the variable ({..., defaultValue}); it has no designer
+    customData mirror, so unlike a node parameter this needs no normalizer pass. A process (20)
+    variable's default IS its initial runtime value, so repointing an event-driven flow at a new
+    resource (a calendar event id, a folder, a base url) is exactly this edit. Left free for input
+    (10) variables too: there the default is only a fallback used when the caller omits the value.
+    """
+    before = var.get("defaultValue")
+    var["defaultValue"] = value
+    after = var.get("defaultValue")
+    return {"changed": before != after, "before": before, "after": after,
+            "direction": VAR_DIRECTION.get(var.get("type"), var.get("type"))}
+
+
+def set_process_title(flow: dict, title: str) -> dict:
+    """Set a flow's title in place. Returns {changed, before, after}.
+
+    The title is cosmetic - the platform wires everything by id, never by name (same reasoning as
+    rename-actions) - so this touches only the top-level `title` field, no node parameter and no
+    designer customData, and cannot break a flow. A `duplicate` always lands as '... (Copy)', so this
+    is the follow-up that gives the copy a real name.
+    """
+    before = flow.get("title")
+    flow["title"] = title
+    return {"changed": before != title, "before": before, "after": title}
+
+
 # --------------------------------------------------------------------------- node removal
 
 _TERMINALS = ("Start", "Stop")

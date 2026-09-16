@@ -72,21 +72,36 @@ def duplicate_process(client, args) -> dict:
     after = _project_ids(client)
     new_ids = sorted(after - before)
     copy_id = new_ids[0] if len(new_ids) == 1 else None
-    title = None
+    title = active = status = None
     if copy_id:
         try:
-            title = _flow_of(client, copy_id).get("title")
+            copy_flow = _flow_of(client, copy_id)
+            title = copy_flow.get("title")
+            active = copy_flow.get("active")
+            status = copy_flow.get("status")
         except ProcesioAPIError:
-            title = None
-    return {"result": {
+            pass
+    result = {
         "source_id": args.id,
         "workspace_id": ws,
         "copy_id": copy_id,
         "copy_candidates": new_ids if copy_id is None else None,
         "title": title,
+        "active": active,
+        "status": status,
         "has_webhook": (dup or {}).get("hasWebhook") if isinstance(dup, dict) else None,
         "designer_url": _designer_url(client, copy_id, ws) if copy_id else None,
-    }}
+    }
+    # PROCESIO creates the duplicate DEACTIVATED, so it will not run - a form or webhook
+    # trigger fires nothing - until it is turned on. Surface that loudly: the source was
+    # almost certainly active, and a silent inactive copy is exactly the trap a caller
+    # who "duplicated to reuse" walks into.
+    if active is False:
+        result["note"] = (
+            "copy is INACTIVE - PROCESIO duplicates are created deactivated and will not "
+            "run until activated. Turn it on with: process-toggle-activation --id "
+            f"{copy_id} --state true")
+    return {"result": result}
 
 
 # -- relayout-process -------------------------------------------------------
@@ -159,7 +174,10 @@ ACTIONS = {
         func=duplicate_process, add_args=_dup_args, needs_client=True,
         description=("Duplicate a process (POST /api/Projects/{id}/duplicate) and return "
                      "the copy's id + designer URL (found by diffing the workspace's "
-                     "project list). Workspace-scoped: pass --workspace-id."),
+                     "project list). The copy lands DEACTIVATED (active=false) and will "
+                     "not run until process-toggle-activation turns it on - the result "
+                     "carries `active`/`status` and a note when it is off. Workspace-scoped: "
+                     "pass --workspace-id."),
     ),
     "relayout-process": ActionDef(
         func=relayout_process, add_args=_relayout_args, needs_client=True,
