@@ -252,6 +252,41 @@ def process_rename(client, args) -> dict:
     return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
+def node_bind_var(client, args) -> dict:
+    flow = _fetch_flow(client, args.id)
+    node = nodeparam.find_node(flow, args.node)
+    if not node:
+        raise UsageError(f"node not found in process {args.id}: {args.node}")
+    param = nodeparam.find_param(node, args.property)
+    if param is None:
+        raise UsageError(
+            f"property not found on node '{args.node}': {args.property} "
+            f"(run node-params --node '{args.node}' to list the labels)")
+    bindings = {}
+    for spec in args.bind or []:
+        if "=" not in spec:
+            raise UsageError(f"--bind must be 'INDEX=variable', got: {spec}")
+        idx, name = spec.split("=", 1)
+        try:
+            idx = int(idx.strip())
+        except ValueError:
+            raise UsageError(f"--bind index must be an integer, got: {idx}")
+        var = nodeparam.find_variable(flow, name.strip())
+        if not var:
+            raise UsageError(f"--bind variable not found in process {args.id}: {name.strip()}")
+        bindings[idx] = var.get("id")
+    if not bindings:
+        raise UsageError("at least one --bind INDEX=variable is required")
+    try:
+        change = nodeparam.bind_param_var(node, param, bindings, find=args.find, replace=args.replace)
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+    result = {"id": args.id, "title": flow.get("title"), "node": node.get("actionName"),
+              "property": param.get("tabPropertyId"), **change}
+    result["normalized"] = normalize_designer_layer(flow)
+    return _gate_and_put(client, flow, args, result)
+
+
 def _params_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="process (project) id")
@@ -328,6 +363,22 @@ def _prename_args(p: argparse.ArgumentParser) -> None:
                    help="patch + validate but do not PUT")
 
 
+def _bindvar_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--node", required=True, help="node actionName (canvas label) or id")
+    p.add_argument("--property", required=True,
+                   help="parameter's designer label (e.g. 'Body') or its tabPropertyId")
+    p.add_argument("--bind", action="append", required=True,
+                   help="INDEX=variable: bind the value's <%%N%%> placeholder N to a process variable "
+                        "(name or id). Repeatable. The value's placeholder set must equal the bound set.")
+    p.add_argument("--find", help="optional exact literal to replace in the value first (e.g. a "
+                                  "mistyped literal '<%%firstName%%>' token)")
+    p.add_argument("--replace", help="replacement for --find (e.g. '<%%0%%>'); empty to delete it")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="patch + normalize + validate but do not PUT")
+
+
 ACTIONS = {
     "node-params": ActionDef(
         func=node_params, add_args=_params_args, needs_client=True,
@@ -345,6 +396,14 @@ ACTIONS = {
                     "at it is re-pointed at its successor (or dropped when it has none) -> validate + "
                     "flow-lint -> PUT. Refuses Start/Stop and a node with more than one outgoing port. "
                     "--dry-run previews; variables are left alone."),
+    "node-bind-var": ActionDef(
+        func=node_bind_var, add_args=_bindvar_args, needs_client=True,
+        description="Bind a process variable into one node parameter's value: set its variable[] "
+                    "so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable "
+                    "(repeatable); optional --find/--replace turns a mistyped literal token (e.g. a "
+                    "text '<%firstName%>' that never resolves) into '<%0%>' in the same write. The "
+                    "value's placeholder set must equal the bound set. Regenerates the designer layer "
+                    "-> validate + flow-lint -> PUT. --dry-run previews."),
     "node-replace-text": ActionDef(
         func=node_replace_text, add_args=_replace_args, needs_client=True,
         description="Replace an EXACT literal in every string leaf of a node's runtime parameters AND "

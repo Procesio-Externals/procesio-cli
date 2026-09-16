@@ -4634,4 +4634,22 @@ written). Both live in handlers/nodeparams.py with pure logic in flowmodel/nodep
   first run reverts the event to the old details. The body's date carried an explicit +00:00 offset
   next to `timeZone: Europe/Bucharest`; Google uses the absolute instant, so convert local->UTC (or
   write the local offset) when moving the date.
+- **A NAMED token like `<%firstName%>` typed into an email body is NOT a variable** - it renders
+  verbatim. PROCESIO substitutes only POSITIONAL `<%N%>`, and only when the SAME parameter's
+  `variable[]` binds index N to a variable id (`{id:N, variableId, attribute}`). Each parameter has
+  its own `<%N%>` namespace (the Send Email `To` and `Body` params both start at `<%0%>`
+  independently). `node-set-param` guards the placeholder set but never writes `variable[]`;
+  `node-bind-var --property Body --find "<%firstName%>" --replace "<%0%>" --bind "0=firstName"` turns
+  the literal into a bound placeholder in one write (value edit + `variable[]` + designer-layer
+  regenerate + validate + PUT). The value's placeholder set must equal the bound index set.
+- **A reusable event flow has TWO email surfaces to adapt, not one:** the confirmation "Send Email"
+  INSIDE the registration flow (fires per sign-up) AND the standalone reminder flow. Adapting only
+  the reminder leaves registrants getting the old event's confirmation. Both carry the full HTML body.
+- **Send Email delivers via the workspace SMTP credential (here a SendGrid cred), instance status 50
+  = finished.** A finished instance means the mail was handed to SendGrid, NOT that it reached the
+  recipient's inbox: internal same-domain delivery lands in INBOX, but an external consumer mailbox
+  (a personal Gmail) can spam-filter a SendGrid message whose From is an unverified/loosely-aligned
+  domain sender. Prove delivery by reading a mailbox you control (send a test to it and check the
+  labelIds for INBOX vs SPAM); non-receipt at an external address is a sender-reputation/SPF-DKIM
+  matter, not a process bug.
 

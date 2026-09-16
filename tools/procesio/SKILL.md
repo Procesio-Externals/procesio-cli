@@ -372,6 +372,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `node-bind-var` | `--id`, `--node`, `--property`, `--bind` | Bind a process variable into one node parameter's value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable… |
 | `node-delete` | `--id`, `--node` | Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) ->… |
 | `node-params` | `--id` | List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only). |
 | `node-replace-text` | `--id`, `--node`, `--find`, `--replace` | Replace an EXACT literal in every string leaf of a node's runtime parameters AND designer settings on a live process - the safe way to reach a value nested… |

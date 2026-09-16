@@ -129,6 +129,37 @@ def set_param_value(node: dict, param: dict, new_value: str, *, allow_binding_ch
     return {"changed": old != new_value, "before": old, "after": new_value}
 
 
+def bind_param_var(node: dict, param: dict, bindings: dict, *, find=None, replace=None) -> dict:
+    """Set a parameter's `variable[]` bindings, optionally rewriting the value first, in place.
+
+    `bindings` maps each `<%N%>` index to a variable id. A NAMED token like `<%firstName%>` typed as
+    literal text is NOT a runtime placeholder (only positional `<%N%>` substitutes), so it renders
+    verbatim; the fix is to turn it INTO `<%0%>` and bind index 0 to the variable. Pass `find`/`replace`
+    to make that small substitution on the value here (so the 30 KB body need not be re-sent), then the
+    value's placeholder set must equal the binding index set, or the write is refused - a `<%N%>` with
+    no binding substitutes to nothing, a binding with no `<%N%>` is dead.
+    """
+    old = param.get("value")
+    if not isinstance(old, str):
+        raise ValueError(
+            f"parameter '{_label_of(node, param.get('tabPropertyId')) or param.get('tabPropertyId')}' "
+            f"holds a {type(old).__name__}, not text - structured parameters are builder territory")
+    value = old
+    if find is not None:
+        if find not in value:
+            raise ValueError(f"--find text is not present in the parameter value")
+        value = value.replace(find, replace if replace is not None else "")
+    idxs = set(placeholders(value))
+    if idxs != set(bindings):
+        raise ValueError(
+            f"after the edit the value binds placeholders {sorted(idxs)} but --bind covers "
+            f"{sorted(bindings)} - each <%N%> must have exactly one binding and vice versa")
+    param["value"] = value
+    param["variable"] = [{"id": i, "variableId": bindings[i], "attribute": None} for i in sorted(bindings)]
+    return {"changed": True, "value_changed": old != value, "before": old if old != value else None,
+            "after": value if old != value else None, "bindings": {i: bindings[i] for i in sorted(bindings)}}
+
+
 # --- literal text replacement across a node's runtime + designer layers -------------------------
 #
 # Some values a flow author needs to change live INSIDE a structured parameter — a Map Data row's

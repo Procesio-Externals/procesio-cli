@@ -245,3 +245,28 @@ def test_set_process_title_changes_and_is_noop_when_same():
     assert r['changed'] is True and r['before'] == 'T' and f['title'] == 'New Name'
     assert nodeparam.set_process_title(f, 'New Name')['changed'] is False
 
+
+def test_bind_param_var_turns_literal_token_into_a_bound_placeholder():
+    node = {"actionName": "Send Email",
+            "parameters": [{"tabPropertyId": "body", "value": "Hey <%firstName%>, welcome", "variable": []}]}
+    param = node["parameters"][0]
+    r = nodeparam.bind_param_var(node, param, {0: "v-first"}, find="<%firstName%>", replace="<%0%>")
+    assert r["value_changed"] is True
+    assert param["value"] == "Hey <%0%>, welcome"
+    assert param["variable"] == [{"id": 0, "variableId": "v-first", "attribute": None}]
+
+
+def test_bind_param_var_refuses_mismatched_placeholder_and_binding_sets():
+    node = {"actionName": "N", "parameters": [{"tabPropertyId": "body", "value": "Hey <%0%>", "variable": []}]}
+    param = node["parameters"][0]
+    import pytest as _pt
+    with _pt.raises(ValueError, match="each"):
+        nodeparam.bind_param_var(node, param, {0: "a", 1: "b"})  # value has only <%0%>
+
+
+def test_bind_param_var_refuses_a_structured_value():
+    node = {"actionName": "N", "parameters": [{"tabPropertyId": "body", "value": {"x": 1}, "variable": []}]}
+    import pytest as _pt
+    with _pt.raises(ValueError, match="structured"):
+        nodeparam.bind_param_var(node, node["parameters"][0], {0: "a"})
+
