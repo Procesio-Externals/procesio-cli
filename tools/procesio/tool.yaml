@@ -2266,7 +2266,7 @@ actions:
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
 - name: duplicate-process
-  description: 'Duplicate a process (POST /api/Projects/{id}/duplicate) and return the copy''s id + designer URL (found by diffing the workspace''s project list). Workspace-scoped: pass --workspace-id.'
+  description: 'Duplicate a process (POST /api/Projects/{id}/duplicate) and return the copy''s id + designer URL (found by diffing the workspace''s project list). The copy lands DEACTIVATED (active=false) and will not run until process-toggle-activation turns it on - the result carries `active`/`status` and a note when it is off. Workspace-scoped: pass --workspace-id.'
   args:
   - name: profile
     type: string
@@ -9221,6 +9221,33 @@ actions:
     type: boolean
     required: false
     description: also run the back-end validator (POST /api/Projects/validate)
+- name: process-rename
+  description: Rename a live process (its title) -> validate + flow-lint -> PUT. The title is cosmetic (wiring is by id), so this is the safe way to give a '... (Copy)' from duplicate-process a real name without a desired-state rebuild. --dry-run previews.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: title
+    type: string
+    required: true
+    description: new process title
+  - name: dry-run
+    type: boolean
+    required: false
+    description: patch + validate but do not PUT
 - name: process-toggle-activation
   description: 'Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). --state true|false is REQUIRED: despite its name the endpoint is a setter, and it reads the target from a `state` request header - called without it, it deactivates every time while reporting success. The response says nothing either way, so this reads `active` before and after from the list-processes projection and warns when the result is not what was asked for.'
   args:
@@ -10396,6 +10423,41 @@ actions:
     type: string
     required: false
     description: ISO-8601 activation end (optional)
+- name: variable-set-default
+  description: Set ONE variable's defaultValue on a live process -> validate + flow-lint -> PUT. A process (20) variable's default is its initial runtime value, so this is how you repoint an event-driven flow at a new resource (e.g. a calendar event id) without a desired-state rebuild. --value is a string literal, or a JSON value with --json. --dry-run previews; an invalid flow is never PUT.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: variable
+    type: string
+    required: true
+    description: variable name or id
+  - name: value
+    type: string
+    required: true
+    description: 'new defaultValue: a string literal, or a JSON value with --json'
+  - name: json
+    type: boolean
+    required: false
+    description: parse --value as JSON (number, object, list, true/false/null)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: patch + validate but do not PUT
 - name: variable-set-type
   description: Retype one variable of a live process (dataType, optionally isList) -> validate + flow-lint -> PUT. Refuses an input/output variable without --allow-contract-change, because those are the run payload and the response shape callers depend on.
   args:

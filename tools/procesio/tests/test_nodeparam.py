@@ -211,3 +211,37 @@ def test_retype_is_a_noop_when_already_that_type():
     f = _typed_flow()
     v = nodeparam.find_variable(f, "exchangeRateList")
     assert nodeparam.set_variable_type(f, v, v["dataType"], is_list=True)["changed"] is False
+
+
+def test_set_variable_default_changes_process_var():
+    f = _typed_flow()
+    f['variables'][0]['defaultValue'] = 'old-event-id'
+    v = nodeparam.find_variable(f, 'exchangeRateList')
+    r = nodeparam.set_variable_default(f, v, 'new-event-id')
+    assert r['changed'] is True and r['direction'] == 'process'
+    assert r['before'] == 'old-event-id' and r['after'] == 'new-event-id'
+    assert v['defaultValue'] == 'new-event-id'
+
+
+def test_set_variable_default_is_a_noop_when_already_that_value():
+    f = _typed_flow()
+    f['variables'][0]['defaultValue'] = 'same'
+    v = nodeparam.find_variable(f, 'exchangeRateList')
+    assert nodeparam.set_variable_default(f, v, 'same')['changed'] is False
+
+
+def test_set_variable_default_allowed_on_input_and_output_vars():
+    f = _typed_flow()
+    # unlike retyping, moving a default is not a contract change - no override needed
+    for name in ('payload', 'exchangeRate'):
+        v = nodeparam.find_variable(f, name)
+        r = nodeparam.set_variable_default(f, v, {'k': 1})
+        assert r['changed'] is True and v['defaultValue'] == {'k': 1}
+
+
+def test_set_process_title_changes_and_is_noop_when_same():
+    f = _typed_flow()
+    r = nodeparam.set_process_title(f, 'New Name')
+    assert r['changed'] is True and r['before'] == 'T' and f['title'] == 'New Name'
+    assert nodeparam.set_process_title(f, 'New Name')['changed'] is False
+

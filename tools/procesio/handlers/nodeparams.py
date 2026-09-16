@@ -220,6 +220,38 @@ def variable_set_type(client, args) -> dict:
     return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
+def variable_set_default(client, args) -> dict:
+    flow = _fetch_flow(client, args.id)
+    var = nodeparam.find_variable(flow, args.variable)
+    if not var:
+        raise UsageError(f"variable not found in process {args.id}: {args.variable}")
+    value = args.value
+    if args.json:
+        import json as _json
+        try:
+            value = _json.loads(args.value)
+        except ValueError as e:
+            raise UsageError(f"--value is not valid JSON: {e}") from e
+    change = nodeparam.set_variable_default(flow, var, value)
+    result = {"id": args.id, "title": flow.get("title"), "variable": var.get("name"), **change}
+    if not change["changed"]:
+        result["note"] = "default already set; nothing to PUT"
+        result["put"] = False
+        return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+
+
+def process_rename(client, args) -> dict:
+    flow = _fetch_flow(client, args.id)
+    change = nodeparam.set_process_title(flow, args.title)
+    result = {"id": args.id, **change}
+    if not change["changed"]:
+        result["note"] = "title already set; nothing to PUT"
+        result["put"] = False
+        return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+
+
 def _params_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="process (project) id")
@@ -276,6 +308,26 @@ def _vartype_args(p: argparse.ArgumentParser) -> None:
                    help="retype + validate but do not PUT")
 
 
+def _vardefault_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--variable", required=True, help="variable name or id")
+    p.add_argument("--value", required=True,
+                   help="new defaultValue: a string literal, or a JSON value with --json")
+    p.add_argument("--json", action="store_true",
+                   help="parse --value as JSON (number, object, list, true/false/null)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="patch + validate but do not PUT")
+
+
+def _prename_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--title", required=True, help="new process title")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="patch + validate but do not PUT")
+
+
 ACTIONS = {
     "node-params": ActionDef(
         func=node_params, add_args=_params_args, needs_client=True,
@@ -304,4 +356,16 @@ ACTIONS = {
         description="Retype one variable of a live process (dataType, optionally isList) -> validate + "
                     "flow-lint -> PUT. Refuses an input/output variable without --allow-contract-change, "
                     "because those are the run payload and the response shape callers depend on."),
+    "variable-set-default": ActionDef(
+        func=variable_set_default, add_args=_vardefault_args, needs_client=True,
+        description="Set ONE variable's defaultValue on a live process -> validate + flow-lint -> PUT. "
+                    "A process (20) variable's default is its initial runtime value, so this is how you "
+                    "repoint an event-driven flow at a new resource (e.g. a calendar event id) without a "
+                    "desired-state rebuild. --value is a string literal, or a JSON value with --json. "
+                    "--dry-run previews; an invalid flow is never PUT."),
+    "process-rename": ActionDef(
+        func=process_rename, add_args=_prename_args, needs_client=True,
+        description="Rename a live process (its title) -> validate + flow-lint -> PUT. The title is "
+                    "cosmetic (wiring is by id), so this is the safe way to give a '... (Copy)' from "
+                    "duplicate-process a real name without a desired-state rebuild. --dry-run previews."),
 }
