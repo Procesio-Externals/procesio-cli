@@ -169,6 +169,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `flow-digest` | `--in` | Readable Markdown digest of flows (offline): variable contract, nodes in execution order, each node's script/SQL/HTTP/subprocess parameters with variable and… |
 | `flow-lint` | `--id` | Designer-layer 'Process Errors' lint on a live flow (the check that blocks designer SAVE, which POST /Projects/validate does NOT catch): stale subprocess… |
 
 ### form
@@ -178,6 +179,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-add-element` | `--id` | Add one or more controls to a LIVE form (authoring-config elements), splicing them into Data.elements AND the data model without regenerating what is already… |
 | `form-create` | — | Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in… |
 | `form-delete` | `--id` | Delete a resource by id (DELETE /api/FormTemplate/{id}). |
+| `form-digest` | `--in` | Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process… |
 | `form-duplicate` | `--id` | POST /api/FormTemplate/{id}/duplicate. |
 | `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |
 | `form-get` | `--id` | Get one resource by id (GET /api/FormTemplate/{id}). |
@@ -186,6 +188,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-get-element-events` | `--id`, `--element` | List one element's event handlers, by trigger. |
 | `form-list` | — | List forms (GET /api/FormTemplate/all/basic). |
 | `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). |
+| `form-set-element-chains` | `--id` | Rewrite the ORDERED event chains of one or more elements on a live form in ONE save (surgical: only the listed element triggers change). Each chain lists its… |
 | `form-set-element-config` | `--id`, `--element` | Set one element's plain configs in place (surgical: only that element's config values change, ids preserved; returns the previous values). Event configs go… |
 | `form-set-element-event` | `--id`, `--element`, `--on`, `--action` | Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element's event config changes). In a… |
 | `form-update` | `--id` | Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data patch into its Data (and/or override --name/--status/--state/--is-private), then… |

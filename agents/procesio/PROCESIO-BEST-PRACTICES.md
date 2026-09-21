@@ -135,6 +135,11 @@ Use the `sql-server-optimizer` skill for any SQL in a SQL action. Core rules:
 - Do not extract from JSON with chains of actions. Model the JSON into a Data Model
   and use the variable as `<DataModel>`; then read attributes directly, often with
   no action at all.
+- A Node that builds an LLM prompt should put the static rules FIRST and the per-run
+  data (history, records, a language hint) LAST. Provider prompt caches key on a
+  byte-identical prefix (OpenAI: >= 1024 tokens), so per-run data at the top makes
+  every call a cache miss. Order only, wording unchanged; diff the line multiset
+  before the PUT.
 
 ---
 
@@ -264,10 +269,12 @@ Export to produce a `.vcf` bulk export (scratchpad build_vcf_flow3.py pattern).
    follow the Node with a Decisional `errVar IS_NOT_EMPTY -> error join`; (c) compose the user-facing
    error message from the error vars in one downstream Node (values from the FAILED action are unset —
    never map them into the notice directly). Proven: 6 silently-dying turns became 6 successes.
-3. **Huge values (base64 media, 100KB+)**: SQL param binding and subprocess input maps carry them fine;
-   Node `<%N%>` JS injection and Decisional operands materialize them as EMPTY. For emptiness/length
-   checks on big attributes use the native **Length** action (template 057d754a: Input String, Result)
-   — NOT an Execute Query (overkill) and NOT JS injection (silently empty).
+3. **Huge values (base64 media) are NOT an engine limit** (corrected 2026-09-21). A controlled probe through
+   `/run` carried a 4 MB string intact through a Node `<%N%>` injection, a Decisional `IS_NOT_EMPTY`, the native
+   **Length** action (template 057d754a: Input String, Result), Map Data, subprocess maps and SQL parameters, on a
+   plain variable and on a data-model attribute alike. The earlier note that 100 KB+ values "materialize as EMPTY"
+   in a Node or Decisional was an artefact of the middleware that fed the flow (it capped its own payload), not of
+   PROCESIO. Length is still the cheapest way to test a big value's presence; it is not a workaround.
 4. **For Each via API** (template dbef0804-66a9-4f8f-872c-ece1b89b8fdb, shape `area`): params =
    For Each Item (57b5b1eb…, the per-iteration var) + In List (2d5f230f…) + timeout + 2 ignore
    literals. The FE node has TWO type-0 ports: first -> loop-body entry child, second -> the after-loop

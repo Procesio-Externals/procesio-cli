@@ -421,3 +421,107 @@ if (active > -1 && active !== lastStep) {
 
 Guarding on `lastStep > -1` stops the page from scrolling itself on the initial
 render, which reads as the page fighting the user.
+
+## 15. Gate a button whose click runs a chain of events
+
+A button's `onClickEvents` is an ordered chain (e.g. `RUN_JAVASCRIPT` →
+`RUN_PROCESS` → `MAP_FORM_DATA` → `RUN_JAVASCRIPT`). A validation placed in the
+first `RUN_JAVASCRIPT` **cannot stop the rest of the chain** — a throw or `return`
+there ends only that block; the process still launches. Two layers:
+
+1. **Capture-phase guard in the runtime** (form-level JS, injected per §4 of
+   `02-CODE-INJECTION.md`): `document.addEventListener('click', fn, true)`, match
+   the button by `closest('[id="<button-id>"]')`, and on invalid state call
+   `preventDefault()` + `stopImmediatePropagation()` + `stopPropagation()`.
+   Document capture runs before the Vue handler on the button, so **no** event of
+   the chain fires. Expose the rules as one `check()` on `window`.
+2. **Gate inside the chain's last block** (the one that navigates): re-run the same
+   `check()` and `throw` before `nextButton.click()`. This is the fallback when the
+   runtime did not load; the rules still live in one place.
+
+Same trick for a checkbox that must not be ticked: intercept its click in capture
+phase and `preventDefault()`. Do not rely on `input.disabled` alone — a Vue
+re-render of the row can reset it. To untick a checkbox programmatically, `click()`
+it (setting `.checked = false` does not reach the Vue model).
+
+Checkboxes inside a `dynamic-table-row` repeat the same DOM `id` on every row —
+select them with `querySelectorAll('[id="<id>"]')` and read the row's other
+columns from the enclosing row's cells, in `tableColumnsSourceValue` order
+(the cell markup is not yet confirmed on a live render — check it before relying
+on the column index).
+
+## 16. One click from a JS decision to a no-code reaction: the trigger field
+
+The common wish: a JS validator decides, and on success the no-code layer locks the
+step's fields, swaps Validate for Modify, reveals the next step and moves to it, all
+from **one** click. The obvious chain (`JS validator` → `MAP_FORM_DATA when
+<flag> EQUALS 1`) does not do that. Verified on a live form, three renderer facts
+decide the design:
+
+1. **An `input`/`number-input` value reaches the form model 500 ms after the DOM
+   write** (`Element.component.vue`, `onInputDebounced`). A MAP condition later in
+   the same chain reads the value from before the JS ran, so the first click never
+   passes. That is why these forms end up with "validate twice, then confirm".
+2. **A field's own `onInputEvents` chain fires when that value lands**, including
+   a value written by JS through the native setter, and its conditions see the
+   new value. This is the hand-off point.
+3. **While a button's chain runs, the whole form is locked** (every element is
+   `disabled`), so JS cannot click another form button mid-chain. The stepper's
+   own Next/Previous are not form elements and still work.
+
+The pattern that follows, measured at about 0.8 s from click to the next step:
+
+```
+Validate click:  loader.show → validator (writes flag "1"/"0") → request(flag, branch)
+request(...):    if flag is "1": remember a pending request, write the clicked
+                 button's branch ("person", "company"…) into a hidden text
+                 input `step-flow-branch`, then increment a hidden number-input
+                 `step-flow-trigger` (native setter + input/change/blur, branch first)
+trigger onInput: MAP when <flag step N> EQUALS 1 AND step-flow-branch EQUALS <branch>
+                     → lock step N, Validate hidden, Modify shown, step N+1 visible
+                 (one MAP per step and branch; only the clicked one matches)
+                 → JS advance(): only with a pending request: click Next, reset
+                   scroll, hide the loader
+Modify click:    MAP (unconditional): unlock step N, flag N = 0, swap the buttons,
+                 hide steps N+1…, and reset them (unlock, flags 0, Validate shown)
+```
+
+Rules that keep it safe:
+
+- **Only `request()` writes the trigger field.** Do not use the flag fields as
+  triggers. A MAP that writes a field fires that field's `onInput` chain
+  immediately, with no debounce. The Modify MAP and any reset would then start a
+  second chain in parallel, and the two chains' JS blocks share one sandbox iframe.
+- **The trigger always changes** (increment it): a flag still at `1` from an
+  earlier pass would not change and would not fire anything.
+- **`advance()` moves on only with a pending request**, and a watchdog (a few
+  seconds) hides the loader if the trigger chain never comes.
+- **The button states its branch; never infer it from a Boolean form variable.**
+  When a step has variants (person / company, electricity / gas), the Validate
+  button that was clicked IS the branch, so it writes it. Measured live, a
+  condition on a Boolean form variable is not reliable here:
+
+  | variable holds | `IS_TRUE` | `IS_FALSE` |
+  |---|---|---|
+  | the text `"false"` / `"False"` (the designer's default) | **passes** | fails |
+  | `null` | fails | passes |
+
+  Any non-empty text counts as true. Variables that a render process fills later
+  still hold that text until the process result lands, and on a form with two
+  variants both "IS_TRUE" branches ran: two lock MAPs fought over which Modify
+  button to show, and the wrong one then unlocked the other variant's fields.
+  `formlint` (every `form-update` / `form-add-element`) and
+  `form-set-element-chains` now warn about this condition.
+- **Previous needs no handler.** A MAP-set `disabled`/`visible` survives the
+  renderer destroying and rebuilding the step, so a step you come back to is still
+  locked and still shows Modify. The stepper's own Next stays available there,
+  because the following step is visible.
+- **A hidden step drops out of the stepper**, and Next exists only while a later
+  step is visible. Hiding steps N+1… on Modify therefore removes Next until step
+  N is validated again.
+
+Wire the chains with `form-set-element-chains` (a plan of ordered events per
+element). It keeps the existing validator blocks by id and builds the MAP blocks
+and conditions from element and variable names. Prove the mechanism on a small
+public copy of the flow before touching a live form. [07](07-DEPLOY-WORKFLOW.md) §4
+has the recipe.

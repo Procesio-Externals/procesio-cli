@@ -36,6 +36,14 @@ developer docs add `workspaceid`. Live results for the two showcase keys:
 | `ws-scoped` | valid | its own workspace GUID | **200** |
 | `ws-scoped` | valid | a DIFFERENT workspace GUID | 401 |
 
+**The `key` header is the key HANDLE, not its display name.** The API Keys page
+shows each key with a human name (e.g. a short label) and a separate random
+*handle* (~16 chars). Sending the display name as `key` returns **403
+`Unauthorized`** on every endpoint; sending the handle returns 200. An empty
+`key` returns 401 instead of 403, so a 403 with a valid value + workspaceid means
+"wrong key name/handle", not "wrong workspace". Store the handle with
+`add-credential --key <handle>`.
+
 **Conclusion:** a personal/master key authenticates without `workspaceid`; a
 workspace-scoped key **requires** the exact workspace GUID. Such a profile must be stored WITH its `workspace_id` to authenticate at all. Find any workspace's GUID with `list-workspaces` (`id`).
 

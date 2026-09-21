@@ -12,7 +12,9 @@ def test_topics_present():
         "playbook", "best-practices", "visual-organization", "datastore",
         "scheduling", "environments", "reliability", "boundary",
         "forms", "forms-anatomy", "forms-code", "forms-dom", "forms-interaction",
-        "forms-motion", "forms-process", "forms-deploy", "forms-pitfalls"}
+        "forms-motion", "forms-process", "forms-deploy", "forms-pitfalls",
+        "patterns", "patterns-processes", "patterns-forms", "patterns-integrations",
+        "patterns-database"}
 
 
 def test_each_topic_loads_real_content():
@@ -29,7 +31,8 @@ def test_all_excludes_the_form_chapters_but_keeps_their_index():
     guidance most callers asked for. The index is small and advertises the rest."""
     served = {d["topic"] for d in knowledge.load_all()}
     assert "forms" in served
-    assert not [t for t in served if t.startswith("forms-")]
+    assert not [t for t in served if t.startswith(("forms-", "patterns-"))]
+    assert "patterns" in served
     assert sum(len(d["content"]) for d in knowledge.load_all()) < 100_000
 
 
@@ -60,3 +63,16 @@ def test_the_process_integration_chapter_carries_the_map_row_contract():
 def test_unknown_topic_raises():
     with pytest.raises(KeyError):
         knowledge.load("nope")
+
+
+def test_implementation_patterns_carry_no_workspace_data():
+    """Hard rule 10: the patterns are framework files read by other teams. They were
+    distilled from one client's workspace, so guard the obvious leaks: GUIDs, e-mail
+    addresses and connection strings."""
+    import re
+    for t in ("patterns", "patterns-processes", "patterns-forms", "patterns-integrations",
+              "patterns-database"):
+        text = knowledge.load(t)["content"]
+        assert not re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", text), t
+        assert not re.search(r"[\w.-]+@[\w-]+\.[a-z]{2,}", text), t
+        assert not re.search(r"(?i)password\s*=|pwd=\w", text), t

@@ -113,6 +113,31 @@ class LiveForm:
                 f"mapped")
         return build(self.root_id, str(el["id"]), str(vcid))
 
+    def element(self, ref: str) -> dict:
+        """One element by id, else by its unique `name` config."""
+        if ref in self.by_id:
+            return self.by_id[ref]
+        els = self.by_name.get(ref) or []
+        if len(els) == 1:
+            return els[0]
+        if not els:
+            raise UsageError(f"{ref!r} is not an element on this form (by id or name)")
+        raise UsageError(f"{len(els)} elements are named {ref!r}; pass the element id instead")
+
+    def config_path(self, ref: str, key: str) -> str:
+        """The path of ANY config of an element (`disabled`, `visible`, `label`…), not only its
+        value. A MAP_FORM_DATA row and a condition address a config the same way a process
+        addresses the value: the fourth segment is that config's own id, which the data model
+        reuses as the attribute id. Same failure mode as a wrong value path, so same refusal."""
+        el = self.element(ref)
+        cid = _config_id(el, key)
+        if not cid:
+            keys = ", ".join(c.get("key", "") for c in el.get("configs") or []
+                             if not str(c.get("key", "")).startswith("on"))
+            raise UsageError(f"element {ref!r} (type {el.get('type')!r}) has no {key!r} config; "
+                             f"it has: {keys}")
+        return build(self.root_id, str(el["id"]), str(cid))
+
     def check(self, path: str, where: str) -> None:
         """Raise unless `path` addresses a real value-bearing field of THIS form.
 

@@ -206,7 +206,7 @@ actions:
   - name: cron
     type: string
     required: false
-    description: 5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab.
+    description: '5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab. BE rule (PRC-5406): 5 fields only (no seconds), @-macros like @daily are REJECTED, max 100 chars, and the schedule''s times are UTC.'
   - name: timezone
     type: string
     required: false
@@ -2386,6 +2386,21 @@ actions:
     type: boolean
     required: false
     description: fetch from archived storage
+- name: flow-digest
+  description: 'Readable Markdown digest of flows (offline): variable contract, nodes in execution order, each node''s script/SQL/HTTP/subprocess parameters with variable and flow ids resolved to names. --in a file or a directory; --out writes one .md per flow + INDEX.md.'
+  args:
+  - name: in
+    type: string
+    required: true
+    description: a flow JSON / API envelope / .procesio bundle file, OR a directory of them (every *.json is read; subprocess targets resolve to titles across the set)
+  - name: out
+    type: string
+    required: false
+    description: write one <slug>.md per flow + INDEX.md here; omit to return the Markdown inline
+  - name: names
+    type: string
+    required: false
+    description: 'optional JSON file {guid: display name} for ids outside the flows (credentials, forms, data models)'
 - name: flow-lint
   description: 'Designer-layer ''Process Errors'' lint on a live flow (the check that blocks designer SAVE, which POST /Projects/validate does NOT catch): stale subprocess side-pannel ids, unmapped/dead required subprocess inputs, subprocess outputs mapped to non-output (non-type-30) vars, Execute Query with null Output, and Node code binding error-scope/undeclared vars. clean=true when none.'
   args:
@@ -2732,6 +2747,21 @@ actions:
     type: string
     required: true
     description: form template id
+- name: form-digest
+  description: 'Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables resolved to names, MAP_FORM_DATA conditions, scripts saved beside. --out adds FORM-PROCESS-MAP.md.'
+  args:
+  - name: in
+    type: string
+    required: true
+    description: a form template JSON (form-get output) or a directory of them; a sibling <id>.code.json (form-get-code output) adds the global CSS/JS
+  - name: processes
+    type: string
+    required: false
+    description: directory of process JSON (API envelope / flow) to name RUN_PROCESS targets and their variables
+  - name: out
+    type: string
+    required: false
+    description: write <slug>.md + <slug>/ (scripts, global form.js/form.css) per form and FORM-PROCESS-MAP.md here; omit to return the Markdown inline
 - name: form-duplicate
   description: POST /api/FormTemplate/{id}/duplicate.
   args:
@@ -2946,6 +2976,41 @@ actions:
     type: boolean
     required: false
     description: report the change (and the previous code) without writing
+  - name: force
+    type: boolean
+    required: false
+    description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
+- name: form-set-element-chains
+  description: 'Rewrite the ORDERED event chains of one or more elements on a live form in ONE save (surgical: only the listed element triggers change). Each chain lists its events in order: {keep: <existing event id>} re-uses an event verbatim (large scripts are never re-sent), {map: {set: {''<element>.<configKey>'': value, ''@<variable>'': value}, when: [{field|variable, op, value}], match: all|any}} builds a MAP_FORM_DATA block from NAMES, {js: code} / {js_file: path} adds a RUN_JAVASCRIPT block, {raw: event} passes an event through. Every name, config key, variable, operator and kept id is resolved before writing; events not listed are dropped and reported. --dry-run prints each chain by name.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: form template id
+  - name: plan
+    type: string
+    required: false
+    description: the chains plan as JSON (see the action description)
+  - name: plan-file
+    type: string
+    required: false
+    description: path to the plan JSON; js_file paths inside it resolve relative to it
+  - name: dry-run
+    type: boolean
+    required: false
+    description: resolve and report every chain (names, not guids) without saving
   - name: force
     type: boolean
     required: false
@@ -10411,7 +10476,7 @@ actions:
   - name: cron
     type: string
     required: false
-    description: 5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab.
+    description: '5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab. BE rule (PRC-5406): 5 fields only (no seconds), @-macros like @daily are REJECTED, max 100 chars, and the schedule''s times are UTC.'
   - name: timezone
     type: string
     required: false

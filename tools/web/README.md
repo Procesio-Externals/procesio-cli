@@ -102,7 +102,9 @@ Unknown `do` values or keys, or missing required keys, fail fast with
 | `click`        | `selector` | `timeout`, `force` | Click the first match. `force: true` skips the actionability wait - for a framework that paints a container over its own controls, where the hit test at the control's centre returns that container and the click is refused although a person can press it. It also skips the visibility check, so a truly hidden element is "clicked" with no effect and no error. |
 | `fill`         | `selector`, `text` | `timeout` | Type text into an input. |
 | `press`        | `key` | `selector` | Press a key (globally, or focused on a selector). |
+| `wait`         | `ms` | | Pause for a fixed time - for a negative check ("nothing happened within N ms"). |
 | `wait_for`     | `selector` | `timeout` | Wait until a selector appears. |
+| `eval`         | `script` | `name`, `arg` | Run JS in the page (Playwright `evaluate`) and store the JSON result in `results[name]`. It reads live state `extract_attr` cannot see (an input's `.value` property, `disabled`). An `async () => {...}` script can click and poll, which times an interaction. |
 | `extract_text` | (none) | `selector`, `name`, `timeout` | Read text (a selector, or whole page body) into `results[name]`. |
 | `extract_attr` | `selector`, `attr` | `name`, `timeout` | Read an attribute into `results[name]`. |
 | `screenshot`   | `path` | `full_page` | Save a screenshot; path collected into `screenshots`. |
@@ -123,6 +125,18 @@ Example `steps.json`:
   {"do": "screenshot", "path": "outputs/profile.png"}
 ]
 ```
+
+#### Anonymous browsing — a session with nothing in it
+
+`run` always loads a session. For a public page that needs no login, give it an EMPTY
+storageState and it behaves as a fresh anonymous browser:
+
+```python
+from tools.web import sessions
+sessions.write_state("anon", {"cookies": [], "origins": []})
+```
+
+Delete it afterwards with `web delete-session --name anon --confirm`.
 
 #### Human handoff — the agent stages, you submit
 

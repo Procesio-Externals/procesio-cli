@@ -64,7 +64,8 @@ def collect_actions() -> dict[str, ActionDef]:
     from tools.procesio.handlers import (
         auth_actions, catalog, customaction_ops, datastore_ops, datatype_ops,
         dto_actions, environment_admin, files,
-        flowgraph, form_code, form_element, form_events, form_update, formprocess, generic, layout, usageguide,
+        flowgraph, form_chains, form_code, form_element, form_events, form_update, formprocess, generic,
+        layout, usageguide,
         process_layout, process_naming, processes, profile_admin,
         flowlint, fevalidate, nodeparams, resource_ops, schedules, sqlactions, transport,
     )
@@ -107,6 +108,9 @@ def collect_actions() -> dict[str, ActionDef]:
     curated.update(form_code.ACTIONS)
     # Same surgical shape, for one element's event handlers (RUN_PROCESS wiring).
     curated.update(form_events.ACTIONS)
+    # Whole ordered chains (JS / MAP / process) of several elements in one save; MAP blocks and
+    # their conditions are built from names, existing events are kept by id.
+    curated.update(form_chains.ACTIONS)
     # Same surgical shape again, for one element's PLAIN configs — label/required/
     # regex/visible. Content and per-field rules belong in the DTO, not in the
     # form-level JS layer where the designer cannot see them.

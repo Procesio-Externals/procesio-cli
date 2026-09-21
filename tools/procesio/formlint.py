@@ -13,6 +13,11 @@ a debugging session to find (see PROCESIO-API-NOTES.md and FORM-DEV-GUIDE/08):
   wrapping the patch as `{"Data": {...}}` (O7).
 * **Multiple-select without isList** — a select with `multiple=true` whose `value`
   config is not marked `isList` maps a list into a scalar.
+* **IS_TRUE / IS_FALSE on a Boolean variable whose default is the text "false"** — the
+  designer stores a Boolean form variable's default as a STRING ("False" / "false"), and a
+  condition treats any non-empty string as true. Measured live: default "false" or "False"
+  → IS_TRUE passes and IS_FALSE fails; default null → IS_TRUE fails and IS_FALSE passes.
+  A gate like `isConfirmed IS_TRUE` on such a default is always open.
 
 Pure and side-effect-free: each returns a list of human-readable warning strings.
 Warnings, never blockers — the caller attaches them to its result JSON.
@@ -134,8 +139,56 @@ def lint_patch_keys(existing_data: Any, patch: Any) -> list[str]:
     return out
 
 
+_BOOLEAN_TESTS = ("IS_TRUE", "IS_FALSE")
+
+
+def string_boolean_conditions(events: Any, variables: Any, where: str) -> list[str]:
+    """Warnings for IS_TRUE / IS_FALSE conditions, in `events`, on a form variable whose
+    default is the TEXT "false" (any case): the condition reads it as true. Shared by the
+    whole-form lint and by form-set-element-chains, which checks only the chains it writes.
+    A "true" text default is left alone - it evaluates the way it reads."""
+    defaults = {v.get("id"): v for v in variables or [] if isinstance(v, dict)}
+    out = []
+    for ev in events or []:
+        conds = ((ev or {}).get("config") or {}).get("conditions") or []
+        for c in conds:
+            op = str(c.get("operator") or "")
+            var = defaults.get((c.get("leftOperator") or {}).get("value"))
+            if op not in _BOOLEAN_TESTS or var is None:
+                continue
+            default = var.get("defaultValue")
+            if not (isinstance(default, str) and default.strip().lower() == "false"):
+                continue
+            effect = ("PASSES although it reads false" if op == "IS_TRUE"
+                      else "never passes although it reads false")
+            out.append(
+                f"{where}: condition `{var.get('name')} {op}` reads a form variable whose "
+                f"default is the TEXT {default!r}; a condition treats any non-empty text as "
+                f"true, so {op} {effect}, until something writes a real boolean (measured "
+                f"live). Set the default to null, or branch with EQUALS on a value that really "
+                f"is text (a select's value, or a field your own flow writes).")
+    return out
+
+
+def lint_string_boolean_conditions(data: Any) -> list[str]:
+    if not isinstance(data, dict):
+        return []
+    variables = data.get("variables") or []
+    out = string_boolean_conditions(data.get("events") or [], variables, "form-level event")
+    for e in _elements(data):
+        if not isinstance(e, dict):
+            continue
+        for c in e.get("configs") or []:
+            if (isinstance(c, dict) and str(c.get("key", "")).startswith("on")
+                    and isinstance(c.get("value"), dict)):
+                out += string_boolean_conditions(c["value"].get("events"), variables,
+                                                 f"element {_label(e)} {c.get('key')}")
+    return out
+
+
 def lint_form_data(data: Any) -> list[str]:
     """All structural (element-level) lints for a form's Data."""
     return (lint_phantom_parent(data)
             + lint_duplicate_configs(data)
-            + lint_multiple_select_islist(data))
+            + lint_multiple_select_islist(data)
+            + lint_string_boolean_conditions(data))

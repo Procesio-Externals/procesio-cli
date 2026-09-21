@@ -1,6 +1,8 @@
 """DTO safety lints (warnings, never blockers) — red/green for each check."""
 from __future__ import annotations
 
+import pytest
+
 from tools.procesio import formlint
 
 
@@ -97,3 +99,57 @@ def test_single_select_not_flagged():
         {"key": "value", "isList": False},
     ])]}
     assert formlint.lint_multiple_select_islist(data) == []
+
+
+# -- IS_TRUE / IS_FALSE on a Boolean variable whose default is a STRING ------
+
+def _cond(left, op, right=""):
+    return {"operator": op, "leftOperator": {"value": left}, "rightOperator": {"value": right}}
+
+
+def _form_with_condition(default, op="IS_TRUE", left="var-pj"):
+    return {
+        "variables": [{"id": "var-pj", "name": "isPJ", "defaultValue": default}],
+        "elements": [_el("btn", configs=[
+            _cfg("name", "confirm"),
+            _cfg("onClickEvents", {"events": [{"action": "MAP_FORM_DATA", "config": {
+                "mapping": [], "conditions": [_cond(left, op)]}}]}),
+        ])],
+    }
+
+
+@pytest.mark.parametrize("default", ["False", "false"])
+def test_is_true_on_text_false_default_flagged(default):
+    # measured live: IS_TRUE passes on both spellings, because any non-empty text is true
+    warns = formlint.lint_string_boolean_conditions(_form_with_condition(default))
+    assert len(warns) == 1
+    assert "isPJ IS_TRUE" in warns[0] and repr(default) in warns[0] and "'confirm'" in warns[0]
+    assert "PASSES" in warns[0]
+    assert warns[0] in formlint.lint_form_data(_form_with_condition(default))
+
+
+def test_is_false_on_text_false_default_flagged_as_never_passing():
+    warns = formlint.lint_string_boolean_conditions(_form_with_condition("False", op="IS_FALSE"))
+    assert len(warns) == 1 and "never passes" in warns[0]
+
+
+def test_text_true_default_is_not_flagged():
+    # "True" evaluates the way it reads, in both directions
+    assert formlint.lint_string_boolean_conditions(_form_with_condition("True")) == []
+    assert formlint.lint_string_boolean_conditions(_form_with_condition("True", op="IS_FALSE")) == []
+
+
+def test_null_default_equals_operator_and_field_operand_not_flagged():
+    assert formlint.lint_string_boolean_conditions(_form_with_condition(None)) == []
+    assert formlint.lint_string_boolean_conditions(_form_with_condition("False", op="EQUALS")) == []
+    field = "root.11223344-5566-7788-99aa-aabbccddeeff.el.cfg"
+    assert formlint.lint_string_boolean_conditions(_form_with_condition("False", left=field)) == []
+
+
+def test_form_level_events_are_checked_too():
+    data = {"variables": [{"id": "v", "name": "flag", "defaultValue": "False"}],
+            "events": [{"action": "MAP_FORM_DATA",
+                        "config": {"mapping": [], "conditions": [_cond("v", "IS_TRUE")]}}],
+            "elements": []}
+    warns = formlint.lint_string_boolean_conditions(data)
+    assert len(warns) == 1 and warns[0].startswith("form-level event")
