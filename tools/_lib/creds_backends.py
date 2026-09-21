@@ -448,11 +448,30 @@ class BridgeBackend(_ReadOnly):
                 body = resp.read().decode("utf-8").strip()
                 return body or None
         except urllib.error.HTTPError as e:
+            # 404 is the ONE quiet outcome: the secret is genuinely absent, which
+            # is what get_optional promises to return None for. Every other code
+            # means "we could not answer the question" and must be loud - a
+            # refusal or an outage reported as None reaches the caller as
+            # "missing credential; run set-credential", sending someone to fix a
+            # store that is fine while the real cause goes unmentioned.
             if e.code == 404:
                 return None
+            if e.code == 401:
+                raise RuntimeError(
+                    f"creds bridge rejected the bearer token ({self._url}); "
+                    "check AAT_CREDS_BRIDGE_TOKEN, or re-issue it with "
+                    "`creds-bridge issue-token --force` and restart the bridge")
+            if e.code == 403:
+                raise RuntimeError(
+                    f"creds bridge policy denies {tool}:{secret} ({self._url}); "
+                    "widen 'allow' in the bridge's policy.json, or the host's "
+                    "audit log will show the denial")
             raise
-        except urllib.error.URLError:
-            return None
+        except urllib.error.URLError as e:
+            raise RuntimeError(
+                f"creds bridge unreachable at {self._url} ({e.reason}); start it "
+                "on the host with `creds-bridge start`, or unset "
+                "AAT_CREDS_BACKEND to use this machine's own vault")
 
 
 class ProcesioBackend(_ReadOnly):

@@ -12,6 +12,7 @@ Actions:
   run               run a declarative step list against a saved session
   get-text          load a session, open a URL, return visible text
   screenshot        load a session, open a URL, save a screenshot
+  archive-document  capture a published document (original + self-contained + extraction)
 
 Playwright is imported lazily (inside the driver) so this tool and its tests
 load even before the browser binaries are installed.
@@ -46,9 +47,10 @@ class _Parser(argparse.ArgumentParser):
 
 def collect_actions() -> dict[str, ActionDef]:
     actions: dict[str, ActionDef] = {}
-    from tools.web.handlers import browse, sessmgmt
+    from tools.web.handlers import archive, browse, sessmgmt
     actions.update(sessmgmt.ACTIONS)
     actions.update(browse.ACTIONS)
+    actions.update(archive.ACTIONS)
     return actions
 
 
