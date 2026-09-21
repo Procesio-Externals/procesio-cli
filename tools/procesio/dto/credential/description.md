@@ -34,7 +34,7 @@ platform added `DbClientType.MYSQL = 2` alongside `MSSQL = 1` (Web-Api / Process
 connection by choosing the **"Server Type"** option `MySQL` (live-confirmed option value
 `40404040-0001-0001-0002-cccccccccccc`; MSSQL is `…-0001-…`). No new tool code — the builder
 resolves the option name to its guid like any other select property. The DB actions
-(**Execute Query V3** / **Execute Command V2** — the current versions) then run against it
+(**Execute Query** / **Execute Command**, GUIDs `76470756-…` / `a1625da6-…`; the newer V2 variants add a Timeout + Parameters tab) then run against it
 unchanged, and the credential's Test button opens a real `MySqlConnection`. Live property
 labels on the `SQL` type: Server Type, Protocol Type, Server Name, Port Number, Database
 Name, Encrypt, Pooling, Trust Server Certificate, Authentication Type, Username, Password.
@@ -71,6 +71,16 @@ by the connector: `80808080-0001-0000-0000-aaaaaaaaaaaa`.
 > the property/option names before relying on the literals above. (Outbound DB hosts are
 > also SSRF-guarded by a host blacklist — `DbHostBlacklistChecker` — so a blacklisted /
 > private host is rejected at connect time.)
+
+**Prelude** ships as a REST-derived credential - `template: "REST API/ Prelude"`, Bearer
+token, base `https://platform.prelude.so`, driving the Prelude connector (phone
+verification + lookup). It IS live in `GET /api/Credentials/types` (verified 2026-09-21,
+35 types). See `PROCESIO-CONNECTORS-NOTES.md`.
+
+> ⚠ **A credential read returns its secrets in plaintext (PRC-5556):** `credential-get`
+> and the read API hand back stored secret values, not a masked placeholder. Never log,
+> print, or echo a fetched credential, and never write one to a file the secret scanner
+> then flags. Treat the whole object as sensitive.
 
 ## API contract (verified live 2026-06-24)
 

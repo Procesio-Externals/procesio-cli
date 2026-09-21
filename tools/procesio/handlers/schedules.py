@@ -152,7 +152,9 @@ def _payload_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--cron",
                    help="5-field crontab expression (min hour day month weekday); sets "
                         "the recurrence to CRON (type 8) over the --payload. Preview it "
-                        "first with validate-crontab.")
+                        "first with validate-crontab. BE rule (PRC-5406): 5 fields only "
+                        "(no seconds), @-macros like @daily are REJECTED, max 100 chars, "
+                        "and the schedule's times are UTC.")
     p.add_argument("--timezone", help="IANA timezone id for the cron (e.g. Europe/Bucharest)")
     p.add_argument("--recurrence-info", dest="recurrence_info",
                    help="human-readable recurrence label (optional)")

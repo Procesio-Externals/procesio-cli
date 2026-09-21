@@ -6763,15 +6763,6 @@
    "events": []
   },
   {
-   "actionId": "a1625da6-c093-4695-a97c-3c3d9a9b0cae",
-   "name": "Execute Command",
-   "icon": "icon-mssql",
-   "shape": "square",
-   "inputPorts": 1,
-   "outputPorts": 1,
-   "isProcesioAction": true,
-   "isTestable": true,
-   "isDisableable": true,
    "configuration": [
     {
      "id": "e1030156-b55d-4a68-86f0-e31462d4457b",
@@ -6911,7 +6902,16 @@
      ]
     }
    ],
-   "events": []
+   "events": [],
+   "actionId": "a1625da6-c093-4695-a97c-3c3d9a9b0cae",
+   "name": "Execute Command",
+   "icon": "icon-sql",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
   },
   {
    "actionId": "c2760ff2-cd9e-49b4-b751-c05c88e06dac",
@@ -7041,15 +7041,6 @@
    "events": []
   },
   {
-   "actionId": "76470756-6dbd-4ab2-a4bf-88b47ed381ba",
-   "name": "Execute Query",
-   "icon": "icon-mssql",
-   "shape": "square",
-   "inputPorts": 1,
-   "outputPorts": 1,
-   "isProcesioAction": true,
-   "isTestable": true,
-   "isDisableable": true,
    "configuration": [
     {
      "id": "3aafb817-4b9d-4948-9828-9c3d4b4bc92f",
@@ -7189,7 +7180,16 @@
      ]
     }
    ],
-   "events": []
+   "events": [],
+   "actionId": "76470756-6dbd-4ab2-a4bf-88b47ed381ba",
+   "name": "Execute Query",
+   "icon": "icon-sql",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
   },
   {
    "actionId": "574a2ab1-4d24-4d6c-9483-f61597a6d5ff",
@@ -16304,15 +16304,6 @@
    "events": []
   },
   {
-   "actionId": "e0fc20c3-e333-554c-a062-f64894db51dd",
-   "name": "Node",
-   "icon": "icon-nodejs",
-   "shape": "square",
-   "inputPorts": 1,
-   "outputPorts": 1,
-   "isProcesioAction": true,
-   "isTestable": true,
-   "isDisableable": true,
    "configuration": [
     {
      "id": "0b2f5d3e-2da4-e242-887c-d4251987460d",
@@ -16333,6 +16324,27 @@
        "isList": false,
        "direction": 1,
        "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": null,
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "4b9a1e7c-2f6d-3580-a1c4-e7b09d3f2a68",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Stdout",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 5,
        "columnId": 0,
        "columnSize": 0,
        "tooltip": null,
@@ -16377,10 +16389,10 @@
        "rowId": 2,
        "columnId": 0,
        "columnSize": 0,
-       "tooltip": "Timeout in seconds. Minimum value is 60 and maximum is 300.",
+       "tooltip": "Timeout in seconds. Minimum 10, maximum 180.",
        "limits": {
-        "min": 60,
-        "max": 300
+        "min": 10,
+        "max": 180
        },
        "dependencies": [],
        "events": []
@@ -16398,7 +16410,7 @@
        "expects": null,
        "isList": false,
        "direction": 3,
-       "rowId": 5,
+       "rowId": 6,
        "columnId": 0,
        "columnSize": 0,
        "tooltip": null,
@@ -16430,7 +16442,16 @@
      ]
     }
    ],
-   "events": []
+   "events": [],
+   "actionId": "e0fc20c3-e333-554c-a062-f64894db51dd",
+   "name": "Node",
+   "icon": "icon-nodejs",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
   },
   {
    "actionId": "a56553a4-1cef-4471-b902-9e1a6457ed02",
@@ -17578,48 +17599,81 @@
    "events": []
   },
   {
-   "actionId": "94b80a76-b58f-ea4c-900b-de2191f4f5ce",
-   "name": "Python",
-   "icon": "icon-python",
-   "shape": "square",
-   "inputPorts": 1,
-   "outputPorts": 1,
-   "isProcesioAction": true,
-   "isTestable": true,
-   "isDisableable": true,
    "configuration": [
     {
-     "id": "4ebb7cce-66ca-0843-960e-944c8f73420e",
-     "label": "Interpret Python",
+     "id": "7ae096ec-da7b-50f8-840c-66552f69af82",
+     "label": "Configuration Tab",
      "orderId": 0,
      "settings": [
       {
-       "id": "d14a2652-15f8-d040-a3db-32135c1636ba",
-       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121220",
-       "label": "Output",
+       "id": "dfbbdf22-4f8f-e4d8-b01f-34cdadc02ecf",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121221",
+       "label": "Single Result",
        "type": "datatype",
        "language": null,
        "credentialsTemplateId": null,
        "value": null,
        "options": null,
-       "isRequired": true,
+       "isRequired": false,
        "expects": null,
        "isList": false,
        "direction": 3,
-       "rowId": 2,
+       "rowId": 3,
        "columnId": 0,
        "columnSize": 0,
-       "tooltip": "Output after interpreting the code.",
+       "tooltip": null,
        "limits": null,
        "dependencies": [],
        "events": []
       },
       {
-       "id": "ac749ab1-87f9-2c47-b890-e1a6a34ae546",
+       "id": "b8cea14b-b74f-e97a-20e6-9489e96e6b37",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Stdout",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 5,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": null,
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "ca7a387d-262b-f572-5351-e18789f89535",
        "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121221",
+       "label": "List Result",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": true,
+       "direction": 3,
+       "rowId": 4,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": null,
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "963dcf83-95d4-e6c8-4a0a-1c65566f05ef",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
        "label": "Code",
        "type": "code-editor",
-       "language": "plaintext",
+       "language": "python",
        "credentialsTemplateId": null,
        "value": "print(\"Hello world\")",
        "options": null,
@@ -17634,11 +17688,65 @@
        "limits": null,
        "dependencies": [],
        "events": []
+      },
+      {
+       "id": "ffd16d91-f29b-4e7c-261e-0534bc7a5428",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121211",
+       "label": "Timeout",
+       "type": "number",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "60",
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 2,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Timeout in seconds. Minimum 10, maximum 180.",
+       "limits": {
+        "min": 10,
+        "max": 180
+       },
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "72b3c0ce-c0d4-ea84-3359-3b956402e022",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Error",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 6,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": null,
+       "limits": null,
+       "dependencies": [],
+       "events": []
       }
      ]
     }
    ],
-   "events": []
+   "events": [],
+   "actionId": "94dc42d2-6e68-f272-025c-7c8ca78e86d6",
+   "name": "Python",
+   "icon": "icon-python",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
   },
   {
    "actionId": "6aca41ed-90bf-4b5d-8fcd-1c84d3c26d88",
@@ -19856,15 +19964,6 @@
    "events": []
   },
   {
-   "actionId": "999d12a9-97e3-864e-a33d-7ff494ccdf5a",
-   "name": "Ruby",
-   "icon": "icon-ruby",
-   "shape": "square",
-   "inputPorts": 1,
-   "outputPorts": 1,
-   "isProcesioAction": true,
-   "isTestable": true,
-   "isDisableable": true,
    "configuration": [
     {
      "id": "f5ba8217-49f4-a34f-b4d3-c071b178ed73",
@@ -19971,10 +20070,10 @@
        "rowId": 2,
        "columnId": 0,
        "columnSize": 0,
-       "tooltip": "Timeout in seconds. Minimum value is 60 and maximum is 300.",
+       "tooltip": "Timeout in seconds. Minimum 10, maximum 180.",
        "limits": {
-        "min": 60,
-        "max": 300
+        "min": 10,
+        "max": 180
        },
        "dependencies": [],
        "events": []
@@ -20003,7 +20102,16 @@
      ]
     }
    ],
-   "events": []
+   "events": [],
+   "actionId": "999d12a9-97e3-864e-a33d-7ff494ccdf5a",
+   "name": "Ruby",
+   "icon": "icon-ruby",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
   },
   {
    "actionId": "a225c085-f958-4c6f-9fef-117a66e2d5ce",
@@ -28795,37 +28903,1035 @@
      "outputTarget": 2
     }
    ],
-   "updatedOn": "2026-05-25T00:00:00",
    "actionId": "02577ada-0000-0100-0000-00000000a001",
    "name": "Data Store",
-   "description": "Perform row-level operations on a Data Store table: insert, select, update, or delete rows.",
    "icon": "database",
    "shape": "square",
    "inputPorts": 1,
    "outputPorts": 1,
    "isProcesioAction": true,
-   "permissions": {
-    "canDelete": true,
-    "canAddFromToolbar": true,
-    "canDuplicate": true,
-    "canSaveActionAsTemplate": true
-   },
    "isTestable": true,
-   "isDebuggable": true,
-   "isDisableable": true,
-   "tooltip": "Perform row-level operations on a Data Store table",
-   "documentation": {
-    "url": "https://docs.procesio.com/how-to/data-store",
-    "image": null
-   },
-   "firstName": null,
-   "lastName": null,
-   "workspaceId": null,
-   "createdBy": null,
-   "updatedBy": null,
-   "createdById": "81dd8ff9-b304-458f-a64a-3ed7e90a068d",
-   "updatedById": "81dd8ff9-b304-458f-a64a-3ed7e90a068d",
-   "createdOn": null
+   "isDisableable": true
+  },
+  {
+   "configuration": [
+    {
+     "id": "e90de19b-0000-0100-0000-00000000a011",
+     "label": "Configuration",
+     "orderId": 0,
+     "settings": [
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a101",
+       "dataTypeId": null,
+       "label": "Prelude Credentials",
+       "type": "credentials",
+       "language": null,
+       "credentialsTemplateId": "9be10de9-0002-0000-0000-aaaaaaaaaaaa",
+       "value": null,
+       "options": null,
+       "isRequired": true,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 0,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "REST credential pointing at https://api.prelude.dev with Bearer Token authentication.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a102",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Operation",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": [
+        {
+         "name": "Send verification code",
+         "value": "send_verification"
+        },
+        {
+         "name": "Check verification code",
+         "value": "check_code"
+        },
+        {
+         "name": "Look up phone number",
+         "value": "lookup"
+        }
+       ],
+       "isRequired": true,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "What this action should do. The fields below change with the selected operation.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      }
+     ]
+    },
+    {
+     "id": "e90de19b-0000-0100-0000-00000000a012",
+     "label": "Input",
+     "orderId": 1,
+     "settings": [
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a103",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Target",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": true,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 10,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Phone number in E.164 format, for example +40712345678. For the Check operation an email address is also accepted.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a104",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Target Type",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": [
+        {
+         "name": "Phone number",
+         "value": "phone_number"
+        },
+        {
+         "name": "Email address",
+         "value": "email_address"
+        }
+       ],
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 11,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Leave empty to detect automatically: a value containing @ is treated as an email address, anything else as a phone number.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        },
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 2,
+         "value": "check_code"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a105",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Code",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 20,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The verification code the end user typed in.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "check_code"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a106",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Delivery Method",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": [
+        {
+         "name": "Auto (let Prelude choose)",
+         "value": "auto"
+        },
+        {
+         "name": "Message",
+         "value": "message"
+        },
+        {
+         "name": "Voice call",
+         "value": "voice"
+        }
+       ],
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 30,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "How the code is delivered. Auto lets Prelude pick the best method for the destination.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a107",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Preferred Channel",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": [
+        {
+         "name": "SMS",
+         "value": "sms"
+        },
+        {
+         "name": "RCS",
+         "value": "rcs"
+        },
+        {
+         "name": "WhatsApp",
+         "value": "whatsapp"
+        },
+        {
+         "name": "Viber",
+         "value": "viber"
+        },
+        {
+         "name": "Zalo",
+         "value": "zalo"
+        },
+        {
+         "name": "Telegram",
+         "value": "telegram"
+        }
+       ],
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 31,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Channel Prelude should try first. Prelude may fall back to another channel if this one cannot deliver.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a108",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Sender ID",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 32,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Alphanumeric sender name shown to the recipient. It must already be approved in your Prelude account.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a109",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Template ID",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 33,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Prelude message template to use. Leave empty to use the account default template.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a10a",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121220",
+       "label": "Template Variables",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "{}",
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 34,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Values substituted into the template, as a JSON object. Keys must match the template exactly.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a10b",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Locale",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 35,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "BCP-47 locale for the message, for example ro-RO or en-US.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a10c",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121211",
+       "label": "Code Size",
+       "type": "number",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "0",
+       "options": null,
+       "isRequired": false,
+       "expects": "number",
+       "isList": false,
+       "direction": 1,
+       "rowId": 36,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Number of digits in the generated code. Leave at 0 to use the Prelude account default.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a10d",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Custom Code",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 37,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Send this exact code instead of a generated one. Only available on Prelude sandbox or test numbers.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a10e",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121210",
+       "label": "Force Challenge",
+       "type": "check-box",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "False",
+       "options": null,
+       "isRequired": false,
+       "expects": "boolean",
+       "isList": false,
+       "direction": 1,
+       "rowId": 38,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Always send a code, even when Prelude's fraud checks would have skipped or silently verified it.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a10f",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Callback URL",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 39,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "HTTPS endpoint Prelude calls with delivery updates for this verification.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a110",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Correlation ID",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 40,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Your own identifier for this verification, echoed back by Prelude. Maximum 80 characters.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a111",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121220",
+       "label": "Signals",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "{}",
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 41,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Optional fraud signals as a JSON object, for example ip, device_id, device_platform, user_agent. Improves Prelude's risk scoring.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a112",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121210",
+       "label": "Include Caller Name",
+       "type": "check-box",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "False",
+       "options": null,
+       "isRequired": false,
+       "expects": "boolean",
+       "isList": false,
+       "direction": 1,
+       "rowId": 50,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Also retrieve the caller ID name (CNAM). This is billed separately by Prelude.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "lookup"
+        }
+       ],
+       "events": []
+      }
+     ]
+    },
+    {
+     "id": "e90de19b-0000-0100-0000-00000000a013",
+     "label": "Output",
+     "orderId": 2,
+     "settings": [
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a113",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121220",
+       "label": "Response",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The full Prelude response for the selected operation.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a114",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Status",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 2,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Send: success, retry, challenged, blocked or shadow_blocked. Check: success, failure, expired_or_not_found, transaction_missing or transaction_mismatch.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        },
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 2,
+         "value": "check_code"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a115",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Verification ID",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 3,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Prelude identifier of the verification, for example vrf_01jc0t6fwwfgfsq1md24mhyztj.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        },
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 2,
+         "value": "check_code"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a116",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Reason",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 4,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Why Prelude blocked or retried the verification, for example in_block_list or suspicious. Empty when the status is success.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "send_verification"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a117",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Request ID",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 5,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Prelude request identifier. Quote it when contacting Prelude support.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a118",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Country Code",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 10,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "ISO country code of the looked-up number, for example RO.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "lookup"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a119",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Carrier Name",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 11,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Current carrier of the looked-up number.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "lookup"
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "e90de19b-0000-0100-0000-00000000a11a",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Line Type",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 12,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Line type of the looked-up number: mobile, fixed_line, voip, toll_free and similar.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "e90de19b-0000-0100-0000-00000000a102",
+         "operator": 1,
+         "logicalOperator": 1,
+         "value": "lookup"
+        }
+       ],
+       "events": []
+      }
+     ]
+    }
+   ],
+   "events": [],
+   "actionId": "e90de19b-0000-0100-0000-00000000a001",
+   "name": "Prelude",
+   "icon": "icon-prelude",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": false
+  },
+  {
+   "configuration": [
+    {
+     "id": "4ebb7cce-66ca-0843-960e-944c8f73420e",
+     "label": "Interpret Python",
+     "orderId": 0,
+     "settings": [
+      {
+       "id": "d14a2652-15f8-d040-a3db-32135c1636ba",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121220",
+       "label": "Output",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": true,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 2,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Output after interpreting the code.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "ac749ab1-87f9-2c47-b890-e1a6a34ae546",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121221",
+       "label": "Code",
+       "type": "code-editor",
+       "language": "plaintext",
+       "credentialsTemplateId": null,
+       "value": "print(\"Hello world\")",
+       "options": null,
+       "isRequired": true,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Python code to be interpreted.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      }
+     ]
+    }
+   ],
+   "events": [],
+   "actionId": "94b80a76-b58f-ea4c-900b-de2191f4f5ce",
+   "name": "Python (Old)",
+   "icon": "icon-python",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
+  },
+  {
+   "configuration": [
+    {
+     "id": "02577ada-0000-0200-0000-00000000b011",
+     "label": "Query Store",
+     "orderId": 0,
+     "settings": [
+      {
+       "id": "02577ada-0000-0200-0000-00000000b101",
+       "dataTypeId": null,
+       "label": "Configure Query",
+       "type": "side-pannel",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": [
+        {
+         "id": "02577ada-0000-0200-0000-00000000b102",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Query",
+         "type": "code-editor",
+         "language": "datastore",
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": true,
+         "expects": null,
+         "isList": false,
+         "direction": 1,
+         "rowId": 0,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "The SQL statement to run against the Data Store. One statement per execution.",
+         "limits": null,
+         "dependencies": [],
+         "events": []
+        },
+        {
+         "id": "02577ada-0000-0200-0000-00000000b103",
+         "dataTypeId": null,
+         "label": "Parameters config tab",
+         "type": "map-parameters",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": false,
+         "direction": 1,
+         "rowId": 1,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Map the query parameter names to the values they are bound to.",
+         "limits": null,
+         "dependencies": [],
+         "events": []
+        },
+        {
+         "id": "02577ada-0000-0200-0000-00000000b104",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121211",
+         "label": "Time Out",
+         "type": "number",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": "1800",
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": false,
+         "direction": 1,
+         "rowId": 2,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Set a custom Timeout in seconds. Minimum is 60.",
+         "limits": {
+          "min": 60,
+          "max": 1800
+         },
+         "dependencies": [],
+         "events": []
+        },
+        {
+         "id": "02577ada-0000-0200-0000-00000000b105",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121220",
+         "label": "Result Rows",
+         "type": "datatype",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": true,
+         "direction": 3,
+         "rowId": 3,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "The rows returned by the statement. Empty for statements that do not return rows.",
+         "limits": null,
+         "dependencies": [],
+         "events": []
+        },
+        {
+         "id": "02577ada-0000-0200-0000-00000000b106",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121211",
+         "label": "Total Count",
+         "type": "datatype",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": false,
+         "direction": 3,
+         "rowId": 4,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "For SELECT: the number of rows returned. For INSERT, REPLACE, UPDATE and DELETE: the number of affected rows.",
+         "limits": null,
+         "dependencies": [],
+         "events": []
+        }
+       ],
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": null,
+       "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": null,
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      }
+     ]
+    }
+   ],
+   "events": [],
+   "actionId": "02577ada-0000-0200-0000-00000000b001",
+   "name": "Query Store",
+   "icon": "database",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
   }
  ]
 }
