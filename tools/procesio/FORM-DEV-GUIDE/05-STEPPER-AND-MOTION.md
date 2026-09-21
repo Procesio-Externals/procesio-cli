@@ -376,3 +376,18 @@ is most of what makes a form read as designed rather than decorated:
 --ux-ease:     cubic-bezier(0.22, 1, 0.36, 1);
 --ux-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 ```
+
+## Stepper JS navigation + accessibility (PRC-5141, 2026-09)
+
+The stepper element exposes two callable **function configs** (`ElementConfigType.FUNCTION`)
+so a script can drive it: `next` and `previous`. PRC-5141 added a generic element-function
+registry (`ui-builder src/js/model/element/function/registry.ts`) plus accessibility work;
+the runtime wiring lives on `main`. Call them like any exposed element function to advance
+or rewind the stepper programmatically instead of relying on the built-in buttons.
+
+Saved config is unchanged by this: a stepper still carries `steps` (step-list),
+`next`/`previous` (button text), `visible`, `activeStepIndex` (default 0), and three
+`field-events` bundles `onStepChangeEvents` / `onNextStepEvents` / `onPreviousStepEvents`.
+The event `type` values stored in those bundles are `STEPPER_STEP_CHANGE`,
+`STEPPER_NEXT_STEP`, `STEPPER_PREVIOUS_STEP`; `$event` on a step-change is the active step
+index. Because the saved shape did not change, no form-golden update is needed for this.

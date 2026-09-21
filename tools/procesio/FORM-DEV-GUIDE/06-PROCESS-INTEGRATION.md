@@ -256,3 +256,26 @@ completed when a model cooperates is not a form.
 ```js
 window.UXToast('This is taking longer than usual. You can fill the fields in manually.', 'err');
 ```
+
+## Data store from a form (not an element - an event action)
+
+A form talks to a data store through an **event action**, not a dedicated element. On any
+element's `field-events`, add an `Event` with `action: "RUN_DATA_STORE_OPERATION"` and a
+config:
+
+```json
+{ "action": "RUN_DATA_STORE_OPERATION",
+  "config": {
+    "dataStoreId": "<uuid>",
+    "operation": "READ",                       // READ | ADD | UPDATE | DELETE
+    "inputMap":  [{ "id": 0, "left": "page", "right": "1" },
+                  { "id": 1, "left": "countPerPage", "right": "1000" }],
+    "outputMap": [{ "id": 0, "left": "rows", "right": "<target var/element>" }] } }
+```
+
+Canonical fields: `page`, `countPerPage`, `rows`, `success`. At runtime the form calls
+`api/Form/dataStore/{id}/rows` (scoped to the template's workspace, PRC-5559). For reading
+a data store from a PROCESS (not a form) use the **Query Store** action (see
+`../PROCESIO-CONNECTORS-NOTES.md`). The process-designer data-store node adds the control
+types `data-store-mapper` / `data-store-decisional` (`FeComponentType` 46 / 47) with a
+richer decisional operator set (BETWEEN, IN/BELONGS, IS_EMPTY→IsNull, IS_NOT_EMPTY→IsNotNull).

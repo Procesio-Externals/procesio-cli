@@ -225,3 +225,44 @@ afterwards is the assertion.
 Finally run one submission through `run-form-with-files`, not just `run-process`: the form and the
 process are assembled separately and nothing asserts they agree. See
 PROCESIO-FORM-SUBMISSION-NOTES.md.
+
+## MySQL is GA - same credential template, `ServerType` discriminator (PRC-3696, 2026-07)
+
+MySQL is a first-class SQL engine now, not a separate credential type. The mechanics an
+API client must know:
+
+- **`DbClientType`**: `MSSQL = 1`, `MYSQL = 2`. This lives on the credential, not the
+  action. The Execute Query / Execute Command action templates are unchanged - the same
+  template runs against either engine and picks the driver from the bound credential.
+- **No separate MySQL credential template.** The existing SQL Server template was
+  UPDATEd in place: renamed to **"SQL"** and given a **`ServerType`** select
+  (`MSSQL` default / `MYSQL`). Choose MySQL by setting that property, not by choosing a
+  different template. `ProtocolType` is now **conditional on `ServerType=MSSQL`**; for
+  MySQL send `ServerType, ServerName, Username, Password` (required) + optional
+  `PortNumber` (default 3306), `DatabaseName`, `Encrypt`, `Pooling`,
+  `TrustServerCertificate`. On MySQL the `Encrypt`/`TrustServerCertificate` flags map to
+  MySqlConnector `SslMode`. Because the tool resolves credential templates live by name,
+  this needs no tool change - you build a "SQL" credential and set `ServerType`.
+- **Parameter binding** is named `@param` (Dapper) via `MapParameters {id, source,
+  destination}` → a dict keyed by `destination.value`, value `source.value`; a duplicate
+  destination errors. MySQL relies on `AllowUserVariables=true` (set server-side). Only
+  the V2 action variants carry a `Parameters` (Map_Parameters) tab; the base
+  Execute Query/Command bind no parameters. Keep using parameters, never inline
+  `<%N%>` for SQL (see the parameterization section above).
+- **DB host blacklist (silent).** Process-Execution enforces a `DbHostBlacklist` (host,
+  `host:port`, IP, or **CIDR**) BEFORE opening a connection; the committed default blocks
+  the private/non-routable ranges (172.16/12, 192.168/16, 127/8, 169.254/16, 100.64/10,
+  0.0.0.0/8 and IPv6 loopback/ULA/link-local), real prod ranges injected per-env. A block
+  is disguised as an ordinary **connect-timeout** - so a SQL/MySQL node that "times out"
+  connecting to an internal host may actually be blacklisted, not slow.
+- **Execute Command injection guard (PRC-5613):** stacked statements in Execute Command
+  are guarded server-side. Author one statement per action; rely on parameters.
+- **Data stores are MySQL-backed, per-workspace users (PRC-5442):** creating/altering a
+  data store provisions a physical MySQL table (why `datastore-create`/`-modify-column`
+  carry a long timeout). Not something the client sends, but explains the latency.
+
+Note reconciliation: an older line in `dto/credential/description.md` called
+"Execute Query V3 / Execute Command V2" the current versions; the live catalog and
+`flowmodel/sqlparam.py` treat the unversioned `Execute Query` / `Execute Command`
+(GUIDs `76470756-…` / `a1625da6-…`) as current, with V2 variants adding Timeout +
+Parameters. Trust the live catalog.

@@ -64,28 +64,72 @@ def main() -> int:
     ap.add_argument("--replace-existing", action="store_true",
                     help="also take the live definition for actions already "
                          "bundled (diff the result before committing)")
+    ap.add_argument("--procesio-only", action="store_true",
+                    help="keep only platform actions (isProcesioAction=true) "
+                         "from the live catalog, so a workspace's own custom / "
+                         "connector actions never leak into the offline bundle. "
+                         "Use this whenever the refresh runs against a real "
+                         "workspace, which the bundle is not meant to mirror.")
     a = ap.parse_args()
 
     bundle = json.loads(BUNDLE.read_text(encoding="utf-8"))
     live = fetch_live(a.profile, a.workspace_id)
+    if a.procesio_only:
+        live = [x for x in live if x.get("isProcesioAction")]
 
+    # Project every live action to the bundle's canonical key set (the union of keys
+    # already in the bundle) BEFORE comparing or storing. The live API attaches volatile,
+    # workspace-specific fields (workspaceId, createdBy/updatedBy, *On timestamps, etc.)
+    # that must never enter a portable, checked-in snapshot; stripping them also makes
+    # `--replace-existing` flag only REAL config changes instead of timestamp churn.
+    from collections import Counter
+    _kc = Counter(k for x in bundle["actions"] for k in x.keys())
+    _n = len(bundle["actions"])
+    # Canonical keys appear in most actions; a volatile field (or one a few polluted
+    # entries carry) appears in a minority, so a majority threshold keeps the portable
+    # shape without hardcoding a blacklist that a new volatile field could slip past.
+    keep = {k for k, c in _kc.items() if c > _n / 2} if _n else None
+
+    def canon(act):
+        return {k: v for k, v in act.items() if k in keep} if keep else act
+
+    # First position per name — the bundle may carry duplicate names, so replace by
+    # recorded index (identity-based .index() blew up on a duplicated action).
+    pos = {}
+    for i, x in enumerate(bundle["actions"]):
+        nm = x.get("name")
+        if nm and nm not in pos:
+            pos[nm] = i
+    name_counts = Counter(x.get("name") for x in bundle["actions"])
     by_name = {x.get("name"): x for x in bundle["actions"] if x.get("name")}
-    added, replaced = [], []
+    added, replaced, skipped_ambiguous = [], [], []
     for act in live:
         name = act.get("name")
         if not name:
             continue
+        act = canon(act)
         if name not in by_name:
             added.append(name)
+            pos[name] = len(bundle["actions"])
             bundle["actions"].append(act)
+            by_name[name] = act
         elif a.replace_existing and by_name[name] != act:
+            # A name that occurs more than once (e.g. an action shipped in two versions
+            # under one display name) cannot be targeted safely by name — replacing would
+            # collapse both onto one live definition. Skip and report it; fix those by id.
+            if name_counts[name] > 1:
+                if name not in skipped_ambiguous:
+                    skipped_ambiguous.append(name)
+                continue
             replaced.append(name)
-            bundle["actions"][bundle["actions"].index(by_name[name])] = act
+            bundle["actions"][pos[name]] = act
+            by_name[name] = act
 
     missing_live = sorted(n for n in by_name if n not in {x.get("name") for x in live})
 
     report = {"bundled_before": len(by_name), "live": len(live),
               "added": sorted(added), "replaced": sorted(replaced),
+              "skipped_ambiguous_names": sorted(skipped_ambiguous),
               "in_bundle_but_not_live": missing_live,
               "written": False}
     if a.write and (added or replaced):
