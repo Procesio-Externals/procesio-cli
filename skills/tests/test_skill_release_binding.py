@@ -59,6 +59,16 @@ def check(snapshot):
     return check_release_binding(root, root / "skills", commit, fingerprint)
 
 
+def test_crlf_working_tree_matches_an_lf_fingerprint(snapshot):
+    # SVN materialises CRLF where the fingerprint was recorded over LF bytes; the
+    # gate normalises newlines, so an SVN checkout is not read as tampering.
+    root, commit, fingerprint = snapshot
+    for p in (root / "skills").rglob("*"):
+        if p.is_file() and p.suffix in {".md", ".json"}:
+            p.write_bytes(p.read_bytes().replace(b"\n", b"\r\n"))
+    assert check_release_binding(root, root / "skills", commit, fingerprint) == []
+
+
 def test_matching_package_and_full_snapshot_pass(snapshot):
     assert check(snapshot) == []
 

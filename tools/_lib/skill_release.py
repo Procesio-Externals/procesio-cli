@@ -30,6 +30,15 @@ def _git(repo: Path, *args: str) -> bytes:
     return result.stdout
 
 
+def _norm(data: bytes) -> bytes:
+    """Content, made newline-agnostic. SVN materialises CRLF where Git keeps LF, so
+    a fingerprint over raw bytes reads the same corpus as tampered on one VCS and
+    intact on the other (the recorded values are the LF hashes). Normalise CRLF -> LF
+    for text; leave binary (anything with a NUL) untouched, so a font or image is
+    compared byte-for-byte as before."""
+    return data if b"\x00" in data else data.replace(b"\r\n", b"\n")
+
+
 def _snapshot(repo: Path, commit: str) -> dict[str, bytes]:
     if _git(repo, "cat-file", "-t", commit).strip() != b"commit":
         raise ValueError("evaluated identity must be a commit, not a tree or tag")
@@ -43,7 +52,7 @@ def _snapshot(repo: Path, commit: str) -> dict[str, bytes]:
             raise ValueError("evaluated skills tree contains an unsupported entry")
         if path.is_absolute() or ".." in path.parts or path.parts[0] != "skills":
             raise ValueError("evaluated tree contains an unsafe path")
-        files[path.relative_to("skills").as_posix()] = _git(repo, "cat-file", "blob", oid)
+        files[path.relative_to("skills").as_posix()] = _norm(_git(repo, "cat-file", "blob", oid))
     if not files:
         raise ValueError("evaluated skills tree is empty")
     return files
@@ -85,13 +94,13 @@ def _live(root: Path) -> dict[str, bytes]:
             if "__pycache__" in rel.parts or path.suffix.lower() in {".pyc", ".pyo"}:
                 raise ValueError("release binding requires a clean source export without bytecode")
             if path.is_file():
-                files[rel.as_posix()] = path.read_bytes()
+                files[rel.as_posix()] = _norm(path.read_bytes())
     for name in EXPERIMENT_FILES:
         path = root / name
         if path.parent.is_symlink() or path.is_symlink():
             raise ValueError("current experiment contract contains a symlink")
         if path.is_file():
-            files[name] = path.read_bytes()
+            files[name] = _norm(path.read_bytes())
     return files
 
 
