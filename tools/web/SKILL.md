@@ -22,6 +22,7 @@ One JSON object on stdout for success; `{"error": {"code", "message", "details"}
 
 | action | required args | what it does |
 |---|---|---|
+| `archive-document` | `--out-dir`, `--name` | Capture a published document (web page or PDF) as a reviewable evidence set: the ORIGINAL response bytes untouched, a self-contained HTML rendering with… |
 | `delete-session` | `--name` | Delete ALL of a saved session's artifacts - the storageState file, the persistent <name>.profile/ directory, and the <name>.cookies.json sidecar. Deleting a… |
 | `get-text` | `--session`, `--url` | Convenience: load a session, open --url, return visible text (whole page or --selector). For lead/topic research. |
 | `list-sessions` | — | List saved sessions (names + metadata only, never contents). |

@@ -114,6 +114,27 @@ actions:
       - {name: direct, type: boolean, default: false, description: "Bypass the owning tool serializing broker and drive the browser in-process (backup; only safe when that broker is stopped)"}
     output_schema: '{ "session": "...", "url": "...", "path": "...", "final_url": "..." }'
 
+  - name: archive-document
+    description: >
+      Capture a published document (web page or PDF) as a reviewable evidence set:
+      the ORIGINAL response bytes untouched, a self-contained HTML rendering with
+      stylesheets inlined so it opens offline with its layout, and a text
+      extraction for searching and quoting. Every readable artefact carries a
+      provenance header (title, the date the document states about itself, source
+      URL, fetch timestamp, sha256 of the original) so a later capture can be
+      compared against it. Unauthenticated fetch only - a login-gated document is
+      recorded as unreachable, never substituted with a summary.
+    args:
+      - {name: url, type: string, description: "URL of the document to capture (exactly one of --url/--file)"}
+      - {name: file, type: string, description: "Local file to archive instead of fetching (an already-downloaded original)"}
+      - {name: source-url, type: string, description: "With --file: the URL the file came from, recorded in the header"}
+      - {name: out-dir, type: string, required: true, description: "Base directory; a subfolder named --name is created inside it"}
+      - {name: name, type: string, required: true, description: "Folder and file basename for the document (a slug, not a URL)"}
+      - {name: title, type: string, description: "Published title override; default reads <title>/<h1>"}
+      - {name: timeout, type: integer, default: 60, description: "Per-request timeout in seconds"}
+      - {name: no-self-contained, type: boolean, default: false, description: "Skip the stylesheet-inlined copy (original + extraction only)"}
+    output_schema: '{ "name": "...", "dir": "...", "url": "...", "final_url": "...", "status": 200, "kind": "html|pdf", "title": "...", "fetched_at": "...", "bytes": 0, "stylesheets_inlined": 0, "chars_extracted": 0, "document_date_candidates": [{"date": "...", "context": "..."}], "files": {"original": "...", "self_contained": "...", "extraction": "..."}, "sha256": {"original": "...", "self_contained": "...", "extraction": "..."} }'
+
   - name: render-pdf
     description: "Render an HTML string/file to a PDF (session-less, headless Chromium page.pdf)."
     args:
@@ -126,6 +147,8 @@ actions:
 examples:
   - cmd: python scripts/run-tool.py web save-session --name linkedin --url https://www.linkedin.com/login
     output: '{"session": "linkedin", "path": ".../tools/web/sessions/linkedin.json", "url": "https://www.linkedin.com/login"}'
+  - cmd: 'python scripts/run-tool.py web archive-document --url https://example.com/terms --out-dir documentation/legal/existing --name terms'
+    output: '{"name": "terms", "dir": "...", "kind": "html", "title": "Terms", "sha256": {"original": "..."}, "files": {"original": "...", "self_contained": "...", "extraction": "..."}}'
   - cmd: python scripts/run-tool.py web list-sessions
     output: '{"sessions": [{"name": "linkedin", "bytes": 4096, "modified": "2026-06-22T09:00:00"}], "count": 1, "dir": "..."}'
   - cmd: 'python scripts/run-tool.py web get-text --session linkedin --url https://www.linkedin.com/in/someone --selector main'

@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**61 rules across 3 notes.**
+**73 rules across 6 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -79,6 +79,33 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [Surgical live edits: placeholder quoting, layer counts, decisional retargeting](PROCESIO-API-NOTES.md#surgical-live-edits-placeholder-quoting-layer-counts-decisional-retargeting)
 - [Surgical live edits, part 2: single-inbound decisionals, error ports, failure-path defaults](PROCESIO-API-NOTES.md#surgical-live-edits-part-2-single-inbound-decisionals-error-ports-failure-path-defaults)
 - [Auditing a workspace: three traps on the read path](PROCESIO-API-NOTES.md#auditing-a-workspace-three-traps-on-the-read-path)
+
+## Procesio Instance History Notes
+
+Source: [`PROCESIO-INSTANCE-HISTORY-NOTES.md`](PROCESIO-INSTANCE-HISTORY-NOTES.md)
+
+- [Traps (each cost a real diagnosis)](PROCESIO-INSTANCE-HISTORY-NOTES.md#traps-each-cost-a-real-diagnosis)
+- [Reading history from INSIDE a flow — binding matters](PROCESIO-INSTANCE-HISTORY-NOTES.md#reading-history-from-inside-a-flow-binding-matters)
+- [Get Recent Instances at RUNTIME — measured, and it corrects the action doc](PROCESIO-INSTANCE-HISTORY-NOTES.md#get-recent-instances-at-runtime-measured-and-it-corrects-the-action-doc)
+- [Capturing a run's output — capture it LIVE, don't count on reading it back](PROCESIO-INSTANCE-HISTORY-NOTES.md#capturing-a-runs-output-capture-it-live-dont-count-on-reading-it-back)
+- [Only FORM-launched instances are LISTED; API-launched ones are only COUNTED](PROCESIO-INSTANCE-HISTORY-NOTES.md#only-form-launched-instances-are-listed-api-launched-ones-are-only-counted)
+- [There is no version anywhere on either object](PROCESIO-INSTANCE-HISTORY-NOTES.md#there-is-no-version-anywhere-on-either-object)
+
+## Procesio Foreach Notes
+
+Source: [`PROCESIO-FOREACH-NOTES.md`](PROCESIO-FOREACH-NOTES.md)
+
+- [A programmatically-built For Each is missing two parameters a designer-built one has](PROCESIO-FOREACH-NOTES.md#a-programmatically-built-for-each-is-missing-two-parameters-a-designer-built-one-has)
+- [The failure mode: the loop times out without iterating a populated list](PROCESIO-FOREACH-NOTES.md#the-failure-mode-the-loop-times-out-without-iterating-a-populated-list)
+- [CONFIRMED (causal test done): the two parameters ARE the cause, and the timeout is NOT](PROCESIO-FOREACH-NOTES.md#confirmed-causal-test-done-the-two-parameters-are-the-cause-and-the-timeout-is-not)
+
+## Procesio Node Code Notes
+
+Source: [`PROCESIO-NODE-CODE-NOTES.md`](PROCESIO-NODE-CODE-NOTES.md)
+
+- [1. <%N%> substitution into a Node's Code is TEXT substitution, and only an OBJECT value is safe](PROCESIO-NODE-CODE-NOTES.md#1-n-substitution-into-a-nodes-code-is-text-substitution-and-only-an-object-value-is-safe)
+- [2. A process can read its own workspace's run history in-flow, with NO credential](PROCESIO-NODE-CODE-NOTES.md#2-a-process-can-read-its-own-workspaces-run-history-in-flow-with-no-credential)
+- [3. Editing a live Node's Code in place: fix BOTH copies (runtime param AND designer customData)](PROCESIO-NODE-CODE-NOTES.md#3-editing-a-live-nodes-code-in-place-fix-both-copies-runtime-param-and-designer-customdata)
 
 ## The Python action
 

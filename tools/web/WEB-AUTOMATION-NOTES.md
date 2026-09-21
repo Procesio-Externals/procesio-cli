@@ -172,3 +172,39 @@ on the page".
 **A DNS failure inside the browser can be transient.** `net::ERR_NAME_NOT_RESOLVED`
 on `goto` while the same URL fetches fine from Python is not proof of a blocked
 host or a broken session. Retry once before diagnosing.
+
+## Archiving a published document as evidence (`archive-document`)
+
+Added 16/09/2026. Captures a web page or PDF as three artefacts in one folder: the response bytes
+untouched, a stylesheet-inlined copy that renders offline, and a text extraction. Every readable file
+carries a provenance header with the sha256 of the original, so a later capture of the same URL can be
+diffed against it to prove whether the publisher edited the document.
+
+**Fetch is plain HTTP with a browser User-Agent, no Playwright.** A CDN edge will serve a challenge
+page to a default urllib/requests agent and the document itself to a browser agent, so the agent
+string is load-bearing, not cosmetic. Server-rendered pages (Next.js and similar) come back complete;
+verify by grepping the extraction for a string only the rendered page would carry before trusting it.
+A client-rendered page needs `web run` / `get-text` with a session instead.
+
+**Why three files and not a markdown conversion.** Clause numbering, layout and pagination are part of
+what a reader of a legal or contractual document relies on, and a markdown conversion destroys all
+three. The original is kept byte for byte and is the only artefact treated as evidence; the other two
+are derived conveniences.
+
+**Date candidates are reported, never reconciled.** The extractor reports date-like strings that sit
+near version wording ("last updated", "effective", "revised"). Two of them on one document is a finding
+about the document. Expect false positives where a document quotes a date for another reason: a policy
+citing a court judgment will surface the judgment's date as a candidate, so read the context line
+before treating a candidate as the document's own date.
+
+**A bucket that returns 403 for an unknown key cannot be used to prove absence.** Object stores
+configured to deny listing commonly answer 403 rather than 404 for a key that does not exist, which
+makes "absent" and "present but private" indistinguishable from outside. Probing for sibling filenames
+is therefore evidence of nothing in either direction; enumerate from the pages that link the objects
+instead, and say so when reporting coverage.
+
+**A published estate can be split across surfaces that do not link to each other.** The documents an
+application presents at sign-up and sign-in can live on a different host from the ones a marketing site
+links in its footer, with no path between them. Crawling the website alone will miss the operative
+contract. Read the sign-up and sign-in screens as first-class sources, and record whether acceptance is
+a ticked box or acceptance by conduct, because the absence of a checkbox is itself a finding.
