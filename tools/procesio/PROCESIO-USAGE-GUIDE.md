@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**58 rules across 3 notes.**
+**61 rules across 3 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -76,6 +76,9 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [POST /api/Projects/validate answers "valid" for flows the designer refuses to save](PROCESIO-API-NOTES.md#post-apiprojectsvalidate-answers-valid-for-flows-the-designer-refuses-to-save)
 - [Every resource read is workspace-scoped, and the designer URL carries the workspace](PROCESIO-API-NOTES.md#every-resource-read-is-workspace-scoped-and-the-designer-url-carries-the-workspace)
 - [toggle-activation takes the target state in a REQUEST HEADER, not a body](PROCESIO-API-NOTES.md#toggle-activation-takes-the-target-state-in-a-request-header-not-a-body)
+- [Surgical live edits: placeholder quoting, layer counts, decisional retargeting](PROCESIO-API-NOTES.md#surgical-live-edits-placeholder-quoting-layer-counts-decisional-retargeting)
+- [Surgical live edits, part 2: single-inbound decisionals, error ports, failure-path defaults](PROCESIO-API-NOTES.md#surgical-live-edits-part-2-single-inbound-decisionals-error-ports-failure-path-defaults)
+- [Auditing a workspace: three traps on the read path](PROCESIO-API-NOTES.md#auditing-a-workspace-three-traps-on-the-read-path)
 
 ## The Python action
 

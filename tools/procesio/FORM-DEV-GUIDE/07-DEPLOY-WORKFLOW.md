@@ -23,6 +23,7 @@ touches exactly one thing:
 | `form-set-element-event` | one element's one event config | every sibling byte-identical |
 | `form-get-element` | nothing (read) | — |
 | `form-set-element-config` | one element's plain configs | every sibling byte-identical |
+| `form-set-element-chains` | the ordered event chains of the listed element triggers, in ONE save | every other element byte-identical; kept events verbatim |
 
 Every write path maps the GET's camelCase onto the PUT's PascalCase envelope
 explicitly, so an unexpected extra field is never echoed back.
@@ -154,6 +155,18 @@ setTimeout(() => console.log('at600',
 
 Run the same navigation **twice** and confirm nothing accumulates — a second copy of
 a listener, a class that never clears, a growing node count.
+
+**A small public test form on the live renderer**, for runtime mechanics a replica
+cannot reproduce (debounce timing, which chain fires when, the lock during a chain).
+Build the smallest form that exercises the mechanism (`form-create`, a stepper with
+two or three steps, the same `form.js`), give it a CustomUrl + `IsPrivate: false`,
+wire it with the same tool calls you will use on the real form, and drive it
+headless with the `web` tool. A saved session that is an EMPTY storageState
+(`{"cookies": [], "origins": []}`) is an anonymous browser. `eval` steps read live
+state (an input's `.value` property, `disabled`, which step is rendered) and can time
+a click. Delete the form and its CustomUrl afterwards. This is how a login-gated
+production form can still be changed on evidence: the gate blocks the headless run
+on the real form, not on the copy of its mechanism.
 
 **A duplicated process**, for anything on the process side. `procesio` can duplicate
 a process; change the copy, run the copy, and promote the change only once it works.

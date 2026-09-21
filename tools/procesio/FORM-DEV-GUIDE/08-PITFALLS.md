@@ -135,6 +135,44 @@ and case on both sides of every comparison.
 
 ---
 
+### A button has to be clicked twice before its MAP_FORM_DATA reacts
+**Cause.** A JS block wrote a value (for example a validation flag) and a MAP
+condition later in the SAME chain reads it. `input`/`number-input` values reach the
+form model 500 ms after the DOM write (`onInputDebounced`), so the MAP sees the
+value from before the click. The second click works only because the first one's
+value has landed by then. Verified live, with a MAP that never saw the value its
+own chain had written.
+**Rule.** Never branch a MAP on a value the same chain's JS just wrote. Hand off
+through a field's own `onInput` chain instead: [04](04-INTERACTION-RECIPES.md) §16.
+
+### A programmatic click on another form button, from inside a chain, does nothing
+**Cause.** While a button's chain runs the form is locked: every element is
+`disabled`, and a disabled button ignores the click. The stepper's Next/Previous
+are not form elements and still respond.
+**Rule.** Do not chain one button into another. Trigger the follow-up through a
+field's `onInput` chain ([04](04-INTERACTION-RECIPES.md) §16), or click the stepper.
+
+### A MAP guarded by `<variable> IS_TRUE` runs although the variable is "false"
+**Cause.** The designer stores a Boolean form variable's default as TEXT (`"False"`
+or `"false"`), and a condition treats any non-empty text as true. Measured live:
+text `"false"` → `IS_TRUE` passes and `IS_FALSE` fails; `null` → the opposite. Two
+mutually exclusive branches both run, and a load gated on `isConfirmed IS_TRUE`
+runs for every visitor. A render process that later writes a real boolean does not
+help a condition evaluated before its result lands.
+**Rule.** Do not branch or gate on a Boolean form variable with `IS_TRUE`/`IS_FALSE`.
+Branch on a value that really is text (`EQUALS` on a select's value, or on a field
+your own flow writes), or give the variable a `null` default. And a condition in
+the browser is never access control: re-check the user inside the process.
+`formlint` flags the pattern.
+
+### A MAP that writes a field also runs that field's handlers, at once
+**Cause.** A value set by MAP_FORM_DATA (or by a process outputMap) reaches the
+element with no debounce and fires its `onInputEvents` chain immediately, in
+parallel with the chain that wrote it. JS blocks of concurrent chains share one
+sandbox iframe, so they can cancel each other.
+**Rule.** A field that must trigger logic is written by exactly one party. Keep
+flags that MAPs reset apart from the field that triggers work.
+
 ## Mapping and processes
 
 ### `[object Object]` lands in every field

@@ -804,6 +804,66 @@ def _ensure_engine_state_properties(template: dict, params: list) -> list:
     return params + extra if extra else params
 
 
+# Call API's two save-clean / run-fatal properties (PROCESIO-API-NOTES.md: "Verb is an OPTION GUID"
+# and "Call API needs Request Parameters even for a bodyless verb"). The catalog serves `Verb` with
+# no options and `Request Parameters` with no default, so neither the option resolver nor
+# `_ensure_input_defaults` can help; both are seeded here from the recovered platform constants.
+_CALL_API_VERB_GUIDS = {
+    "GET": "3ab385bd-f8ae-b641-9176-e7db886aec01",
+    "POST": "eb0b6e47-858e-fd43-a616-d8ffc1baec02",
+    "PUT": "f0e5b463-9207-c44d-8ed5-937e5f4aec03",
+    "PATCH": "2e1515c5-06e8-e24d-bc0d-b2c8ae1aec04",
+    "DELETE": "cdf1a1fe-d4eb-e342-87d4-211c800aec05",
+}
+_CALL_API_VERB_SUFFIX = "8420f7790001"
+_CALL_API_REQPARAMS_SUFFIX = "8420f7790003"
+
+
+def _empty_request_parameters() -> dict:
+    return {"body": {"type": "RAW", "value": {"BINARY": "", "FORM_DATA": [],
+                                             "RAW": {"format": "json", "value": ""},
+                                             "X_WWW_FORM_URLENCODED": []}},
+            "headers": [], "queryParams": []}
+
+
+def _ensure_call_api_properties(template: dict, params: list) -> list:
+    """Seed a `Call API` node's run-time-mandatory properties the config could not express.
+
+    `Verb` written as the word (`"GET"`) saves and validates, then dies at run time with
+    `Http verb is invalid.`; a node with no `Request Parameters` at all dies with
+    `CallApi has NULL value on request parameters.` (measured live 2026-09-21 building
+    Chat Flow/Fetch WTB media). Resolve a verb NAME to its platform option guid, and add
+    the empty payload structure when the caller bound no request parameters.
+    """
+    if (template.get("name") or "").strip().lower() != "call api":
+        return params
+    out = []
+    have_req = False
+    for p in params:
+        pid = str(p.get("TabPropertyId") or "")
+        if pid.endswith(_CALL_API_VERB_SUFFIX) and isinstance(p.get("Value"), str):
+            word = p["Value"].strip().upper()
+            if word in _CALL_API_VERB_GUIDS:
+                p = {**p, "Value": _CALL_API_VERB_GUIDS[word]}
+        if pid.endswith(_CALL_API_REQPARAMS_SUFFIX):
+            have_req = True
+        out.append(p)
+    if not have_req:
+        base = next((str(p["TabPropertyId"])[:-12] for p in params
+                     if str(p.get("TabPropertyId") or "").endswith(_CALL_API_VERB_SUFFIX)), None)
+        if base is None:
+            for cfg in template.get("configuration") or []:
+                for s in cfg.get("settings") or []:
+                    subs = s["value"] if isinstance(s.get("value"), list) else [s]
+                    for sub in subs:
+                        if isinstance(sub, dict) and str(sub.get("id") or "").endswith(_CALL_API_REQPARAMS_SUFFIX):
+                            base = str(sub["id"])[:-12]
+        if base is not None:
+            out.append({"TabPropertyId": base + _CALL_API_REQPARAMS_SUFFIX, "Variable": [],
+                        "Value": _empty_request_parameters()})
+    return out
+
+
 # The input-setting types whose template default the DESIGNER pre-fills and persists,
 # and which are safe to copy verbatim. `code-editor` is deliberately excluded: its
 # default is a placeholder function/script, and an unbound Code is a caller error we
@@ -1027,6 +1087,7 @@ def build(config: dict, ctx: dict) -> dict:
         params = _ensure_sql_bind_property(tpl, params)
         params = _ensure_engine_state_properties(tpl, params)
         params = _ensure_input_defaults(tpl, params)
+        params = _ensure_call_api_properties(tpl, params)
         nodes[cid] = _action_node(node_id[cid], tpl, node_name,
                                   params, 100 + 300 * (i + 1), 300, ctx, parent_id)
         if a.get("onError"):            # error port -> handler + capture error variable

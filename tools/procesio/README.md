@@ -195,6 +195,44 @@ procesio list-project-schedules    --profile account --id <pid>   # the target p
 and posts to `/api/Projects/{id}/run`. Use `--dry-run` to preview the request
 without executing the process.
 
+### Rewriting event chains on a live form — `form-set-element-chains`
+
+When a change moves, adds or conditions `MAP_FORM_DATA` blocks inside a button's
+chain (or spreads one behaviour over several elements), restate the chains in a
+plan and save them in ONE surgical write:
+
+```powershell
+procesio form-set-element-chains --id <form> --plan-file plan.json --dry-run   # names, not guids
+procesio form-set-element-chains --id <form> --plan-file plan.json
+```
+
+```json
+{"chains": [
+  {"element": "validate-step-2", "on": "click", "events": [
+    {"keep": "<existing event id>"},
+    {"js_file": "request.js"}]},
+  {"element": "step-flow-trigger", "on": "input", "events": [
+    {"map": {"when": [{"field": "flag-step-2", "op": "EQUALS", "value": "1"},
+                      {"field": "step-flow-branch", "op": "EQUALS", "value": "company"}],
+             "set": {"Input2.disabled": true, "step-3.visible": true, "@isDone": true}}},
+    {"js_file": "advance.js"}]}]}
+```
+
+- `keep` re-uses an existing event of that element and trigger verbatim, id included.
+  Large validator scripts are never re-sent.
+- A `set` key is `<element>.<configKey>`, or `@<formVariable>`. A condition operand is
+  `field` (`<element>` = its value, `<element>.<key>` = any config) or `variable`.
+  `match` is `all` (AND) or `any` (OR).
+- Every name, config key, variable, operator and kept id is resolved before the write.
+  Events a chain does not list are dropped and reported.
+- `warnings` flags an `IS_TRUE`/`IS_FALSE` on a Boolean variable whose default is the text
+  `"false"`. A condition reads that text as TRUE (measured live, see FORM-DEV-GUIDE/08).
+- Get the ids to keep from `form-get-element-events`. After a code change, call it with
+  `AAT_RUNNER=0` (the worker pool serves stale modules).
+
+The pattern this was built for (one-click validate + lock + advance on a stepper) is
+[FORM-DEV-GUIDE/04](FORM-DEV-GUIDE/04-INTERACTION-RECIPES.md) §16.
+
 ## Export — `.procesio` bundle (Transport)
 
 ```powershell

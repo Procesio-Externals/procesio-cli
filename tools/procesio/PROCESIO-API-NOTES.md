@@ -1012,9 +1012,8 @@ Property labels: `Select REST API credentials` (`{"credential": <gid>}`), `Verb`
   CREDENTIALS route was tried. Name-to-guid resolution has nothing to resolve against there. Sending the word `"GET"`
   passes FE validation, passes BE validation, saves, and then dies at RUNTIME with
   `Http verb is invalid.` on the action — a save-time-clean / run-time-fatal class, so it
-  survives every pre-flight check. Until a guid for another verb is recovered from the
-  designer, build Call API actions as **POST** and put any parameters in the endpoint query
-  string or the request body.
+  survives every pre-flight check. Since 2026-09-21 the process builder maps the five words above to
+  their guids itself (`_ensure_call_api_properties`), so a config may say `"Verb": "GET"`.
 - **`Response Status` must bind an `integer` variable** (`...121212121211`). A
   `number` var fails BE validation with "Data type mismatch ... StatusOutput".
   `Response Body` binds a `json` var (`...121212121220`).
@@ -3611,9 +3610,10 @@ be built while the credential sits unauthorized. Only the first live run is bloc
 ## `Call API`: use the unversioned action, and copy a live node for the payload
 
 `Request Parameters` is a `tabs-payload-v2` structured property (body / headers / query tabs), and
-the process builder has no special handling for it — it is not a value a config can express by
-label. Authoring one blind is guesswork; take the shape from a live node that already works
-(`node-params` on a real flow, or a `.procesio` export) rather than inventing it.
+the process builder seeds it EMPTY when a config binds none (`_ensure_call_api_properties`, 2026-09-21) and
+resolves a `Verb` written as a word to its platform guid; a request WITH a body still takes the shape
+from a live node that already works (`node-params` on a real flow, or a `.procesio` export) rather than
+inventing it.
 
 And use the unversioned `Call API`, never `Call API v3`: the v-pinned ones are older generations
 with differently named outputs (`Status Output`/`Body Output` instead of
@@ -4653,3 +4653,119 @@ written). Both live in handlers/nodeparams.py with pure logic in flowmodel/nodep
   labelIds for INBOX vs SPAM); non-receipt at an external address is a sender-reputation/SPF-DKIM
   matter, not a process bug.
 
+
+## ⚠ Surgical live edits: placeholder quoting, layer counts, decisional retargeting (measured 2026-09-20)
+
+Four things a surgical writer must know, each learned from a node that validated clean and then
+misbehaved at runtime - the validator does not catch any of them.
+
+- **A Node's `<%N%>` placeholder is substituted RAW.** A string variable must be quoted in the JS
+  (`` var t = String(`<%1%>` || ''); ``); a Json / list / number variable is injected as a literal and
+  must NOT be quoted. An unquoted string placeholder becomes a syntax error at runtime, the Node
+  reports it only through its Error output, and every downstream consumer of the Node's output sees
+  the OLD value - the flow "works" and the change silently never lands. Check every new Node body
+  against this before the PUT.
+- **`node-replace-text --expect N` counts both layers.** A literal that occurs once in a node's
+  runtime parameter also occurs once in the mirrored designer setting, so a single logical occurrence
+  is `--expect 2`. A count that comes back as exactly twice what you expected is not a duplicate in
+  the text; it is the mirror.
+- **`node-delete` heals ports, not decisional targets.** When the deleted node was a decisional's
+  branch target, the branch keeps pointing at the dead id in BOTH layers (runtime `actionid`, designer
+  `target`) - retarget them by hand in the same PUT, or the branch dead-ends.
+- **A Trigger Subprocess input map can pass a GUID-typed parent variable into a string subprocess
+  input** (session id -> string) - validate accepts it and the runtime coerces. The reverse (string into
+  GUID) is the one to test on a duplicate first.
+
+Related: the `isValid` stamp is the writer's job ([`isValid` section above](#-isvalid-is-a-field-the-caller-sets-not-one-the-platform-computes));
+a flow whose only FE error is a pre-existing designer quirk (a disabled pass-through node before Stop reads
+as UNCONNECTED) can be re-stamped valid after the edit rather than left marked broken.
+
+## `Call API` with REST credentials, binary downloads, Decisional port rules (measured 2026-09-21)
+
+- **A `Call API` bound to a REST credential appends its `Endpoint` to the credential's base URL**; a query string in
+  the endpoint passes through. One credential reaches ONE host, so a flow that must call two hosts with the same
+  secret (an API that answers with a download URL on another domain is the usual case) needs one credential per host.
+  A `Call API` with no credential accepts an absolute URL in `Endpoint` but then needs its auth header inline, which
+  is how secrets end up in node parameters.
+- **Copy a secret credential-to-credential IN PROCESS, never through a file.** `GET /api/Credentials/{id}` returns
+  property values in clear: read `Value` into a variable, build the new config through
+  `tools/procesio/dto/credential/builder.py` (`prepare_ctx` probes `/test` and stores the result as validated) and
+  `POST /api/Credentials`. The secret never touches a file, argv or stdout.
+- **`Response File` (`...0008`) is a real File output** (FileModel `10c6ac59-...-121212121219`) and `File To
+  Base64` (`File` -> `Base64 Content`) turns it into a string; that pair is the whole "download binary into a string
+  variable" recipe.
+- **A cloned Trigger Subprocess carries the SOURCE flow's instance-id output variable** (`...4f7d3be111e9`); rebind
+  it to a variable of the target flow or BE validation fails with `Variable added in parameters was not found`.
+- **One port per TARGET on a Decisional**: two cases that route to the same node share ONE outgoing port; a second
+  port to the same destination is `Duplicate connection port`. The same rule forbids a normal port and an error
+  port from one node to the same Join.
+- **`Call API` Time Out minimum is 60 s** (validation `LIMIT_RANGE [60, 3600]`).
+- **Adding optional attributes to a live webhook input model is safe.** `datatype-add-attribute` on the model the
+  webhook maps its payload to; a payload without the field lands `null`, a payload with extra unknown fields is
+  ignored. Verified by launching the webhook before and after with and without the new fields.
+- **`process-create` traps closed in the builder (2026-09-21):** `Verb` words are resolved to the platform guids and
+  a missing `Request Parameters` is seeded empty (`_ensure_call_api_properties`); a Node or Decisional that two
+  branches converge on still needs an explicit `Join` in the config (`Action has too many input ports`).
+
+## ⚠ Surgical live edits, part 2: single-inbound decisionals, error ports, failure-path defaults (measured 2026-09-20)
+
+- **A Decisional accepts ONE inbound edge.** Adding a second path into an existing decisional fails FE
+  validation with `Action has too many input ports`; route both paths through a Join first. A Call
+  Subprocess / Node target has no such limit, but a Join before it costs nothing and keeps the layout readable.
+- **An error port is three things, not one:** the port (`type: 1`, `data: {"isDefault": "error"}`), the node's
+  `variableErrorId`, and that variable being `isError: true` of the error datatype
+  (`10c6ac59-3929-49e6-99dc-121212121220`). A plain string variable there validates and never fires. A Node
+  action's own **Error output**, by contrast, is a plain string variable (the JS exception text) and a JS error
+  never travels the error port - it lands in that output and the flow continues with the Node's OLD value.
+- **A subprocess that ends on a failure branch returns each output variable's DEFAULT.** Give a Json output
+  an empty-template default (`{"emails":[],"phones":[],...}`), or every `Extract Objects` in the parent dies
+  with `The input is not a valid JSON/JArray` on the null - the honest "not found" line never reaches the user
+  because the parent crashed two nodes later.
+- **A Map Data literal row with a single space is REQUIRED-invalid;** an empty literal is fine.
+- **Reading a live instance:** `GET /api/Projects/instances/{iid}/status?flowTemplateId=<flow>&getVariables=true&getActions=true`
+  (no project id in the path). `GET /api/Projects/{flow}/history` lists webhook/trigger instances only, lags
+  several minutes, and does NOT list synchronous `/run` instances - keep the `/run` response if you need their
+  variables. The `/run` response of a flow with no output variables carries no `variable` block at all.
+
+### ✔ PROCESIO Call API -> Meta WhatsApp Cloud API works (2026-09-21)
+Live-proven from a builder-created process: Call API node with credential=REST API
+(API-key-as-header, `Authorization: Bearer <token>`), `Verb`=POST GUID, `Endpoint`=
+`/v22.0/{phone_number_id}/messages`, `Request Parameters` body type=RAW json
+(`body.value.RAW.value` = the JSON string `{"messaging_product":"whatsapp","to":...,
+"type":"template","template":{"name":"hello_world","language":{"code":"en_US"}}}`),
+Content-Type: application/json header. run-process --synchronous -> status 50,
+Response Status=200, Response Body carries Meta's `wamid`+`accepted`. A Meta TEST number
+sends ONLY to pre-verified recipients and the FIRST business-initiated message MUST be an
+approved template (no 24h window yet).
+- **Language belongs to the TURN, not to the LLM's prose.** A subprocess that words a reply must receive the
+  turn's language as an INPUT (the router's detected value); inferring it from label regexes on another model's
+  output defaults to one language the moment that output is a one-liner, and an empty `language` field in a
+  contract is the normal value, never a signal.
+- **Prompt builders and provider caching:** OpenAI's automatic prompt cache needs a byte-identical prefix of
+  >= 1024 tokens. A builder that interpolates per-turn data (sessions, history, a language hint) at the TOP of the
+  system prompt makes every turn a cache miss; put the static rules first and the per-turn blocks last (before
+  the closing instruction). Wording unchanged, order only - verify with a line-multiset diff before the PUT.
+
+## ⚠ Auditing a workspace: three traps on the read path (measured 2026-09-21)
+
+- **`GET /api/Credentials/{id}` returns secrets in plaintext.** A DB / SMTP / FTP credential
+  comes back as a list of `properties[]`, and the password field is an ordinary
+  `{"label": "Password", "type": "password", "value": "<plaintext>"}` — the key is `value`,
+  not `password`. A redaction filter keyed on field NAMES (`pass`, `secret`, `token`) walks
+  right past it. Redact by the property's `type == "password"` (and its `label`), never by
+  the JSON key, and never print a whole credential DTO. To reuse a DB credential for a
+  direct connection, read the property in code straight into the credential store
+  (`creds.set_secret`) without echoing it.
+- **A process DTO can exceed the runner's 8 MB protocol line.** A flow that embeds a
+  document template (Generate Document with a .docx inside) is ~10 MB of JSON; through
+  `scripts/run-tool.py` the call fails with `runner_lost … protocol line exceeds 8388608
+  bytes` even though the API answered 200. For such a flow, fetch in-process
+  (`tools.procesio.auth.auth_headers(...)` + `requests`) or through `export`.
+- **`run-tool.py` reads stdin.** In a shell `while read id; do run-tool … ; done < ids.txt`
+  loop, the first call swallows the rest of the id list and the loop runs once. Iterate
+  with `for id in $(cat ids.txt)` or redirect each call `</dev/null`.
+
+Offline audit path that works: `request GET /api/Projects/<id>` per process +
+`form-get` / `form-get-code` per form into a folder, then `flow-digest --in <dir> --out …
+--names names.json` and `form-digest --in <forms> --processes <dir> --out …` — readable
+Markdown with variables, SQL, scripts and the form↔process maps resolved to names.

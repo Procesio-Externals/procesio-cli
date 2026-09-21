@@ -16,6 +16,11 @@ KB_DIR = Path(__file__).resolve().parent
 # release, and the version the model reads is the one that would be wrong.
 FORM_GUIDE = KB_DIR.parents[1] / "tools" / "procesio" / "FORM-DEV-GUIDE"
 
+# The house style, distilled from auditing a production workspace: HOW this team builds,
+# where the best-practices doc says WHAT good looks like. Served per file like the form
+# guide (~80 KB together); `patterns` is the index and names the rest.
+PATTERNS = KB_DIR / "IMPLEMENTATION-PATTERNS"
+
 # topic -> (path relative to KB_DIR, or an absolute Path; human label)
 TOPICS: dict[str, tuple[str | Path, str]] = {
     "playbook": ("PROCESIO-BUILD-AND-TEST-PLAYBOOK.md",
@@ -64,13 +69,25 @@ TOPICS: dict[str, tuple[str | Path, str]] = {
                      "Publishing a form and its custom URL"),
     "forms-pitfalls": (FORM_GUIDE / "08-PITFALLS.md",
                        "Known form traps and their signatures"),
+
+    "patterns": (PATTERNS / "00-INDEX.md",
+                 "House implementation patterns - START HERE, names the sub-topics + the "
+                 "workspace-knowledge folder convention"),
+    "patterns-processes": (PATTERNS / "01-PROCESSES.md",
+                           "How we build processes: result flags, HTML rendering, Node idioms, utilities"),
+    "patterns-forms": (PATTERNS / "02-FORMS.md",
+                       "How we build forms and form<->process communication"),
+    "patterns-integrations": (PATTERNS / "03-INTEGRATIONS.md",
+                              "How we build integrations: webhooks, ERP, SFTP, LLM extraction, documents"),
+    "patterns-database": (PATTERNS / "04-DATABASE.md",
+                          "How we design tables and stored procedures for PROCESIO"),
 }
 
 # `topic=all` concatenates everything it lists, so the form guide's chapters stay out of
 # it: they would multiply that payload sixfold and bury the process guidance most callers
 # actually asked for. The `forms` index IS included - it is small and it advertises the
 # chapters, which is exactly what a caller who did not know they existed needs.
-_ALL_EXCLUDED = {t for t in TOPICS if t.startswith("forms-")}
+_ALL_EXCLUDED = {t for t in TOPICS if t.startswith(("forms-", "patterns-"))}
 
 
 def topics() -> list[str]:
