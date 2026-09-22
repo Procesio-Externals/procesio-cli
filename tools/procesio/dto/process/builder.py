@@ -482,6 +482,130 @@ def _ds_where_config(value, ctx):
     return out
 
 
+# -- Query Store node: one SQL statement over the workspace's Data Stores ------
+# The Query (code-editor) carries `<%N%>` placeholders whose Variable[] entries are
+# CHIPS bound to a Data Store / column id (type dataStoreTable / dataStoreColumn), NOT a
+# process variable. `@param` in the SQL is bound by the Parameters map (b103). Outputs
+# (Result Rows / Total Count) bind like any {var}. One <%N%> id sequence per node.
+# Verified against a live export. Query Store is MySQL and runs SELECT/WITH plus
+# INSERT/UPDATE/DELETE/REPLACE; see PROCESIO-QUERY-STORE-NOTES.md.
+_QS_TOKEN = re.compile(r"{{\s*(ds|table|col|column)\s*:\s*([^}]+?)\s*}}", re.I)
+
+
+def _qs_prop(pidx: dict, label: str, ctype: str) -> dict:
+    p = pidx.get(label) or next((s for s in pidx.values() if s.get("type") == ctype), None)
+    if p is None:
+        raise UsageError(f"Query Store template has no {label!r} ({ctype}) property")
+    return p
+
+
+def _qs_store_id(ref: str, ctx: dict) -> str:
+    ref = ref.strip()
+    if _GUID_RE.match(ref):
+        return ref
+    ent = (ctx.get("datastore_meta") or {}).get(ref.lower())
+    if not ent:
+        known = ", ".join(sorted(k for k in (ctx.get("datastore_meta") or {})
+                                 if not _GUID_RE.match(k))) or "(none)"
+        raise UsageError(f"queryStore references unknown Data Store {ref!r}; known: {known}")
+    return ent["id"]
+
+
+def _qs_col_id(store_ref: str, store_id: str, col: str, ctx: dict) -> str:
+    col = col.strip()
+    if _GUID_RE.match(col):
+        return col
+    meta = ctx.get("datastore_meta") or {}
+    ent = meta.get(store_ref.strip().lower()) or meta.get(str(store_id).lower()) or {}
+    cid = (ent.get("columns") or {}).get(col.lower())
+    if not cid:
+        known = ", ".join(sorted(ent.get("columns") or {})) or "(none)"
+        raise UsageError(f"queryStore column {col!r} is not on Data Store {store_ref!r}; known: {known}")
+    return cid
+
+
+def _build_query_store(template: dict, spec: dict, var_ids: dict, ctx: dict, counter: list) -> list:
+    """Query Store node Parameters (b102 Query + chips, b103 Parameters map, b104 Time Out,
+    b105 Result Rows, b106 Total Count) from a friendly spec:
+      {sql, params:{name: binding}, timeout?, resultRows?, totalCount?}
+    sql uses {{ds:StoreNameOrId}} / {{col:StoreNameOrId.ColNameOrId}} tokens (-> id chips)
+    and @param (-> Parameters map). ids resolve from ctx['datastore_meta'] or pass through
+    when already a GUID. One <%N%> id sequence across the whole node."""
+    if not isinstance(spec, dict) or not spec.get("sql"):
+        raise UsageError("queryStore needs a 'sql' string")
+    pidx = _property_index(template)
+    q_prop = _qs_prop(pidx, "query", "code-editor")
+    p_prop = _qs_prop(pidx, "parameters config tab", "map-parameters")
+    chips = []
+
+    def sub(m):
+        kind = m.group(1).lower()
+        ref = m.group(2).strip()
+        idx = counter[0]
+        counter[0] += 1
+        if kind in ("ds", "table"):
+            chips.append({"id": idx, "type": "dataStoreTable", "variableId": None,
+                          "dataStoreId": _qs_store_id(ref, ctx), "attribute": None})
+        else:
+            store_ref, _, col = ref.rpartition(".")
+            if not store_ref or not col:
+                raise UsageError(f"queryStore column token must be col:Store.Column, got {ref!r}")
+            sid = _qs_store_id(store_ref, ctx)
+            chips.append({"id": idx, "type": "dataStoreColumn", "variableId": None,
+                          "dataStoreId": sid, "columnId": _qs_col_id(store_ref, sid, col, ctx),
+                          "attribute": None})
+        return f"<%{idx}%>"
+
+    out = [{"TabPropertyId": q_prop["id"], "Variable": chips,
+            "Value": _QS_TOKEN.sub(sub, spec["sql"])}]
+    rows = []
+    for i, (pname, binding) in enumerate((spec.get("params") or {}).items()):
+        srcbind = binding if isinstance(binding, dict) else {"value": binding}
+        rows.append({"id": i, "source": _operand(srcbind, var_ids, counter, ctx),
+                     "destination": {"value": str(pname).lstrip("@"), "variable": []}})
+    out.append({"TabPropertyId": p_prop["id"], "Variable": [], "Value": rows})
+    t_prop = pidx.get("time out")
+    if t_prop:
+        out.append({"TabPropertyId": t_prop["id"], "Variable": [],
+                    "Value": str(spec.get("timeout", 1800))})
+    for label, key in (("result rows", "resultRows"), ("total count", "totalCount")):
+        b = spec.get(key)
+        prop = pidx.get(label)
+        if b is not None and prop is not None:
+            out.append(_make_parameter(prop["id"], b if isinstance(b, dict) else {"var": b},
+                                       ctx, counter))
+    return out
+
+
+def _qs_params_config(rows) -> list:
+    """map-parameters runtime rows {id, source:{value,variable}, destination:{value}} ->
+    designer rows {id, destination:<paramName>, source:<varId|literal>} (verified export)."""
+    out = []
+    for r in rows or []:
+        src = r.get("source") or {}
+        source = _ref_from_variable(src.get("variable"))
+        if source is None:
+            source = src.get("value")
+        dest = r.get("destination")
+        out.append({"id": r.get("id"),
+                    "destination": dest.get("value") if isinstance(dest, dict) else dest,
+                    "source": source})
+    return out
+
+
+def _ensure_query_store_properties(template: dict, params: list) -> list:
+    """Seed a Query Store node's Parameters map (b103) EMPTY when unbound, like the Execute
+    Query bind: the designer renders it from the template and refuses the save without it."""
+    if (template.get("name") or "").strip().lower() != "query store":
+        return params
+    pidx = _property_index(template)
+    p = pidx.get("parameters config tab") or next(
+        (s for s in pidx.values() if s.get("type") == "map-parameters"), None)
+    if p and not any(x.get("TabPropertyId") == p["id"] for x in params):
+        params = params + [{"TabPropertyId": p["id"], "Variable": [], "Value": []}]
+    return params
+
+
 def _is_foreach(a: dict) -> bool:
     return (a.get("action") or "").strip().lower() in ("for each", "foreach")
 
@@ -570,6 +694,12 @@ def _config_value_from_param(value, variable):
         return value
     idmap = {}
     for v in variable:
+        if v.get("type") == "dataStoreTable":          # Query Store chip (Data Store)
+            idmap[v.get("id")] = f"ds.{v.get('dataStoreId')}"
+            continue
+        if v.get("type") == "dataStoreColumn":         # Query Store chip (column)
+            idmap[v.get("id")] = f"ds.{v.get('dataStoreId')}.{v.get('columnId')}"
+            continue
         ref = v.get("variableId")
         attr = v.get("attribute")
         while attr:
@@ -703,6 +833,8 @@ def _apply_values_to_config(cfg_tree: list, params: list, ctx: dict, aid=None) -
             s["value"] = _subprocess_map_config(p.get("Value"), True)
         elif stype == "process-outputs":
             s["value"] = _subprocess_map_config(p.get("Value"), False)
+        elif stype == "map-parameters":
+            s["value"] = _qs_params_config(p.get("Value"))
         else:
             cv = _config_value_from_param(p.get("Value"), p.get("Variable"))
             # DESIGNER number inputs bind a STRING: a raw int/float renders EMPTY, then
@@ -716,6 +848,7 @@ def _apply_values_to_config(cfg_tree: list, params: list, ctx: dict, aid=None) -
 
 # value-shapes the designer reads for the bespoke types (used by the build audit)
 _BESPOKE_REQUIRED = {"document-mapper": ("process", "document"),
+                     "map-parameters": ("destination",),
                      "data-store-mapper": ("left", "right"),
                      "data-store-decisional": ("condition",),
                      "decisional-case": ("target", "condition"),
@@ -1061,6 +1194,8 @@ def build(config: dict, ctx: dict) -> dict:
             params = params + [_build_ds_mapper(tpl, a["dsMap"], var_ids, ctx, counter)]
         if a.get("dsWhere"):            # Data Store Where (Select/Update/Delete)
             params = params + [_build_ds_where(tpl, a["dsWhere"], var_ids, ctx, counter)]
+        if a.get("queryStore"):         # Query Store (one SQL statement over Data Stores)
+            params = params + _build_query_store(tpl, a["queryStore"], var_ids, ctx, counter)
         if a.get("branches"):           # Decisional routing
             bparams, bports = _build_decisional(tpl, a, node_id, var_ids, ctx)
             params = params + bparams
@@ -1088,6 +1223,7 @@ def build(config: dict, ctx: dict) -> dict:
         params = _ensure_engine_state_properties(tpl, params)
         params = _ensure_input_defaults(tpl, params)
         params = _ensure_call_api_properties(tpl, params)
+        params = _ensure_query_store_properties(tpl, params)
         nodes[cid] = _action_node(node_id[cid], tpl, node_name,
                                   params, 100 + 300 * (i + 1), 300, ctx, parent_id)
         if a.get("onError"):            # error port -> handler + capture error variable
@@ -1422,6 +1558,29 @@ def prepare_ctx(client, config: dict) -> dict:
             doc_vars[a.get("id")] = {}
     if doc_vars:
         ctx["doc_vars"] = doc_vars
+
+    # resolve Data Store metadata (name/column-name -> id) for Query Store chips
+    if any(a.get("queryStore") for a in config.get("actions", [])):
+        dsmeta = {}
+        try:
+            r = client.get("/api/DataStore", {"pageNumber": 1, "pageItemCount": 500})
+            items = r.get("pageItems") if isinstance(r, dict) else r
+            for it in items or []:
+                sid = it.get("id") or it.get("Id")
+                cols = {}
+                for c in (it.get("columns") or it.get("Columns") or []):
+                    cn = (c.get("name") or c.get("Name") or "").strip().lower()
+                    if cn:
+                        cols[cn] = c.get("columnId") or c.get("ColumnId") or c.get("id")
+                entry = {"id": sid, "columns": cols}
+                nm = (it.get("name") or it.get("Name") or "").strip().lower()
+                if nm:
+                    dsmeta[nm] = entry
+                if sid:
+                    dsmeta[str(sid).lower()] = entry
+        except Exception:  # noqa: BLE001 - names unresolved -> caller can pass GUIDs
+            pass
+        ctx["datastore_meta"] = dsmeta
     return ctx
 
 

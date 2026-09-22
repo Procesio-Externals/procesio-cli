@@ -4051,6 +4051,14 @@ exactly one sweep interval apart, and only the second copy carries the join link
 row of a group carries the stamp, every row of that group must sit behind the same gate, so they
 leave on the same tick and the stamp covers all of them.
 
+**An image URL copied from a social network's CDN is a signed, expiring link.** LinkedIn media
+URLs (`media.licdn.com/dms/image/...`) carry `e=<unix seconds>` and `t=<signature>` in the query
+string; after `e` the CDN answers 403 and a page that embedded the URL shows a broken picture with
+no other change. The link worked for weeks, which is what made it look permanent. For a picture a
+form or email must show indefinitely, either host it yourself or store it as a `data:` URI in the
+setting that holds the URL (an `nvarchar(max)` column takes it; a 160px JPEG/PNG is 10-30 KB).
+Decode `e` before blaming the form: `datetime.fromtimestamp(e, UTC)`.
+
 **The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
 though they are valid and route normally. Worth knowing before using one as a test address.
 
