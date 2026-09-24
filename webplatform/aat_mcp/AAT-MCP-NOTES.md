@@ -115,6 +115,66 @@ normalize or prettify them.
 - **Headless fail-safe:** `AAT_MCP_DENY_IRREVERSIBLE=1` makes even the confirmed tools
   refuse — matches `orchestrator drive`'s default when no human is in the seat.
 
+## Two surfaces over one substrate
+
+There are two MCP servers here, on purpose. `server.py` offers six freeform tools that
+dispatch whatever the registry holds - right for an operator driving the framework.
+`chat_server.py` offers one named tool per operation, built from `chat_surface.yaml` -
+what a general chat client and a directory review both need.
+
+**A published tool list is a different kind of artefact from a registry.** The registry
+is the source of truth for what a tool IS, and a surface that derives from it tracks it
+automatically, which is correct for the freeform one. A published list is a contract
+with people who did not write the manifests, and deriving it from them means a rename
+silently removes a published tool, a new argument silently reshapes a published schema,
+and a new tool silently appears in a surface someone reviewed. **MCP clients cache tool
+definitions at initialisation and do not refresh them**, so none of those three errors
+even produce an error - the client keeps calling the old shape and the model
+misunderstands the result. That is why the declaration is a separate file and why the
+disagreement is resolved at CI rather than at a user's call.
+
+**`read_only` and `reversible` answer different questions.** Reversible asks whether a
+change can be undone; read-only asks whether anything changes at all. A create action is
+reversible and is not read-only. Mapping one onto the other would mark every write
+safe to run unattended. The implication only runs one way, and that is what is asserted:
+read_only ⟹ reversible.
+
+**Annotations are not a control.** The spec tells clients to treat tool annotations as
+untrusted. They drive a client's auto-run behaviour, so a wrong one is a write that
+fires unprompted - worth getting right - but the enforcement is `gate.py`. The curated
+surface carries no `*_confirmed` twin and instead refuses irreversible actions outright,
+with a test asserting nothing declared is irreversible; adding a destructive operation
+fails the build rather than growing a second, softer approval path.
+
+**Some duplication is the seam.** `chat_server.py` repeats ~50 lines of JSON-RPC loop
+rather than importing `server.py`. That is what lets it change transport or protocol
+version later without touching a server already in use. Both import `bridge` and `gate`;
+neither imports the other, and `test_chat_surface.py` asserts it by parsing the AST.
+
+### Design rules taken from published guidance
+
+- **Namespace tool names by domain** (`procesio_list_processes`, not `list_processes`).
+  A directory client merges several servers into one list. Anthropic's tool-writing
+  guidance reports that naming scheme alone has non-trivial effects on tool-use
+  evaluations.
+- **Curate for workflows, not endpoints.** Prefer `search_*` over `list_*` because agent
+  context is limited. The generated REST passthroughs are exactly what does not belong
+  in a published surface.
+- **Cap tool results.** A result lands directly in a model's context, so an unbounded
+  one is a context leak rather than a large answer. Truncation carries a hint naming the
+  arguments that narrow *that* tool, because a generic "too large" is not actionable.
+  (Claude Code caps tool responses at 25,000 tokens by default; MCP metadata has been
+  measured at ~40% of token usage in some environments, which is the argument for a
+  small surface.)
+- **Version the surface separately from the package.** The MCP registry requires a
+  unique version string per publication and recommends semver; `server.json` aligns with
+  the release, while `surface_version` describes the published tool contract. A client
+  pins to a surface, and a release can ship with the surface unchanged.
+- **Known gap:** the declaration is a 1:1 mapping (one MCP tool = one action), which
+  keeps it free of behaviour and fully verifiable against the registry, but forecloses
+  the consolidation that guidance recommends (one `schedule_event` rather than find-slot
+  + book). Consolidation needs composition logic in the surface layer and its own tests.
+
 ## Status
 
 Spec 02 (B1) transport + surface AND spec 03 (B2) reversibility gate: built +

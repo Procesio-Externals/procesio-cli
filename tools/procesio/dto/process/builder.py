@@ -682,6 +682,60 @@ def _action_parameters(template: dict, params: dict, ctx: dict, counter: list | 
     return out
 
 
+def _is_template_default_output(s: dict) -> bool:
+    """A template setting the builder must MATERIALISE rather than drop: a
+    runtime-written OUTPUT slot the compact config never binds — `direction == 2`
+    (output) or `type == "ignore"` — that the template gives a concrete SCALAR
+    default `value`. The designer copies these verbatim into every flow; a
+    binding-driven builder emits one param per binding and so drops them, and a
+    `For Each` with no `Zero based list index` slot then hangs having iterated its
+    body zero times (measured: iterations went 0→3 when exactly the two are
+    restored, and the drop was located here). A list/dict `value` is a nested
+    side-panel container, not a default; None/'' is no default, both skipped.
+    Empirically, over the live 233-action catalog, this class is exactly three settings
+    across two actions: `For Each` (`61724e`=-1, `808b0d`=the datetime sentinel)
+    and `Call Subprocess` (`a03fe2`=the null-guid started-flow slot)."""
+    if not ((s.get("direction") == 2) or (s.get("type") == "ignore")):
+        return False
+    v = s.get("value")
+    if v is None or isinstance(v, (list, dict)):
+        return False
+    if isinstance(v, str):
+        return v.strip() != ""
+    return isinstance(v, (int, float, bool))
+
+
+def _template_default_params(template: dict, existing: list) -> list[dict]:
+    """After an action's binding-driven params are assembled, materialise each
+    template setting that is a defaulted output slot NO binding (nor a bespoke
+    builder — subprocess/decisional/doc-mapper) already supplied. Emits the
+    designer's own shape `{TabPropertyId, Value: <template default>, Variable: []}`,
+    deduped by `TabPropertyId` against the params already built.
+
+    ⚠ It is a pure APPEND, driven off the template: an action whose template has no
+    such setting yields `[]`, so its build is BYTE-IDENTICAL to before this fix
+    (verified by a byte-identical rebuild across the catalog). `Call Subprocess`'s `a03fe2` is already emitted
+    by `_build_subprocess`, so the dedupe makes this a no-op there — no double.
+    General over the catalog, not a `For Each` special-case."""
+    have = {str(p.get("TabPropertyId")) for p in existing}
+    seen: set = set()
+    out: list[dict] = []
+
+    def walk(settings):
+        for s in settings or []:
+            sid = s.get("id")
+            if sid and sid not in seen:
+                seen.add(sid)
+                if _is_template_default_output(s) and str(sid) not in have:
+                    out.append({"TabPropertyId": sid, "Value": s.get("value"), "Variable": []})
+            val = s.get("value")
+            if isinstance(val, list):                   # side-pannel nested props
+                walk(val)
+    for tab in template.get("configuration", []):
+        walk(tab.get("settings", []))
+    return out
+
+
 # -- nodes / ports ------------------------------------------------------------
 
 def _config_value_from_param(value, variable):
@@ -1202,6 +1256,12 @@ def build(config: dict, ctx: dict) -> dict:
             branch_ports.append((cid, bports))
         if a.get("subprocess"):         # Call/Trigger Subprocess variable mapping
             params = params + _build_subprocess(tpl, a["subprocess"], var_ids, ctx, counter)
+        # materialise the template's default-valued OUTPUT slots that no binding (nor a
+        # bespoke builder above) supplied — the designer copies these verbatim and a
+        # binding-driven builder drops them, which is why a programmatic For Each hangs.
+        # Deduped against everything already built; a template with no
+        # such setting appends nothing, so non-loop builds stay byte-identical.
+        params = params + _template_default_params(tpl, params)
         parent_id = None
         if a.get("parent"):
             pcid = a["parent"]

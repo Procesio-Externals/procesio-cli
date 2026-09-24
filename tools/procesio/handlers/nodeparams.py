@@ -124,6 +124,13 @@ def node_params(client, args) -> dict:
 
 
 def node_set_param(client, args) -> dict:
+    if getattr(args, "value_file", None):
+        if args.value is not None:
+            raise UsageError("pass either --value or --value-file, not both")
+        import io as _io
+        args.value = _io.open(args.value_file, encoding="utf-8", newline="").read()
+    if args.value is None:
+        raise UsageError("nothing to set: pass --value or --value-file")
     flow = _fetch_flow(client, args.id)
     node = nodeparam.find_node(flow, args.node)
     if not node:
@@ -220,25 +227,230 @@ def variable_set_type(client, args) -> dict:
     return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
-def variable_set_default(client, args) -> dict:
+def variable_set_required(client, args) -> dict:
     flow = _fetch_flow(client, args.id)
     var = nodeparam.find_variable(flow, args.variable)
     if not var:
         raise UsageError(f"variable not found in process {args.id}: {args.variable}")
-    value = args.value
-    if args.json:
-        import json as _json
-        try:
-            value = _json.loads(args.value)
-        except ValueError as e:
-            raise UsageError(f"--value is not valid JSON: {e}") from e
-    change = nodeparam.set_variable_default(flow, var, value)
+    want = args.required.strip().lower()
+    if want not in ("1", "true", "yes", "0", "false", "no"):
+        raise UsageError(f"--required must be true or false, got {args.required!r}")
+    try:
+        change = nodeparam.set_variable_required(
+            flow, var, want in ("1", "true", "yes"),
+            allow_contract_change=args.allow_contract_change)
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+
     result = {"id": args.id, "title": flow.get("title"), "variable": var.get("name"), **change}
     if not change["changed"]:
-        result["note"] = "default already set; nothing to PUT"
+        result["note"] = "isRequired already set; nothing to PUT"
         result["put"] = False
         return result
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+
+    valid, errors = _validate(client, flow)
+    result["isValid"] = valid
+    result["lint_problems"] = _lint(client, flow)
+    if not valid:                       # never PUT an invalid flow
+        result["errors"] = errors
+        result["put"] = False
+        return result
+    if args.dry_run:
+        result["put"] = False
+        result["dry_run"] = True
+        return result
+    # Every save decides the mark: the platform stores what the body carries,
+    # never computes it, so a pass-through PUT files a repaired flow as broken.
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
+    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
+    result["put"] = True
+    return result
+
+
+def variable_add(client, args) -> dict:
+    flow = _fetch_flow(client, args.id)
+    try:
+        var = nodeparam.add_variable(
+            flow, args.name, args.data_type, args.direction,
+            is_list=bool(args.is_list), default_value=args.default,
+            is_required=bool(args.required))
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+
+    result = {"id": args.id, "title": flow.get("title"), "variable": var["name"],
+              "variable_id": var["id"], "dataType": var["dataType"],
+              "direction": args.direction.lower(), "isList": var["isList"],
+              "isRequired": var["isRequired"]}
+
+    valid, errors = _validate(client, flow)
+    result["isValid"] = valid
+    result["lint_problems"] = _lint(client, flow)
+    if not valid:                       # never PUT an invalid flow
+        result["errors"] = errors
+        result["put"] = False
+        return result
+    if args.dry_run:
+        result["put"] = False
+        result["dry_run"] = True
+        return result
+    # Every save decides the mark: the platform stores what the body carries,
+    # never computes it, so a pass-through PUT files a repaired flow as broken.
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
+    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
+    result["put"] = True
+    return result
+
+
+def variable_set_default(client, args) -> dict:
+    import io as _io, json as _json
+    flow = _fetch_flow(client, args.id)
+    var = nodeparam.find_variable(flow, args.variable)
+    if not var:
+        raise UsageError(f"variable not found in process {args.id}: {args.variable}")
+    if args.value is not None and args.value_file:
+        raise UsageError("pass either --value or --value-file, not both")
+    if args.clear:
+        # Clearing needs no value, and combining the two hides which one won.
+        if args.value is not None or args.value_file:
+            raise UsageError("--clear removes the default; do not combine it with "
+                             "--value or --value-file")
+        value = None
+    else:
+        if args.value_file:
+            raw = _io.open(args.value_file, encoding="utf-8", newline="").read()
+        elif args.value is not None:
+            raw = args.value
+        else:
+            raise UsageError("nothing to set: pass --value, --value-file, or --clear")
+        if args.json:
+            try:
+                value = _json.loads(raw)
+            except ValueError as e:
+                raise UsageError(f"--json was passed but the value is not valid JSON: {e}") from e
+        else:
+            value = raw
+
+    try:
+        change = nodeparam.set_variable_default(
+            flow, var, value, allow_contract_change=args.allow_contract_change)
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+
+    result = {"id": args.id, "title": flow.get("title"), "variable": var.get("name"), **change}
+    if not change["changed"]:
+        result["note"] = "default already set to that value; nothing to PUT"
+        result["put"] = False
+        return result
+    valid, errors = _validate(client, flow)
+    result["isValid"] = valid
+    result["lint_problems"] = _lint(client, flow)
+    if not valid:
+        result["errors"] = errors
+        result["put"] = False
+        return result
+    if args.dry_run:
+        result["put"] = False
+        result["dry_run"] = True
+        return result
+    # Every save decides the mark: the platform stores what the body carries,
+    # never computes it, so a pass-through PUT files a repaired flow as broken.
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
+    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
+    result["put"] = True
+    return result
+
+
+def node_insert(client, args) -> dict:
+    import io as _io, json as _json, uuid as _uuid
+    from tools.procesio.dto.process import builder as _b
+
+    flow = _fetch_flow(client, args.id)
+    anchor = nodeparam.find_node(flow, args.after) if hasattr(nodeparam, "find_node") else None
+    if anchor is None:
+        key = str(args.after).strip().lower()
+        for a in flow.get("actions") or []:
+            if str(a.get("id")) == args.after or str(a.get("actionName") or "").strip().lower() == key:
+                anchor = a
+                break
+    if anchor is None:
+        raise UsageError(f"anchor node not found in process {args.id}: {args.after}")
+
+    params = {}
+    if args.params_file:
+        params = _json.loads(_io.open(args.params_file, encoding="utf-8").read())
+    elif args.params:
+        params = _json.loads(args.params)
+
+    # ctx the builder needs: the action catalog, this flow's id, and its variables BY NAME so a
+    # {"var": "x"} binding resolves to the same guid the rest of the flow already uses.
+    ctx = {
+        "flow_id": flow.get("id"),
+        "catalog": _b.catalog_index(),
+        "var_ids": {str(v.get("name")).strip().lower(): v.get("id")
+                    for v in (flow.get("variables") or [])},
+        "var_models": {}, "model_attrs": {},
+        "new_id": lambda: str(_uuid.uuid4()),
+    }
+    try:
+        template = _b._resolve_template(args.action, ctx)
+    except Exception as e:
+        raise UsageError(f"could not resolve action template {args.action!r}: {e}") from e
+
+    counter = [0]
+    built = _b._action_parameters(template, params, ctx, counter)
+    pos = ((anchor.get("customData") or {}).get("position") or {})
+    dto = _b._action_node(str(_uuid.uuid4()), template, args.name or args.action, built,
+                          float(pos.get("x") or 0) + 160, float(pos.get("y") or 0), ctx)
+    action = nodeparam.to_live_action(dto)
+
+    ok, message = nodeparam.insert_node(flow, anchor, action)
+    result = {"id": args.id, "title": flow.get("title"), "after": anchor.get("actionName"),
+              "action": template.get("name"), "node_id": action.get("id"), "message": message}
+    if not ok:
+        result["inserted"] = False
+        result["put"] = False
+        return result
+
+    valid, errors = _validate(client, flow)
+    result["isValid"] = valid
+    result["lint_problems"] = _lint(client, flow)
+    if not valid:                       # never PUT an invalid flow
+        result["errors"] = errors
+        result["inserted"] = False
+        result["put"] = False
+        return result
+    if args.dry_run:
+        result["inserted"] = True
+        result["put"] = False
+        result["dry_run"] = True
+        return result
+    # Every save decides the mark: the platform stores what the body carries,
+    # never computes it, so a pass-through PUT files a repaired flow as broken.
+    fe = run_fe_validation(client, flow)
+    result["fe"] = fe
+    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
+    result["isValid"] = saved["isValid"]
+    result["stamped"] = saved["stamped"]
+    if "readback_error" in saved:
+        result["readback_error"] = saved["readback_error"]
+    result["inserted"] = True
+    result["put"] = True
+    return result
 
 
 def process_rename(client, args) -> dict:
@@ -299,8 +511,12 @@ def _set_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--node", required=True, help="node actionName (canvas label) or id")
     p.add_argument("--property", required=True,
                    help="parameter's designer label (e.g. 'Endpoint') or its tabPropertyId")
-    p.add_argument("--value", required=True,
+    p.add_argument("--value",
                    help="new literal text; keep every positional variable placeholder the old value had")
+    p.add_argument("--value-file", dest="value_file",
+                   help="read the new literal from a FILE instead of --value. Required for anything "
+                        "larger than the OS argv limit (~32 KB on Windows) - a big Node body or an "
+                        "embedded reference table cannot be passed on a command line")
     p.add_argument("--allow-binding-change", dest="allow_binding_change", action="store_true",
                    help="permit a different placeholder set (only when variable[] is rewritten too)")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
@@ -343,16 +559,66 @@ def _vartype_args(p: argparse.ArgumentParser) -> None:
                    help="retype + validate but do not PUT")
 
 
+def _varrequired_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--variable", required=True, help="input variable name or id")
+    p.add_argument("--required", required=True,
+                   help="true to make the input mandatory, false to make it optional")
+    p.add_argument("--allow-contract-change", dest="allow_contract_change", action="store_true",
+                   help="permit making an optional input required - tightens the public contract "
+                        "and breaks callers that omit it")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="set + validate but do not PUT")
+
+
+def _varadd_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--name", required=True, help="new variable name (must be unique in the flow)")
+    p.add_argument("--data-type", dest="data_type", required=True,
+                   help="alias (string, integer, boolean, json, object, file, date, datetime, guid) "
+                        "or a data-type GUID")
+    p.add_argument("--direction", required=True,
+                   help="input (run payload), process (internal) or output (response)")
+    p.add_argument("--is-list", dest="is_list", action="store_true", help="make it a list")
+    p.add_argument("--default", help="default value")
+    p.add_argument("--required", action="store_true",
+                   help="mark an input as required (see variable-set-required)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="add + validate but do not PUT")
+
+
 def _vardefault_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="process (project) id")
     p.add_argument("--variable", required=True, help="variable name or id")
-    p.add_argument("--value", required=True,
-                   help="new defaultValue: a string literal, or a JSON value with --json")
+    p.add_argument("--value", help="the default value, as text")
+    p.add_argument("--value-file", dest="value_file",
+                   help="read the default from a FILE (needed above the ~32 KB argv limit)")
     p.add_argument("--json", action="store_true",
-                   help="parse --value as JSON (number, object, list, true/false/null)")
+                   help="parse the value as JSON before storing it (use for a File object)")
+    p.add_argument("--clear", action="store_true", help="clear the default back to null")
+    p.add_argument("--allow-contract-change", dest="allow_contract_change", action="store_true",
+                   help="required for an input/output variable: it changes what a run does when "
+                        "the caller supplies nothing")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
-                   help="patch + validate but do not PUT")
+                   help="set + validate but do not PUT")
+
+
+def _insert_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--after", required=True,
+                   help="node to insert AFTER - its actionName (canvas label) or id")
+    p.add_argument("--action", required=True,
+                   help="action template NAME from the catalog (e.g. 'Data Store', 'Decisional')")
+    p.add_argument("--name", help="canvas label for the new node (defaults to the template name)")
+    p.add_argument("--params", help="parameters as a JSON object of {property label: binding}")
+    p.add_argument("--params-file", dest="params_file",
+                   help="read the parameters JSON from a file (needed above the argv limit)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="build + splice + validate but do not PUT")
 
 
 def _prename_args(p: argparse.ArgumentParser) -> None:
@@ -380,6 +646,12 @@ def _bindvar_args(p: argparse.ArgumentParser) -> None:
 
 
 ACTIONS = {
+    "node-insert": ActionDef(
+        func=node_insert, add_args=_insert_args, needs_client=True,
+        description="Insert ONE action into a live process immediately after another, rewiring the "
+                    "graph: the new node takes the anchor's successor and the anchor is repointed at "
+                    "it -> validate + flow-lint -> PUT. Refuses an anchor with more than one outgoing "
+                    "port (which branch it belongs on is a design decision). --dry-run previews."),
     "node-params": ActionDef(
         func=node_params, add_args=_params_args, needs_client=True,
         description="List a live process's nodes with each runtime parameter's designer label, "
@@ -415,13 +687,28 @@ ACTIONS = {
         description="Retype one variable of a live process (dataType, optionally isList) -> validate + "
                     "flow-lint -> PUT. Refuses an input/output variable without --allow-contract-change, "
                     "because those are the run payload and the response shape callers depend on."),
+    "variable-add": ActionDef(
+        func=variable_add, add_args=_varadd_args, needs_client=True,
+        description="Add ONE variable to a live process (name, data type, direction) -> validate + "
+                    "flow-lint -> PUT. Safe for existing wiring: everything else addresses variables "
+                    "by id, and nothing can already point at an id that did not exist. Refuses a "
+                    "duplicate NAME (the form-event tooling resolves names to ids) and an unknown "
+                    "direction. --dry-run previews."),
     "variable-set-default": ActionDef(
         func=variable_set_default, add_args=_vardefault_args, needs_client=True,
-        description="Set ONE variable's defaultValue on a live process -> validate + flow-lint -> PUT. "
-                    "A process (20) variable's default is its initial runtime value, so this is how you "
-                    "repoint an event-driven flow at a new resource (e.g. a calendar event id) without a "
-                    "desired-state rebuild. --value is a string literal, or a JSON value with --json. "
-                    "--dry-run previews; an invalid flow is never PUT."),
+        description="Set (or --clear) one variable's defaultValue on a live process -> validate + "
+                    "flow-lint -> PUT. This is how an input stops being something the caller must "
+                    "supply: a File default is honoured on a run that omits it, and the platform "
+                    "re-stages the file into that run's own instance. Needs --allow-contract-change "
+                    "on an input/output. --json parses the value first (use for a File object)."),
+    "variable-set-required": ActionDef(
+        func=variable_set_required, add_args=_varrequired_args, needs_client=True,
+        description="Set or clear one INPUT variable's isRequired flag on a live process -> validate "
+                    "+ flow-lint -> PUT. Clearing it is allowed outright (no existing caller breaks); "
+                    "making an optional input required needs --allow-contract-change. Refused on a "
+                    "non-input variable. Guard any bare raw placeholder that reads the variable "
+                    "(`var f = <%6%>;` -> `[<%6%>][0]`) BEFORE clearing, or an absent value becomes "
+                    "a SyntaxError at run time."),
     "process-rename": ActionDef(
         func=process_rename, add_args=_prename_args, needs_client=True,
         description="Rename a live process (its title) -> validate + flow-lint -> PUT. The title is "

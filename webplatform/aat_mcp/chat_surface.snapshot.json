@@ -1,0 +1,668 @@
+[
+  {
+    "name": "procesio_list_processes",
+    "title": "List PROCESIO processes",
+    "description": "List the automation processes in a PROCESIO workspace, newest first. Use this to find the id of a process before running, editing or validating it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Only processes whose name matches this text."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Processes per page."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List PROCESIO processes",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_create_process",
+    "title": "Create a PROCESIO process",
+    "description": "Create a new automation process from a JSON definition of its steps and connections. Returns the new process id. Pass dry_run to see what would be built without creating anything.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "string",
+          "description": "The process definition, as a JSON object."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report what would be created; create nothing."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "Create a PROCESIO process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_edit_process",
+    "title": "Edit a PROCESIO process",
+    "description": "Change an existing process - add, retarget or reconfigure its steps. Pass dry_run first to see the diff. Removing steps additionally requires allow_remove, so a partial definition cannot silently delete work.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "config": {
+          "type": "string",
+          "description": "The changes, as a JSON object."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report the diff; change nothing."
+        },
+        "allow_remove": {
+          "type": "boolean",
+          "description": "Permit this edit to delete steps."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Edit a PROCESIO process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_validate_process",
+    "title": "Validate a PROCESIO process",
+    "description": "Check a process for errors without running it - unconnected steps, missing required inputs, broken references. Do this before running a process you just built. Validating is not the same as running: a process can validate and still fail at execution.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Validate a PROCESIO process",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_run_process",
+    "title": "Run a PROCESIO process",
+    "description": "Execute a process and return its run id. A process does real work - it can send mail, write to databases and call external systems - so this is never run unattended. Follow it with procesio_get_run_status and procesio_get_run_output.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "payload": {
+          "type": "string",
+          "description": "Input values for the run, as a JSON object."
+        },
+        "synchronous": {
+          "type": "boolean",
+          "description": "Wait for the run to finish instead of returning immediately."
+        },
+        "timeout": {
+          "type": "integer",
+          "description": "Seconds to wait when synchronous."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Run a PROCESIO process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_run_status",
+    "title": "Check a PROCESIO run",
+    "description": "Report whether a run is still going, finished or failed, and which step it reached. Takes the run id returned by procesio_run_process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The run id."
+        },
+        "actions": {
+          "type": "boolean",
+          "description": "Include per-step detail."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Check a PROCESIO run",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_run_output",
+    "title": "Read a PROCESIO run output",
+    "description": "Return the values a finished run produced. Only meaningful once the run has completed - check with procesio_get_run_status first.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The run id."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read a PROCESIO run output",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_tidy_process_layout",
+    "title": "Tidy a process canvas",
+    "description": "Re-arrange a process's steps on the design canvas so it is readable. Changes only the visual layout, never what the process does. Worth running after building a process through the API, which places steps without arranging them.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report the new layout; change nothing."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Tidy a process canvas",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_forms",
+    "title": "List PROCESIO forms",
+    "description": "List the forms in a workspace. A form is the screen a person fills in to start or feed a process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List PROCESIO forms",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_form",
+    "title": "Read a PROCESIO form",
+    "description": "Return a form's definition - its fields, their types and how they are laid out.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read a PROCESIO form",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_create_form",
+    "title": "Create a PROCESIO form",
+    "description": "Create a form from a JSON definition. Returns the new form id. Add fields afterwards with procesio_add_form_field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "string",
+          "description": "The form definition, as a JSON object."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report what would be created; create nothing."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "Create a PROCESIO form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_add_form_field",
+    "title": "Add fields to a PROCESIO form",
+    "description": "Add one or more input fields to an existing form.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "elements": {
+          "type": "string",
+          "description": "The fields to add, as a JSON array."
+        },
+        "parent": {
+          "type": "string",
+          "description": "Id of the container to add them into."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report what would be added; add nothing."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Add fields to a PROCESIO form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_build_connector",
+    "title": "Build a PROCESIO connector from API docs",
+    "description": "Start building a custom PROCESIO connector from an API's documentation. Give it the docs URL and what you need the connector to do; it reads the docs, asks what it still needs, and generates a connector package. Returns a build id - follow it with procesio_get_connector_build.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "api_url": {
+          "type": "string",
+          "description": "URL of the API documentation to read."
+        },
+        "api_docs_text": {
+          "type": "string",
+          "description": "The documentation itself, if there is no public URL."
+        },
+        "user_requirements": {
+          "type": "string",
+          "description": "What the connector needs to do, in plain language."
+        }
+      }
+    },
+    "annotations": {
+      "title": "Build a PROCESIO connector from API docs",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_connector_builds",
+    "title": "List connector builds",
+    "description": "List connector builds and their current stage.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "type": "string",
+          "description": "Only builds in this stage."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List connector builds",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_connector_build",
+    "title": "Check a connector build",
+    "description": "Report a build's stage, what it is waiting on, and whether a connector package is ready to download.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "build_id": {
+          "type": "string",
+          "description": "The build id."
+        }
+      },
+      "required": [
+        "build_id"
+      ]
+    },
+    "annotations": {
+      "title": "Check a connector build",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_download_connector",
+    "title": "Download a built connector",
+    "description": "Save a finished build's connector package to a local file, ready to install with procesio_install_connector.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "build_id": {
+          "type": "string",
+          "description": "The build id."
+        },
+        "out": {
+          "type": "string",
+          "description": "Local path to write the package to."
+        }
+      },
+      "required": [
+        "build_id",
+        "out"
+      ]
+    },
+    "annotations": {
+      "title": "Download a built connector",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_install_connector",
+    "title": "Install a connector into PROCESIO",
+    "description": "Install a connector package into a workspace, after which its operations appear as steps you can use when building a process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "description": "Path to the connector package."
+        },
+        "name": {
+          "type": "string",
+          "description": "Name to show in the designer."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      },
+      "required": [
+        "file"
+      ]
+    },
+    "annotations": {
+      "title": "Install a connector into PROCESIO",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_connectors",
+    "title": "List installed connectors",
+    "description": "List the connectors installed in a workspace - the extra step types available when building a process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List installed connectors",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_workspaces",
+    "title": "List PROCESIO workspaces",
+    "description": "List the workspaces this account can reach. A workspace holds its own processes, forms, connectors and credentials.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List PROCESIO workspaces",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_environments",
+    "title": "List PROCESIO environments",
+    "description": "List the configured environments, so a call can be pointed at the right one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "List PROCESIO environments",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_test_credential",
+    "title": "Test a PROCESIO credential",
+    "description": "Check that a stored credential can still reach the system it belongs to. Answers whether a connection is working without running a whole process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "string",
+          "description": "The credential to test, as a JSON object."
+        },
+        "workspace_id": {
+          "type": "string",
+          "description": "Workspace to act in. Omit to use the default workspace."
+        },
+        "environment": {
+          "type": "string",
+          "description": "Named environment, e.g. Internal-QA. Omit for the default."
+        }
+      }
+    },
+    "annotations": {
+      "title": "Test a PROCESIO credential",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  }
+]

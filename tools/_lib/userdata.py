@@ -15,6 +15,12 @@ in ``agents/_lib`` to be importable by both without a cross-package dependency.
 Relocatable: set ``AAT_USERDATA_DIR`` to move the whole user-data root to another
 path or laptop with no code change (serves the LLM-agnostic / portable direction).
 
+Installed rather than cloned: when this ships inside a wheel there IS no repo root to
+sit beside, so user data goes to the platform's per-user data directory instead. It must
+never land inside the installation: that directory is replaced on upgrade (taking the
+credentials config and run history with it), can need admin rights to write on a
+system-wide install, and is shared by every account on the machine.
+
 Layout under the base:
 
     context-state-knowledge/
@@ -32,6 +38,7 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from pathlib import Path
 
 # tools/_lib/userdata.py -> parents[2] == repo root
@@ -58,9 +65,34 @@ def _safe_component(name: str) -> str:
     return seg
 
 
+def _is_checkout() -> bool:
+    """True when running from a clone rather than an installed package.
+
+    A checkout carries its own ``pyproject.toml`` beside the tree; a wheel installs the
+    tree without it. That is the cheapest honest signal - matching on "site-packages" in
+    the path guesses at a layout that varies by installer, platform and editable install.
+    """
+    return (_REPO_ROOT / "pyproject.toml").is_file()
+
+
+def _platform_data_dir() -> Path:
+    """The per-user data directory, by platform convention. Standard library only."""
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or r"~\AppData\Local"
+    elif sys.platform == "darwin":
+        base = "~/Library/Application Support"
+    else:
+        base = os.environ.get("XDG_DATA_HOME") or "~/.local/share"
+    return Path(base).expanduser() / "procesio-cli"
+
+
 def _root() -> Path:
     override = os.environ.get(_ENV_VAR)
-    return Path(override).expanduser() if override else _REPO_ROOT / _DEFAULT_DIRNAME
+    if override:
+        return Path(override).expanduser()
+    if _is_checkout():
+        return _REPO_ROOT / _DEFAULT_DIRNAME
+    return _platform_data_dir()
 
 
 def current_user() -> str | None:

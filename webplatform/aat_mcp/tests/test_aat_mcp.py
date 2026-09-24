@@ -213,3 +213,43 @@ def test_no_delegation_without_runner_url(monkeypatch):
                         lambda tool, argv, **k: {"ok": True, "data": {"local": True}})
     # a host-only tool still runs locally when no host-runner is configured (local platform)
     assert bridge.run_tool("whatsapp-personal", "list-chats", {})["data"]["local"] is True
+
+
+# --- tool annotations ----------------------------------------------------
+
+def test_every_tool_declares_a_title_and_hints():
+    """A directory listing requires both, and a client uses them for permissions."""
+    for t in server.TOOLS:
+        assert t.get("title"), f"{t['name']} has no title"
+        a = t.get("annotations") or {}
+        assert a.get("title") == t["title"]
+        for hint in ("readOnlyHint", "destructiveHint", "idempotentHint", "openWorldHint"):
+            assert isinstance(a.get(hint), bool), f"{t['name']} missing {hint}"
+        assert len(t["name"]) <= 64
+
+
+def test_a_tool_that_dispatches_arbitrary_actions_is_never_read_only():
+    """The rule that stops a write from running unprompted.
+
+    A readOnlyHint tool may be run by a client WITHOUT asking. Anything that takes a
+    caller-supplied action and forwards it can reach a create or an update, so it can
+    never make that claim. The check reads the input schema rather than a list of
+    names, so a dispatcher added later is caught without anyone remembering to add it.
+    """
+    for t in server.TOOLS:
+        props = set(((t.get("inputSchema") or {}).get("properties") or {}))
+        dispatches = "action" in props and bool(props & {"tool", "agent"})
+        if dispatches:
+            a = t["annotations"]
+            assert a["readOnlyHint"] is False, (
+                f"{t['name']} forwards a caller-supplied action and claims readOnlyHint")
+            assert a["destructiveHint"] is True
+
+
+def test_a_freeform_dispatcher_names_the_api_it_targets():
+    """Required of any tool whose caller constructs the request."""
+    for t in server.TOOLS:
+        props = set(((t.get("inputSchema") or {}).get("properties") or {}))
+        if "action" in props and "tool" in props:
+            assert "procesio.com" in t["description"], (
+                f"{t['name']} accepts freeform actions but names no API")

@@ -91,7 +91,8 @@ TOOLS = [
         "description": (
             "Run a registered AAT tool for a REVERSIBLE / read action. 'args' is a "
             "JSON object of flag name->value (objects/arrays pass cleanly, no shell "
-            "escaping). If the action is irreversible (send/delete/pay/post/...), "
+            "escaping). Targets the PROCESIO platform API - see "
+            "https://docs.procesio.com. If the action is irreversible (send/delete/pay/post/...), "
             "this REFUSES and returns approval_required telling you to use "
             "run_tool_confirmed. Discover tools/actions via capabilities."
         ),
@@ -101,7 +102,8 @@ TOOLS = [
         "name": "run_tool_confirmed",
         "description": (
             "Run a tool INCLUDING an irreversible action (send/delete/pay/post/"
-            "issue-invoice/...). The operator is asked to approve before it runs. "
+            "issue-invoice/...). Targets the PROCESIO platform API - see "
+            "https://docs.procesio.com. The operator is asked to approve before it runs. "
             "Use this only after run_tool returned approval_required, or when you "
             "know the action has a real-world side effect."
         ),
@@ -145,6 +147,39 @@ TOOLS = [
         },
     },
 ]
+
+
+# Titles and hints, kept in one table so the claim each tool makes about itself can be
+# audited in one place. The hints drive auto-permissions in a client: a readOnlyHint tool
+# may run without asking, so a wrong one here is a write that fires unprompted.
+#
+# run_* are NOT read-only. They dispatch any registered action, and the reversible set
+# they admit still includes creates and updates (add-credential, datastore-add-rows,
+# update-*). "Reversible" answers whether a thing can be undone; "read-only" answers
+# whether it changes anything, and those are different questions. Mapping one onto the
+# other would mislabel roughly ninety write actions as safe to run unattended.
+_ANNOTATIONS = {
+    "capabilities":        ("Discover PROCESIO capabilities", True),
+    "get_skill":           ("Read a PROCESIO skill", True),
+    "run_tool":            ("Run a PROCESIO tool action", False),
+    "run_tool_confirmed":  ("Run a PROCESIO tool action (approval required)", False),
+    "run_agent":           ("Run a PROCESIO agent action", False),
+    "run_agent_confirmed": ("Run a PROCESIO agent action (approval required)", False),
+}
+
+for _t in TOOLS:
+    _title, _read_only = _ANNOTATIONS[_t["name"]]
+    _t["title"] = _title
+    _t["annotations"] = {
+        "title": _title,
+        "readOnlyHint": _read_only,
+        # A dispatcher can reach an update, which overwrites data. Only a tool that
+        # cannot change anything may claim otherwise.
+        "destructiveHint": not _read_only,
+        "idempotentHint": _read_only,
+        # Read-only calls answer from the local registry; the rest reach the platform.
+        "openWorldHint": not _read_only,
+    }
 
 
 def _log(msg: str) -> None:

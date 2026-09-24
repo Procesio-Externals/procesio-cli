@@ -1,0 +1,15 @@
+{
+  "name": "procesio-cli",
+  "description": "Source for the official PROCESIO plugin: the CLI, its MCP server and the Agent Skills that carry the build, verify and audit method.",
+  "owner": {
+    "name": "Ringhel TEAM SRL (PROCESIO)",
+    "url": "https://procesio.com"
+  },
+  "plugins": [
+    {
+      "name": "procesio",
+      "source": "./",
+      "description": "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant."
+    }
+  ]
+}

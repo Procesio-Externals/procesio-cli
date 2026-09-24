@@ -1,5 +1,7 @@
 # PROCESIO CLI + Agent
 
+<!-- mcp-name: io.github.Procesio-Externals/procesio-cli -->
+
 Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant.
 
 Everything here talks to a PROCESIO installation over its public API. You point it at
@@ -118,11 +120,40 @@ usable by an assistant that has never seen it before.
 Point your assistant at the repo root and let it run `scripts/run-tool.py`. Nothing
 else is required.
 
+### Or install it into Claude Code as a plugin
+
+One command, and Claude Code carries the tools, the MCP server and the Agent Skills
+together. No clone, no path to write into a config file.
+
+```
+/plugin marketplace add Procesio-Externals/procesio-cli
+/plugin install procesio@procesio-cli
+```
+
+The plugin launches the MCP server through `uvx`, so [uv](https://docs.astral.sh/uv/)
+has to be on the machine; everything else it needs it resolves itself on first run.
+Authenticate exactly as a clone does, with `add-credential` below.
+
 ### Or connect it over MCP, with no shell at all
 
-There is an MCP server in `webplatform/aat_mcp/`. It speaks JSON-RPC over stdio with
-no third-party dependency, and it exposes the whole registry through six generic
-tools rather than one per action:
+There are two MCP servers in `webplatform/aat_mcp/`, over the same substrate, for two
+different jobs. Both speak JSON-RPC over stdio.
+
+| | `procesio-mcp-chat` | `procesio-mcp` |
+|---|---|---|
+| tools | 21, one per operation | 6, generic |
+| picks up a tool you add | no, it is a declared list | yes, immediately |
+| what it is for | a chat client, where each tool has to say what it does | driving the whole registry |
+| launched by | the plugin, via `.mcp.json` | your own client config |
+
+The curated surface is grouped by what you are building — processes, forms, connectors —
+and nothing in it takes a caller-supplied action, so every tool in the list is legible to
+a person reading it and to a model choosing between them. Its contents are declared in
+`webplatform/aat_mcp/chat_surface.yaml`, and CI checks that every operation it names still
+exists with the arguments it claims.
+
+The generic surface is the one to reach for when you want reach rather than a short list.
+It exposes the whole registry through six tools rather than one per action:
 
 | tool | what it does |
 |---|---|
@@ -279,11 +310,11 @@ action is required; `--help` lists the actions a tool exposes.
 
 | Tool | Actions | What it does |
 |---|--:|---|
-| `procesio` | 379 | The platform API: processes, forms, documents, custom actions, environments, credentials, schedules. |
+| `procesio` | 390 | The platform API: processes, forms, documents, custom actions, environments, credentials, schedules. |
 | `connector-builder` | 54 | Turns API documentation into a compiled PROCESIO custom action. Custom actions are the platform's main extension point, so this is the shortest route from a third-party API to something a process can call. |
 | `mysql` | 9 | Query the MySQL database a SQL action talks to, to see what a process actually wrote. |
 | `sqlserver` | 9 | The same, for SQL Server. |
-| `web` | 7 | Drive a real browser: render, click, fill, screenshot, read runtime diagnostics. |
+| `web` | 8 | Drive a real browser: render, click, fill, screenshot, read runtime diagnostics. |
 | `xlsx` | 3 | Read a workbook outside a process. PROCESIO's Node allowlist ships no xlsx library. |
 | `framework-map` | 2 | Render everything installed as one bilingual page: `python scripts/run-tool.py framework-map build`. |
 

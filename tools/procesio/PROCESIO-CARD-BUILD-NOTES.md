@@ -145,3 +145,39 @@ source files to both, so what runs on the platform is byte-for-byte what was pro
 Assert the OUTPUT, not the call: open a generated workbook with a real reader and read the
 figure back out of the file. "It returned base64" and "it produced a workbook" are different
 claims, and only the second one is worth making.
+
+## 9. Assembling a file-in / file-out card through the builder (the renderer wiring)
+
+A reconciliation-style card is `File(s) in -> engine -> report renderers -> File(s) out`. Every
+piece is a native action the **compact builder can wire by property label** — you do not splice
+raw DTO. The labels (from the live action catalog `configuration[].settings[]`, which the builder's
+`_property_index` reads, recursing into `side-pannel` nested `value` lists):
+
+- **File To Base64** — `File` (input file var) → `Base64 Content` (output string var).
+- **String To Base64** — `Input String` (input) → `Result` (output string var).
+- **HTML To PDF** — a **side-panel** `Configure` holding `HTML string` (the HTML var), `File Name`
+  (a literal, e.g. `Bank-Reconciliation.pdf`) and `File Output` (the output File var).
+- **Base64 To File** — `Base64 String` (the base64 var), `File Name` (a literal) and `File` (the
+  output File var).
+
+⚠ **A File variable is declared with `model:<File datatype GUID 10c6ac59-…-121212121219>`, NOT
+`type:"file"`** — the process-create schema's `type` enum has no `file` (it 400s: "'file' is not one
+of [...]"). Same pattern as a Guid var (`model:<Guid GUID>`). The engine and the report builders are
+ordinary `Node` actions (`Code:{template,vars}`); a downstream Node reads an upstream Node's output
+by binding that output var as its input (`vars:["recon"]`). A linear `edges` chain is enough;
+Start/Stop auto-inject.
+
+**Run it with files, and prove the files, not the run.** `run-process-with-file --id <pid> --file
+StatementFile=stmt.csv --file LedgerFile=ledg.csv --payload '{...non-file inputs...}'` publishes →
+uploads bytes → launches → polls. The File outputs arrive as objects `{id,name,path,size,hash}`;
+`file-download --from-run <result.json> --var ExcelFile --out out.xlsx` fetches one. Judge on
+opening the file (openpyxl sheets + values; the `%PDF-` magic), never on status 50 — a clean 50
+returning a null File is this platform's failure signature (Rule 8).
+
+**Cross-workspace import is CONDITIONAL, not absolute.** The API-NOTES record `Transport/import`
+answering `403 "workspace migration"`; that is the RELOCATION case. `import --file <pack>
+--workspace-id <clean-different-ws>` into a workspace where the ids do not already exist **succeeds**
+(measured: PL-120 B-022, PL-004 B-023) and preserves the flow id — so the round-trip proof (import
+into a clean different ws, run there, judge on the produced files) is achievable over the API for a
+process-bearing pack. Forms still need the designer (a form-bearing pack is not API-installable);
+the process is the marketplace artefact, the intake form is the designer front door.

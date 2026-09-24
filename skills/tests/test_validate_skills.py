@@ -87,3 +87,29 @@ def test_waiver_matches_only_the_declared_finding():
 def test_committed_waiver_file_is_valid_json():
     data = json.loads((ROOT / "skills" / "evals" / "validation-baseline.json").read_text(encoding="utf-8"))
     assert isinstance(data["allow"], list)
+
+
+def test_committed_skills_tree_passes_the_validator():
+    """The read-back the hand-written skills never had.
+
+    Every other test in this file builds its own fixture under tmp_path, so they
+    prove the validator's logic and nothing about the tree that ships. The
+    mirror guard for the GENERATED manuals does scan for real
+    (tests/test_tool_skills.py::test_skill_frontmatter_parses) - which is why a
+    description carrying a colon-space is caught under tools/ and was not caught
+    under skills/.
+
+    Why one bad file is not one file's problem: registry.list_skills() parses
+    every manifest in a single pass, so one unloadable SKILL.md fails get-skill
+    for EVERY skill, not just its own.
+
+    This calls main() rather than validate_repo() on purpose. validate_repo()
+    applies the full rubric to every folder, ignoring the `source_policy`
+    governance opt-in, so it fails imported skills that were never written to
+    that rubric. main() is what the CLI and both pre-commit hooks run, so this
+    test and the command a developer runs cannot drift apart.
+    """
+    assert module.main([]) == 0, (
+        "the committed skills tree does not pass the validator - "
+        "run `python scripts/validate-skills.py` for the findings"
+    )

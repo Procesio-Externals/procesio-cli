@@ -187,7 +187,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (id or name). |
 | `form-get-element-events` | `--id`, `--element` | List one element's event handlers, by trigger. |
 | `form-list` | — | List forms (GET /api/FormTemplate/all/basic). |
-| `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). |
+| `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). --clear removes the… |
 | `form-set-element-chains` | `--id` | Rewrite the ORDERED event chains of one or more elements on a live form in ONE save (surgical: only the listed element triggers change). Each chain lists its… |
 | `form-set-element-config` | `--id`, `--element` | Set one element's plain configs in place (surgical: only that element's config values change, ids preserved; returns the previous values). Event configs go… |
 | `form-set-element-event` | `--id`, `--element`, `--on`, `--action` | Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element's event config changes). In a… |
@@ -377,9 +377,10 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 |---|---|---|
 | `node-bind-var` | `--id`, `--node`, `--property`, `--bind` | Bind a process variable into one node parameter's value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable… |
 | `node-delete` | `--id`, `--node` | Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) ->… |
+| `node-insert` | `--id`, `--after`, `--action` | Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor's successor and the anchor is repointed at… |
 | `node-params` | `--id` | List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only). |
 | `node-replace-text` | `--id`, `--node`, `--find`, `--replace` | Replace an EXACT literal in every string leaf of a node's runtime parameters AND designer settings on a live process - the safe way to reach a value nested… |
-| `node-set-param` | `--id`, `--node`, `--property`, `--value` | Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime… |
+| `node-set-param` | `--id`, `--node`, `--property` | Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime… |
 
 ### patch
 
@@ -587,6 +588,12 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 |---|---|---|
 | `stop-instance` | `--id` | Stop a running instance (POST /api/Projects/instances/{id}/stop). |
 
+### strip
+
+| action | required args | what it does |
+|---|---|---|
+| `strip-webhook-bindings` | `--in` | Strip webhook bindings from a .procesio pack (offline). A binding lives in the process definition, so it TRAVELS - and the launch endpoint is anonymous, so the… |
+
 ### update
 
 | action | required args | what it does |
@@ -609,7 +616,9 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `variable-set-default` | `--id`, `--variable`, `--value` | Set ONE variable's defaultValue on a live process -> validate + flow-lint -> PUT. A process (20) variable's default is its initial runtime value, so this is… |
+| `variable-add` | `--id`, `--name`, `--data-type`, `--direction` | Add ONE variable to a live process (name, data type, direction) -> validate + flow-lint -> PUT. Safe for existing wiring: everything else addresses variables… |
+| `variable-set-default` | `--id`, `--variable` | Set (or --clear) one variable's defaultValue on a live process -> validate + flow-lint -> PUT. This is how an input stops being something the caller must… |
+| `variable-set-required` | `--id`, `--variable`, `--required` | Set or clear one INPUT variable's isRequired flag on a live process -> validate + flow-lint -> PUT. Clearing it is allowed outright (no existing caller… |
 | `variable-set-type` | `--id`, `--variable`, `--data-type` | Retype one variable of a live process (dataType, optionally isList) -> validate + flow-lint -> PUT. Refuses an input/output variable without… |
 
 ### verify

@@ -8,9 +8,17 @@ Auth/export mechanics stay in [PROCESIO-API-NOTES.md](PROCESIO-API-NOTES.md); ca
 rule (live=camelCase, export=PascalCase) applies to everything here.
 
 Top-level keys (every bundle): `DataTypes, Credentials, Webhooks, DocumentTemplates,
-Flows, Forms, DataStores, TimeStamp`. `Webhooks` and `DataStores` are present but
-**empty at top level** — webhooks live inside `Flows[].Webhooks`; a `DataStore` is a
-real resource type but is its own thing, not embedded here.
+Flows, Forms, DataStores, TimeStamp`. `Webhooks` is empty at top level — webhooks live
+inside `Flows[].Webhooks`.
+
+⚠ **CORRECTED 2026-09-03: `DataStores` is NOT always empty.** It fills whenever the export
+request NAMES a store (`--data-stores` → `dataStoreIds`), and the store's backing data model
+is exported into `DataTypes` alongside it. Each entry carries **schema only** —
+`Id, Name, Description, Columns[{ColumnId, Name, DataTypeId, IsList, IsPrimaryKey, IsRequired,
+IsSystemColumn}], DataTypeId` — with **no rows key of any kind**, so a store always arrives in
+the target EMPTY. The system columns are omitted from the exported `Columns` and re-appended by
+the target on create. Full measurement in
+[PROCESIO-API-NOTES.md](PROCESIO-API-NOTES.md) (dated Data Store section).
 
 ---
 

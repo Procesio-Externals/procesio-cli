@@ -259,3 +259,21 @@ belongs on is a design decision.
 adding one action to a 22-node flow through it means re-expressing the whole flow — including a
 70 KB Node body — as config. `read-flow-graph` is an offline reader and does not produce that
 config, so there is no round-trip.
+
+## A `<%N%>` placeholder is injected RAW - quote it yourself for a string
+
+The scripting actions substitute the value into the source text before it is parsed, so the
+template has to supply the quotes for anything that is not already valid JavaScript on its own.
+A list or object arrives as JSON and needs none; a **string does**:
+
+```js
+const isoDate = String('<%0%>' || '');   // right
+const isoDate = String(<%0%> || '');     // wrong
+```
+
+Unquoted, `2026-09-24` is parsed as arithmetic and silently becomes `1993`, and a date-shaped
+string is the common case. There is no error: the script runs, the value is quietly wrong, and
+the step returns an empty result. Cost an hour on a slot generator that answered "no times
+available" for every day. The same applies to any free text - a name with an apostrophe in it
+will end the string early, so a value that can contain quotes belongs in a JSON-serialised
+object placeholder rather than an interpolated string.

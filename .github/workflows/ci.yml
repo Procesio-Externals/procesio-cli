@@ -34,3 +34,41 @@ jobs:
       - name: generated files are current
         run: |
           uv run python scripts/build-router.py --check
+      - name: skills are valid
+        # The manuals are generated, and a generated file nothing parses is how
+        # 35 of them shipped with invalid YAML frontmatter. The validator is the
+        # thing that would have caught it.
+        run: uv run python scripts/validate-skills.py
+      - name: both MCP surfaces start, and the plugin launches the one .mcp.json names
+        # The launch command is read OUT of .mcp.json rather than repeated here. A gate
+        # that names its own command stops testing the plugin the moment the config
+        # points somewhere else, and stays green the whole time it is not testing it.
+        #
+        # Proving this here is the only place it gets proven: a plugin that installs and
+        # then fails to start is indistinguishable from a broken product. Both surfaces
+        # are checked because both ship - the curated one the plugin uses, and the full
+        # registry one anybody can still configure by hand.
+        if: runner.os == 'Linux'
+        run: |
+          python - <<'PY'
+          import json, pathlib, subprocess
+
+          cfg = json.loads(pathlib.Path(".mcp.json").read_text())["mcpServers"]["procesio"]
+          plugin_argv = [cfg["command"]] + [
+              a.replace("${CLAUDE_PLUGIN_ROOT}", ".") for a in cfg["args"]
+          ]
+          request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'
+
+          for label, argv in (
+              ("plugin, per .mcp.json", plugin_argv),
+              ("full registry surface", ["uvx", "--from", ".", "procesio-mcp"]),
+          ):
+              proc = subprocess.run(argv, input=request, capture_output=True,
+                                    text=True, timeout=600)
+              if proc.returncode != 0:
+                  raise SystemExit(f"{label}: exited {proc.returncode}\n{proc.stderr[-2000:]}")
+              tools = json.loads(proc.stdout.splitlines()[0])["result"]["tools"]
+              if not tools:
+                  raise SystemExit(f"{label}: started but listed no tools")
+              print(f"{label}: {len(tools)} tools via {' '.join(argv)}")
+          PY

@@ -268,6 +268,173 @@ def repair_datastore_mapper(args) -> dict:
     return {"result": result}
 
 
+# ---------------------------------------------------------------------------
+# Webhook binding strip
+#
+# Everything else a process depends on is LEFT BEHIND by an export - Data Store
+# rows, credentials - so an imported process arrives visibly incomplete and
+# somebody provisions it. A webhook BINDING is the exception: it lives in the
+# process definition, so it TRAVELS. The schema requires it to:
+#
+#     webhooks/0: Additional properties are not allowed ('id' was unexpected)
+#     webhooks/0: 'webhookId' is a required property
+#
+# And the launch endpoint is anonymous - every verb on
+# /api/Webhooks/launch/{id} documents "Permission required: None" - so the id
+# IS the access control, not a name for something a permission protects.
+#
+# A pack therefore carries a LIVE CAPABILITY FOR THE SOURCE INSTALLATION while
+# being LESS functional at the destination, where the id names nothing. That is
+# the opposite failure direction from every other missing binding: the others
+# fail closed, this one fails open. A pack is the artefact handed to a customer.
+#
+# TWO ARRAYS, TWO EXPOSURES, counted separately:
+#   Flows[*].Webhooks   the BINDING. Travels with the flow, asked for or not
+#   Webhooks            the webhook ENTITY. Only present if --webhooks was
+#                       passed - but then it carries the id directly
+#
+# The transform is IDEMPOTENT: a pack with no webhooks is returned unchanged,
+# and a flow with no `Webhooks` KEY does not gain one, because absence of a key
+# and an empty array are different documents to the import.
+#
+# It also REPORTS residual ids found anywhere else in the pack rather than
+# staying silent about them. A count of what was removed is not evidence that
+# no copy survives - a launch URL pasted into a Call API parameter carries the
+# same id, and reporting "clean" over the top of one would be worse than the
+# leak, because the caller would stop looking.
+# ---------------------------------------------------------------------------
+
+_WEBHOOK_KEYS = ("Webhooks", "webhooks")
+_ID_KEYS = ("webhookId", "WebhookId", "id", "Id")
+
+
+def _hook_ids(entries) -> list:
+    out = []
+    for e in entries or []:
+        if isinstance(e, dict):
+            for k in _ID_KEYS:
+                v = e.get(k)
+                if isinstance(v, str) and v:
+                    out.append(v)
+                    break
+        elif isinstance(e, str) and e:
+            out.append(e)
+    return out
+
+
+def _flow_containers(pack):
+    """Yield every dict that could carry a per-flow webhook binding.
+
+    A pack uses PascalCase (`Flows`/`Webhooks`); a definition read back from
+    `get-process` uses camelCase (`flow`/`webhooks`). The same function checks
+    both, so it has to see both.
+    """
+    for key in ("Flows", "flows"):
+        for flow in pack.get(key) or []:
+            if isinstance(flow, dict):
+                yield flow
+    for key in ("flow", "Flow"):
+        flow = pack.get(key)
+        if isinstance(flow, dict):
+            yield flow
+
+
+def strip_webhook_bindings_pack(pack: dict) -> tuple[dict, dict]:
+    """Return (stripped copy, report). The input is never mutated.
+
+    The report NEVER carries an id - it is printed and logged, so it has to be
+    safe to print. Lengths and counts only.
+    """
+    out = json.loads(json.dumps(pack))
+    removed_ids, flows_unbound = [], []
+    bindings = entities = 0
+
+    for flow in _flow_containers(out):
+        for key in _WEBHOOK_KEYS:
+            if key not in flow:
+                continue                     # ⚠ absent is not empty
+            ids = _hook_ids(flow.get(key))
+            if flow.get(key):
+                bindings += len(flow[key])
+                removed_ids += ids
+                fid = flow.get("Id") or flow.get("id")
+                if fid:
+                    flows_unbound.append(fid)
+                flow[key] = []
+
+    for key in _WEBHOOK_KEYS:
+        if key in out and isinstance(out.get(key), list) and out[key]:
+            entities += len(out[key])
+            removed_ids += _hook_ids(out[key])
+            out[key] = []
+
+    # ⚠ Now look for the ids ANYWHERE ELSE, in the serialised artefact, both
+    # verbatim and dash-stripped. This is the check that makes "clean" mean
+    # something: a launch URL in a parameter carries the same capability.
+    blob = json.dumps(out, ensure_ascii=False)
+    dashless = blob.replace("-", "")
+    # Independent of what was removed: a launch URL anywhere in the pack carries the same
+    # capability, whether or not a binding was present to strip.
+    launch_urls = len(re.findall(r"Webhooks/launch/", blob, flags=re.IGNORECASE))
+    residual = sum(1 for i in set(removed_ids)
+                   if i in blob or i.replace("-", "") in dashless)
+
+    return out, {
+        "flow_bindings_removed": bindings,
+        "webhook_entities_removed": entities,
+        "flows_unbound": flows_unbound,
+        "residual_ids_found": residual,
+        "launch_urls_found": launch_urls,
+        "clean": residual == 0 and launch_urls == 0,
+        "already_clean": bindings == 0 and entities == 0,
+        "idempotent": True,
+        "note": ("a webhook binding travels in a pack and the launch endpoint "
+                 "is anonymous, so the id is the access control; this report "
+                 "carries no ids because it is printed"),
+    }
+
+
+def _strip_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--in", dest="in_path", required=True,
+                   help="the .procesio pack to strip (a path, or '-' for stdin)")
+    p.add_argument("--out", dest="out_path",
+                   help="write the stripped pack here (omit to print it)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="report what would change without writing anything")
+
+
+def strip_webhook_bindings(args) -> dict:
+    import sys as _sys
+    from pathlib import Path as _Path
+
+    if args.in_path == "-":
+        raw = _sys.stdin.read()
+    else:
+        src = _Path(args.in_path)
+        if not src.is_file():
+            raise UsageError("--in is not a readable file: %s" % args.in_path)
+        raw = src.read_text(encoding="utf-8")
+    try:
+        pack = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise UsageError("--in is not valid JSON: %s" % e)
+
+    stripped, report = strip_webhook_bindings_pack(pack)
+    result = dict(report)
+    if args.dry_run:
+        result["written"] = None
+        result["dry_run"] = True
+        return {"result": result}
+    if args.out_path:
+        _Path(args.out_path).write_text(
+            json.dumps(stripped, ensure_ascii=False), encoding="utf-8")
+        result["written"] = args.out_path
+    else:
+        result["pack"] = stripped
+        result["written"] = None
+    return {"result": result}
+
+
 ACTIONS = {
     "export": ActionDef(
         func=export, add_args=_export_args, needs_client=True,
@@ -282,5 +449,15 @@ ACTIONS = {
                      "(offline). An imported process carrying the exported form "
                      "cannot run. Idempotent: an already-correct pack is "
                      "unchanged."),
+    ),
+    "strip-webhook-bindings": ActionDef(
+        func=strip_webhook_bindings, add_args=_strip_args, needs_client=False,
+        description=("Strip webhook bindings from a .procesio pack (offline). A "
+                     "binding lives in the process definition, so it TRAVELS - "
+                     "and the launch endpoint is anonymous, so the id it carries "
+                     "is a live capability for the SOURCE installation. Removes "
+                     "the per-flow bindings and any top-level webhook entities, "
+                     "counted separately, and reports any id still present "
+                     "elsewhere. Idempotent."),
     ),
 }
