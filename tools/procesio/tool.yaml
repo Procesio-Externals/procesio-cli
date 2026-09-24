@@ -2938,7 +2938,7 @@ actions:
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
 - name: form-set-code
-  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code).'
+  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open.'
   args:
   - name: profile
     type: string
@@ -2972,6 +2972,10 @@ actions:
     type: string
     required: false
     description: path to a .js file
+  - name: clear
+    type: boolean
+    required: false
+    description: remove the form's code entirely without decrypting it - the only repair for a blob the stored form-code-key cannot open
   - name: dry-run
     type: boolean
     required: false
@@ -6727,6 +6731,49 @@ actions:
     type: boolean
     required: false
     description: delete + heal + validate but do not PUT
+- name: node-insert
+  description: 'Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor''s successor and the anchor is repointed at it -> validate + flow-lint -> PUT. Refuses an anchor with more than one outgoing port (which branch it belongs on is a design decision). --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: after
+    type: string
+    required: true
+    description: node to insert AFTER - its actionName (canvas label) or id
+  - name: action
+    type: string
+    required: true
+    description: action template NAME from the catalog (e.g. 'Data Store', 'Decisional')
+  - name: name
+    type: string
+    required: false
+    description: canvas label for the new node (defaults to the template name)
+  - name: params
+    type: string
+    required: false
+    description: 'parameters as a JSON object of {property label: binding}'
+  - name: params-file
+    type: string
+    required: false
+    description: read the parameters JSON from a file (needed above the argv limit)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: build + splice + validate but do not PUT
 - name: node-params
   description: List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only).
   args:
@@ -6826,8 +6873,12 @@ actions:
     description: parameter's designer label (e.g. 'Endpoint') or its tabPropertyId
   - name: value
     type: string
-    required: true
+    required: false
     description: new literal text; keep every positional variable placeholder the old value had
+  - name: value-file
+    type: string
+    required: false
+    description: read the new literal from a FILE instead of --value. Required for anything larger than the OS argv limit (~32 KB on Windows) - a big Node body or an embedded reference table cannot be passed on a command line
   - name: allow-binding-change
     type: boolean
     required: false
@@ -10498,6 +10549,21 @@ actions:
     type: string
     required: false
     description: flowTemplateId (the process id)
+- name: strip-webhook-bindings
+  description: Strip webhook bindings from a .procesio pack (offline). A binding lives in the process definition, so it TRAVELS - and the launch endpoint is anonymous, so the id it carries is a live capability for the SOURCE installation. Removes the per-flow bindings and any top-level webhook entities, counted separately, and reports any id still present elsewhere. Idempotent.
+  args:
+  - name: in
+    type: string
+    required: true
+    description: the .procesio pack to strip (a path, or '-' for stdin)
+  - name: out
+    type: string
+    required: false
+    description: write the stripped pack here (omit to print it)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: report what would change without writing anything
 - name: update-schedule
   description: Update a schedule (PUT /api/Schedules) from a JSON --payload; --cron/--timezone sets a crontab recurrence.
   args:
@@ -10575,8 +10641,55 @@ actions:
     type: string
     required: false
     description: ISO-8601 activation end (optional)
+- name: variable-add
+  description: 'Add ONE variable to a live process (name, data type, direction) -> validate + flow-lint -> PUT. Safe for existing wiring: everything else addresses variables by id, and nothing can already point at an id that did not exist. Refuses a duplicate NAME (the form-event tooling resolves names to ids) and an unknown direction. --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: name
+    type: string
+    required: true
+    description: new variable name (must be unique in the flow)
+  - name: data-type
+    type: string
+    required: true
+    description: alias (string, integer, boolean, json, object, file, date, datetime, guid) or a data-type GUID
+  - name: direction
+    type: string
+    required: true
+    description: input (run payload), process (internal) or output (response)
+  - name: is-list
+    type: boolean
+    required: false
+    description: make it a list
+  - name: default
+    type: string
+    required: false
+    description: default value
+  - name: required
+    type: boolean
+    required: false
+    description: mark an input as required (see variable-set-required)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: add + validate but do not PUT
 - name: variable-set-default
-  description: Set ONE variable's defaultValue on a live process -> validate + flow-lint -> PUT. A process (20) variable's default is its initial runtime value, so this is how you repoint an event-driven flow at a new resource (e.g. a calendar event id) without a desired-state rebuild. --value is a string literal, or a JSON value with --json. --dry-run previews; an invalid flow is never PUT.
+  description: 'Set (or --clear) one variable''s defaultValue on a live process -> validate + flow-lint -> PUT. This is how an input stops being something the caller must supply: a File default is honoured on a run that omits it, and the platform re-stages the file into that run''s own instance. Needs --allow-contract-change on an input/output. --json parses the value first (use for a File object).'
   args:
   - name: profile
     type: string
@@ -10600,16 +10713,63 @@ actions:
     description: variable name or id
   - name: value
     type: string
-    required: true
-    description: 'new defaultValue: a string literal, or a JSON value with --json'
+    required: false
+    description: the default value, as text
+  - name: value-file
+    type: string
+    required: false
+    description: read the default from a FILE (needed above the ~32 KB argv limit)
   - name: json
     type: boolean
     required: false
-    description: parse --value as JSON (number, object, list, true/false/null)
+    description: parse the value as JSON before storing it (use for a File object)
+  - name: clear
+    type: boolean
+    required: false
+    description: clear the default back to null
+  - name: allow-contract-change
+    type: boolean
+    required: false
+    description: 'required for an input/output variable: it changes what a run does when the caller supplies nothing'
   - name: dry-run
     type: boolean
     required: false
-    description: patch + validate but do not PUT
+    description: set + validate but do not PUT
+- name: variable-set-required
+  description: Set or clear one INPUT variable's isRequired flag on a live process -> validate + flow-lint -> PUT. Clearing it is allowed outright (no existing caller breaks); making an optional input required needs --allow-contract-change. Refused on a non-input variable. Guard any bare raw placeholder that reads the variable (`var f = <%6%>;` -> `[<%6%>][0]`) BEFORE clearing, or an absent value becomes a SyntaxError at run time.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: variable
+    type: string
+    required: true
+    description: input variable name or id
+  - name: required
+    type: string
+    required: true
+    description: true to make the input mandatory, false to make it optional
+  - name: allow-contract-change
+    type: boolean
+    required: false
+    description: permit making an optional input required - tightens the public contract and breaks callers that omit it
+  - name: dry-run
+    type: boolean
+    required: false
+    description: set + validate but do not PUT
 - name: variable-set-type
   description: Retype one variable of a live process (dataType, optionally isList) -> validate + flow-lint -> PUT. Refuses an input/output variable without --allow-contract-change, because those are the run payload and the response shape callers depend on.
   args:

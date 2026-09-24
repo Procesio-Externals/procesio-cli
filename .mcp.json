@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "procesio": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "${CLAUDE_PLUGIN_ROOT}",
+        "procesio-mcp-chat"
+      ]
+    }
+  }
+}

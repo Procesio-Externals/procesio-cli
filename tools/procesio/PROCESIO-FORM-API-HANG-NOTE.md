@@ -1,3 +1,15 @@
+> ## ⚠ SUPERSEDED (re-probed 2026-09-03): `form-get` does NOT hang
+>
+> `GET /api/FormTemplate/{id}` returned a 342 KB DTO in seconds, repeatedly, and every
+> read-modify-write action built on it (`form-get-element-events`, `form-set-element-event`,
+> `form-add-element`, `form-set-element-config`) worked. Whatever caused the original hang is
+> not reproducible on this installation.
+>
+> **Why this matters more than a stale row:** the note below steers the reader away from the
+> surgical read-modify-write path and toward full rebuilds, which is the riskier route on a
+> live form. Treat the table as history. Re-probe before believing any "this call hangs"
+> claim — an intermittent or since-fixed hang reads identically to a permanent one.
+
 # PROCESIO forms over the API — what works, and the one call that hangs
 
 Live-probed while shipping a form for a marketplace template. The folklore is "form

@@ -1,9 +1,31 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
 [project]
 name = "procesio-cli"
 version = "0.1.0"
 description = "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant."
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
+readme = "README.md"
+authors = [{ name = "Ringhel TEAM SRL (PROCESIO)" }]
+keywords = ["procesio", "automation", "ipaas", "workflow", "low-code", "mcp", "cli", "agent"]
+# No "License ::" classifier: the license is declared above as an SPDX expression, and
+# carrying both is what makes a build warn about contradicting itself.
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Build Tools",
+    "Topic :: System :: Systems Administration",
+]
+
 dependencies = [
     "requests>=2.31",
     "pyyaml>=6.0",
@@ -17,6 +39,26 @@ dependencies = [
     # lazy import and would have been happy as an extra; the eager one decides.
     "cryptography>=42.0",
 ]
+
+[project.urls]
+Homepage = "https://procesio.com"
+Documentation = "https://docs.procesio.com"
+Repository = "https://github.com/Procesio-Externals/procesio-cli"
+Issues = "https://github.com/Procesio-Externals/procesio-cli/issues"
+Changelog = "https://github.com/Procesio-Externals/procesio-cli/blob/main/CHANGELOG.md"
+
+
+[project.scripts]
+# The clone workflow is unchanged (python scripts/run-tool.py ...); these are
+# the same scripts, reachable after `pip install` / `uvx` without a checkout.
+procesio = "procesio_cli._cli:run_tool"
+procesio-agent = "procesio_cli._cli:run_agent"
+procesio-tools = "procesio_cli._cli:list_tools"
+procesio-skill = "procesio_cli._cli:get_skill"
+# Two MCP surfaces over one substrate. `procesio-mcp` is the full registry, six generic
+# tools; `procesio-mcp-chat` is the curated set of named tools that the plugin launches.
+procesio-mcp = "procesio_cli._cli:mcp_server"
+procesio-mcp-chat = "procesio_cli._cli:mcp_chat_server"
 
 [project.optional-dependencies]
 # Every one of these is imported lazily, at the point of use, so the base install
@@ -35,8 +77,20 @@ databases = ["pyodbc>=5.1", "pymysql>=1.1"]
 [dependency-groups]
 dev = ["pytest>=8.0"]
 
-[tool.uv]
-package = false
+[tool.hatch.build.targets.wheel]
+packages = ["procesio_cli"]
+
+[tool.hatch.build.targets.wheel.force-include]
+# A tool is resolved by PATH, and folder names like google-calendar are not
+# importable, so the tree ships whole under the package rather than being
+# split into modules. procesio_cli/__init__.py puts this directory on sys.path.
+"tools" = "procesio_cli/tools"
+"agents" = "procesio_cli/agents"
+"scripts" = "procesio_cli/scripts"
+"skills" = "procesio_cli/skills"
+"webplatform" = "procesio_cli/webplatform"
+"dashboard" = "procesio_cli/dashboard"
+"registry.py" = "procesio_cli/registry.py"
 
 [tool.pytest.ini_options]
 testpaths = ["tools", "agents", "dashboard"]

@@ -1,0 +1,68 @@
+name: release
+
+# Publishing is driven by a tag, so the thing released is always a commit someone
+# deliberately marked. Nothing here holds a PyPI token: the publish job proves its
+# identity to PyPI over OIDC (trusted publishing), which has to be configured once
+# on pypi.org against this repository, this workflow file and the `pypi` environment.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build distributions
+    runs-on: ubuntu-latest
+    steps:
+      # Third-party actions are pinned to a commit SHA, not a moving tag: a tag can be
+      # repointed at new code, and this workflow holds id-token: write. The trailing
+      # comment records which release the SHA was, so a bump stays a reviewable change.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        with:
+          enable-cache: true
+      - name: build wheel and sdist
+        run: uv build
+      - name: the tag and the package version must agree
+        # A tag that says one thing while the metadata says another is how a release
+        # ends up unreproducible. Cheaper to fail here than to yank from PyPI.
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(ls dist/*.tar.gz | sed -E 's/.*-([0-9][^-]*)\.tar\.gz/\1/')
+          echo "tag=$tag package=$pkg"
+          test "$tag" = "$pkg"
+        if: startsWith(github.ref, 'refs/tags/v')
+      - name: the built package installs and runs
+        # Installed into a clean environment, not the checkout: this is what catches a
+        # wheel that builds but ships an incomplete tree.
+        run: |
+          uv venv /tmp/verify
+          VIRTUAL_ENV=/tmp/verify uv pip install dist/*.whl
+          cd /tmp && /tmp/verify/bin/procesio-tools > /dev/null
+          echo "entry points run from an installed package"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    name: publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    # The environment is the approval gate: require a reviewer on it in the repository
+    # settings and a release cannot go out on a tag push alone.
+    environment:
+      name: pypi
+      url: https://pypi.org/p/procesio-cli
+    permissions:
+      id-token: write      # OIDC, so no API token is stored anywhere
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1

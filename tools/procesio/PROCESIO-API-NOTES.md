@@ -43,6 +43,15 @@ first returned 0 actions on a live process because it only looked for `Actions`.
 - **The display name is in `title`, NOT `name`** — `name` is null in the list.
   Item keys: `id, parentId, status, title, description, isValid, active, timeout,
   currentActionId, debugMode, isNotification, workspaceId, created*/updated*`.
+- **A process/form/pack carries NO structured classification field** — no category,
+  tag, folder, or jurisdiction. A process has only free-text `title` + `description`;
+  a form has `name` + `browserTitle`; a `.procesio` pack's top keys are
+  `DataTypes/Credentials/Webhooks/DocumentTemplates/Flows/Forms/TimeStamp`. The
+  `category` that exists is an action-node CANVAS attribute (`"category":"cat1"` inside
+  `actions[]`), and a form element's `category`/`group` are DESIGNER-PALETTE groupings —
+  neither classifies the process. So any business/jurisdiction classification (e.g. a
+  Process-Library card's country) must ride in the `title` or `description`, not a field;
+  a naming convention is the only filter available.
 - Run: `POST /api/Projects/{id}/run` body `{"payload":{}, "connectionid":null}`.
 - **An action's canvas label lives in TWO fields and both must be written together:**
   the DTO's `ActionName` and `CustomData.name`. The designer renders
@@ -84,6 +93,24 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   `Workspace.Admin`.
 - Verified 2026-06-23: exported lazarusDM + 2 flows + 1 document, no credentials,
   from WS "MD test 4 support" (`4159b568-…`) → 92,868-byte bundle, sections matched.
+- ⚠⚠ **SUPERSEDED (withdrawn 2026-08-24, re-measured working 2026-08-29 and
+  2026-09-16): the API import WORKS across workspaces** once the request carries the
+  `importedData` part and the seven boolean headers — see "Data Stores in an export
+  pack" and "Multi-tenancy on one master" below. The paragraph that follows is kept
+  as history only; do not route imports through the UI on its strength.
+- ~~⚠ **`POST /api/Transport/import` is REFUSED with `HTTP 403 "workspace
+  migration"`** for a same-account cross-workspace relocation (measured
+  2026-08-12, reproduced into scratch; and again in a later card audit
+  2026-08-28).~~ It reportedly succeeds in the **designer UI**, not over the API.
+  **So the only API route that relocates a component is `process-create`
+  (`POST /api/Projects`), and it carries the PROCESS ALONE** — no form, store,
+  webhook or credential. Consequence for shipping a Process-Library card/pack:
+  the pack is **not API-installable**; a form-bearing card must be imported
+  through the designer. **Ids are preserved on import** (a process/form id does
+  not identify a single artefact across workspaces). Whether import honours a
+  form's `IsPrivate` flag is **unestablished** (no successful API import exists to
+  read back), and forms are **born public** — so a shipped form must be verified
+  private before first use.
 
 ## Validation oracles (use before committing a create/edit)
 
@@ -101,6 +128,13 @@ see DTO-SUBTOOLS-NOTE.md and `agents/procesio/`.)
   request error. Seen: `390 "Action has too few input ports."`, `391 "Action has
   too few output ports."`. So a 400 here is a *result*, not a transport failure —
   parse `details.body.body` for the messages (the agent's verify does this).
+- ⚠ **`statusCode 147 "A variable with the same id already exists."` — variable ids are
+  CASE-INSENSITIVE.** Two variables whose names differ only by case (e.g. a File input
+  `SourceFile` beside a json var `sourceFile`) derive the **same** id and the build is
+  rejected at BE validation with 147 (twice, once per colliding name). The compact-config
+  builder does not catch it (the names are distinct strings); the platform does, on validate.
+  Give every variable a name that is distinct **ignoring case** — not just distinct as a
+  string. (Seen CARDS B-027, building a File-intake front end.)
 
 ## Authoritative DTO source
 
@@ -182,6 +216,16 @@ The catalog has distinct scripting actions: **Javascript**, **Node**, **Python**
   param): the `{result:...}` wrapper leaks — a JS-computed `searchTerm` made
   `q = "{ 'result': 'Example Company' }"` -> empty search -> empty table + leaked cells.
   Drive downstream actions (the search query, the file name) from the ORIGINAL inputs.
+- **A DECISIONAL CANNOT ROUTE ON A JAVASCRIPT OUTPUT, AND IT FAILS SILENTLY.** A Decisional
+  condition `jsOut == 'REFUSE'` compares the whole wrapper `{result:'REFUSE'}` to the string and
+  is always false, so the Decisional **falls through to its DEFAULT branch** — no error, the
+  wrong branch just runs (measured: a scanned-PDF guard whose Javascript verdict was `REFUSE`
+  was silently routed to PROCEED). A Decisional cannot read the `.result` field either (it
+  resolves attributes to a Data Model GUID). **Fix = lift-then-decide:** put a **Node** action
+  between the Javascript node and the Decisional that returns the bare scalar
+  (`return v && v.result !== undefined ? v.result : v;`), and route the Decisional on the Node's
+  bare `Single Result`. (Same family as the downstream-scalar leak above, but SILENT because a
+  Decisional emits no type error.)
 
 ### `Generate Document` has an "HTML string" OUTPUT
 Its configuration includes `"HTML string"` (`id 79c77296-37a6-43d7-b002-ba346860b6f1`,
@@ -277,6 +321,42 @@ body.
 - Round-trip proven live: create (id `9cbe…`) → get → set-status false → get
   (status=false) → delete → list confirms cleanup. No residue left.
 
+### Notification EMAIL — what it carries, and what fires OnFail (measured live)
+
+`NotificationDto` at `POST /api/Projects/notifications` (process) and
+`POST /api/Schedules/notifications` (schedule) is `{Id, EmailList, IsEnabled,
+OnSuccess, OnFail}`. ⚠ **`IsEnabled` defaults FALSE** — set it true or nothing sends.
+`EmailList` is a single comma/semicolon-separated string (not an array). `Id` = the
+process-template (flow) id / schedule id. Binding is case-insensitive (camelCase and
+PascalCase both bind). Remove a process notification by **deleting the process** — the
+GET-back (`/api/Projects/notifications/{flowId}`) then returns HTTP 400; there is no
+`DELETE …/notifications` endpoint.
+
+**What the email contains — IDS ONLY (measured):** the platform sends an HTML mail
+**From a PROCESIO-owned sender address (via SendGrid, DKIM/SPF/DMARC pass)** carrying
+**ids + names + a deep-link and nothing else** — process name, submitter display name,
+start/end/duration, **instance id**, **workspace id**, **workspace name**, the
+process-template id (inside the link), and a `procesio.app/admin/process/.../details/...`
+deep-link. ⚠ **It carries NO process variable VALUES and NO error/failure-message
+text.** Proven by baking three distinct fabricated markers into (a) an input variable
+no node reads, (b) a variable interpolated into the fault message, (c) the `Throw`
+Custom Message: all three sat in the failed instance and **all three were absent from
+the email**. The DTO has **no content-suppression field**, and none is needed — so the
+notification is safe as a failure monitor without leaking payload content.
+
+**What FIRES OnFail — a genuine fault, status 40 (`RUNNING_WITH_ERRORS`):** ⚠⚠ **A
+Javascript/Node action `throw` is CAPTURED into that action's output variable and the
+instance FINISHES at status 50** (measured: runtime throw → status 50, instance
+`error[]` empty, the error object in `out.error`). So a script error — and any
+fail-closed script/Decisional path that records its verdict in a variable — does **NOT**
+fire OnFail. To end an instance at status 40, use the native **`Throw`** action (its
+`Custom Message` param is the error text) or a Data-Store duplicate-key insert
+(§`row_key` uniqueness). The mail fires within **~1 s** of the status-40 transition, for
+**direct API runs too** (not only scheduled; `scheduleName/webhookName/formName` were
+all null). ⚠ Which mailbox actually receives it is governed by the **recipient address**,
+not the trigger — verify a test recipient lands in the mailbox you read (a bare external
+address may route elsewhere than a same-domain one).
+
 ### Node scripting action — list output + MANDATORY Timeout
 - `return <value>` at top level returns the value **RAW** (no `{result}` wrapper, unlike the
   Javascript action's `setOutput`). An **array** return binds to the **List Result** output
@@ -342,6 +422,34 @@ Shipped as `customaction-upload` / `customaction-delete` / `customaction-list`
   Context Window Tokens, Max Recommended Input Tokens, Method(GET/POST test), Test endpoint. For OpenAI:
   URL `https://api.openai.com/v1`, Key `Authorization`, Prefix `Bearer `, Max Tokens Param Name
   `max_completion_tokens`, test **Method GET + `/models`** (POST /models → 405).
+
+### The DB credential is multi-engine — SQL Server AND MySQL, chosen by a Server Type option (2026-08, PRC-3696)
+
+Long-standing notes and every research grounding said *SQL Server is the only native database*. **That is now
+wrong.** MySQL landed natively as a **credential property, not a new action**: the DB credential type — renamed
+**`SQL`** in the live catalog (formerly "SQL Server") — now offers a **Server Type** select whose value maps to
+`DbClientType`, and the enum gained `MYSQL = 2` beside `MSSQL = 1` (`CustomMySQLClient` over the `MySqlConnector`
+driver, in the Web-Api credential-test and Process-Execution runtime stacks). Consequences worth keeping:
+
+- **Same actions, same credential shape.** `Execute Query` / `Execute Command` (current: **Execute Query V3** /
+  **Execute Command V2**) run against a MySQL-typed credential **unchanged** — pick `Server Type = MySQL`
+  (option guid `40404040-0001-0001-0002-cccccccccccc`, `be_value=MYSQL`; MSSQL is `…-0001-…`). No new action, no
+  new tool code — the builder resolves the option name to its guid like any other select. Property labels on the
+  `SQL` type: Server Type, Protocol Type, Server Name, Port Number, Database Name, Encrypt, Pooling, Trust Server
+  Certificate, Authentication Type, Username, Password.
+- **Existing processes are unchanged.** A process built before the change still selects an MSSQL-typed credential
+  and runs exactly as before; nothing needs re-saving. The server type is read off the *credential*, so switching
+  a step to MySQL is a credentials change, not a flow change.
+- **The server-type list is CLOSED, and it is exactly two.** The field is a GUID-valued select bounded by
+  `DbClientType {MSSQL=1, MYSQL=2}` — the builder **raises** on an unmatched value. **MariaDB** rides the MySQL
+  option (same wire protocol; `MySqlConnector` handles it; Test Connection verified against MySQL 8 / MariaDB).
+  **PostgreSQL is NOT supported** — no `Npgsql`, no enum member, not on the near-term roadmap; do not infer it
+  from "the driver is a .NET MySQL provider." Oracle remains roadmap only.
+- **Docs lag (2026-09).** `docs.procesio.com/sql-credential` still documents only *"Server type — MSSQL"* and
+  `how-to/execute-query` still says *"Microsoft SQL"* only — the renamed type and the Server Type field are
+  documented, the MySQL option is not. Treat the docs as behind on this; the credential template is authoritative.
+- The credential *type* is DB-seeded (no create-type API); instances are fully API-creatable via the `procesio`
+  tool. Full field/option contract lives beside the tool in `dto/credential/description.md`.
 
 ### Running a process with a File INPUT variable — verified live (2026-07-03)
 The one-call `run` endpoint can't carry file bytes; use the three-step sequence
@@ -566,6 +674,37 @@ live example from the designer rather than guessing.**
 
 ⚠ **Storing the dropdown LABEL instead of the VALUE suppresses every dependent field.**
 
+### ⚠ A CONSTANT column in `Set Values` needs NO variable binding (F-1381)
+
+A `Set Values` source can be a LITERAL: `{"source":{"value":"HELD","variable":[]},"column":"status"}`
+writes the constant `HELD` with no `<%N%>` placeholder and no variable list. The `InsertRows`
+template only ever shows variable-bound columns (`{"value":"<%0%>","variable":[{variableId}]}`),
+but a constant column does not need a process variable. Measured on both `InsertRows` and
+`UpdateRows`. Useful when a column must be a fixed value the caller must NOT be able to set
+(e.g. a `status` an anonymous submitter should not control).
+
+### ⚠ `UpdateRows` updates IN PLACE, matched by a keyed `Where` — only the matched row moves (F-1382)
+
+A `Data Store` `UpdateRows` node with a a106 `Where` of `<column> EQUALS <input>` and a a103
+`Set Values` of the columns to change updates exactly the matching row and leaves every other
+row untouched (measured: a second row with a different key did not move). `Set Values` (a103)
+and `Where` (a106) carry **INDEPENDENT `<%i%>` namespaces** — each `<%0%>` indexes its own
+parameter's inline `variable` array, so both may start at `<%0%>`. This is the primitive for a
+two-process HOLD-AND-RESUME (no native event-wait exists): process 1 `InsertRows` a HELD row and
+terminates ("end the instance at the hold"; `Form Trigger` does not block and there is no
+instance timeout); process 2, started by the anonymous form-launch, `UpdateRows` that row to
+RESOLVED keyed by the correlation id.
+
+### ⚠⚠ AN ANONYMOUS RESUME MAKES THE CORRELATION ID THE ACCESS CONTROL (F-1384)
+
+When a hands-off resume is triggered by the anonymous form-launch, process 2 receives its
+correlation key from the **client-supplied publish body** and acts on `WHERE <key> EQUALS
+<supplied>`. So the correlation id IS the authorization: anyone holding the key can drive the
+resume. Same shape as F-663/F-953 (the `[AllowAnonymous]` launch/variables endpoints where the
+id is the access token), now realized in the WRITE/resume path. A no-login review form cannot
+separate "the identifier of the held item" from "the permission to act on it"; a deployment must
+add an authenticated reviewer or a forge-proof capability, not rely on the correlation id.
+
 ### ⚠⚠ INSTRUMENT RULE: A PERMISSIONS FACT COMES FROM THE ASSIGNABLE ROLE MODEL
 
 > **Establish a permissions fact from `GET /api/UserPermissions/entities` (the
@@ -637,6 +776,16 @@ no error**.
 ⚠ **The clean control is what makes the failing case readable.** Without
 "100 lands 100" first, "0 landed" is indistinguishable from a batch-size limit.
 
+⚠ **Inside a process, the same duplicate-key 409 surfaces as instance status 40 (not 50).** A native
+`Data Store` `InsertRows` step whose row has a primary key that ALREADY exists faults the run: the
+instance ends **finished-with-errors (status 40)**, the row is not written, and any output the flow set
+*before* the write is still readable. A row with a **fresh** key ends **50**. So a store with a natural
+key (a business id, or `id::date`) is **idempotent by construction**: re-recording an identical row
+loudly fails rather than silently duplicating, which is the wanted behaviour for an append-only
+evidence/audit ledger (record one entry per key; re-run on a new key to append). Design the readout
+accordingly — a run that "failed" at 40 on a duplicate is a correct refusal, not a defect, and should be
+judged on whether the intended NEW rows landed, not on the terminal status alone.
+
 **Measured ceiling:** no break to **5,000 rows / 1.06 MB** in one call (8.1 s).
 E-26 had measured no size break to 100 KB EMBEDDED, but an array is a different
 shape — many small objects rather than one long string — and it scales further.
@@ -677,6 +826,39 @@ to tokenise against 2 to restore. The API DOES batch
 (`POST /api/DataStore/{id}/rows` takes `Rows` as an ARRAY), so a `Call API`
 action is the only route to a constant cost, at the price of a credential, a
 hop and a Decisional.
+
+### ⚠ A native `Set Values` mapper writes a COMPUTED value only from a TYPED variable, and CANNOT write a null DateTime
+
+The recovered `InsertRows`/`UpdateRows` mapper (`{source:{value:"<%N%>", variable:[{variableId,
+attribute}]}, column}`) was first proven binding a **String input** whole (`attribute: null`).
+To bind a value a **Node computed** (a deadline, a state) you cannot bind the Node's plain `json`
+output by field: `attribute.attributeId` must be a **GUID**, and a field NAME fails at build with
+`Error converting value "<field>" to type 'System.Nullable`1[System.Guid]'`. Two facts make it work:
+
+- **Type the Node's output variable to the target store's backing data model** — builder
+  `{"name":"rec","model":"<store dataTypeId>","direction":"output"}` (the `model` escape hatch;
+  the store's `dataTypeId` comes from `datastore-get`). Return a plain object from the Node whose
+  KEYS match the model's attribute names; the platform populates the typed attributes by name.
+  Then each mapper row binds `attribute:{attributeId:<data-model attr GUID>, nextAttribute:null}`,
+  `column:"<store column name>"`.
+- ⚠ **The store's COLUMN ids (`datastore-get` `columns[].id`) are NOT the data-model ATTRIBUTE ids
+  (`datastore-get-data-model` `attributes[].id`).** The mapper needs the **data-model attribute
+  ids** (they are the variable's model), so read them from `datastore-get-data-model`, not
+  `datastore-get`.
+
+⚠⚠ **A native `Set Values` mapper cannot write a null DateTime.** A null value substitutes into the
+operand as **empty string**, and the column rejects it at build: `Error while building input model:
+String '' was not recognized as a valid DateTime`. Both a JS `null` field AND an OMITTED object key
+fail identically (the typed model coerces the unset attribute to `''`). The **only** way to leave a
+nullable DateTime null through a native write is to **omit that column from the mapper entirely** —
+the inserted row then defaults it to null (measured: a 3-column store, `d2` bound=fail, `d2` absent
+from the mapper=row lands with `d2: null`). So a static native writer maps **only the columns
+guaranteed non-null in its contract**; a column that is null at that point is omitted on
+`InsertRows` (defaults null) and left out of `Set Values` on `UpdateRows` (unchanged). External
+`datastore-add-rows` tolerates a null DateTime; the native in-flow step does NOT — this is the
+mechanical reason a store-binding card's create/update paths are split by which columns are set,
+not one write of the whole row. (Non-DateTime nulls are milder: a null String stores as `''`
+without erroring.)
 
 ### ⚠ REPORT THE AMBIGUITY RATHER THAN PICKING A WINNER
 
@@ -727,6 +909,19 @@ A process built through `dto/process/builder.py` carries a full
 `column`/`source` spelling; a hand-built one exported re-spelled. So the export
 defect E-47 found looks like a CONSEQUENCE of hand-building rather than
 unconditional platform behaviour.
+
+### ⚠ A large flow body cannot go through the CLI `--body` arg (Windows argv ceiling)
+
+`put-projects` (and any generated action that takes `--body`) receives the JSON body as a
+**command-line argument**, and Windows `CreateProcess` caps the whole command line near **32 KB**.
+A real multi-action flow read back from `GET /api/Projects/{id}` and PUT back for a splice is easily
+**60-80 KB**, so `run-tool.py procesio put-projects --body '<flow>'` dies with
+`FileNotFoundError: [WinError 206] The filename or extension is too long` *before the tool even runs*
+(a probe flow of a couple of variables, like the first store-write proof, stays under the ceiling and
+hides this). It is not a tool bug and not compressible away. Call the client **in process** instead —
+`ProcesioClient(profile).put("/api/Projects", flow)` (set `.workspace_id` first) — the same endpoint
+the curated `put-projects` action uses, with no argv layer. Judge the result behaviourally (the PUT
+echoes an empty 200 body, which can lie — O4); run the process and read the effect.
 
 > **Build through the builder. Use a raw PUT to inspect or to control an id that
 > the builder cannot express, and treat anything it produces as unshippable
@@ -1255,6 +1450,48 @@ call, never assume the list carries them.
 - The bundled endpoint index predates such releases; for anything released
   after the bundle, grep the LIVE swagger.json rather than `list-endpoints`.
 
+### ⚠ Live-confirmed on a clock build (2026-09-01) — six facts a store-binding card meets
+
+Measured end to end while binding a store from scratch. Kept generalized; the specifics that
+ARE the knowledge are kept.
+
+1. **`datastore-create` persists the full typed schema on the POST — no follow-up PUT.** A
+   `DataStoreMetadataDto` with typed `columns` (each `{name, dataTypeId, isPrimaryKey?,
+   isRequired?}`) and even a **composite** PK (two `isPrimaryKey:true` columns) sticks on
+   `POST /api/DataStore`; read it back with `datastore-get` and the columns + PK are present, with
+   the four system columns (`CreatedOn/UpdatedOn/CreatedById/UpdatedById`) appended. The two-step
+   "POST name, then PUT columns" the older note implied is not required on this version.
+2. **DS-07 confirmed, and the accepted grammar bounded.** A DateTime writes as
+   `YYYY-MM-DDTHH:mm:ss`; a trailing **`Z` is rejected `HTTP 400` "One or more values are
+   incompatible with the column type."** A **space** separator and **sub-seconds** are tolerated on
+   input but **normalised to `T` + whole seconds** on read. So establish the format before schema
+   design and fix ONE timezone convention (values are stored as written, no conversion).
+3. **DS-06 confirmed by contrast.** The literal `99999.99` → an **Integer** column stores `100000`
+   (silent round); the same value → a **Double** column stores `99999.99`. Money is Double.
+4. **⚠ DS-01 does NOT reproduce on the unified `rows/filter` path.** Against a mixed true/false set,
+   a Boolean `equals` filter returns the TRUE rows (and `equals false` the FALSE rows); `istrue`/
+   `isfalse` also correct. The historic "Equals-true returns FALSE rows" defect was the OLD
+   query-string `GetRows` path; the filter-tree read the tool uses evaluates booleans correctly.
+   Prefer `istrue`/`isfalse` for clarity, but `equals` is not broken here. A boolean filter value
+   must be a JSON boolean or `"true"`/`"false"` string — an **int `1`/`0` is rejected 400**.
+5. **A batch `datastore-add-rows` requires a UNIFORM column set across every row** — heterogeneous
+   keys → `400` "All rows in a batch must have the same set of column aliases." Send every row
+   full-column with explicit `null` for absent values (a **null DateTime is accepted**). Judge the
+   write by the **count read back** (`datastore-get-rows` → `rows.totalItemCount`), not `affectedRows`.
+   The tool's `datastore-get-rows` result shape is `{columns:[…], rows:{totalItemCount, pageNumber,
+   pageItemCount, pageItems:[…]}}` — the rows nest under `rows`, not at the top.
+6. **In a process (compact builder): a Data Store SELECT-all builds; a write does NOT.** A `Data
+   Store` action with `Operation:"SelectRows"` binding `Result Rows` (a json list var) + `Total
+   Count` (an **integer** var — a Double is rejected) builds and runs through `process-create`. But
+   the builder has **no handler for `Set Values` (`data-store-mapper`) or `Where`
+   (`data-store-decisional`)**, so an INSERT/UPDATE/filtered-SELECT is not builder-expressible — the
+   write path needs a `Call API` step + a bound REST credential (excluded from a pack export) or raw
+   mapper splicing. This is the mechanical reason a pure-compute process ships as a pack and a
+   store-writing one does not. `get-datatypes-count` does **not** count store-backing data models, so
+   the datatype floor is insensitive to store create/drop; the **datastore count** is the floor that
+   moves. `get-projects` lists flows by **`title`** (the `name` field is null) and returns promptly
+   (it does not hang like `get-process`).
+
 ## API-key scoping is strict: cross-workspace reads answer 403
 
 A workspace-scoped API key returns **HTTP 403 "Unauthorized"** for a request
@@ -1292,6 +1529,22 @@ survives intact (verified by bisection: `"hello"` OK, `"has \"inner\" quotes"` O
 Transport recipe for free-form text into a process input: strip/replace backslashes, JSON.stringify,
 then replace the `\n` sequences with a token (e.g. `%%NL%%`); the receiving Node bare-injects inside an
 empty-safe IIFE `(function(){return <%N%>;})()` and decodes with `split('%%NL%%').join(String.fromCharCode(10))`.
+
+**Addendum (2026-08-28, Process-Library card audit): the injection CONTEXT sets the failure
+class, and a backtick is worse than a quote.**
+- **bare** `var g = <%0%>;` → a quote / newline / empty value is a SYNTAX ERROR → the Node returns null (a silent DoS).
+- **double-quoted** `var g = "<%0%>";` → a `"` in the value breaks the literal (DoS); `${}` stays inert.
+- ⚠ **backtick** `` var g = `<%0%>`; `` → a value containing `${…}` **EXECUTES** as a template expression (measured under Node v24: `${(7*7)}` → `49`), and a backtick in the value breaks out into code. **This is code execution, and Node actions have open outbound network (A-34), so it is exfiltration-capable.** Bounded only by who can set the variable (a private form → authenticated).
+- **The two SAFE patterns, both proven:** base64-encode a file's bytes before injecting (the base64 alphabet carries no break / `${` / backtick char), and inject a **structure** bare (the platform JSON-encodes it into a valid, inert literal). A `.replace(/[^A-Za-z0-9+/=]/g,"")` *inside* the code does NOT help — the backtick has already evaluated any `${}` before that line runs.
+
+**Audit signature in an exported pack:** a variable whose `DataType` is `String`/`DateTime` (a free scalar)
+and whose `Type` is `10` (an INPUT) appearing inside a `code-editor` setting's **resolved** `value`
+(its GUID spliced where the `<%N%>` was — `CustomData…settings[].value` keeps the resolved copy, the
+`Parameters[].Value` keeps the `<%N%>` template). A String input in a code-editor value is the sink;
+read the delimiter around the GUID (backtick / dquote / bare) for the class. Worth a reusable
+detector that resolves every site → variable → datatype → context and tallies error-port
+consumption and provisioning bindings. Recurring real sink across the processes audited so far:
+**date/period inputs** spliced raw into a Node; file content and structured results were correctly defused.
 Live example: `social_media/Set Decision`'s `editedCopy` (multi-line captions with quotes land intact).
 
 ## Call API — absolute URLs, response outputs, LinkedIn recipe (2026-08-10)
@@ -1469,6 +1722,19 @@ that survive a rebuild are the BINDING NAMES** (each element's `id`/`name`
 config), which the wiring resolves against. Carry those verbatim and the form
 wires itself correctly; a rebuilt form is nonetheless a NEW form with a new id,
 so it can never be a drop-in replacement for the original.
+
+**Reading a form back: there is no `get-form`; the `form-create` RESPONSE is the
+readback.** Calling `get-form` returns `unknown action: get-form` — it is not a
+registered action on this build. The `form-create` response already carries the full
+stored form under `result` (`id`, `name`, `isPrivate`, `data.code` cleaned by the
+server, elements), so **that response is the authoritative readback** — confirm
+`isPrivate:true` from it, not from a follow-up call. An agent that creates a form and
+then tries to verify its privacy with `get-form` hits the unknown-action wall and
+reads a bare error where the answer was in hand. `form-delete --id <id>` removes a
+form by id and returns `{deleted:true, id}`. ⚠ Observed once: a form created via
+`form-create` was **not** surfaced by a subsequent `form-list` scoped to the workspace,
+though the form existed and `form-delete --id` removed it — so do not treat an empty
+`form-list` as proof the create failed; trust the create response and delete by id.
 
 **`_set_config` fails silently.** It overwrites a config key only if that key
 already exists on the golden control template in `dto/form/elements/<type>.json`.
@@ -1835,6 +2101,41 @@ entities, so for processes the design and the runs are independently grantable.
   name from /api/Actions).
 - Form trigger: `RUN_DATA_STORE_OPERATION` event; runtime hits anonymous
   `api/Form/dataStore/{id}/rows(/filter)` with form context in headers.
+
+### Schema mutation after creation — add a column with `PUT`, NEVER via the backing model (measured 2026-08-27)
+
+A data store's schema is **mutable in place**. To add a column to an
+**already-populated** store, `PUT /api/DataStore` (`datastore-update`) with the
+full `DataStoreMetadataDto` — the `id`, plus the existing columns AND the new one.
+**Measured**: on a store seeded with rows, a PUT carrying the original columns + a
+new **non-required** column added the column **in place, every existing row
+preserved with its values byte-identical**, the new column reading `null` on those
+rows and **immediately writable**. No re-create, no re-seed, the store id and every
+`Data Store` node binding unchanged. Make an added column **non-required** —
+existing rows have no value for it, so a required add would reject them. (`PATCH
+.../column` MODIFIES an existing column — rename / retype / constrain — it does not
+add.)
+
+⚠️⚠️ **DO NOT add a column by mutating the store's BACKING data model** — i.e. do
+not call `POST /api/DataTypes/attribute/{modelId}` (`datatype-add-attribute`) on
+the model id a data store is built on. **Measured: it DESTROYS the store while
+reporting success.** Both attribute POSTs returned `ok`; the store's
+`GET /api/DataStore/{id}` columns then read **`[]`** and its rows became
+**unreadable**. ⚠️ **The trap is the handler's own docstring** — *"the only path
+that COMPILES the attribute into the runtime model"* — which is true of a
+**standalone** data model used as a process-variable / DTO type and **wrong for a
+model that backs a data store**: the store keeps its own column projection and
+mutating the type from under it breaks the store↔model correspondence. **Add store
+columns only through `PUT /api/DataStore`.** This is a platform defect (a
+documented path silently destroys a store) and is routed to Andrei.
+
+**Read vs write pick up a new column differently.** A row read
+(`POST .../rows/filter`) returns whole rows keyed by **every current display
+name**, so a consumer that binds the whole rows object (a `Data Store` SELECT node
+pins no column list — its params are just the store id + `SelectRows`) gains a
+newly-added column **with no query or node change**. A **write mapper that
+enumerates columns** (`{source, column:<name>}` per column, as an INSERT/UPDATE
+node does) does **not** — it must name the new column explicitly.
 
 ## Scheduler — crontab recurrence (PRC-3282, 2026-08)
 
@@ -2727,9 +3028,15 @@ built on one inherits that.
 ## Exports: what can be named, and what a pack section proves
 
 The export request names components by type: `--data-models`, `--processes`,
-`--documents`, `--webhooks`, `--forms`, `--credentials`, building a body of
-`dataModelIds / flowIds / documentIds / webhookIds / formIds / credentialIds`.
-⚠ **There is no way to name a Data Store in an export request.**
+`--documents`, `--webhooks`, `--forms`, `--credentials`, `--data-stores`, building a
+body of `dataModelIds / flowIds / documentIds / webhookIds / formIds / credentialIds /
+dataStoreIds`.
+
+⚠ **SUPERSEDED 2026-09-03: "there is no way to name a Data Store in an export request"
+was true of an earlier surface and is now WRONG.** `--data-stores` populates
+`dataStoreIds`, the pack's `DataStores[]` section fills, and the store's backing data
+model is dragged into `DataTypes` alongside it. See the dated Data Store section at the
+end of this file for the exact keys — **schema only, never rows**.
 
 The resulting `.procesio` file is JSON (not a zip) whose top level is
 `DataTypes, Credentials, Webhooks, DocumentTemplates, Flows, Forms, DataStores,
@@ -2737,8 +3044,8 @@ TimeStamp`. ⚠ **A section existing in the format is not evidence that anything
 populates it.** Measured live: a selection of `--data-models all --processes all`
 resolved one data-model id — the backing model of the workspace's only Data Store
 — and the resulting pack reported `DataTypes: 0` and `DataStores: 0`, with the
-store's id absent. Whether a store travels when an exported flow *references* it
-is a separate question and needs a referencing flow to answer.
+store's id absent. The lesson survives its example: a store travels **only when the
+request NAMES it**, and a flow that references one does not drag it along.
 
 ⚠ **Scan every export before it goes anywhere** (CLAUDE.md hard rule 1).
 `--export-sensitive-data` is off by default and `Credentials: 0` in the sections
@@ -2952,6 +3259,47 @@ row or column, while create names `Columns[1].Name`. **So "the API names the
 field" is true of create and NOT true of the rows endpoint** — which is exactly
 the over-generalisation this note was corrected for. Measure the endpoint you
 are on.
+
+### ⚠ `503 / statusCode 100 / target data_store` is a PLATFORM row-store outage, not your request
+
+On `POST /api/DataStore/{id}/rows/filter` (and the other row paths):
+
+```
+HTTP 503
+[{"statusCode": 100, "value": "Database connection error. Please contact support.", "target": "data_store"}]
+```
+
+**The rows live behind a different connection from the metadata**, so during such
+an outage the store looks perfectly healthy: `GET /api/DataStore` (list),
+`GET /api/DataStore/{id}` (name + columns + PK) and
+`GET /api/DataStore/{id}/data-model` all answer **200**, process/schedule/the rest
+of the Web-API are unaffected, and the **web UI renders the store and says "No
+records yet" — an EMPTY store, not an error**. A store that reads as empty in the
+UI is therefore NOT evidence that its rows were deleted. Read that split before
+blaming a payload, a filter tree, a key or a permission.
+
+**Three read-only checks separate it from a request-side fault:**
+
+1. **Same call, a store id the caller's workspace does not hold → still
+   `404 / 1004 "Data store not found."`** The resolve step is metadata and stays
+   alive, so a **503 means the id RESOLVED** and the failure is downstream of it.
+   (Measured during an outage: resolvable store → 503, unresolvable → 404.)
+2. **Another credential / another workspace.** Scoping faults answer
+   `403 Unauthorized`, a wrong id answers 404 — never 503. A 503 that follows the
+   caller across accounts is platform-wide, not tenant-bound.
+3. **Repeat the call a few seconds apart.** An outage of this kind is flat, not
+   flapping, so no retry wins. The client retries **GET only** on `429/502/503/504`
+   and this is a POST, which is correct — retrying cannot help here.
+
+**There is no client-side fix**: no header, filter shape, paging, credential or
+environment switch changes it, and bisecting the payload is wasted work. ⚠ **The
+Forms read path is not a workaround** — `POST /api/Form/dataStore/{id}/rows/filter`
+refuses first with `400 / 1005 "Form template id is required."`, so it needs a
+published form template bound to that store and cannot be reached generically.
+Escalate to platform support with the first-observed UTC timestamp and a store id;
+the `value` string says so literally. (Seen once platform-wide on Internal-PROD,
+independently reported by an unrelated tenant in the same window — the duration ran
+to hours, so treat it as an outage to report, not a wait-and-retry.)
 
 ### Two paging shapes on the same tool, and they differ
 
@@ -3167,6 +3515,470 @@ Neither raises anything a structural check can see.
 > provisioning step the pack cannot carry: seed the data, create the credential,
 > point it at the address. Budget it as a deployment step, and verify each part
 > by **counting** at the far end rather than by the import succeeding.
+
+### ⚠ THE ONE BINDING THAT DOES TRAVEL — AND IT CARRIES A BEARER ID
+
+A **webhook binding** is the exception, and it is the dangerous one. Asked with
+nothing bound, the process schema answers:
+
+```
+webhooks/0: Additional properties are not allowed ('id' was unexpected)
+webhooks/0: 'webhookId' is a required property
+```
+
+So the binding lives **in the process definition**, and definitions are what a
+pack is made of. Meanwhile every verb on `/api/Webhooks/launch/{id}` documents
+**`Permission required: None`** — so **the id IS the access control**, not a name
+for something a permission protects.
+
+⚠ **The other gaps fail CLOSED — something is missing and the thing does not
+work. This one fails OPEN:** the exported pack is *less* functional at the
+destination (the id names a webhook that does not exist there) **while carrying a
+live capability for the SOURCE installation.** Anyone holding the pack can fire
+the origin's webhook.
+
+⚠ **Two arrays, two different exposures:**
+
+| `Flows[*].Webhooks` | the **binding**. Travels with the flow whether asked for or not |
+|---|---|
+| `Webhooks` (top level) | the webhook **entity**. Only present if the export named it — but then it carries the id directly |
+
+**Strip both before shipping a pack**, the same way credentials are already
+excluded by default:
+
+```
+procesio strip-webhook-bindings --in pack.procesio --out clean.procesio
+```
+
+## ⚠ Binding a webhook to a process: `put-projects`, never `process-edit`
+
+⚠ **`process-edit` merges a config onto the GOLDEN TEMPLATE, not onto the live
+process.** A dry run with `{"title": ..., "webhooks": [...]}` built a DTO with
+**2 actions and 0 variables** — the target's real actions and variables were
+gone. There is **no reverse path** (nothing turns a live DTO back into a config),
+so a partial edit silently replaces a process rather than amending it.
+
+**Bind by reading the definition back and PUTting it with one array added**, so
+fidelity comes from the platform's own DTO rather than from a reconstruction:
+
+```jsonc
+// flow.webhooks[] — the shape PUT /api/Projects accepts
+{ "id": "<a FRESH GUID you mint>",       // the BINDING INSTANCE's own identity
+  "webhookId": "<the webhook>",          // the bearer capability
+  "webhookVariables": [ ... ],
+  "isObsoleted": false,
+  "filterRules": { "value": [], "parameters": [] } }
+```
+
+| ⚠ `id` must be a **real GUID**, never `null` | the validator answers `Error converting value {null} to type 'System.Guid'`. It looks like an optional field and is required |
+|---|---|
+| ⚠ omitting `filterRules`/`webhookVariables` | `HTTP 500 — Error mapping types … Destination Member: WebhookInstances`. The flow DTO's `webhooks` maps to `WebhookInstances` internally |
+| ⚠ the **config** form `{webhookId, variables:[{name, source}]}` | that is the `process-edit` CONFIG schema, **not** the PUT DTO. Sent to `put-projects` it produces the same 500 |
+
+⚠ **AND THE VARIABLE MAP IS NOT `{name, source}` AT THE DTO LAYER.** Sending
+`webhookVariables: [{"name": ..., "source": "body"}]` is **accepted**, and reads
+back as the right NUMBER of entries with **every `variableId` set to
+`00000000-0000-0000-0000-000000000000`**. The binding exists; it maps nothing.
+**A process fired through it receives null inputs, writes nothing, and looks
+exactly like a platform that cannot fire.** The DTO wants
+`{"variableId": "<the flow variable's GUID>", "variableType": <n>}` — resolve the
+names against `flow.variables` before sending.
+
+> ⚠ **The PUT returns an empty-body 200 for all of this.** The tool's own warning
+> is right: verify by **re-reading the definition**, never by the save.
+
+## ⚠ The `req/opt` column in this API reference does NOT carry information
+
+**Three from three, and the third is in a DTO that documents EVERY field
+optional:**
+
+| `DataStoreFromJsonDto.PrimaryKeyAttributeNames` | documented optional · **required** — *"At least one column must be marked as a primary key"* |
+|---|---|
+| `formInstanceId` (anonymous store path) | documented optional · **supplied, and the path still refused** |
+| `SetFormDto.Pid` | documented optional · **required** — omitting it answers `400 "Invalid request due to missing or incorrect resource parameters"`, **target `form template`** |
+
+⚠ **Treat the column as ABSENT, not as a hint.** Establish requiredness from a
+refusal message — **all three named their own target** — and read a related
+endpoint to find the field rather than trying candidates: `Pid` was identified
+because `GET /api/Form/{pid}/all` lists form INSTANCES by pid, so pid is the
+template they hang from.
+
+## ⚠ The gateway's middleware chain answers before the controller does
+
+`01-authentication.md` documents a fixed chain on every request:
+
+```
+LoggingMiddleware → SecureInternalRequests → DeserializeToken → Authentication
+  → GetUserFromToken → Authorization → Controller
+```
+
+> *"If an endpoint requires auth and none is supplied, the gateway returns
+> `401 Unauthorized`"* — cookie clients may instead get a `307` auto-refresh.
+
+⚠ **A bare `Unauthorized` string with NO content type, `Set-Cookie`, and ~1 ms
+upstream is THAT middleware**, not the controller and not a third-party WAF. The
+controller's own refusals are ASP.NET ProblemDetails at hundreds of milliseconds.
+⚠ **Kong is undocumented transport in front of it** — its `X-Kong-*` headers are
+what make the latency readable, and it appears nowhere in 15 files of reference.
+
+⚠ **`DeserializeToken` picks Anonymous mode only when there are no auth headers
+AND the endpoint is `[AllowAnonymous]`.** A documented-anonymous route that still
+gets the middleware `401` means the deployed attribute and the reference disagree.
+
+## ⚠ A working webhook binding, measured from 29 production exports
+
+**56 flows across 29 bundles carry a populated `Webhooks` array. 104
+`WebhookVariables` entries in total:**
+
+| field names | `{VariableId, VariableType}` — **104 of 104** |
+|---|---|
+| `VariableType` values in use | **3 (×56), 2 (×24), 1 (×24)** — Body, Query, Header |
+| ⚠ **`VariableId` == null GUID** | ⚠ **0 of 104** |
+
+⚠ **So a real binding always carries a resolved variable GUID.** A null GUID is
+a construction error, not a platform shape. **And every one of those bundles
+ships someone's live webhook id — strip bindings before distributing a pack.**
+
+## ⚠ Read UPSTREAM LATENCY on a refusal — it separates two classes no status code does
+
+`X-Kong-Upstream-Latency` is on every response through this gateway, and it
+distinguishes refusals that share nothing but a colour:
+
+| refusal | status | content-type | body | upstream |
+|---|---|---|---|---|
+| `api/Form/dataStore/{id}/rows` | `401` | ⚠ **absent** | the bare word `Unauthorized` | ⚠ **1 ms** |
+| a real controller `401` | `401` | `application/json` | ProblemDetails | **365 ms** |
+| `api/FormProcess/.../launch` | `500` | `application/json` | *"Response status code does not indicate success: 403 (Forbidden)."* | ⚠ **545 ms** |
+
+⚠ **A few milliseconds means the application never ran.** Hundreds of
+milliseconds means it ran and either decided, or called something downstream that
+refused. **The `500`-wrapping-`403` text is .NET's `EnsureSuccessStatusCode()`,
+i.e. the Web-Api gateway's own internal call being rejected** — and the same
+pattern appears when a REQUIRED QUERY PARAMETER is omitted, so it is not by
+itself evidence of an authorization gap.
+
+## ⚠ A form maps fields to process variables BY NAME; a webhook cannot
+
+| the FORM path | `{on, do:"process", processId, inputs:[{to:<procVar>, from:<formField>}]}` → `RUN_PROCESS{inputMap:[{left: procVarGUID, right: formFieldPath}]}` — **field-level, resolved by name to the variable's GUID** |
+|---|---|
+| the WEBHOOK path | `WebhookVariableDto = {VariableId, VariableType}` with `VariableType` = Header/Query/Body — ⚠ **nowhere to name a field**, so every bound variable receives the WHOLE serialised payload |
+
+⚠ **And `LaunchFlowPayload` is `{connectionId?, flowTemplateId}` — no payload
+field at all**, so the form launch never carries values in its body; they come
+from the form's own field map. **Build form-triggered flows on the element event,
+not on a payload.**
+
+## ⚠ The anonymous store path's `401` is NOT produced by the application
+
+Measured against a control rather than an expectation. `GetAnonymousForm` on a
+**private** form is a documented controller-generated `401`; compare it with the
+store path's:
+
+| | content-type | body | `X-Kong-Upstream-Latency` |
+|---|---|---|---|
+| controller `401` | `application/json; charset=utf-8` | ProblemDetails `{status,title,traceId,type}` (RFC 9110) | **365 ms** |
+| ⚠ **store path `401`** | ⚠ **absent** | ⚠ **the bare string `Unauthorized`** | ⚠ **1 ms** |
+
+The store path's response also carries **`Set-Cookie`** and
+**`Transfer-Encoding`** where the controller sends `Content-Length` and
+`Content-Type`.
+
+⚠ **A `401` answered in 1 ms with `Set-Cookie` and no content type is an
+AUTHENTICATION-LAYER signature, not an application error.** Something in front of
+the controller refuses the request; the app's error pipeline is never reached.
+
+⚠ **CONSEQUENCE FOR ANYONE PROBING THIS PATH: no application-level
+configuration opens it.** Binding the store to a form, publishing the form, and
+creating a form instance were all tried and all refused identically — **they
+configure code the request never reaches.**
+
+⚠ **AND READ THE BODY SHAPE, NOT ONLY THE STATUS.** Three blocks compared
+status codes and missed that the refusal did not look like the API's other
+refusals.
+
+## ⚠ A form INSTANCE does not unlock the anonymous store path
+
+Measured: `POST api/Form` (`SaveForm`) creates a form instance **anonymously**
+(`200`, no `Authorization`, empty cookie jar) when `Pid` names the template.
+Supplying that instance as the `formInstanceId` header on
+`GET api/Form/dataStore/{id}/rows` **still returns `401`** — identical to the
+baseline taken in the same block without it.
+
+⚠ **AND THE `401` IS A BARE `"Unauthorized"` STRING, not the standardized error
+shape**, on verbs that document only `200` and *"standardized error response"*.
+**A refusal that does not look like the API's other refusals may not be coming
+from the application at all** — compare it against `GetAnonymousForm` on a
+private form, which is a documented controller-generated anonymous `401`.
+
+## ⚠ A form's DATA-STORE binding is an element EVENT, not an element type
+
+`dropdown`, `select`, `table`, `dynamic-table-row` and `static-table-row` are
+element **types** and **none of them binds a store**. The binding lives on an
+element's `events`:
+
+```jsonc
+{"type": "button", "events": [
+  {"on": "click", "do": "datastore",
+   "dataStoreId": "<store id>", "operation": "ADD",   // READ|ADD|UPDATE|DELETE
+   "inputs": [], "outputs": [], "filters": []}]}      // filters: every op but ADD
+```
+
+which the builder emits as `RUN_DATA_STORE_OPERATION`.
+
+⚠ **Prove it landed by READING THE FORM BACK** and finding both the store id and
+`RUN_DATA_STORE_OPERATION` in the returned definition. The create response does
+not show the binding.
+
+## ⚠ The anonymous `api/Form/dataStore/{id}/rows` path refuses a bound form's own store
+
+Measured: a form with `isPrivate: false`, anonymously fetchable
+(`GET api/FormTemplate/{workspaceId}/{id}` → **200**, no `Authorization`, empty
+cookie jar), genuinely bound to a store by a `do: datastore` event, still got
+
+```
+GET api/Form/dataStore/{that store}/rows  ->  401  "Unauthorized"
+```
+
+⚠ **That `401` is UNDOCUMENTED on this path** — the four verbs document only
+`200` and "standardized error response" — and the reply is a bare string, not the
+standardized error shape. It is **not** a form-privacy refusal (the template
+fetch succeeded) and **not** store-vs-form validation (the store was bound).
+
+⚠ **HYPOTHESIS, UNTESTED:** the controller auth entity is `FormInstance`, and a
+form *instance* is "a filled-in copy of a template that lives inside a
+process/flow run". A live instance — created by `POST api/Form` (`SaveForm`) —
+may be required, making the documented-optional `formInstanceId` header
+effectively mandatory. **The same domain already documents
+`PrimaryKeyAttributeNames` as optional when it is required.**
+
+## ⚠ Creating a Data Store from JSON — two required things the DTO does not shout
+
+`POST /api/DataStore/from-json` takes `DataStoreFromJsonDto`
+`{Name, Description?, Content, PrimaryKeyAttributeNames?}`. Two refusals are easy
+to hit and both are named by the validator:
+
+| ⚠ **`Content` must be a JSON OBJECT, not an array** | *"The JSON content must be an object, not an array."* (target `Content`). One object defines the schema; a one-element array does not |
+|---|---|
+| ⚠ **`PrimaryKeyAttributeNames` is effectively REQUIRED** | documented "optional", but omitting it answers *"At least one column must be marked as a primary key."* (target `Columns`). The names are **case-insensitive top-level property names** of the `Content` object |
+
+⚠ **Form element `type` values are a closed set**, and an unknown one is refused
+with the full list: `approval, assignee, button, chart, chat, checkbox, column,
+columns, datetime-input, divider, dropdown, dynamic-table-row, file-upload,
+file-viewer, heading, icon, image, input, list, number-input, paragraph,
+radiobox, section, select, side-panel, signature-pad, static-table-row, step,
+stepper, tab, table, tabs, textarea`. **`text` is not one of them** — the plain
+text field is **`input`**.
+
+## ⚠⚠ The FormProcess anonymous route resolves the process WITHIN the form's workspace
+
+`POST api/FormProcess/{formTemplateId}/{processTemplateId}/publish` (and the
+launch that follows) is `[AllowAnonymous]` and scoped by the
+`formTemplateWorkspaceId` **header** — the form's workspace. The process template
+GUID sits in the URL with no workspace of its own on the wire, so the request
+*looks* like it could name a process in any workspace. **It cannot.** Measured
+with one form and two publishes differing only in the process's workspace:
+
+- process in the **form's** workspace → publish `200`, launch runs, the flow's
+  Data Store write lands. **True whether or not the form's element is bound to
+  that process** — resolution is by `(formTemplateWorkspaceId, processTemplateId)`,
+  NOT by the form's button binding.
+- process in **another** workspace → `400`, `statusCode 373`, target
+  **`"Cannot find flow with id <id>"`** — a workspace-scoped flow lookup that
+  failed, with the process proven valid+active+runnable by a direct `run-process`
+  in its own workspace. Not "invalid flow"; "not in this scope".
+
+⚠ **So a public form cannot anonymously drive a process in a different workspace.**
+The workspace is a boundary for this surface — the security-relevant twin of the
+anonymous Data Store *read* path being workspace-scoped-not-form-scoped. `373` is
+the generic "cannot launch"; read its **target** (`"…is inactive"` vs `"Cannot
+find flow with id"`) for the reason. **Never assert on the launch response**
+(a non-2xx completes as success here) — assert on the row landing in the store.
+
+## ⚠ A process built by `process-create` + `put-projects` is created INACTIVE
+
+`run-process` then refuses with `statusCode 373`, target `"…Flow with id <id> is
+inactive"`. ⚠ **`process-toggle-activation` returns `{toggled:true, errors:[]}`
+and is a NO-OP here** (the "accepted ≠ applied" family). What activates it is
+**`active: true` in the flow DTO passed to `put-projects`** (desired-state). Set
+it before the PUT and read the flow back to confirm `active:true`.
+
+## ⚠⚠ Sub-workspace create/delete on a capped Business plan is lossy — reconcile from the ledger
+
+`POST /api/Workspace` (`CreateWorkspaceDto`) documents only `canExceedPaidTime`
+required, but in practice needs a **real `defaultWorkspaceConfiguration`**
+(`{UserTypeId, Roles}` taken from `get-userpermissions-usertypes`). Omit it and
+you get **HTTP 500 `"Unable to create sub-workspace!"`** — a *domain* 500, not a
+`400` validation, so it reads as a capacity cap and is not one. ⚠⚠ **AND THAT 500
+STILL CREATES THE WORKSPACE** (it appears `active` in
+`get-resources-used-subworkspaces`): a create that reports failure still landed,
+so reconcile from the ledger, never from the create's own report.
+
+`DELETE /api/Workspace/{id}` (`DeleteSubWorkspace`) and `PUT /api/Workspace`
+(`UpdateSubWorkspace` — the rename/limits update) BOTH return **`500`** on a capped
+master and change nothing: DELETE as **`500`-wrapping-`400`**, PUT as a wrapped
+**`500 Internal Server Error`** even with a byte-correct `UpdateWorkspaceDto` (the
+name field is **`workspace`**, NOT the create DTO's `workspaceName`; required
+`canExceedPaidTime` + `maxThreads` + `licenseType`; verified against the API-doc
+DTO). ⚠⚠ **So on such a master only CREATE and READ work; UPDATE and DELETE are
+both dead** — you can neither delete a sub-workspace to reclaim a slot NOR rename a
+stuck throwaway into a real workspace. **Repurpose-by-rename is therefore NOT a
+cap workaround here** (measured: three PUT attempts, correct DTO, all `500`,
+read-back name unchanged; one DELETE, `500`-wrapping-`400`, read-back still active).
+
+⚠⚠ **The cap counts TOTAL non-purged sub-workspaces (active + soft-deleted), not
+just active.** `Business` plan, `softLimit=hardLimit`, `canBeReused:false` → a
+removed slot is NEVER reclaimed: a "successful" delete only sets
+`workspaceState:"removed"`, and that row still counts. Measured: a master at
+**13 active + 4 removed = 17 total** refused `POST` with `"Unable to create
+sub-workspace!"` — the SAME message the omit-`defaultWorkspaceConfiguration` case
+gives, but here nothing lands (read-back `DID-NOT-LAND`), the opposite of that
+case. So that one 500 message covers **two opposite outcomes** (landed vs refused);
+only a read-back tells them apart. A soft-delete (UI or API) does NOT free room, so
+neither the DELETE deadlock nor the create cap can be escaped from the account
+side. **Getting under the ceiling needs a hard PURGE of the removed rows — a
+platform/support action (`ProcesioAdmin:Delete` via `DELETE api/Workspace/any/{id}`)
+or the billing renewal — not anything the owner can do via API or the web UI** (the
+owner's UI delete is the same soft-delete). The gateway hides the real downstream
+error behind `EnsureSuccessStatusCode`. ⚠ Prefer a QA/DEV environment or
+pre-provisioned disposable workspaces over creating throwaways in a capped master.
+
+⚠⚠ **The web-UI create and the API `POST /api/Workspace` enforce the cap
+DIFFERENTLY.** Measured on the same over-cap master, same day: a **web-UI**
+sub-workspace create **landed** while non-purged was already above the paid
+`hardLimit`, but an **API `POST /api/Workspace`** with a byte-correct body (proven
+`defaultWorkspaceConfiguration`, Basic usertype — `--dry-run`-validated) at the same
+count was **refused** with `HTTP 500 "Unable to create sub-workspace!"`, and
+read-back showed the count **unchanged** (nothing landed). So the API path enforces
+the count ceiling and the owner-driven UI path does not. ⚠ When the master is over
+its ceiling, create the workspace **in the web UI**, not via the API. This over-cap
+API 500 is a genuine refusal — tell it apart from the omit-`defaultWorkspaceConfiguration`
+500-that-still-lands **by read-back**: count unchanged = did-not-land; count +1 =
+landed. Never retry the API create (that is how the removed-row residue accrued).
+
+⚠⚠ **CORRECTION — the count-block is a platform BUG (confirmed by the PROCESIO
+team), and the subscription `softLimit`/`hardLimit` are NOT a sub-workspace count
+cap.** Two facts dissolve the earlier "cap of 10 / 14" framing: **(1)** the
+subscription's `softLimit`/`hardLimit` are a **`LicenseType` (Time/Thread) budget** —
+for a `type:Time` plan they are paid-TIME units (the `/api/Resources/used` budget is
+in **milliseconds**, e.g. `soft/hard = 36000000`), **not** a workspace count. **There
+is no documented sub-workspace COUNT limit** anywhere in the API reference (the only
+`MAX_NR_*` is `MAX_NR_API_KEYS = 25`). **(2)** The docs define `DELETE
+api/Workspace/{id}` as a **plain delete (`200 OK`, empty)** — no soft-delete, no
+"still counts" semantics. So the observed behavior (delete only soft-deletes to
+`workspaceState:"removed"`, and removed rows still block `POST` / `PUT`) is **not
+intended design — it is a confirmed platform bug that is being addressed.** Intended
+behavior: a deleted sub-workspace is an inactive record that does **not** hold an
+active slot. ⚠ **Therefore the create/rename block is TEMPORARY** — once the fix
+ships, deleting frees capacity and normal create/rename resume. Until then the
+workaround (create in the UI, or repurpose existing workspaces) stands, but frame it
+as a **bug workaround, not a plan limit**, and do not quote "10" as a workspace cap.
+
+## ⚠ A form template is fetchable ANONYMOUSLY — measured
+
+`GET api/FormTemplate/{workspaceId}/{id}` returned **`200` with no
+`Authorization` header and an empty cookie jar** for a form created with
+`isPrivate: false`. ⚠ **So `formTemplateWorkspaceId` and `formTemplateId` — the
+two headers that scope every anonymous form-runtime endpoint, including the four
+`api/Form/dataStore/{id}/rows` verbs — are obtainable without authentication.**
+They are the form's public address, not a secret, and cannot be the access
+control.
+
+## ⚠⚠ A native Data Store node is WORKSPACE-SCOPED — cross-workspace store access needs a Call API, not a node
+
+Measured live: a valid, active process in workspace **A**, with a
+Data Store `InsertRows` node whose store-id parameter points at a store in workspace
+**B**, **builds and validates fine** (the store id is only a literal parameter) but
+**fails at runtime with `status 40`** and `Error while building input model: Error
+while getting data store metadata <storeId> for workspace <A>`. The engine resolves
+the bound store id **within the process's own workspace** and errors when it is not
+there. ⚠ Nothing lands, but it is a **mechanistic error, not a silent no-op** — read
+the error, not just an empty count.
+
+⚠ **To reach a store in another workspace, use an authenticated Call API to the
+DataStore REST endpoint** (`api/DataStore/{id}/rows`) with a credential scoped to
+that workspace — treat the other workspace's store as an external authenticated
+resource. A cross-workspace **mediated write** (the shape a per-workspace custody
+split needs) is therefore a Call API, never a Data Store node.
+
+## ⚠ THIS REPO SHIPS A FULL API REFERENCE — READ IT BEFORE PROBING
+
+`tools/procesio/docs_info/API-DOCUMENTATION/` is a checked-in, endpoint-by-endpoint
+reference for this platform, including a **Shared enums** section. It defines
+`FlowStatus`, `WebhookVariableType`, `WebhookVariableDto`, `WebhookInstanceDto`,
+`ActionStatus` and the exact contract of every controller.
+
+⚠ **Three separate investigations chased answers that were already in it**, and
+three "platform refusals" turned out to be malformed requests whose correct shape
+was documented. **Grep `docs_info/API-DOCUMENTATION/` before designing a probe.**
+
+### `FlowStatus`, verbatim
+
+`STATUS_NONE`=1 · `INACTIVE`=5 · `STATUS_STOP_BY_USER`=6 · `STATUS_INITIALIZING`=15 ·
+`STATUS_DISPATCHED_ACTIONS`=20 · `STATUS_RUNNING`=30 · `STATUS_RUNNING_WITH_ERRORS`=40 ·
+`BREAK_POINT`=45 · `STATUS_FINISH`=50 · `STATUS_TEMPORARY_WAITING`=60
+
+⚠ **`status: 1` means the instance exists and has not started** — not "running",
+not "queued". A run that never began sits here.
+
+⚠ **`GET /api/Projects/{id}/instances` lists CURRENT RUNTIME instances, not
+history.** A finished instance disappears from it, so it cannot answer "has an
+instance ever been in state X".
+
+## ⚠ A webhook binding cannot map FIELDS — one variable gets the WHOLE body
+
+`WebhookVariableDto` is exactly `{VariableId, VariableType}`, and
+`WebhookVariableType` is `Header`=1, `Query`=2, `Body`=3. ⚠ **There is nowhere to
+name a body field.**
+
+| `variableType` out of range (e.g. 0) | ⚠ **ACCEPTED without complaint** — the DTO validates that the GUID is a GUID and does **not** range-check the enum. The variables receive nothing, and a Data Store insert fails with *"primary key column '<col>' cannot be null for insert operation."* |
+|---|---|
+| N variables all bound to `Body` = 3 | ⚠ **each receives the ENTIRE serialised payload.** A row was written whose primary key, and two other columns, were each the whole JSON object |
+| ✅ **the correct design** | **ONE variable of an object/JSON type bound to `Body`**, parsed inside the flow |
+
+⚠ **Both failure modes are silent at bind time and only visible in the written
+data.** Check what a triggered run actually wrote, not that the binding saved.
+
+## ⚠ A webhook launch CREATES an instance that does not necessarily RUN
+
+`POST /api/Webhooks/launch/{id}` returns quickly and an instance appears in the
+process's history **attributed to the webhook by name** (`webhookName` on the
+instance listing). That attribution is the proof the trigger arrived.
+
+⚠ **It is not proof the process ran.** Measured on a bound, active, valid process
+whose variable map was fully resolved:
+
+| | direct `run-process` | webhook launch |
+|---|---|---|
+| `webhookName` | `null` | **the webhook's name** |
+| `status` | **50** | ⚠ **1** |
+| `actionsConsumed` | **1** | ⚠ **0** |
+| `timeConsumed` | **283 ms** | ⚠ **0** |
+| side effect | the Data Store row appeared | **none** |
+
+The webhook-attributed instance was still `status: 1` with zero actions and zero
+milliseconds **25 minutes later**. ⚠ **So a launch returning success, and even an
+instance existing, says nothing about execution — read `actionsConsumed` and
+`timeConsumed`, not the launch response and not the presence of an instance.**
+
+⚠ **AND `POST /api/Projects/instances/{id}/launch` NEEDS A BODY** — called
+without one it answers `415 Unsupported Media Type`, which is a fact about the
+request and not about whether a pending instance can be launched.
+
+⚠ **An instance record OUTLIVES the webhook that caused it**, and its
+`webhookName` becomes `"Currently Unavailable"` once the webhook is deleted — so
+run history can show a run with no visible cause.
+
+## ⚠ Revoking a webhook: UNBIND FIRST
+
+`DELETE /api/Webhooks/{id}` is **refused while a process still binds it**. Delete
+the binding (or the process) first, then delete the webhook. `GET
+/api/Webhooks/{webhookId}/used` answers what still holds it, and returns `[]`
+once nothing does.
+
+⚠ **A second delete of an already-deleted webhook answers `400` wrapping
+`502 "Invalid request. Provided resource is not able to be created or
+modified."`** — so a failed delete does **not** mean the webhook survived.
+**Confirm by listing twice**, not by the delete's status.
 
 ## PROCESIO's outbound calls identify themselves
 
@@ -3462,6 +4274,29 @@ must be a **list<Object>** — a `list<Json>` runs correctly but the designer pa
 mismatch" on the node (flow-lint `EXECQUERY_OUTPUT_TYPE`). Retyping that internal list variable
 to Object fixes the designer without touching the response shape.
 
+### Pushing a whole Node script body, and proving it landed
+
+`node-set-param --property "Code"` accepts a full multi-line **Node script body**, not just a
+short literal — the same validate + flow-lint + PUT path, `--dry-run` to preview. Two facts that
+bite on a body push specifically:
+
+- **Push the body as LF, not CRLF.** The platform stores and returns a Node's Code as **LF**; a
+  disk copy of the same body is often CRLF. If anything binds a deploy-source copy to production
+  by a fingerprint hashed with universal-newline translation (LF), a CRLF push mismatches that
+  guard even though the two are "the same" text. Normalise to LF before sending, and hash the LF
+  form when comparing to what the platform returns.
+- **`put` returning success is NOT evidence the body changed; the whole-document hash MOVING is
+  NOT a failed write.** Read the node back (`node-params --node X`) and hash its Code against the
+  bytes you sent — that is the only proof it landed (the platform's failure signature is a clean
+  status that persisted nothing). Separately, any PUT makes the **whole-document** hash move
+  because the platform materialises `ports` fields on write that a read never triggers — so gate
+  on the single node-body hash, never on a before/after hash of the entire flow definition.
+- **Deliver the body with no shell/CRT mangling** by driving the tool in-process (`from
+  tools.procesio import main; main.dispatch("node-set-param", argv)` with the value as an exact
+  string) or via a subprocess whose argv is a LIST — `--value` is a plain arg with no `@file` or
+  stdin form, and a newline-bearing value quoted onto a Windows command line is where bytes get
+  lost.
+
 ## An arithmetic `Add` node can be a silent no-op
 
 Seen live on a flow that computed `year = year + (-1)`: an **`Add`** action (template
@@ -3482,6 +4317,290 @@ leaving `-1` in place is a latent behaviour change; `0` is not.
 Watch for this whole class: an action whose input and output bind the same variable. Prefer a
 separate result variable, and rename any node whose label describes arithmetic it does not do —
 a canvas that lies costs the next reader more than the bug did.
+
+## Data Store `InsertRows` does NOT fan out a list-bound mapper
+
+Binding a **list** variable into an `InsertRows` mapper column does **not** insert
+one row per element. The action writes **ONE row whose cell holds the
+JSON-serialised whole array**, and reports success while doing it:
+
+```
+status = 50        # normal completion
+affected = 1
+error = []         # and the node's Error binding stays null
+```
+
+A four-column mapper bound to four parallel 3-element lists produced a single row:
+
+```
+declared_value = '["alpha","bêta","العرب"]'
+row_key        = '["gz-446a…","gz-dea5…","gz-3380…"]'
+```
+
+⚠ **The lists DO arrive at the node as real arrays** — a read-only Node action
+placed immediately before the insert, binding the same variables, returned
+`isArray=true typeof=object len=3` on every one, non-ASCII intact. So the
+collapse is in the Data Store action, not in variable transport.
+
+⚠ **Why this is easy to get wrong:** production flows *do* bind lists into Data
+Store mappers, so the shape reads as an established batch-insert idiom. Observing
+the shape says nothing about the row count it produces. **Reading a shape
+correctly and inferring its semantics are two different acts.**
+
+**Consequence for design:** inserting N rows where N is data-dependent cannot be
+expressed as one node. A static graph can only express a fixed node count (e.g.
+one per COLUMN, derivable from the store schema at build time). A data-dependent
+N needs a loop construct or N executions — neither is proved here.
+
+**Diagnosing a collapsed batch:** the landed row alone cannot distinguish "the
+lists never arrived as lists" from "the action did not fan out". Put a read-only
+probe node between the stages binding exactly what the failing node binds. It
+writes nothing, so it cannot perturb the outcome it measures.
+
+## `For Each` — containment is `ParentId`, and identity is never the name
+
+**Body membership is stored, not implied by wiring.** A node inside a `For Each`
+carries `ParentId` = the For Each node's id. Across the 29-bundle export corpus
+(612 flows, 7,567 actions) **all 979 parented actions resolve to a `For Each`** —
+no other template parents anything.
+
+⚠ **`ActionTemplateName` IS NOT IDENTITY.** Of the **138** nodes whose
+`TemplateId` is `dbef0804-66a9-4f8f-872c-ece1b89b8fdb` (`For Each`), **72 carry
+`ActionTemplateName: null`** and only 66 carry `"For Each"`. `ActionName` is free
+text (observed in production: `"concatEmails"`, `"Check Top Pagex"`).
+**A name-keyed census of the corpus misses 52% of them.** Key every census on
+`TemplateId`.
+
+⚠ **`For Each` is not the only loop.** **60 corpus flows contain a directed cycle
+in their port graph with no `For Each` node in it** — a hand-rolled loop that
+exists only as an *edge*, invisible to any name-based search. It is priced at
+about **+2 actions per item** (a Decisional plus an increment node) where a
+`For Each` costs none.
+
+⚠ **The loop-item variable** is `IsList: false` and its `ContextId` is the
+For Each node's own id. A body child addresses fields of the current item by
+binding **that one variable** on several different `attributeId`s — one
+production node binds it on 7 attributes in a single statement.
+
+### The insert-per-element shape that works
+
+Put the Data Store node **inside** the loop (`ParentId` = the For Each) with
+`Operation: InsertRows`, and bind the mapper to **SCALARS** — per-iteration values
+picked out of the loop item by small Node actions in the body. **Binding lists
+into the mapper instead is what collapses to one serialised row.** Wire the last
+body node **back** to the `For Each`.
+
+⚠ Measured 1-of-1, 5-of-5 and 100-of-100 rows landed; ~4 `actionsConsumed` per
+element for a 4-node body. **The `For Each` itself consumes none.**
+
+⚠ **Port ORDER is not load-bearing** (a corpus census finds 100 outside-first vs
+37 child-first, and a working built process is child-first). What matters is that
+both edges exist and the last body node returns to the For Each.
+
+⚠ **NOT ESTABLISHED:** N=0, N much greater than 100, and loop-carried
+accumulation across iterations.
+
+## The anonymous form/dataStore path is scoped to the WORKSPACE, not the form
+
+`POST /api/Form/dataStore/{dataStoreId}/rows/filter` with headers
+`formTemplateWorkspaceId` + `formTemplateId` (both full GUIDs; `formInstanceId`
+optional) returns rows for **any store in that workspace** — including a store the
+form does not reference at all.
+
+Measured with a form bound to store A and store B asserted absent from the form
+definition: A → 200 with A's marker; **B → 200 with B's marker**; an unknown store
+id → **404**, so the path does refuse when there is nothing to return.
+
+⚠⚠ **A form is not a key to one store. It is a read capability over every store in
+its workspace.** A workspace holding a store that must not be read anonymously
+must therefore contain **zero** forms — not merely no form bound to that store.
+
+### ⚠ The 401 on `/rows` is a ROUTING failure, not an auth failure
+
+Four separate investigations concluded this surface refused them. On one store
+with one set of headers:
+
+```
+POST /api/Form/dataStore/{id}/rows          -> 401, no Content-Type, upstream   1 ms
+POST /api/Form/dataStore/{id}/rows/filter   -> 200, application/json, upstream 328 ms
+```
+
+The bare `Unauthorized` string with no content type and ~1 ms upstream latency is
+**the gateway declining to route the verb**, not the application declining the
+caller — a real controller 401 returns ASP.NET ProblemDetails in hundreds of ms.
+**Before concluding a surface refuses you, try a second verb on the same path.**
+
+### Reading workspace ids
+
+`list-workspaces` returns `id: null` for the **Personal** workspace — the key
+exists, so `.get("id")` yields `None` and `str()` turns it into the plausible
+4-character non-address `"None"`. Filter on `isinstance(id, str) and len(id) == 36`
+before using one as an address. `datastore-list` **is** workspace-scoped.
+
+## A data-model-typed input variable is not delivered by `run-process --payload`
+
+A flow whose input variable's `dataType` is a **data model** (measured with the
+built-in `FileDataModel`) **validates, PUTs, activates — and then the run returns
+a response with no `status` field at all**, `error: null`, and nothing written.
+
+Discriminated with a three-arm ladder, one property changed per step:
+
+```
+Json          + attribute:None   -> status: 50, affected: 1, ROW LANDED
+FileDataModel + attribute:None   -> no `status` field, error null, NO ROW
+FileDataModel + attribute:{id}   -> identical to the arm above
+```
+
+⚠ The arm carrying **no attribute binding at all** fails exactly as the bound one
+does, so **leaf addressing is not implicated** — the input's *type* is.
+
+⚠⚠ **The `status` field is ABSENT, not null.** Record `status_present` separately
+from `status_value`: a missing field and a null value both render as `None`, and
+this platform has a *different* failure — `FlowStatus.STATUS_NONE`, a returned
+value of **1** on an instance created but never executed. Fusing the two would
+manufacture one explanation for two unrelated faults.
+
+⚠ **Scope, because the over-claim is tempting:** this is measured through
+`run-process --payload`. Production flows plainly *do* bind data-model values —
+one live node binds a single variable to **17 distinct `attributeId`s**, and 145
+such params exist across the export corpus. So the finding is that a synchronous
+run payload does not deliver one, **not** that the platform cannot. Untested
+candidates: the value arriving via a form or webhook instead; a generated model
+rather than a built-in; or a typed envelope the run path does not construct.
+
+**Judge any of this on rows landed in the store, never on the run's response** —
+this platform reports `status: 50, affected: 1, error: []` for writes that did
+not do what was asked.
+
+---
+
+## `Extract Text` returns ONE page object per page — a no-text page is NOT an empty list (measured)
+
+`Extract Text` (native PDF action, `actionId f15741e2-…`): input `Pdf File`
+(`FileDataModel`, `10c6ac59-…-121212121219`), output **`Extracted Text` typed
+`Object` with `isList: true`** (`0317bfee-…-121212121221`). Executed against
+fabricated scanned vs text-layer PDFs, the output shape is:
+
+```
+[ { "PageNumber": 1, "Text": "<page text, lines concatenated with NO separators>",
+    "Words": [ { "Id", "Text", "TextOrientation", "FontName", "Position": {…} }, … ] }, … ]
+```
+
+⚠⚠ **The list holds ONE element per PAGE, always — its length is the page count,
+not a presence signal.** A page with **no extractable text layer** (a scanned /
+image-only page) yields **`{ "PageNumber": n, "Text": "", "Words": [] }`** — the
+action **succeeds** (instance `status: 50`), it does **not** error and does **not**
+refuse, and **the list is NOT empty.** So:
+
+- ⚠ **A Decisional `IS_EMPTY` on the `Extracted Text` variable does NOT detect a
+  scanned document** — the list is non-empty (one page object), so it routes to
+  the non-empty branch. `IS_EMPTY` is reliable and evaluates the Object list fine;
+  it is answering the wrong question. The emptiness is one level down, in
+  `element.Text` / `element.Words`.
+- ⚠ **Detecting "no text" needs a SCRIPT node**, not a Decisional: a Decisional
+  cannot read a field of an `Object` variable (it resolves to a Data Model
+  attribute GUID), so lift per-page `Text` to a scalar in a `Javascript`/`Python`
+  node first, then decide. A single script node reading per-page `Text` refuses a
+  wholly-scanned PDF and passes a text-layer one (measured both ways).
+- ⚠ **A PARTIALLY-scanned document cannot be caught natively.** Its list is
+  non-empty on the text pages, so any whole-document check passes it; the
+  image-only page is lost silently. **No native action reports a PDF's page
+  count** — across the 233-action catalog the only page-aware actions are
+  `Remove Pages` and `Select Pages`, neither of which counts — so the extraction
+  cannot be cross-checked against document extent without a Custom Action or an
+  out-of-band page count. `Read Files Content` does not help: its failure mode on
+  a bad-encoding PDF is a mis-decode that PRODUCES content (silence), not an
+  `Errors` entry.
+
+The lesson under this: `isList: true` on an output does **not** mean an empty
+extraction is an empty list — verify a platform action's empty/edge behaviour by
+**executing** it, not by reading the action definition.
+
+## `list-processes` is paginated — an "absence by listing" is not proof (measured)
+
+`GET /api/Projects` / `list-processes` does **not** reliably enumerate every
+process: the default page — and even `--page-size 500` — can omit
+recently-created processes, so a scan that finds no match is **not** evidence the
+process is gone or never existed (a false absence; the same shape as the
+`datastore-list` page cap). **Verify a specific process's existence/lifecycle
+per-id with `get-process --id <id>`**, never by scanning the list: a **deleted**
+(or non-existent) process returns `HTTP 400` wrapping `statusCode 501, "User is
+not authorized for the requested resource."` — so `get-process` erroring that way
+is the confirmation a delete landed. (Seen at a teardown where the default
+`list-processes` reported zero of three just-created processes.)
+
+## CSV/XLSX read-actions return THREE different empty-shapes — and per-action status `90` = FAILED (measured)
+
+The native spreadsheet read-actions do **not** share one empty behaviour; each
+needs its own guard branch (measured against fabricated empty / malformed /
+content-control files — one control per action, so an empty result and a broken
+reader are distinguishable):
+
+- **`Read Range from CSV`** (`9c9cc774-…`; input `CSV file`[file] + `Range`[text],
+  output `Values`[json]): an **empty (0-byte) file FAULTS** — instance `status 40`,
+  `error:[{errorMessage:"Object reference not set to an instance of an object."}]`.
+  A malformed-but-parseable CSV does **not** fault (CSV parsing is permissive — NUL
+  bytes / an unterminated quote come back as a row). ⚠ **Output type shifts with row
+  count:** one row → a single **object** `{A,B,C}`, many rows → a **list** of them.
+- **`Read Range`** (Excel, `c183ff97-…`; input `Excel workbook`+`Sheet name`+
+  `Range`, output `Values`+`Formulas`[json]): an **empty sheet returns a NON-empty
+  list of ALL-empty rows** (length = the requested range height, every cell `""`) —
+  the `Extract Text`-on-a-scan shape: `IS_EMPTY` is FALSE, emptiness one level down.
+  A corrupt/non-zip workbook FAULTS (`status 40`, `"File contains corrupted
+  data."`). ⚠ **Fidelity gap: STRING cells read back `""` while NUMERIC cells read**
+  (on openpyxl-generated `.xlsx`; the CSV read did not drop strings) — a string-only
+  workbook can look empty.
+- **`Split Workbook To CSV`** (`155c2a82-…`; input `Excel workbook`+`Sheet name`+
+  `Rows number`[num], output `CSV files`[file,**isList**]): an **empty workbook
+  returns `null`** (a clean `status 50` carrying nothing — NOT an empty list); a
+  corrupt workbook FAULTS (`status 40`, `"End of Central Directory record could not
+  be found."`); a real workbook returns a **list of file descriptors**.
+
+⚠⚠ **A platform action's FAILURE surfaces as per-action `status 90`** (distinct
+from per-action `40` = executed, and from instance-level `40` = finished-with-
+errors), alongside instance `status 40` + the `error[]` entry naming the action.
+So the per-action register is at least `{1: never entered, 40: executed, 90:
+failed}`. A read-action that can fault needs its **error port wired**
+(`"onError": "<handler>"`) so a fault routes to a fail-closed handler — a raw
+`status 40` fault is a crash, not a legible refusal.
+
+⚠ **`Get Sheet Names`** (`d5a0194d-…`; workbook → list of names) exists, so —
+unlike the PDF partial (no page count) — a partial workbook (one populated sheet +
+empty sheets, which a sheet-scoped `Read Range`/`Split` proceeds on) IS catchable
+natively: `Get Sheet Names → For Each → Read Range → aggregate`.
+
+## ⚠⚠ A NULL variable injected at `<%N%>` is a captured SyntaxError that SILENTLY ADMITS — use `[<%N%>][0]` (measured)
+
+Script injection (`Javascript`/`Node` `Code`) is **textual**: `<%N%>` is replaced
+by the bound variable's JSON serialisation. A **null** value serialises to
+**empty**, so `var v=<%0%>;` becomes `var v=;` — a **`SyntaxError: Unexpected token
+';'`**. ⚠⚠ **The throw is CAPTURED, not fatal**: the instance still finishes
+`status 50`, and the script's Output is set to `{"error":{"errorMessage":
+"SyntaxError…"}}`. A lift doing `String(v.result)` on that yields `"[object
+Object]"`, and a Decisional comparing it to an expected token **defaults** — i.e. a
+guard reading a null-returning action **silently PROCEEDS**. Invisible to a
+two-signal check; a three-signal readout (verdict / which terminal fired by
+per-action status / output shape) exposes it.
+
+**Fix:** wrap every value-injecting placeholder as **`[<%0%>][0]`** — `undefined`
+on a null injection (valid JS), the whole value on a list/object — and make the
+lift **fail-closed on an `{error:…}` verdict**. Any node whose bound input can
+legitimately be null (e.g. `Split Workbook To CSV` on an empty workbook) needs
+this; an action that never returns null (e.g. `Extract Text`) does not — which is
+why a guard cloned from a never-null action breaks when re-pointed at a can-be-null
+one.
+
+## Reading a finished run's output values: `result.variable` is keyed BY the variable name (measured)
+
+`run-process-with-file` / synchronous `run-process` / `get-instance-output` return
+the finished instance's output values under **`result.variable`, a dict keyed by
+the variable NAME with the value inline** — e.g. `{"values_out":[{…row…},…],
+"gateway_out":{"result":"…"}}`. It is **not** a list of `{name,value}` records, so a
+walker searching for a `name`/`value` pair finds nothing and reports `null` for
+every output. ⚠ Read `result.variable[<varName>]` directly (a `Javascript` `Output`
+wraps as `{"result":…}`; a `Node` `Single Result` is bare — unwrap the former).
+Always send a **content control** through a probe: if the control's output also
+reads empty, the reader is broken, not the action.
 
 ## Deleting a node over the API: heal the edges yourself (`node-delete`)
 
@@ -4062,6 +5181,7 @@ Decode `e` before blaming the form: `datetime.fromtimestamp(e, UTC)`.
 **The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
 though they are valid and route normally. Worth knowing before using one as a test address.
 
+
 ## `datatype-add-attribute` on a store-backing model: reported destructive, NOT reproduced (B-048 cluster 4a)
 
 B-048 reported that `POST /api/DataTypes/attribute/{modelId}` on the data model a **data
@@ -4602,6 +5722,364 @@ What a form author can do, and it is only ever a reduction:
 The rest belongs upstream: a re-render scoped to the element that changed, and a way to set many
 values and render once, would remove the whole class of problem.
 
+
+
+## ⚠⚠ Processing-time BILLING is readable per-workspace and per-run — and the meter is not what you'd guess
+
+⚠ **Consumption is readable from any workspace (no admin):** `GET /api/Resources/used`
+(`get-resources-used`, permission `Workspace.Read`) returns `result.time.consumed` /
+`masterConsumed` (**milliseconds** of processing time spent, against a `limit.soft`/`hard`
+paid-time budget also in ms), plus `result.average.platform.{total, internal, external}` —
+the platform **already splits internal (action) time from external (Call-API) time**. It
+accepts `--startDate`/`--endDate`; the **no-window** call can read 0 while a same-day window
+shows the real spend, so pass an explicit window. So "billing can't be seen from a workspace"
+is FALSE.
+
+⚠ **Per-run, use the instance record, not the workspace budget:** `list-instances` →
+`pageItems[].timeConsumed` / `totalTimeConsumed` / `actionsConsumed` / `status`, and
+`GET /api/Resources/analytics/instances/{id}/details`
+(`get-resources-analytics-instances-by-id-details`) → per action
+`{actionName, totalRuns, totalTime, actionExecutionTime}`. ⚠⚠ **For a status-50 instance the
+per-instance `timeConsumed` equals the workspace `consumed`-delta EXACTLY** (verified against a
+0-ms ambient-drift floor), so `timeConsumed` IS the billed paid-time and is attributable per
+run. `get-projects-by-id-used` returned empty and `get-resources-analytics-processes` needs
+non-obvious params — prefer the instance path. A **failed (status 40)** instance bills
+`timeConsumed ≈ 0`.
+
+⚠⚠ **What the meter actually counts is surprising — prove it with a positive control:**
+- **In-script (`Node`) CPU is NOT metered.** A `Node` busy-looping real EE CPU billed a FLAT
+  ~4 ms whether it burned 3 s, 5 s, or 20 s (wall clock confirmed the burn). Billing
+  approximates a small **fixed per-action orchestration** cost (consistent with the "≈360k
+  actions per paid hour" framing), **not** CPU-ms. So a "0/near-0 ms" is "not billed", not
+  "meter asleep" — but confirm with a compute positive-control first.
+- **`Delay` is a SUSPEND → 0 billed.** `Start→Delay(period 30 s)→Stop` billed
+  `timeConsumed=0`, `actionsConsumed=0`, status 50 (33.5 s wall). The catalog description is
+  literal: *"suspends the execution"* — the executor is released, so nothing accrues. Same for
+  form/user-task human waits, idle schedules, API-rate-limit waits (the marketing "a 30-minute
+  approval costs milliseconds" is TRUE for this reason).
+- **`Call API` is a synchronous HOLD → billed by ROUND-TRIP WALL-TIME.** Its per-action
+  `actionExecutionTime` tracked the round-trip (181 ms for a ~200 ms round-trip; 7 ms for a
+  7 ms connect-fail) — NOT a fixed cost, unlike `Node`/`Delay`. The executor is kept on the
+  blocking I/O, so a slow external endpoint bills its wait. (A "N-seconds billed for a slow
+  call" figure elsewhere in the corpus is often the *external service's* elapsed latency
+  relabelled "billed" under this assumption — distinguish a meter read from a stopwatch read.)
+
+⚠ **Reconciliation to carry:** *suspend* (Delay / form-hold / schedule / rate-limit wait) = not
+billed; *synchronous hold* (`Call API` on a slow endpoint) = billed by wall-time. Both public
+and internal statements about "waits" are true — of different mechanisms.
+
+⚠ **Building a `Delay` or credential-less `Call API` via the friendly `process-create` spec:**
+`Delay value` is a composite and must be wrapped as a binding — `{"Delay value": {"value":
+{"value": "30", "interval": 1}}}` with `{"Delay Type": "1"}` (interval 1=Second … 7=Year).
+`Call API` credential is OPTIONAL (`Select REST API credentials` isRequired=false), but a
+**credential-less** `Call API` with a full URL in `Endpoint` FAILS AT BINDING at runtime
+(status 40, no per-action metering, ~3.5 s fixed fail-overhead — the request never fires); a
+real external call needs a credentialed base URL. `Endpoint` is a path relative to that base.
+
+⚠⚠ **Billed time is decided by a process's ACTION MIX, not by its input size — measured across four
+processes at 3 input sizes × 5 runs each.** Two regimes:
+- **Node + Decisional + Data-Store processes bill FLAT — independent of input size.** ~15–27 ms whether the
+  input carried 10 or 500 records (a ×20–50 data span → billed ×1.0–1.1). Consistent with the flat
+  per-action orchestration cost: in-script (`Node`) work over N rows is not metered, so looping more rows
+  inside one action adds no billed time.
+- **Processes with document-RENDERING actions (`HTML To PDF`, `Excel`/xlsx build) bill MORE as the output
+  document grows — sublinearly.** One 16-action file→Excel+PDF process billed 197 ms at 10 rows → 305 ms at
+  200 → 1,079 ms at 2,000 (size ×200 → billed ×5.5). These render actions do metered work proportional to
+  the document (like `Call API` wall-time, unlike `Node`); the fixed orchestration floor dominates at small
+  sizes, the rendering at large. So predict a process's billed cost from its action mix — which actions
+  render or hold I/O — not from input size alone.
+
+⚠ **On a SHARED workspace, read the per-instance `timeConsumed`, not the workspace `consumed`-delta.** The
+measured identity (`timeConsumed == consumed`-delta for a status-50 run) holds **only when the run's own bill
+dominates ambient noise**. With a concurrent session billing into the same workspace, the `consumed`-delta
+**over-reads** (it captures the neighbour's ms too): seen as delta 28–33 ms against a per-instance
+`timeConsumed` of 0–3 ms for the same tiny run, while a ~200 ms and a ~2,459 ms run matched their delta
+exactly. `list-instances → pageItems[].timeConsumed` is attributable to one instance id and is the figure
+to trust; the workspace delta is a quiet-window-only cross-check.
+
+⚠ **Running a process 403s if the account lacks DataStore-execute on a store the process touches.** A
+workspace-scoped **userpass owner** that runs pure-compute processes fine gets **HTTP 403 "Unauthorized"**
+on `POST /api/Projects/{id}/run` for a process whose flow references a data store it cannot execute against
+— the same account also 403s the REST row API (`POST /api/DataStore/{id}/rows/filter`). A **workspace-bound
+apikey** with the DataStore permission can run it, but such an apikey's authorization was observed to be
+**intermittent** (one success, then a run of 403s in the same session — an expired/rate-limited token).
+Measure store-touching processes with a credential that holds stable DataStore-execute, and read `/run`'s
+status, not the launch response.
+
+---
+
+## Data Store — the properties a product design rests on, re-measured end to end (2026-09-03)
+
+Everything below was measured live against throwaway stores and deleted afterwards. Where an
+existing note is contradicted, the contradiction is stated.
+
+### ⚠ A Data Store lives in EXACTLY ONE workspace. There is no master → sub inheritance.
+
+Measured in both directions with a principal that can cross workspaces (a userpass account — a
+workspace-bound **apikey answers 403 for any other workspaceid, which is a refusal of the KEY and
+proves nothing about the STORE**; do not read that 403 as a scoping answer):
+
+| store created in | visible from master | visible from a SIBLING sub | visible from its own ws |
+|---|---|---|---|
+| the **master** workspace | yes | **no — 404, absent from the listing** | yes |
+| a **sub**-workspace | **no — 404, absent from the listing** | **no — 404** | yes |
+
+`GET /api/DataStore/{id}` answers `404 "Data store not found."` from every workspace but the owner,
+and the resource itself carries `workspaceId`. **Per-entity isolation via sub-workspaces is
+therefore real**, and the converse — one store serving a master and its subs — is not expressible:
+it has to be replicated per workspace, or fronted by a mediated writer.
+
+⚠ **An id is NOT a global handle, and "the id exists here" is not an identity test.** A pack import
+PRESERVES the store id, so after importing a store into a second workspace the SAME id resolves in
+both — with different `workspaceId` and different contents (measured: 3 rows in the source, 0 in
+the import). Distinguish two stores by CONTENT, never by id.
+
+### ✅ Read AND write are credential-free. The native action has nowhere to put a credential.
+
+The `Data Store` action (`02577ada-0000-0100-0000-00000000a001`) exposes exactly three settings —
+`Select Data Store`, `Operation`, `Configure Operation` (side-panel) — and **no credential setting
+of any kind**. Discrimination control on the same catalogue: `Call API` carries `Select REST API
+credentials` and `Execute Query` carries `Select Database Server`, both `type: "credentials"`. So
+the absence is a property of this action, not of how it was read.
+
+Corroborated three ways: (1) every shipped store-binding pack does read *and* write through this one
+action (`SelectRows` including a filtered `Where`, and `InsertRows`) with `Credentials: 0`; (2) a
+live valid flow doing both has **104 `credentialsTemplateId` fields, all null**, and references no
+credential id in its workspace; (3) a live run of a minimal one-action writer inserted a row and
+returned status 50.
+
+⚠ **`Credentials: 0` in a pack is NOT by itself evidence** — `export` excludes credentials by
+default, so that section is empty even for a flow that needs one. Judge on the ACTION's setting list.
+
+⚠ Unchanged: a **batch** write (`POST .../rows` with a `Rows` array) is the REST API, reachable from
+a flow only through `Call API` — which does need a credential. Credential-free applies to the native
+row-at-a-time action.
+
+### Export carries SCHEMA ONLY. Rows never travel in a pack.
+
+`export --data-stores <id>` produces the usual top level (`DataTypes, Credentials, Webhooks,
+DocumentTemplates, Flows, Forms, DataStores, TimeStamp`); the `DataStores[]` entry has exactly these
+keys and no other:
+
+```
+Id, Name, Description, Columns[{ColumnId, Name, DataTypeId, IsList, IsPrimaryKey,
+                                IsRequired, IsSystemColumn}], DataTypeId
+```
+
+There is **no rows/data key at all**, and a store export also drags its backing data model into
+`DataTypes` (so a store-only selection reports `DataTypes: 1`). The four system columns are absent
+from the exported `Columns` and are re-appended by the target on create. On import the id and full
+schema are preserved and the store **arrives empty** — measured, with the source still holding rows.
+
+⚠ **Correction to the older note: a Data Store CAN be named in an export request**
+(`--data-stores` → `dataStoreIds`), and `DataStores` at top level is NOT always empty. The still-true
+half is that a flow referencing a store does not drag it along — name it, or the pack ships a
+dangling reference.
+
+**Seed rows ship out of band, and the supported route is the CSV job.** Measured round trip:
+`datastore-export-start` → `export-download` yields a CSV of the USER columns only (system columns
+excluded), and `datastore-import-start` on a twin store with the same schema lands every row
+faithfully, nulls included. ⚠ `import-failures` on a clean job answers **HTTP 409 "CSV import
+completed without failed rows."** — an error status for a success, so branch on the message.
+`datastore-from-json` is **schema inference only**: it derives columns from a JSON **object** (an
+array is refused: "The JSON content must be an object, not an array.") and seeds **zero rows**; it
+also infers a decimal as **Float**, not Double, so retype money columns after using it.
+
+### Creation, column types, and the duplicate-key contract
+
+- `POST /api/DataStore` needs only `Name` (missing → `1005 "A required value is missing."`).
+- ⚠ **The primary key is mandatory only when you SUPPLY `columns`.** A create carrying a columns
+  array with no `isPrimaryKey` is refused `400 "At least one column must be marked as a primary
+  key."`, but a create with **no `columns` key at all succeeds** and yields a store with the four
+  system columns and NO primary key. So "a store always has a PK" is false at the API.
+- Column types offered by the platform's primary set: **Boolean, Integer, Float, Double, String,
+  DateTime, Json, Object, Guid**. The typed schema (including a composite PK) persists on the POST.
+- `datastore-delete` **cascades to the backing data model** — after deleting a store its
+  `dataTypeId` answers `350 "Requested data type not found!"`. No orphan model to clean up.
+- **Duplicate primary key — confirmed at both layers.** REST: `409` +
+  `1006 "A row with the specified key already exists."`, and the batch is **all-or-nothing** (a
+  2-row batch with one new + one duplicate key wrote **neither**; count unchanged). In a flow: a
+  native `InsertRows` on a colliding key ends the instance at **status 40** with
+  `Duplicate key violation: "A row with the specified key already exists."` naming the action, the
+  affected-rows output null and the store unchanged; the same flow on a **fresh** key ends 50 with
+  affected 1. Run the fresh-key case first — without that positive control a 40 is unreadable.
+
+### Limits — measured, and the ones that are NOT what the flow-value figure suggests
+
+- ⚠ **The 32 KB figure does NOT apply to store values.** A `String` column accepts and returns
+  **65,535 bytes** exactly and refuses 65,536 with `502 "One or more values exceed the maximum
+  allowed length."` (32 KB is a Windows **argv** ceiling on passing a body as a CLI argument, a
+  different layer — call the client in process for large payloads.)
+- ⚠ **That ceiling is BYTES, not characters.** 32,767 two-byte characters (65,534 bytes) is
+  accepted; 32,768 of them (65,536 bytes) is refused. Size a text column in UTF-8 bytes.
+- A **`Json`** column is a different, much larger store: valid JSON of **16 MB** was written and read
+  back intact. ⚠ But it **normalises** what it stores — the JSON is re-serialised, so the bytes read
+  back are not the bytes written (a separator gains a space). Never hash a Json column's
+  round-tripped value. ⚠ And an **invalid-JSON string in a Json column fails with an opaque 502 "A
+  database error occurred"**, not a validation message — do not read that as a size limit.
+- ⚠ **The column ceiling is a per-row storage budget, not a column count.** Measured boundary for
+  **String** columns: **172 user columns succeed, 173 fails** (`1001 "A database error occurred
+  during the schema operation."`); `Json` fails at 173 the same way; but **300 Integer and 300
+  Boolean columns succeed**, while 1000 Integer fails. A wide table's real limit therefore depends on
+  the column TYPES, and the error names neither the limit nor the cause.
+- **No row-count ceiling met**: a single store was taken to **110,003 rows**. Batch inserts of
+  5,000 / 10,000 / 20,000 / 25,000 rows in one call all succeeded (2.7 MB, ~150 s at 25k), and a
+  3,000-row batch padded to 3.2 MB succeeded in 1.8 s — so **cost tracks ROW COUNT, not payload
+  bytes**. ⚠ One 25,000-row call failed fast with `1001 "Could not add rows to the data store."` and
+  the identical call **succeeded twice on retry**: that was a transient, not a ceiling. A single
+  failing sample does not establish a limit — re-run before recording one.
+
+
+## `Call Subprocess` cannot receive a File variable (2026-09-03)
+
+Attempting to pass a File-typed variable into a subprocess fails at run time, in the calling
+flow, with the target's variable named:
+
+```
+Error generating fileId for variable ImportLedgerFile:
+   Error parsing Infinity value. Path '', line 1, position 1..
+   (and, from a re-materialised file) Unexpected character encountered while parsing value: L.
+```
+
+Tried and failed, both ways:
+
+1. the caller's own uploaded File passed straight through;
+2. the file **re-materialised inside the calling flow** (`File To Base64` → `Base64 To File`)
+   so the object was created in that flow's own context — same failure, different parse
+   position, so it is not about where the file came from.
+
+The engine appears to JSON-parse the mapped value while staging a new `fileId` for the target,
+and a `FileDataModel` value does not survive that. Non-file inputs map fine.
+
+**Consequences.**
+
+- A "thin wrapper flow that prepares inputs and calls the real engine as a subprocess" does
+  **not** work when any of those inputs is a file. That is the natural shape for hiding
+  configuration from an end user, and it is unavailable.
+- You cannot drop the file inputs from the map to work around it: `process-edit` refuses the
+  save with designer errors, because a subprocess call must map every REQUIRED input of its
+  target.
+- **`Call Subprocess` appears in none of the process packs shipped so far**, so there is no
+  prior art either contradicting this or to lean on. Treat subprocess composition as
+  unproven ground generally, not just for files.
+
+**What to do instead** when an input must be supplied without the user providing it: change the
+consuming flow so the value is optional and defaulted in place (a Decisional that branches
+around the native encode, since a native File action rejects null — see
+`PROCESIO-NODE-CODE-NOTES.md` §6), rather than composing two flows.
+
+## Multi-tenancy on one master: measured behaviour (2026-09-16)
+
+Measured on a Business (processing-time) master with a pack of throwaway entities (process
+with a Node + a Call API through a named REST credential, a CPU-burn process, data model,
+document, webhook, private draft form, disabled schedule) exported from one sub-workspace
+and imported over the API into two empty sibling sub-workspaces. Everything was deleted
+afterwards. Read these as rules about the platform, not about that pack.
+
+### What an API import carries, and what it leaves behind
+
+| entity | after `import` into a sibling sub-workspace |
+|---|---|
+| processes | land with the **same ids**, active and valid; `createdOn` is the import time |
+| data models, documents | land with the same ids |
+| form | lands with the same id; **`isPrivate`, draft status and disabled state survive** |
+| credential (named in the export, secrets off) | lands with the same id and its **non-secret properties** (URL, option GUIDs); each workspace then holds an **independent** copy |
+| webhook **entity** | ⚠ **NOT imported** (the manager's webhook flag is hard-coded off) — `GET` in the target answers 400 / statusCode 502 target `webhook` |
+| webhook **binding** inside the flow | ⚠ **arrives anyway**, pointing at the SOURCE workspace's webhook id |
+| schedule | ⚠ **not in the pack at all** (no section) — recreate per workspace |
+
+⚠ **The dangling binding does not cross tenants.** Firing the source webhook id through the
+anonymous `api/Webhooks/launch/{id}` ran only the source workspace's bound process; the
+imported copies that carried the same binding did not start. A target needs its own webhook
+(new id, new address) created and bound before its copy can be triggered.
+
+### A credential id resolves inside the executing workspace
+
+With the same credential id present in three workspaces and a different URL edited into each
+copy, each workspace's run of the same process id called its own URL (verified through an
+echo endpoint). Per-tenant configuration therefore lives in the tenant's credential copy, and
+the process definition can stay identical.
+
+### Re-importing an updated pack: what `overrideData` really does
+
+| import | measured result |
+|---|---|
+| `overrideData=true`, credentials included | process updated **in place** (same id, `createdOn` kept, `updatedOn` bumped, run history kept) — ⚠⚠ **and the tenant's edited credential is RESET to the pack's value** |
+| `overrideData=false` | ⚠ **200 and nothing changes** — existing entities are skipped silently, no duplicates, no warning |
+| `overrideData=true` + `--no-credentials` | process updated in place **and the tenant's credential is preserved** |
+
+**Rule:** ship updates to existing tenants with override on and every tenant-owned entity type
+excluded (at least `--no-credentials`), then verify by reading `updatedOn` and content in each
+tenant. Never judge an import by its 200: an override-off import "succeeds" while doing nothing.
+
+### No version field, but each run keeps the definition it executed
+
+Neither a process nor an instance carries a version number. The instance status body does
+carry a snapshot of the action parameters as executed (a marker string changed between two
+imports appeared in the older run's snapshot and not the newer one's). To tell which build a
+tenant ran, compare that snapshot or stamp a build marker into an output; to tell copies apart,
+only `workspaceId` and `updatedOn` differ.
+
+### Workspace scoping of ids, instances, credentials and files
+
+With one id present in several workspaces, every read answered from the workspace in the
+header, and a delete removed only that workspace's copy. Crossed reads, each with a passing
+same-workspace control:
+
+| read | crossed answer |
+|---|---|
+| process that exists only in another workspace | 400, statusCode 501 "User is not authorized for the requested resource." |
+| instance status of another workspace's run (same template id) | 400, statusCode 450 "Database requested information not found." |
+| credential that exists only in another workspace | 400, statusCode 450 |
+| `GET /api/File/download` of another workspace's run file (owner with the other header, or a key minted in the other workspace) | 400 wrapping "403 (Forbidden)" |
+| same file through `[AllowAnonymous]` `GET /api/FormProcess/download`, no auth | 400 (all headers) / 400 statusCode 502 (path only) — refused for a process-run file; a public-form run file was NOT tested |
+| a workspace API key with another workspace's header | 403 `Unauthorized` (projects, sub-workspace list, usage, subscriptions) |
+
+⚠ **But `GET /api/Workspaces` with a workspace-scoped key lists every workspace the key's
+OWNER can see** — names, ids and the master. A key minted by a master owner and handed to a
+tenant discloses the names of every sibling tenant, even though it can read none of them.
+
+⚠ **Tenant-visible metadata carries the master's name.** The form template body's
+`workspaceName` (and an instance's) reads `<master workspace name>/<sub-workspace name>`.
+
+### Capacity and consumption are pooled at the master
+
+- A burst of nine 10-second CPU-bound runs queued **identically** whether all nine were in one
+  sub-workspace or three were in each of three: seven started at once, the other two were
+  released **one at a time** (waits of about 10 s and 20 s). The ceiling is shared across the
+  sub-workspaces; a sub-workspace does not get its own pool, and one tenant's burst delays the
+  others. Whether the ceiling is the master's or the cluster's was not established.
+- `GET /api/Resources/used` in a sub-workspace shows that sub-workspace's `consumed`, the pool's
+  `masterConsumed`, and the **master's** limit — there is no per-sub-workspace limit field.
+- `GET /api/Resources/used/subWorkspaces` at **master** scope returns one row per sub-workspace
+  (`timeConsumed` as a string of ms, removed sub-workspaces included) and the rows sum
+  **exactly** to the master's `consumed`; at sub-workspace scope it returns `[]`; with a
+  workspace API key at master scope, 403.
+- ⚠ **Both usage endpoints behave as MONTH buckets, not as date windows.** A window of one
+  day, of the last hour, or of the whole month to date all returned the same month-to-date
+  figures; a window of a past month returned that month's totals; a window spanning several
+  months (January to August) returned **0 everywhere**. Query one calendar month at a time.
+- `GET /api/Subscriptions` returns the plan row on the master and `[]` on a sub-workspace.
+- `GET /api/analytics/executionEnvironment/topProcesses` returned `[]` at both scopes despite
+  consumption in the window; `…/concurrency` with the documented headers answered 400 /
+  statusCode 502 target `workspaceId`.
+
+### Deleting a process does not delete its run files
+
+After the owning process was deleted, a run's uploaded file was still downloadable.
+`DELETE /api/Projects/instances/{id}/dataRetention?flowTemplateId=<process>` answered 200
+"Delete process instance data complete." and the file then refused from both the live and the
+archived store; the instance row itself remains. Tenant off-boarding and erasure need that
+per-instance purge (or a retention setting in force beforehand), not just entity deletion.
+
+### A PROCESIO-published app tile appears in every workspace
+
+`GET /api/FormApplication/all` in every workspace checked returned one tile with
+`isProcesio: true`, owned by a PROCESIO workspace, described as importing pre-configured
+processes. `GET /api/FormApplication/{id}` for it answered 500 NRE. It is a vendor distribution
+surface that copies by import; nothing observed lets a workspace owner publish such a tile.
+
+
 ## Repointing an event-driven flow, and renaming a duplicate (variable-set-default / process-rename)
 
 Two surgical actions on the same safe pipeline as node-set-param (fetch flow -> patch in place ->
@@ -4613,8 +6091,13 @@ written). Both live in handlers/nodeparams.py with pure logic in flowmodel/nodep
   placeholder, so the literal id appears ONLY on the variable, and none of the node-* tools reach it
   (they sweep node params/settings). Changing which resource the flow acts on - a calendar event id,
   a folder, a base url - is therefore a variable-default edit: `variable-set-default --variable X
-  --value ...` (`--json` for a non-string default). It is NOT a contract change (unlike retyping),
-  so it is allowed on input/output variables too. There is no desired-state rebuild involved, which
+  --value ...` (`--json` for a non-string default). On a PROCESS (20) variable that is a free
+  edit. On an INPUT/OUTPUT variable it is gated behind `--allow-contract-change`: the signature
+  is unchanged, but the default is what a run uses when the caller supplies NOTHING, so moving
+  it changes behaviour for every caller that omits the field. `--clear` removes a default and is
+  gated the same way. (Both readings were argued independently - 'a default is only a fallback'
+  vs 'a fallback IS the behaviour when the caller is silent'; the gated one shipped, and the
+  ungated edit stays one flag away.) There is no desired-state rebuild involved, which
   matters because a full process-edit rebuild risks corrupting structured settings (decisional-case,
   extract/map params, a Call API body) the config round-trip does not preserve.
 
@@ -4777,3 +6260,262 @@ Offline audit path that works: `request GET /api/Projects/<id>` per process +
 `form-get` / `form-get-code` per form into a folder, then `flow-digest --in <dir> --out …
 --names names.json` and `form-digest --in <forms> --processes <dir> --out …` — readable
 Markdown with variables, SQL, scripts and the form↔process maps resolved to names.
+
+## A resource delete can outlive the client timeout and still succeed
+
+Deleting a process that has accumulated a large run history takes longer server-side than the
+client's 60-second read timeout, so the call returns
+`HTTPSConnectionPool(...): Read timed out` while the delete goes on to complete. Retrying then
+returns the same timeout, which reads like a permanent failure and is not one.
+
+**Never conclude a delete failed from the transport error: LIST the resource and look.** The same
+applies to any long-running write here. Deletes of credentials and Data Stores, which carry no
+instance history, return promptly - it is the history that costs the time.
+
+## Transport import PRESERVES resource ids across workspaces (measured 2026-09-22)
+
+Importing a `.procesio` bundle into a **different** workspace does not mint new
+ids. A data store exported from workspace A and imported into workspace B keeps
+its original GUID, and so does a process. After the import the same id exists in
+both workspaces.
+
+That is convenient and it is a trap:
+
+- **A rebind that only remaps store ids does nothing**, because the ids are
+  already identical on both sides. It looks like it worked.
+- **What actually routes the call is the `workspaceid` HTTP header.** A `Call API`
+  action against a data store carries the store id in the URL and the workspace
+  in a header:
+
+  ```
+  Parameters[2].Value                     /api/DataStore/<storeId>/rows/filter?...
+  Parameters[3].Value.headers[n]          {"key": "workspaceid", "value": "<workspaceId>"}
+  ```
+
+- So a process imported into workspace B, **without** rewriting that header,
+  reads workspace A's data. A copy deployed for testing silently reads
+  production. Nothing errors: the id resolves, the header is valid, the rows
+  come back.
+
+⚠ The header appears **twice** per action — once in `Parameters` (runtime) and
+once mirrored under `CustomData.configuration[].settings[].value[]` (the designer
+layer). Rewriting only the first leaves the designer disagreeing with the
+runtime, which survives a save and reappears on the next edit.
+
+**So when moving a process between workspaces, the thing to re-point is the
+workspace header, not the resource ids.** Verify by exporting the target
+afterwards and reading the header back — the import response is an empty body and
+proves nothing.
+
+Related: a data-store export through Transport carries **schema only, no rows**
+(measured: a 49-row store exported as 7,404 bytes of column definitions). Rows
+move separately via `datastore-export-start` -> `datastore-export-download` ->
+`datastore-import-start`, and the import job reports a jobId rather than a row
+count, so confirm by counting rows on the target.
+
+## Data-store access control is per WORKSPACE, never per store (measured 2026-09-22)
+
+Permissions are granted as `<entity type> -> <role>`, and the data-store entities
+are **types**, not instances:
+
+```
+Data Store Schema    DataStoreSchema
+Data Store Rows      DataStoreRows
+```
+
+So a key holding `Data Store Rows: Write` in a workspace can write **every store
+in that workspace**. There is no per-store grant to make, and
+`datastore-list-restricted` does not help: it means "the stores this caller is
+restricted to" in the sense of *its workspace*, and it returns all of them (a key
+scoped to a 4-store workspace lists all 4).
+
+Measured on two keys in separate workspaces:
+
+```
+key A -> its own workspace, store it owns        READ OK
+key A -> workspace B, a store there              DENIED 403
+key B -> workspace A, a store there              DENIED 403
+one key -> both stores co-located in ONE space   READ OK, both
+```
+
+⚠ **The consequence for design: if two datasets must be writable by different
+identities, they must live in different WORKSPACES.** Co-locating them and
+issuing two keys does not separate them — both keys carry the workspace-wide
+role. A topology that relies on "this service cannot write that store" is only
+enforced by the workspace boundary.
+
+Least privilege *within* a workspace is still available across entity types
+(a key can hold `Data Store Rows: Write` with `Data Store Schema: None`, so it
+can write rows but not alter schemas) — just not between two stores of the same
+type.
+
+## ⚠ Importing `tools.procesio.main` as a library RE-EXECUTES the CLI (measured 2026-09-22)
+
+`main.py` carries a venv re-exec preamble that runs **at import time**, before
+the `if __name__ == "__main__"` guard is ever reached:
+
+```python
+if _VENV_PY.exists() and Path(sys.executable).resolve() != _VENV_PY.resolve():
+    sys.exit(subprocess.run([str(_VENV_PY), __file__, *sys.argv[1:]]).returncode)
+```
+
+So `from tools.procesio.main import dispatch`, run under ANY interpreter that is
+not the framework `.venv` — a second venv, the system Python, a tool's own
+environment — spawns the CLI as a subprocess with **the importing script's own
+argv forwarded**, then `sys.exit()`s the importing process.
+
+**The two failure shapes, and the second one is the dangerous one:**
+
+| the caller's argv | what happens |
+|---|---|
+| has arguments | the child reports `unknown action: <your first argument>` and exits non-zero |
+| is empty | the child prints the action list to stderr and exits **0** — so the caller looks like it SUCCEEDED and silently did nothing |
+
+The empty-argv case is why this can sit unnoticed: a provisioning or rebinding
+script that imports the tool, takes no CLI arguments and edits a credential
+will report success and never have run. Blanking `sys.argv` before the import
+does not help — it converts the loud shape into the silent one.
+
+**The rule: a script that imports a framework tool as a library must assert its
+interpreter before the import**, because after the import there is no process
+left to assert in:
+
+```python
+_VENV = Path(r'C:\AAT\.venv\Scripts\python.exe')
+if _VENV.exists() and Path(sys.executable).resolve() != _VENV.resolve():
+    raise SystemExit('run this with %s' % _VENV)
+from tools.procesio.main import dispatch
+```
+
+The general form: **a module whose import has a side effect on the process
+cannot be imported defensively.** Any preamble that may `sys.exit`, re-exec or
+mutate global state belongs behind a function the caller invokes, not at module
+scope — and where it already exists, every library consumer has to guard for it.
+
+## A save can be refused by a limit the action's own metadata says is legal
+
+`POST /api/Projects/validate` runs before every `process-edit`,
+`variable-set-default`, `node-set-param` and the other surgical writers. It can
+enforce a range that **disagrees with the range the action declares about
+itself**. Seen on the `Timeout` parameter of the JavaScript action:
+
+| source | allowed range |
+|---|---|
+| the parameter's own `limits` in the flow, and its designer tooltip | `{"min": 60, "max": 300}` |
+| the validator, at save time | `[10, 180]` |
+
+A process carrying `Timeout: 300` is therefore legal by the designer contract
+and unsaveable by the validator. Every surgical write to it is refused — **and
+the process keeps running**, because it was created by a route that does not run
+this validator.
+
+⚠ **The consequence is not "one parameter is annoying".** A single
+out-of-range value anywhere in the flow blocks *every* subsequent surgical edit
+to that process, including edits to unrelated variables and nodes. The error
+names the parameter, not the node, and is repeated once per offending node, so
+six identical lines mean six nodes rather than six problems.
+
+**Routes out, in order of preference:**
+
+1. `import` (`POST /api/Transport/import`) does **not** run this validator, so
+   it deploys a bundle the surgical writers would refuse. This is the route to
+   use when the out-of-range value is deliberate — a model-inference call that
+   genuinely needs longer than the validator's ceiling.
+2. Bring the value inside the validator's range, **only** when the shorter limit
+   is actually acceptable at runtime. Lowering a timeout to satisfy a save is a
+   runtime behaviour change dressed as a formality.
+
+⚠ **`import` returns an EMPTY body on success** (`{"imported": true, "result":
+{"raw_text": ""}}`), so it carries no evidence of what it did. Re-export and
+compare; never treat `imported: true` as proof.
+
+## ⚠ `changed` is the intent, `put` is the outcome
+
+The surgical writers return both, and they answer different questions:
+
+```json
+{"changed": true, "isValid": false, "put": false, "errors": [...]}
+```
+
+`changed: true` means *the value you passed differs from the stored one*. It is
+computed before the write is attempted and stays `true` on a refused save.
+`put` is whether the PUT was actually sent. A write refused by validation
+reports exactly the above — a truthful record that reads, at a glance, like
+success.
+
+**Check `put`, then re-read the resource.** The tool reports the refusal
+honestly; reading `changed` and stopping is how a refused write gets recorded as
+a deployment. The generalisation beyond this API: **when a result carries both
+a field describing what was requested and a field describing what happened, the
+one that looks like a success flag is usually the former.**
+
+## Variable substitution into a script is LITERAL, and a json variable IS the escaping mechanism (2026-09-23)
+
+A `Node`'s Code, a `Map Data` row's `source.value` and a `Call API` body are all
+templates carrying `<%N%>` placeholders, and the engine substitutes the
+variable's value into them **as raw text, unquoted, for every data type**. There
+is no escaping step.
+
+So a TEXT variable holding free-form user input cannot be read by a script:
+
+```js
+var t = <%0%>;            // value "Contact Ion Popescu" -> var t = Contact Ion Popescu;
+```
+
+fails with `Unexpected identifier 'Ion'`. A text variable is only safe in a
+script when its values are themselves valid JS literals — which is why
+`String(<%3%>) !== 'false'` works for a flag holding `true`/`false` and would
+break the moment that variable held a word.
+
+⚠ **The run still reports `status: 50` and `error: []`.** The node writes its
+exception into its error-port variable and the flow carries on, so a broken
+script looks exactly like a clean run from the outside. Assert on an OUTPUT
+value, never on the status.
+
+**The working pattern, and why it is the pattern.** Declare the input as
+**json** and pass an OBJECT. The engine serialises it to JSON text, and JSON
+text pasted into a script is a valid object literal with the string contents
+already escaped:
+
+```js
+var t = [<%0%>][0];       // value {"v":"Contact \"Ion\"…"} -> a valid JS object
+```
+
+The json wrapper is not a convention or a quirk — it is the only escaping
+mechanism available. The caller doing the serialising (an SDK, `json.dumps`,
+`JSON.stringify`) is what makes the text safe.
+
+⚠ **Substitution is SINGLE-PASS.** Text containing `<%0%>` or `<%99%>` arrives
+as literal characters and is not expanded, so a value cannot reach a second
+substitution and read another variable. Measured across nine hostile inputs
+(quotes, newlines, backslashes, `}; var x = 1; {`, `][0]`, placeholder text,
+astral-plane emoji, RTL). Worth re-measuring after an engine upgrade, because
+the whole safety of passing untrusted text rests on it.
+
+### Consequence: a form field cannot feed a json-typed process input
+
+A form control produces a plain string. Mapping it to a json process variable
+passes that string raw, and every downstream script breaks. On-platform
+construction of the object is not available either — each route was tried:
+
+| route | why it does not work |
+|---|---|
+| a `Node` that builds the object | reads the text variable → literal substitution → breaks |
+| `Map Data` | its `source.value` is a string template with the same substitution |
+| `Call Subprocess` input row | the parent side must be a PLAIN VARIABLE; a structure or an attribute path lands a value the designer rejects |
+| `Call API` body | the placeholder occupies a whole leaf, so it passes a value through but cannot compose one |
+
+**What works: serialise in the browser.** A `RUN_JAVASCRIPT` step placed first
+in the control's own click chain writes `JSON.stringify(payload)` into a hidden
+field, and the `RUN_PROCESS` step maps that field to the json input. The
+browser's `JSON.stringify` is real serialisation, so what the platform then
+pastes is always valid. Anything the page asserts in that payload (a tenant or
+account id) is CLIENT-SUPPLIED and must be treated as such.
+
+⚠ **A structured `source.value` on a subprocess row also diverges the two
+layers.** The designer row is derived from the FIRST entry of the row's inline
+`variable` array, so a hand-built structure shows in the designer as a plain
+variable mapping while the runtime sends something else — and the next person
+who opens the designer and saves silently reverts it. Runtime and designer
+layers that disagree are worse than a missing feature, because the divergence
+is invisible until a save destroys it.

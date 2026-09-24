@@ -285,20 +285,218 @@ def set_variable_type(flow: dict, var: dict, data_type: str, *,
             "direction": VAR_DIRECTION.get(direction, direction)}
 
 
-def set_variable_default(flow: dict, var: dict, value) -> dict:
-    """Set one flow variable's defaultValue in place. Returns {changed, before, after}.
 
-    A variable default lives only on the variable ({..., defaultValue}); it has no designer
-    customData mirror, so unlike a node parameter this needs no normalizer pass. A process (20)
-    variable's default IS its initial runtime value, so repointing an event-driven flow at a new
-    resource (a calendar event id, a folder, a base url) is exactly this edit. Left free for input
-    (10) variables too: there the default is only a fallback used when the caller omits the value.
+def set_variable_required(flow: dict, var: dict, required: bool, *,
+                          allow_contract_change: bool = False) -> dict:
+    """Set one INPUT variable's `isRequired` flag in place. Returns {changed, before, after}.
+
+    Only an input (10) variable has a caller-supplied value, so `isRequired` is meaningless
+    anywhere else and setting it there is refused rather than silently written.
+
+    The two directions are NOT symmetric, and only one of them is guarded:
+
+    * **Clearing** it (required -> optional) can never break an existing caller: every payload
+      that was valid before is still valid. It is allowed outright.
+    * **Setting** it (optional -> required) tightens the public contract and breaks every caller
+      that legitimately omitted the field, so it needs `allow_contract_change`.
+
+    Clearing the flag is safe for CALLERS but not automatically safe for the FLOW: a Node body
+    that injects the variable through a bare raw placeholder (`var f = <%6%>;`) becomes
+    `var f = ;` -- a SyntaxError -- the first time the value is genuinely absent. Guard such an
+    injection as `[<%6%>][0]` (which yields `undefined`) BEFORE clearing the flag. This function
+    cannot see into node bodies, so it cannot check that for you.
     """
-    before = var.get("defaultValue")
-    var["defaultValue"] = value
-    after = var.get("defaultValue")
+    direction = var.get("type")
+    if direction != 10:
+        raise ValueError(
+            f"'{var.get('name')}' is a {VAR_DIRECTION.get(direction, direction)} variable - only an "
+            f"input variable carries a caller-supplied value, so isRequired means nothing on it")
+    required = bool(required)
+    before = {"isRequired": var.get("isRequired")}
+    if required and not before["isRequired"] and not allow_contract_change:
+        raise ValueError(
+            f"making input '{var.get('name')}' required tightens the process's public contract and "
+            f"breaks every caller that omits it. Pass --allow-contract-change if that is intended")
+    var["isRequired"] = required
+    after = {"isRequired": var.get("isRequired")}
     return {"changed": before != after, "before": before, "after": after,
-            "direction": VAR_DIRECTION.get(var.get("type"), var.get("type"))}
+            "direction": VAR_DIRECTION.get(direction, direction)}
+
+
+
+VAR_DIRECTION_BY_NAME = {"input": 10, "process": 20, "output": 30}
+
+_DATATYPE_ALIASES = {
+    "boolean": "0317bfee-b2f5-4bde-bfe8-121212121210",
+    "integer": "0317bfee-b2f5-4bde-bfe8-121212121211",
+    "float":   "0317bfee-b2f5-4bde-bfe8-121212121212",
+    "double":  "0317bfee-b2f5-4bde-bfe8-121212121213",
+    "string":  "0317bfee-b2f5-4bde-bfe8-121212121214",
+    "date":    "0317bfee-b2f5-4bde-bfe8-121212121215",
+    "time":    "0317bfee-b2f5-4bde-bfe8-121212121217",
+    "datetime":"0317bfee-b2f5-4bde-bfe8-121212121218",
+    "guid":    "0317bfee-b2f5-4bde-bfe8-121212121222",
+    "json":    "0317bfee-b2f5-4bde-bfe8-121212121220",
+    "object":  "0317bfee-b2f5-4bde-bfe8-121212121221",
+    "file":    "10c6ac59-3929-49e6-99dc-121212121219",
+}
+
+
+def resolve_data_type(spec: str) -> str:
+    """A friendly alias ('string', 'file') or a data-type GUID -> the GUID."""
+    key = str(spec or "").strip().lower()
+    if key in _DATATYPE_ALIASES:
+        return _DATATYPE_ALIASES[key]
+    if "-" in str(spec):
+        return str(spec).strip()
+    raise ValueError(
+        f"unknown data type {spec!r}; use a GUID or one of: {', '.join(sorted(_DATATYPE_ALIASES))}")
+
+
+def add_variable(flow: dict, name: str, data_type: str, direction: str, *,
+                 is_list: bool = False, default_value=None, is_required: bool = False,
+                 new_id: str | None = None) -> dict:
+    """Append one variable to a flow in place. Returns the variable that was added.
+
+    A flow's variables are addressed BY ID everywhere else - node parameter binds, a form's
+    input/output maps - so adding one is safe for existing wiring in a way that renaming or
+    retyping is not: nothing can already point at an id that did not exist.
+
+    Refused rather than guessed:
+    * a duplicate NAME, even though the platform keys on id. Two variables sharing a name make
+      every later name-based lookup ambiguous, and the form-event tooling resolves names to ids.
+    * an unknown direction. 10/20/30 are input/process/output; a variable with no direction is
+      not addressable from either the run payload or the response.
+    """
+    import uuid as _uuid
+
+    nm = str(name or "").strip()
+    if not nm:
+        raise ValueError("a variable needs a name")
+    dirn = str(direction or "").strip().lower()
+    if dirn not in VAR_DIRECTION_BY_NAME:
+        raise ValueError(f"direction must be one of input, process, output - got {direction!r}")
+    for v in flow.get("variables") or []:
+        if str(v.get("name")) == nm:
+            raise ValueError(f"a variable named {nm!r} already exists in this flow "
+                             f"(id {v.get('id')}); pick another name")
+    var = {
+        "id": new_id or str(_uuid.uuid4()),
+        "contextId": None,
+        "dataType": resolve_data_type(data_type),
+        "type": VAR_DIRECTION_BY_NAME[dirn],
+        "name": nm,
+        "defaultValue": default_value,
+        "isList": bool(is_list),
+        "isError": False,
+        "isRequired": bool(is_required),
+    }
+    flow.setdefault("variables", []).append(var)
+    return var
+
+
+
+def set_variable_default(flow: dict, var: dict, default_value, *,
+                         allow_contract_change: bool = False) -> dict:
+    """Set one variable's `defaultValue` in place. Returns {changed, before, after}.
+
+    This is how an input stops being something the caller must supply. Verified on a File
+    variable: a run that omits it entirely still receives the object, and the platform
+    RE-STAGES the referenced file into the calling flow's own instance path. So a value a user
+    should never have to provide - a configuration, a reference table, an empty placeholder -
+    can be set once by an admin and then simply is not a field on anyone's form.
+
+    Two cautions, both learned rather than assumed:
+
+    * A File default carries a `path` pointing into some flow instance's storage. If that
+      instance is cleaned up - data retention is per-flow and finite - the default becomes a
+      dangling reference. Stamp defaults from a file whose lifetime you control, and re-check
+      after any retention change.
+    * Changing an input's default changes what a run does when the caller says nothing. That
+      is a contract change in every sense that matters, even though the signature is unchanged,
+      so an input/output variable needs `allow_contract_change`.
+    """
+    direction = var.get("type")
+    if direction in (10, 30) and not allow_contract_change:
+        raise ValueError(
+            f"'{var.get('name')}' is an {VAR_DIRECTION.get(direction)} variable - changing its "
+            f"default changes what a run does when the caller supplies nothing. Pass "
+            f"--allow-contract-change if that is intended")
+    before = {"defaultValue": var.get("defaultValue")}
+    var["defaultValue"] = default_value
+    after = {"defaultValue": var.get("defaultValue")}
+    return {"changed": before != after, "before": before, "after": after,
+            "direction": VAR_DIRECTION.get(direction, direction)}
+
+
+
+def _camel(key: str) -> str:
+    """`TabPropertyId` -> `tabPropertyId`. The DTO builder emits PascalCase (the CREATE shape);
+    a flow read back from the API is camelCase. Splicing one into the other without this is the
+    silent-corruption case: the API accepts both, the designer renders neither consistently."""
+    return key[:1].lower() + key[1:] if key else key
+
+
+def to_live_action(dto: dict) -> dict:
+    """Convert a builder ActionDto (PascalCase) into the camelCase shape a LIVE flow carries.
+
+    Only the top level and the `parameters` rows need it - `customData` is already authored in
+    the live casing by the builder, and its `configuration` tree is copied from the template.
+    """
+    out = {}
+    for k, v in dto.items():
+        ck = _camel(k)
+        if ck == "parameters" and isinstance(v, list):
+            out[ck] = [{_camel(pk): pv for pk, pv in row.items()} if isinstance(row, dict) else row
+                       for row in v]
+        elif ck == "ports" and isinstance(v, list):
+            out[ck] = [{_camel(pk): pv for pk, pv in row.items()} if isinstance(row, dict) else row
+                       for row in v]
+        else:
+            out[ck] = v
+    return out
+
+
+def insert_node(flow: dict, after: dict, action: dict) -> tuple[bool, str]:
+    """Splice one already-built action into a flow immediately AFTER `after`, in place.
+
+    Ports live on the SOURCE action and carry `destinationId`, so an insertion is two edits and
+    not one: the new node gets a port to whatever `after` pointed at, and `after`'s own outgoing
+    port is repointed at the new node. Do only the first and the new node is unreachable; do only
+    the second and the tail of the flow is orphaned. Both failures validate.
+
+    Refused rather than guessed: an anchor with more than one outgoing port (which branch the new
+    node belongs on is a design decision), and an anchor that is not in this flow.
+    """
+    actions = flow.get("actions") or []
+    anchor_id = after.get("id")
+    if not any(a.get("id") == anchor_id for a in actions):
+        return False, "anchor %r is not in this flow" % (after.get("actionName") or anchor_id)
+
+    outgoing = [p for p in after.get("ports") or []
+                if p.get("sourceId") == anchor_id and p.get("destinationId")]
+    if len(outgoing) > 1:
+        return False, ("anchor %r has %d outgoing ports - which branch the new node belongs on is a "
+                       "design decision, so wire it explicitly instead"
+                       % (after.get("actionName"), len(outgoing)))
+
+    new_id = action.get("id")
+    successor = outgoing[0]["destinationId"] if outgoing else None
+    action.setdefault("ports", [])
+    if successor:
+        action["ports"].append({
+            "id": str(__import__("uuid").uuid4()), "flowId": flow.get("id"),
+            "sourceId": new_id, "destinationId": successor,
+            "type": 0, "state": 1, "data": {}, "errors": {}, "config": {}})
+        outgoing[0]["destinationId"] = new_id
+        tail = "between %r and its successor" % (after.get("actionName"),)
+    else:
+        tail = "after %r, which had no successor" % (after.get("actionName"),)
+
+    actions.append(action)
+    flow["actions"] = actions
+    return True, "inserted %r (%s) %s" % (action.get("actionName"),
+                                          action.get("actionTemplateName"), tail)
 
 
 def set_process_title(flow: dict, title: str) -> dict:

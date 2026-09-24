@@ -65,6 +65,94 @@ def test_nested_foreach_rejected():
         pb.build(cfg, _ctx())
 
 
+# -- template default-valued OUTPUT slots (For Each hang) --
+# A For Each built from the compact config must carry the two runtime-written output
+# slots the designer materialises — `Zero based list index` (61724e="-1") and
+# `Action start time` (808b0d=the 2010 sentinel) — or the loop iterates its body ZERO
+# times and times out. The builder is binding-driven and used to drop them; it now
+# materialises any `direction:2 / type:ignore` template setting carrying a scalar
+# default that no binding supplied.
+FE_IDX = "99e8766d-d6be-4948-8f57-1f141f61724e"      # Zero based list index -> "-1"
+FE_START = "9d2d3483-f04b-48ac-9dea-2ef7ae808b0d"    # Action start time -> 2010-... sentinel
+
+
+def _params_by_id(action):
+    return {p["TabPropertyId"]: p for p in action["Parameters"]}
+
+
+def test_foreach_materialises_template_default_outputs():
+    cfg = {"title": "loop", "variables": [
+        {"name": "items", "type": "string", "direction": "process", "isList": True},
+        {"name": "cur", "type": "string", "direction": "process"}],
+        "actions": [
+        {"id": "loop", "action": "For Each", "name": "loop",
+         "params": {"In List": {"var": "items"}, "For Each Item": {"var": "cur"},
+                    "Action timeout": 120}},
+        {"id": "body", "action": "Map Data", "name": "body", "parent": "loop"}]}
+    loop = _by_cid(pb.build(cfg, _ctx()))["loop"]
+    P = _params_by_id(loop)
+    # the three bound params AND the two template-default outputs = 5 total
+    assert len(loop["Parameters"]) == 5
+    assert FE_IDX in P and P[FE_IDX]["Value"] == "-1" and P[FE_IDX]["Variable"] == []
+    assert FE_START in P and str(P[FE_START]["Value"]).startswith("2010-01-01T00:00:00")
+    assert P[FE_START]["Variable"] == []
+
+
+def test_foreach_default_outputs_are_append_only():
+    """The materialised outputs are APPENDED after the bound params; the bound
+    params keep their identity and order (a transform, not a rewrite)."""
+    cfg = {"title": "loop", "variables": [
+        {"name": "items", "type": "string", "direction": "process", "isList": True},
+        {"name": "cur", "type": "string", "direction": "process"}],
+        "actions": [{"id": "loop", "action": "For Each", "name": "loop",
+                     "params": {"In List": {"var": "items"}, "For Each Item": {"var": "cur"},
+                                "Action timeout": 120}}]}
+    loop = _by_cid(pb.build(cfg, _ctx()))["loop"]
+    ids = [p["TabPropertyId"] for p in loop["Parameters"]]
+    # the two materialised slots come LAST, after the three bound ones
+    assert ids[-2:] == [FE_IDX, FE_START] or set(ids[-2:]) == {FE_IDX, FE_START}
+    assert ids.index(FE_IDX) >= 3 and ids.index(FE_START) >= 3
+
+
+def test_paramless_foreach_still_gets_the_two_outputs():
+    """Even a For Each the config binds nothing on (empty params -> the early
+    return in _action_parameters) still receives the two template defaults."""
+    cfg = {"title": "t", "actions": [{"id": "loop", "action": "For Each"}]}
+    loop = next(a for a in pb.build(cfg, _ctx())["Actions"]
+                if a["CustomData"]["type"] == "area")
+    P = _params_by_id(loop)
+    assert FE_IDX in P and FE_START in P and len(loop["Parameters"]) == 2
+
+
+def test_non_foreach_action_gains_no_template_defaults():
+    """An action whose template has no defaulted OUTPUT slot gains no OUTPUT default.
+
+    The INPUT half of this guard was SUPERSEDED upstream. `_ensure_input_defaults`
+    now materialises a template's input defaults deliberately: an unbound Node
+    `Timeout` was dropped, the engine ran it as 00:00:00 and the action died with
+    "value ('00:00:00') must be greater than '00:00:00'" (verified live). So a bare
+    Node legitimately carries its default "60" now, and the three tests around
+    `test_node_unbound_timeout_gets_template_default` pin that behaviour. What must
+    still never appear is an OUTPUT-side slot: that is what the For Each fix touched,
+    and its blast radius is what this test exists to hold.
+    """
+    cfg = {"title": "t", "actions": [{"id": "n", "action": "Node", "name": "n"}]}
+    n = _by_cid(pb.build(cfg, _ctx()))["n"]
+    # the input default 177a57 ("60") is intended; nothing else may be materialised
+    assert [p["TabPropertyId"] for p in n["Parameters"]] == [
+        "d3e52aab-b9d0-2d42-911e-b0e6de177a57"]
+
+
+def test_call_subprocess_started_flow_not_doubled():
+    """Call Subprocess's a03fe2 started-flow slot (direction 2/ignore, default the
+    null guid) is already emitted by _build_subprocess; the materialiser must dedupe
+    it, not emit a second copy."""
+    cfg = _sub_cfg()
+    call = _by_cid(pb.build(cfg, _ctx()))["call"]
+    a03 = [p for p in call["Parameters"] if p["TabPropertyId"].endswith("a03fe2")]
+    assert len(a03) == 1 and a03[0]["Value"] == pb.NULL_GUID
+
+
 # -- Call/Trigger Subprocess --------------------------------------------------
 
 TARGET = "b8f1d9e7-906e-46fa-9947-8700d1602d22"

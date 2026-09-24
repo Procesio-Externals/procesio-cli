@@ -1,0 +1,20 @@
+{
+  "name": "procesio",
+  "description": "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant.",
+  "version": "0.1.0",
+  "author": {
+    "name": "Ringhel TEAM SRL (PROCESIO)",
+    "url": "https://procesio.com"
+  },
+  "homepage": "https://procesio.com",
+  "repository": "https://github.com/Procesio-Externals/procesio-cli",
+  "license": "Apache-2.0",
+  "keywords": [
+    "procesio",
+    "automation",
+    "ipaas",
+    "mcp",
+    "workflow",
+    "low-code"
+  ]
+}

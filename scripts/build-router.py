@@ -234,7 +234,11 @@ def main() -> int:
         print("CLAUDE.md Capability Router is up to date.")
         return 0
 
-    claude_path.write_text(updated, encoding="utf-8")
+    # newline="\n" because on Windows write_text() would translate every \n to \r\n.
+    # CLAUDE.md is LF in version control, so without this each run rewrites all ~370
+    # lines and buries a real two-line change in a whole-file diff - which the git<->svn
+    # mirror then has to resolve line by line. Same reason build-tool-skill.py does it.
+    claude_path.write_text(updated, encoding="utf-8", newline="\n")
     print(f"Wrote Capability Router to {claude_path} ({len(updated)} bytes).")
     for w in warnings:
         print(f"warning: {w}", file=sys.stderr)

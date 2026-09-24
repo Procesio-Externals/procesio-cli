@@ -1,0 +1,32 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.Procesio-Externals/procesio-cli",
+  "description": "Drive the PROCESIO automation platform from a terminal or an AI assistant.",
+  "status": "active",
+  "version": "0.1.0",
+  "repository": {
+    "url": "https://github.com/Procesio-Externals/procesio-cli",
+    "source": "github"
+  },
+  "website_url": "https://procesio.com",
+  "packages": [
+    {
+      "registry_type": "pypi",
+      "registry_base_url": "https://pypi.org",
+      "identifier": "procesio-cli",
+      "version": "0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtime_hint": "uvx",
+      "environment_variables": [
+        {
+          "name": "AAT_USERDATA_DIR",
+          "description": "Where per-user state and configuration live. Defaults to the platform's per-user data directory.",
+          "is_required": false,
+          "is_secret": false
+        }
+      ]
+    }
+  ]
+}

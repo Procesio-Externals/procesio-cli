@@ -153,8 +153,33 @@ def get_code(client, args) -> dict:
 def set_code(client, args) -> dict:
     css = _read_text(args.css, args.css_file, "css")
     js = _read_text(args.javascript, args.js_file, "js")
+
+    if getattr(args, "clear", False):
+        # Recovery path. Every other route through this action DECRYPTS the existing blob first, so
+        # that omitting one side preserves it — which means a form saved under a different passphrase
+        # (a rotated key, another workspace, an import) becomes permanently uneditable: the decrypt
+        # fails before any write can happen. Clearing is the only repair that does not need the
+        # original key, so it deliberately never touches the cipher. The discarded blob is reported
+        # by LENGTH only; a value that cannot be decrypted must not be echoed either.
+        if css is not None or js is not None:
+            raise UsageError("--clear removes the form's code entirely; do not combine it with "
+                             "--css/--css-file or --javascript/--js-file")
+        form = _fetch(client, args.id)
+        old = form["data"].get("code") or ""
+        result = {"id": args.id, "name": form.get("name"), "cleared": True,
+                  "discarded_blob_bytes": len(old),
+                  "elements": len(form["data"].get("elements") or [])}
+        if args.dry_run:
+            return {"dry_run": True, **result}
+        guard = guard_unchanged(lambda: _fetch(client, args.id), form, force=args.force)
+        data = dict(form["data"])
+        data["code"] = ""
+        client.put("/api/FormTemplate", build_put_body(form, data=data))
+        return {"updated": True, "concurrency": guard, **result}
+
     if css is None and js is None:
-        raise UsageError("nothing to set: pass --css/--css-file and/or --javascript/--js-file")
+        raise UsageError("nothing to set: pass --css/--css-file and/or --javascript/--js-file, "
+                         "or --clear to remove the form's code entirely")
 
     key = _code_key()
     form = _fetch(client, args.id)
@@ -196,6 +221,9 @@ def _set_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--css-file", dest="css_file", help="path to a .css file")
     p.add_argument("--javascript", help="JavaScript source as an inline string")
     p.add_argument("--js-file", dest="js_file", help="path to a .js file")
+    p.add_argument("--clear", action="store_true",
+                   help="remove the form's code entirely without decrypting it - the only repair "
+                        "for a blob the stored form-code-key cannot open")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="report the change (and the previous code) without writing")
     add_force_arg(p)
@@ -208,7 +236,8 @@ ACTIONS = {
     ),
     "form-set-code": ActionDef(
         func=set_code, add_args=_set_args, needs_client=True,
-        description="Set a form's global CSS + JavaScript in place (surgical: only "
-                    "Data.code changes; omitted side is preserved; returns the previous code).",
-    ),
+        description="Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; "
+                    "omitted side is preserved; returns the previous code). --clear removes the code "
+                    "entirely WITHOUT decrypting it, which is the only repair for a blob the stored "
+                    "form-code-key cannot open."),
 }

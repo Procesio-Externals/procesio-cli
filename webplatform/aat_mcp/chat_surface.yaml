@@ -1,0 +1,372 @@
+# The PUBLISHED chat surface: exactly which PROCESIO operations are offered to a
+# general chat client, under which names, with which public wording.
+#
+# WHY THIS FILE EXISTS. The registry is the source of truth for what a tool IS
+# (Hard rule 3) and server.py rightly tracks it - that surface dispatches whatever
+# exists. A directory listing is a different kind of thing: a contract with people
+# who did not write the manifests. If the published list were derived from them,
+# renaming an action would silently remove a published tool, adding an argument
+# would silently reshape a published schema, and a new tool would silently appear
+# in a surface someone had reviewed. All three are invisible at the moment they
+# happen, which is the worst property a published contract can have.
+#
+# So this file is the source of truth for ONE fact no manifest records: which
+# operations we stand behind publicly, and how they are described to a stranger.
+# It holds no behaviour. When it disagrees with the registry, CI fails
+# (tests/test_chat_surface.py) - deliberately, and at build time.
+#
+# CURATION RULES, applied when adding an entry:
+#   - It serves creating something in PROCESIO, or seeing what you created.
+#   - It is nameable. A tool called "run any action" tells a model nothing and
+#     reads to a reviewer as an unbounded surface.
+#   - Its failure mode is legible. An action that can hang a client does not go
+#     here whatever else it does (see `excluded:` at the bottom).
+#   - `description` is written for someone who has never used PROCESIO. It is NOT
+#     copied from the manifest: manifest text addresses an operator who already
+#     knows the platform, and generating it from there would reintroduce exactly
+#     the coupling this file removes.
+#
+# read_only: true means the call changes nothing, anywhere. A client may run it
+# without asking. It is NOT the same question as the reversibility gate, which
+# asks whether a change can be undone - process-create is reversible and is
+# emphatically not read-only. The gate is still enforced: a conformance test
+# asserts read_only entries are also reversible, so a mislabel cannot widen what
+# runs unattended.
+
+# Semver, and the contract this number describes is the published tool list: names,
+# schemas and wording. Adding a tool is a minor bump, removing or renaming one or
+# tightening a schema is a major bump, and rewording a description is a patch. It is
+# NOT the package version - server.json aligns that with the release - because a
+# client pins to a surface and a release can ship with the surface unchanged.
+surface_version: "0.1.0"
+
+# A tool result goes straight into a model's context, so an unbounded one is a
+# context leak rather than a large answer. Results over the cap are truncated and
+# carry a note telling the caller how to narrow the request, which is more useful
+# to a model than a silently short list. Per-tool `max_response_bytes` overrides.
+limits:
+  max_response_bytes: 60000
+
+# Arguments every PROCESIO action accepts and this surface exposes by default.
+# `profile` is deliberately NOT among them: it selects a local credential profile,
+# which is an installation detail rather than something a chat user should choose.
+common_args:
+  workspace_id:
+    flag: workspace-id
+    type: string
+    description: "Workspace to act in. Omit to use the default workspace."
+  environment:
+    flag: environment
+    type: string
+    description: "Named environment, e.g. Internal-QA. Omit for the default."
+
+tools:
+
+  # --- Pillar 1: Process Designer ------------------------------------------
+  - name: procesio_list_processes
+    pillar: process
+    title: List PROCESIO processes
+    description: >
+      List the automation processes in a PROCESIO workspace, newest first.
+      Use this to find the id of a process before running, editing or validating it.
+    target: {tool: procesio, action: list-processes}
+    read_only: true
+    common: [workspace_id, environment]
+    args:
+      - {flag: search, type: string, description: "Only processes whose name matches this text."}
+      - {flag: page, type: integer, description: "1-based page number."}
+      - {flag: page-size, type: integer, expose: page_size, description: "Processes per page."}
+
+  - name: procesio_create_process
+    pillar: process
+    title: Create a PROCESIO process
+    description: >
+      Create a new automation process from a JSON definition of its steps and
+      connections. Returns the new process id. Pass dry_run to see what would be
+      built without creating anything.
+    target: {tool: procesio, action: process-create}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: config, type: string, description: "The process definition, as a JSON object."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report what would be created; create nothing."}
+
+  - name: procesio_edit_process
+    pillar: process
+    title: Edit a PROCESIO process
+    description: >
+      Change an existing process - add, retarget or reconfigure its steps. Pass
+      dry_run first to see the diff. Removing steps additionally requires
+      allow_remove, so a partial definition cannot silently delete work.
+    target: {tool: procesio, action: process-edit}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: config, type: string, description: "The changes, as a JSON object."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report the diff; change nothing."}
+      - {flag: allow-remove, type: boolean, expose: allow_remove, description: "Permit this edit to delete steps."}
+
+  - name: procesio_validate_process
+    pillar: process
+    title: Validate a PROCESIO process
+    description: >
+      Check a process for errors without running it - unconnected steps, missing
+      required inputs, broken references. Do this before running a process you
+      just built. Validating is not the same as running: a process can validate
+      and still fail at execution.
+    target: {tool: procesio, action: process-validate}
+    read_only: true
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+
+  - name: procesio_run_process
+    pillar: process
+    title: Run a PROCESIO process
+    description: >
+      Execute a process and return its run id. A process does real work - it can
+      send mail, write to databases and call external systems - so this is never
+      run unattended. Follow it with procesio_get_run_status and procesio_get_run_output.
+    target: {tool: procesio, action: run-process}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: payload, type: string, description: "Input values for the run, as a JSON object."}
+      - {flag: synchronous, type: boolean, description: "Wait for the run to finish instead of returning immediately."}
+      - {flag: timeout, type: integer, description: "Seconds to wait when synchronous."}
+
+  - name: procesio_get_run_status
+    pillar: process
+    title: Check a PROCESIO run
+    description: >
+      Report whether a run is still going, finished or failed, and which step it
+      reached. Takes the run id returned by procesio_run_process.
+    target: {tool: procesio, action: get-instance-status}
+    read_only: true
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The run id."}
+      - {flag: actions, type: boolean, description: "Include per-step detail."}
+
+  - name: procesio_get_run_output
+    pillar: process
+    title: Read a PROCESIO run output
+    description: >
+      Return the values a finished run produced. Only meaningful once the run has
+      completed - check with procesio_get_run_status first.
+    target: {tool: procesio, action: get-instance-output}
+    read_only: true
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The run id."}
+
+  - name: procesio_tidy_process_layout
+    pillar: process
+    title: Tidy a process canvas
+    description: >
+      Re-arrange a process's steps on the design canvas so it is readable. Changes
+      only the visual layout, never what the process does. Worth running after
+      building a process through the API, which places steps without arranging them.
+    target: {tool: procesio, action: relayout-process}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report the new layout; change nothing."}
+
+  # --- Pillar 2: Form Designer ---------------------------------------------
+  - name: procesio_list_forms
+    pillar: form
+    title: List PROCESIO forms
+    description: >
+      List the forms in a workspace. A form is the screen a person fills in to
+      start or feed a process.
+    target: {tool: procesio, action: form-list}
+    read_only: true
+    common: [workspace_id, environment]
+    args: []
+
+  - name: procesio_get_form
+    pillar: form
+    title: Read a PROCESIO form
+    description: >
+      Return a form's definition - its fields, their types and how they are laid out.
+    target: {tool: procesio, action: form-get}
+    read_only: true
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+
+  - name: procesio_create_form
+    pillar: form
+    title: Create a PROCESIO form
+    description: >
+      Create a form from a JSON definition. Returns the new form id. Add fields
+      afterwards with procesio_add_form_field.
+    target: {tool: procesio, action: form-create}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: config, type: string, description: "The form definition, as a JSON object."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report what would be created; create nothing."}
+
+  - name: procesio_add_form_field
+    pillar: form
+    title: Add fields to a PROCESIO form
+    description: >
+      Add one or more input fields to an existing form.
+    target: {tool: procesio, action: form-add-element}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: elements, type: string, description: "The fields to add, as a JSON array."}
+      - {flag: parent, type: string, description: "Id of the container to add them into."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report what would be added; add nothing."}
+
+  # --- Pillar 3: AI Connector Builder --------------------------------------
+  - name: procesio_build_connector
+    pillar: connector
+    title: Build a PROCESIO connector from API docs
+    description: >
+      Start building a custom PROCESIO connector from an API's documentation. Give
+      it the docs URL and what you need the connector to do; it reads the docs,
+      asks what it still needs, and generates a connector package. Returns a build
+      id - follow it with procesio_get_connector_build.
+    target: {tool: connector-builder, action: create-build}
+    read_only: false
+    common: []
+    args:
+      - {flag: api-url, type: string, expose: api_url, description: "URL of the API documentation to read."}
+      - {flag: api-docs-text, type: string, expose: api_docs_text, description: "The documentation itself, if there is no public URL."}
+      - {flag: user-requirements, type: string, expose: user_requirements, description: "What the connector needs to do, in plain language."}
+
+  - name: procesio_list_connector_builds
+    pillar: connector
+    title: List connector builds
+    description: >
+      List connector builds and their current stage.
+    target: {tool: connector-builder, action: list-builds}
+    read_only: true
+    common: []
+    args:
+      - {flag: status, type: string, description: "Only builds in this stage."}
+      - {flag: page, type: integer, description: "1-based page number."}
+
+  - name: procesio_get_connector_build
+    pillar: connector
+    title: Check a connector build
+    description: >
+      Report a build's stage, what it is waiting on, and whether a connector
+      package is ready to download.
+    target: {tool: connector-builder, action: get-build}
+    read_only: true
+    common: []
+    args:
+      - {flag: build-id, type: string, expose: build_id, required: true, description: "The build id."}
+
+  - name: procesio_download_connector
+    pillar: connector
+    title: Download a built connector
+    description: >
+      Save a finished build's connector package to a local file, ready to install
+      with procesio_install_connector.
+    target: {tool: connector-builder, action: download-artifact}
+    read_only: false
+    common: []
+    args:
+      - {flag: build-id, type: string, expose: build_id, required: true, description: "The build id."}
+      - {flag: out, type: string, required: true, description: "Local path to write the package to."}
+
+  - name: procesio_install_connector
+    pillar: connector
+    title: Install a connector into PROCESIO
+    description: >
+      Install a connector package into a workspace, after which its operations
+      appear as steps you can use when building a process.
+    target: {tool: procesio, action: customaction-upload}
+    read_only: false
+    common: [workspace_id, environment]
+    args:
+      - {flag: file, type: string, required: true, description: "Path to the connector package."}
+      - {flag: name, type: string, description: "Name to show in the designer."}
+
+  - name: procesio_list_connectors
+    pillar: connector
+    title: List installed connectors
+    description: >
+      List the connectors installed in a workspace - the extra step types available
+      when building a process.
+    target: {tool: procesio, action: customaction-list}
+    read_only: true
+    common: [workspace_id, environment]
+    args: []
+
+  # --- Workspace ------------------------------------------------------------
+  - name: procesio_list_workspaces
+    pillar: workspace
+    title: List PROCESIO workspaces
+    description: >
+      List the workspaces this account can reach. A workspace holds its own
+      processes, forms, connectors and credentials.
+    target: {tool: procesio, action: list-workspaces}
+    read_only: true
+    common: [workspace_id, environment]
+    args: []
+
+  - name: procesio_list_environments
+    pillar: workspace
+    title: List PROCESIO environments
+    description: >
+      List the configured environments, so a call can be pointed at the right one.
+    target: {tool: procesio, action: list-environments}
+    read_only: true
+    common: []
+    args: []
+
+  - name: procesio_test_credential
+    pillar: workspace
+    title: Test a PROCESIO credential
+    description: >
+      Check that a stored credential can still reach the system it belongs to.
+      Answers whether a connection is working without running a whole process.
+    target: {tool: procesio, action: credential-test}
+    read_only: true
+    common: [workspace_id, environment]
+    args:
+      - {flag: config, type: string, description: "The credential to test, as a JSON object."}
+
+# Operations kept OUT of the published surface, with the reason. This list is part
+# of the contract: it is where a future "why isn't X here?" gets answered, and it
+# stops an exclusion being quietly reversed by someone who assumes it was an oversight.
+excluded:
+  - target: "procesio/get-process"
+    reason: >
+      Prints its JSON and then does not exit. Over stdio that is an unrecoverable
+      hang rather than an error, and a chat client has no way to recover from it.
+      procesio_list_processes plus procesio_validate_process cover the same need. Revisit only when
+      the action is proven to terminate.
+  - target: "procesio/*-delete"
+    reason: >
+      Irreversible with a data-loss blast class. A first public surface has no
+      deletion in it; the full surface still reaches these behind confirmation.
+      There is a second reason, and it is the stronger one: deleting a resource with a
+      large run history takes longer server-side than the client's read timeout, so the
+      call returns a transport error while the delete goes on to complete. Retrying
+      returns the same error, which reads like a permanent failure and is not one. A
+      caller therefore cannot tell from the response whether the deletion happened - and
+      a tool whose failure signal does not distinguish "nothing happened" from "it is
+      done" has no safe place on a surface a model drives. Confirm by listing the
+      resource, never from the error. (Deletes of credentials and Data Stores return
+      promptly; it is the instance history that costs the time.)
+  - target: "procesio/<generated REST passthroughs>"
+    reason: >
+      Several hundred generated get-/post-/put-/delete- actions mirroring raw API
+      endpoints. They are why the freeform surface exists. Publishing them would
+      make the tool list unreadable and turn the schema into the API reference.
+  - target: "procesio/profile (argument)"
+    reason: >
+      Selects a local credential profile. An installation detail, not a choice a
+      chat user should be asked to make. The default profile is used.
