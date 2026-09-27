@@ -6272,25 +6272,33 @@ returns the same timeout, which reads like a permanent failure and is not one.
 applies to any long-running write here. Deletes of credentials and Data Stores, which carry no
 instance history, return promptly - it is the history that costs the time.
 
-## A process built from a config has no action names, and the canvas shows the template instead
+## Put an explicit `name` on every action in a config
 
-An action's canvas label lives in **`customData.name`**, mirrored on **`actionName`**. The process
-config format carries no name field, so every action of a config-built flow lands labelled with its
-TEMPLATE: a canvas of nine boxes all reading `Query Store`, three reading `Node`, and nothing to
-tell them apart. It validates, runs and lays out correctly, so nothing ever complains.
+**A config CAN name its actions**: the builder reads `name` on an action spec and an explicit
+name always wins (`dto/process/builder.py`, `explicit = a.get("name")`). When it is absent,
+`dto/process/naming.py` DERIVES a label from literal config; it deliberately returns None when a
+parameter is bound to a variable or a template, because it will not guess, and the action then
+falls back to its generic template label. Most real nodes bind variables, so most unnamed actions
+land as `Query Store`, `Node`, `Call API` - a canvas of a dozen identical boxes.
 
-Check with `get-process` and read `customData.name`; an unnamed action is one whose label equals
-its `actionTemplateName`. `rename-actions --map-file <id -> name JSON>` fixes a whole process in
-one save and validates the flow before writing.
+**Renaming post-hoc does not survive, and it costs the layout too.** `rename-actions` fixes the
+labels on a live flow, but the next desired-state edit rebuilds from the config and the labels go
+back to the template. The same edit ALSO loses the canvas positions, because position
+preservation matches the live action against the name the config WOULD produce
+(`_edit_ctx`): once the live label is "Seed the timezones" and the config still yields
+"Query Store", the match fails and the node is re-placed. One cause, both symptoms.
 
-**Name before laying out.** The layout engine clusters by what the graph does and will place the
-boxes correctly either way, but a tidy canvas whose every box says `Query Store` still tells a
-reader nothing. Naming is the half that carries the meaning.
+So: **name the action in the config**, and treat `rename-actions` as a repair for flows you do
+not own the config for, not as the way to name your own.
 
 Names worth giving: what the statement does to which store ("Read the settings", "Stamp the
 meeting as notified"), what an endpoint is for ("List the Google calendars"), what a script
 produces ("Build the meeting type options"). Avoid two identical labels in one process - a
 duplicate label is worse than a generic one, because the canvas can no longer be talked about.
+
+*(Corrected 2026-09-27: an earlier version of this note claimed a config could not carry action
+names at all. It can, and the claim cost a workspace its labels and its layout when configs were
+re-applied after a rename.)*
 ## Transport import PRESERVES resource ids across workspaces (measured 2026-09-22)
 
 Importing a `.procesio` bundle into a **different** workspace does not mint new
@@ -6538,3 +6546,37 @@ variable mapping while the runtime sends something else — and the next person
 who opens the designer and saves silently reverts it. Runtime and designer
 layers that disagree are worse than a missing feature, because the divergence
 is invisible until a save destroys it.
+
+### ✔ A PROCESIO webhook CAN serve a Meta-style verification callback (2026-09-27, corrects an earlier claim)
+Meta (WhatsApp/Facebook) webhook setup GET-verifies the callback: it must return HTTP 200
+with the body = the raw `hub.challenge`. A PROCESIO webhook DOES this via the designer's
+**"Handshake response body"** on the webhook (Create/Edit Webhook -> Configure Response(s)):
+- Response configuration method = **JSONPath**
+- JSONPath input = **request.params** (PROCESIO exposes the query as an object; note it
+  materialises each param BOTH dotted and underscored: `hub.challenge` AND `hub_challenge`,
+  each a one-element array)
+- JSONPath expression = **`$['hub.challenge'][0]`** (the `[0]` unwraps the array so the body
+  is the bare challenge, not `["..."]`; `$.hub_challenge[0]` also works)
+- Response status code = 200
+The webhook must be SAVED for the endpoint to answer (an unsaved/creating webhook's launch
+URL just hangs -> Meta times out -> "callback URL or verify token couldn't be validated").
+This is a SYNCHRONOUS designer-only feature; it is NOT the async `customResponse`/launch path
+(that returns an empty 200 and cannot echo the challenge). So NO external bridge/Azure Function
+is needed for Meta inbound - keep it pure-PROCESIO. (An earlier note here wrongly concluded a
+bridge was required; that was a procedure error - the webhook was unsaved when tested.) Real
+inbound events still only flow after the Meta app is PUBLISHED + business-verified.
+
+### Builder: webhook-triggered process + Node-built request body (2026-09-27)
+Two gotchas building a webhook->parse->Call API chain via the process builder:
+- **Node's timeout property is `Timeout`** (no space); **Call API's is `Time Out`** (with a
+  space). Passing `Time Out` to a Node action fails validation ("no property 'Time Out';
+  known: Code, Error, List Result, Single Result, Stdout, Timeout").
+- **Testing a webhook process with `run-process --synchronous --payload`**: the payload maps
+  to INPUT variables BY NAME, so to fill an input var `payload` you pass
+  `--payload '{"payload": <event>}'`, NOT the bare event. A bare event leaves the model var
+  empty; a Node then injects `<%0%>` as nothing -> `const P=;` -> "Unexpected token ';'".
+- **Inject a Node-built request body into a Call API** with the `{template, vars}` param
+  binding on `Request Parameters`: pass the whole body dict as `template` with `<%0%>` inside
+  the form field (`{"key":"data","value":"<%0%>"}`) and `vars:["theVar"]`. The builder remaps
+  `<%0%>` to a global index and binds the variable. This is the RPC pattern: a Node computes
+  the full request `data` string (auth + params), the Call API just ships `data=<%it%>`.
