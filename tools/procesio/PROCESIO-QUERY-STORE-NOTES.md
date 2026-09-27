@@ -340,3 +340,29 @@ column added later whose name happens to be reserved.
 which is what a seed should carry: a real user id in an exported pack is a stranger's id at the
 destination. The error when they are missing is unusually good - it names the column:
 *"The required column 'CreatedById' has no default value and was not supplied."*
+
+## Write the statement over lines, always
+
+A Query Store node IS one statement, so an unreadable statement is an unreadable node. SQL built
+by concatenating strings arrives as a single line, runs perfectly, and shows in the designer as
+one row scrolling off the screen - 3375 characters in the worst case measured here.
+
+**The builder now lays it out on the way in** (`tools/procesio/sqlformat.py`, called from
+`_build_query_store`). The formatter only moves whitespace OUTSIDE string literals, treats
+`<%N%>` and `{{ds:...}}` / `{{col:...}}` as opaque words, and compares its output's token stream
+against the input before returning - handing the input back unchanged if they differ, because a
+formatter that can alter a statement is worse than none. It leaves an already-multi-line
+statement exactly as written.
+
+`flow-lint` raises **UNREADABLE_STATEMENT** / **UNREADABLE_SCRIPT** for a statement or script
+body over ~160 characters on one line that reached the flow some other way (a hand-set parameter,
+an import). The lint flags and never rewrites: reflowing someone else's code is not its job.
+
+**A script is REFUSED, not reformatted.** SQL can be laid out safely because only whitespace
+outside string literals moves and the token stream is verified afterwards; a script cannot,
+because rewriting someone's JavaScript or Python risks changing it. So the builder raises on a
+`code-editor` body over ~160 characters on ONE line and names the property, and the author lays
+it out. Keep a script multi-line, one statement per line; a single line is fine only when it is
+genuinely one short expression (`return String(x || '')`).
+
+The same rules apply to the external SQL actions.

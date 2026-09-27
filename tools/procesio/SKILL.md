@@ -179,6 +179,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-add-element` | `--id` | Add one or more controls to a LIVE form (authoring-config elements), splicing them into Data.elements AND the data model without regenerating what is already… |
 | `form-create` | — | Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in… |
 | `form-delete` | `--id` | Delete a resource by id (DELETE /api/FormTemplate/{id}). |
+| `form-delete-element` | `--id`, `--element` | Remove one control from a LIVE form: out of Data.elements, out of the form's data model, and out of its container's own list - leaving every other element's id… |
 | `form-digest` | `--in` | Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process… |
 | `form-duplicate` | `--id` | POST /api/FormTemplate/{id}/duplicate. |
 | `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |

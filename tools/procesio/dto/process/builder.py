@@ -28,6 +28,7 @@ from pathlib import Path
 from tools.procesio.dto import refdata
 from tools.procesio.dto.framework import Component
 from tools.procesio.dto.process import naming
+from tools.procesio.sqlformat import format_sql, is_unreadable
 from tools.procesio.errors import RemovalBlocked, UsageError
 
 DIR = Path(__file__).resolve().parent
@@ -40,7 +41,14 @@ NULL_GUID = "00000000-0000-0000-0000-000000000000"
 _GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
                       r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 ERROR_MODEL = "10c6ac59-3929-49e6-99dc-121212121220"    # ErrorDataModel (error-port variable type)
-_DIRECTION = {"input": 10, "process": 20, "output": 30}
+_DIRECTION = {"input": 10, "process": 20, "output": 30, "processinfo": 40}
+
+# The platform's own per-run facts (workspaceId, instanceId, templateId, name, startedOn).
+# It is an ordinary flow variable of a fixed model, NOT an ambient runtime object, and the
+# designer adds it the first time something references it - so a flow rebuilt from a config
+# silently loses it unless the config can ask for it.
+SYSTEM_DATA_MODEL_ID = "10c6ac59-3929-49e6-99dc-121212121221"
+PROCESS_INFO_NAME = "ProcessInfo"
 # actions that have NO error port (per PROCESIO) — onError is rejected on these
 _NO_ERROR_PORT = {"start", "stop", "join", "for each", "foreach"}
 # Some action names are ambiguous (a versioned/list variant shares the name). For
@@ -556,8 +564,12 @@ def _build_query_store(template: dict, spec: dict, var_ids: dict, ctx: dict, cou
                           "attribute": None})
         return f"<%{idx}%>"
 
+    # Laid out over lines before it is stored. A Query Store node IS its statement, so a
+    # statement concatenated onto one line makes the node unreadable in the designer; the
+    # formatter only moves whitespace outside string literals and hands back the input
+    # untouched if it cannot prove that (tools/procesio/sqlformat.py).
     out = [{"TabPropertyId": q_prop["id"], "Variable": chips,
-            "Value": _QS_TOKEN.sub(sub, spec["sql"])}]
+            "Value": format_sql(_QS_TOKEN.sub(sub, spec["sql"]))}]
     rows = []
     for i, (pname, binding) in enumerate((spec.get("params") or {}).items()):
         srcbind = binding if isinstance(binding, dict) else {"value": binding}
@@ -663,6 +675,32 @@ def _subprocess_map_config(rows, is_input):
         sub, proc = (dst, src) if is_input else (src, dst)
         out.append({"id": r.get("id"), "subprocess": sub, "process": proc})
     return out
+
+
+def _refuse_unreadable_code(tpl: dict, params: list, action_name: str) -> None:
+    """Refuse a script body stored as one long line.
+
+    SQL can be laid out safely, because only whitespace outside string literals moves and the
+    token stream is checked afterwards. A script cannot: reformatting someone's JavaScript or
+    Python risks changing it. So the guard here REFUSES instead of rewriting - the author lays
+    it out, which costs a moment, and nobody inherits a node whose logic is a single
+    three-thousand-character line that the designer shows as one row scrolling off the screen.
+    """
+    by_id = {p["id"]: p for p in _property_index(tpl).values() if isinstance(p, dict) and p.get("id")}
+    for prm in params:
+        prop = by_id.get(prm.get("TabPropertyId"))
+        if not prop or prop.get("type") != "code-editor":
+            continue
+        if str(prop.get("label", "")).strip().lower() == "query":
+            continue                                   # SQL: the formatter already handled it
+        value = prm.get("Value")
+        if is_unreadable(value):
+            raise UsageError(
+                f"{action_name}: the script in '{prop.get('label')}' is "
+                f"{len(value.strip())} characters on ONE line. Lay it out over lines, one "
+                f"statement per line - a script node's body is its logic, and a single long "
+                f"line is unreadable in the designer. (The builder will not reformat code for "
+                f"you: rewriting a script risks changing it.)")
 
 
 def _action_parameters(template: dict, params: dict, ctx: dict, counter: list | None = None) -> list[dict]:
@@ -1121,6 +1159,13 @@ def _port(src, dst, ctx, extra=None) -> dict:
 
 def _variable(v: dict, ctx: dict) -> dict:
     name = v["name"]
+    if str(v.get("direction", "")).strip().lower() == "processinfo":
+        # Fixed shape: the model is the platform's and the value is written by the runtime.
+        return {
+            "Id": ctx["var_ids"][name.strip().lower()], "ContextId": None,
+            "DataType": SYSTEM_DATA_MODEL_ID, "Type": 40, "Name": name,
+            "DefaultValue": None, "IsList": False, "IsError": False, "IsRequired": False,
+        }
     if "model" in v:
         ref = v["model"].strip()
         dt = ctx.get("models", {}).get(ref.lower()) or ref
@@ -1262,6 +1307,7 @@ def build(config: dict, ctx: dict) -> dict:
         # Deduped against everything already built; a template with no
         # such setting appends nothing, so non-loop builds stay byte-identical.
         params = params + _template_default_params(tpl, params)
+        _refuse_unreadable_code(tpl, params, a.get("action", cid))
         parent_id = None
         if a.get("parent"):
             pcid = a["parent"]
@@ -1590,6 +1636,10 @@ def prepare_ctx(client, config: dict) -> dict:
     var_models: dict[str, str] = {}
     for v in config.get("variables", []):
         ref = (v.get("model") or "").strip()
+        if str(v.get("direction", "")).strip().lower() == "processinfo":
+            # Its model is fixed, so a {var: ProcessInfo, path: [workspaceId]} binding can be
+            # resolved to an attribute id like any other model-typed variable.
+            ref = SYSTEM_DATA_MODEL_ID
         if not ref:
             continue
         mid = (ctx.get("models") or {}).get(ref.lower()) or ref
