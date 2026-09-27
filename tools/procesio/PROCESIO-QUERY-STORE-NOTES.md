@@ -310,3 +310,33 @@ parameter, and a refused statement routed to an error branch.
   branches into one Stop is refused by the BE validator ("Action has too many input ports").
 - The generated node's designer config mirrors the runtime (Query -> `ds.<id>[.<col>]`,
   Parameters -> `{id,destination,source}`), so it shows configured in the Process Designer.
+
+## Seeding a store from one statement, idempotently
+
+An export carries a Data Store's COLUMNS and not its ROWS, so any pack meant to run elsewhere
+has to seed its own reference data. Two things make that one statement instead of hundreds:
+
+- **`JSON_TABLE` works.** Pass the rows as a single JSON string parameter and read them as a
+  table, so several hundred rows insert in ONE round trip:
+
+      INSERT INTO {{ds:Store}} ({{col:Store.A}}, CreatedById, UpdatedById)
+      SELECT jt.c_A, @uid, @uid
+      FROM JSON_TABLE(@j, '$[*]' COLUMNS (c_A VARCHAR(80) PATH '$.A')) AS jt
+      WHERE NOT EXISTS (SELECT 1 FROM {{ds:Store}} AS existing)
+
+- **The `NOT EXISTS` guard against the target store is allowed here and is genuinely
+  idempotent.** Verified: run against an already-populated store it affects 0 rows and raises
+  nothing, and the row count is unchanged. This is the one place the target table MAY be named
+  in a subquery - an UPDATE or DELETE doing the same thing hits MySQL 1093 instead. Note it is
+  an all-or-nothing guard: a partially filled store is left alone, not topped up.
+
+**A `JSON_TABLE` column name is a plain identifier, so a reserved word breaks it.** A column
+declared as `Key VARCHAR(100) PATH '$.Key'` fails with the platform's generic
+*"The query contains invalid SQL syntax."* and no hint as to which word is the problem. Declare
+every column under a safe alias (`c_Key`) and map it in the SELECT list; that also covers a
+column added later whose name happens to be reserved.
+
+**`CreatedById` / `UpdatedById` are required on any INSERT** and the all-zero guid is accepted,
+which is what a seed should carry: a real user id in an exported pack is a stranger's id at the
+destination. The error when they are missing is unusually good - it names the column:
+*"The required column 'CreatedById' has no default value and was not supplied."*

@@ -722,3 +722,15 @@ ADD (`dataStoreOperationSupportsFilters`). Map items are `{id, left, right}`
 (DataStoreMapItem). Wired via `form-set-element-event --action RUN_DATA_STORE_OPERATION`
 (surgical) or the builder `do: datastore`. Operation wire encoding (string vs numeric) +
 map orientation confirmed live post-launch.
+
+## A platform-seeded data model cannot be deleted
+
+`DELETE /api/DataTypes/{id}` on a model the platform seeded into the workspace returns HTTP 400 with
+
+    {"statusCode": 452, "value": "Unauthorized data type change!", "target": "data_type"}
+
+Seeded models are not distinguishable by guid prefix the way the primitive types are, and one of them
+can even carry a real user as `createdBy` (the account that first opened the workspace), so neither
+the id nor the author tells you. Treat 452 as the answer: **an unreferenced model that refuses to
+delete is the platform's, not a leftover of yours.** A tidy-the-workspace pass should report those
+rather than keep retrying them.
