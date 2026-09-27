@@ -767,3 +767,97 @@ afterwards. Declare it with `direction: "processinfo"`.
 right, needs no configuration, and survives an import into another workspace - where a literal
 in an action parameter does not, since an import rewrites a resource's own `workspaceId`
 metadata but never a value inside a parameter.
+
+## What a Transport export/import actually carries (verified cross-tenant, 2026-09)
+
+Measured by exporting a whole working product out of one workspace and importing it into a
+workspace under a **different master**, then diffing both sides resource by resource. The summary
+a packager needs: **the graph travels, the environment does not.** Everything a flow points at
+that lives outside the flow is either absent from the pack or present only as an id the new
+workspace cannot resolve.
+
+### Travels, intact
+
+| Carried | Detail |
+| --- | --- |
+| Flows, forms, data stores, data models | every one, **with its original id** |
+| Cross-references between them | consequently survive: a form's RUN_PROCESS map binds a process by id, so it still resolves |
+| A form's encrypted `Data.code` | global CSS + JS decrypt byte-identically in the new workspace, so the key is not per-workspace |
+| A form's `IsPrivate` | privacy is part of the form, not of the environment |
+| Action names and canvas coordinates | the readability work is in `customData`, which is part of the flow |
+| `Active` and `IsValid` | **carried verbatim, not recomputed** — see the trap below |
+
+A platform-seeded data model is skipped rather than duplicated: those ids are identical in every
+workspace (the `…12121212121x` family plus a few named ones), so the importer finds them already
+present. Only genuinely custom models are created.
+
+### Does NOT travel
+
+| Absent | Consequence in the new workspace |
+| --- | --- |
+| **Data store ROWS** | every imported store arrives with the right columns and zero rows |
+| **Credentials** | excluded by default, and the ids stay baked into the nodes (below) |
+| **Schedules** | anything time-driven simply never fires, with no error anywhere |
+| **API keys** | a key is per workspace; a setting that holds one arrives empty |
+| **CustomUrl / tinyUrl**, at workspace AND entity level | **the forms are not reachable at any address** |
+
+### The trap: a credential is a node parameter, so an import leaves 11 dangling references
+
+A credential slot is `CustomData.configuration[].settings[].type == "credentials"`, and the chosen
+credential lands in the node's `Parameters[].Value` as the credential INSTANCE gid. That gid is
+part of the flow, so it travels — pointing at a credential that does not exist in the new
+workspace. Nothing rewrites it, and nothing warns: the flows arrive with `IsValid: true` because
+validity is client-set and simply carried over, so the workspace looks healthy while every
+credential-bearing node is broken.
+
+The failure is at least precise, and it happens while building the input model, i.e. before the
+node does anything:
+
+```
+Error while building input model: Error while getting credential <gid> for workspace <new-ws-id>.
+```
+
+The run ends at status 40 and names the action. Two consequences worth designing around:
+
+- **A flow fails whole, not partially.** Nodes before the credential node DO commit their work
+  (a seeding branch ahead of an API call still seeds), so a failed bootstrap can still leave the
+  stores correctly populated. Check state before concluding that nothing ran.
+- **A form whose FORM_LOAD launches such a flow cannot populate.** If that form is the product's
+  own setup screen, the new user cannot reach the screen they need in order to fix the problem.
+  Keep the nodes that need a credential OFF the load path of the screen that configures them, or
+  let them tolerate a missing credential, or the product is unreachable until someone edits it in
+  the designer.
+
+Re-pointing is scriptable rather than manual: the process config accepts a `{credential: <gid>}`
+binding for that parameter, so a whole workspace can be remapped from one credential to another in
+one pass per flow.
+
+### Rows not travelling is also a safety property
+
+It is the reason a pack cannot leak the exporter's configuration or their customers' records: a
+key/value settings store carrying an API key, a logo, an owner's address, and an operational table
+of real bookings all stay behind. So a "publishable" pack is not achieved by scrubbing an export,
+it is achieved by **keeping every environment-specific value in a data store row and never in a
+node** — then the export is publishable by construction. Verified on a real pack: the stored API
+key value is absent from the bundle, and only placeholder/help text carries a hostname.
+
+What DOES travel as author metadata: every resource keeps `createdBy` / `createdById` and the
+source `workspaceId` in its metadata. Harmless for logic, but it means a published pack names its
+author.
+
+### Therefore: what a product must ship to be installable
+
+Seeding cannot be left to the export. A pack needs a bootstrap flow that creates its own reference
+data and its own settings KEYS with neutral defaults, because it will always land in empty stores.
+Two rules learned from doing it wrong:
+
+- **Seed identity and branding BLANK, seed only mechanics.** Buffers, notice periods and a UTC
+  default timezone are safe; a name, an address, a logo or a timezone taken from the author's own
+  install is a value the new owner has to discover and undo. A seed that hardcodes one region's
+  timezone into a weekly-availability table while the global default seeds as UTC is the
+  inconsistency this produces.
+- **Seed what is deterministic.** Because form ids survive a transport, a setting that stores a
+  form id can be seeded as a literal instead of being left for the installer to look up. A
+  setting that a flow READS but that no screen can WRITE, left blank by the seed, is a silent
+  defect — the classic case is a cancellation link built from such a setting, which then goes out
+  in customer email pointing nowhere.
