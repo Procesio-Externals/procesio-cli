@@ -6272,6 +6272,25 @@ returns the same timeout, which reads like a permanent failure and is not one.
 applies to any long-running write here. Deletes of credentials and Data Stores, which carry no
 instance history, return promptly - it is the history that costs the time.
 
+## A process built from a config has no action names, and the canvas shows the template instead
+
+An action's canvas label lives in **`customData.name`**, mirrored on **`actionName`**. The process
+config format carries no name field, so every action of a config-built flow lands labelled with its
+TEMPLATE: a canvas of nine boxes all reading `Query Store`, three reading `Node`, and nothing to
+tell them apart. It validates, runs and lays out correctly, so nothing ever complains.
+
+Check with `get-process` and read `customData.name`; an unnamed action is one whose label equals
+its `actionTemplateName`. `rename-actions --map-file <id -> name JSON>` fixes a whole process in
+one save and validates the flow before writing.
+
+**Name before laying out.** The layout engine clusters by what the graph does and will place the
+boxes correctly either way, but a tidy canvas whose every box says `Query Store` still tells a
+reader nothing. Naming is the half that carries the meaning.
+
+Names worth giving: what the statement does to which store ("Read the settings", "Stamp the
+meeting as notified"), what an endpoint is for ("List the Google calendars"), what a script
+produces ("Build the meeting type options"). Avoid two identical labels in one process - a
+duplicate label is worse than a generic one, because the canvas can no longer be talked about.
 ## Transport import PRESERVES resource ids across workspaces (measured 2026-09-22)
 
 Importing a `.procesio` bundle into a **different** workspace does not mint new
