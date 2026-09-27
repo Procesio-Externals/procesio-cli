@@ -45,7 +45,7 @@
         "name": {"type": "string", "minLength": 1},
         "type": {"type": "string", "enum": ["boolean", "integer", "float", "double", "string", "datetime", "json", "object", "guid", "bool", "int", "long", "number", "text", "str", "uuid", "date-time"]},
         "model": {"type": "string", "description": "data model name/id (instead of a primitive type)"},
-        "direction": {"type": "string", "enum": ["input", "process", "output"], "default": "process"},
+        "direction": {"type": "string", "enum": ["input", "process", "output", "processinfo"], "default": "process", "description": "processinfo declares the platform's ProcessInfo variable (type 40, SystemDataModel): bind its fields with {var: ProcessInfo, path: [workspaceId|instanceId|templateId|name|startedOn]}. It is NOT added automatically."},
         "isList": {"type": "boolean", "default": false},
         "required": {"type": "boolean", "default": false},
         "isError": {"type": "boolean", "default": false},

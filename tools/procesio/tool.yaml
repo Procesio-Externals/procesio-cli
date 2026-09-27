@@ -2747,6 +2747,41 @@ actions:
     type: string
     required: true
     description: form template id
+- name: form-delete-element
+  description: 'Remove one control from a LIVE form: out of Data.elements, out of the form''s data model, and out of its container''s own list - leaving every other element''s id and field path untouched, the same property that makes form-add-element safe. REFUSES by default when the control still contains other controls or is still referenced (an event, a RUN_PROCESS input/output map, a visibility condition), because a dangling field path is saved without any error and the control that pointed at it then silently launches nothing; --force-refs deletes anyway and reports what it broke. References are found by element id, so one made by NAME is not detected. --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: form template id
+  - name: element
+    type: string
+    required: true
+    description: the control to remove, by its `name` config or its id
+  - name: force-refs
+    type: boolean
+    required: false
+    description: delete even when the control is still referenced, or still contains other controls, and report what that breaks
+  - name: dry-run
+    type: boolean
+    required: false
+    description: report what would be removed, without saving
+  - name: force
+    type: boolean
+    required: false
+    description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-digest
   description: 'Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables resolved to names, MAP_FORM_DATA conditions, scripts saved beside. --out adds FORM-PROCESS-MAP.md.'
   args:
@@ -9028,7 +9063,9 @@ actions:
               - input
               - process
               - output
+              - processinfo
               default: process
+              description: 'processinfo declares the platform''s ProcessInfo variable (type 40, SystemDataModel): bind its fields with {var: ProcessInfo, path: [workspaceId|instanceId|templateId|name|startedOn]}. It is NOT added automatically.'
             isList:
               type: boolean
               default: false

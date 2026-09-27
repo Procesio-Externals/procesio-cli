@@ -163,6 +163,38 @@ def _add_element_args(p: argparse.ArgumentParser) -> None:
     add_force_arg(p)
 
 
+def form_delete_element(client, args) -> dict:
+    form = _fetch(client, args.id)
+    data, report = addelement.delete_element(form, args.element, force=bool(args.force_refs))
+
+    lints = formlint.lint_form_data(data)
+    body = build_put_body(form, data=data)
+    result = {"id": form.get("id"), "name": body["Name"], **report,
+              "dry_run": bool(args.dry_run), "applied": False}
+    if lints:
+        result["lints"] = lints
+    if args.dry_run:
+        return result
+    guard = guard_unchanged(lambda: _fetch(client, args.id), form, force=args.force)
+    client.put("/api/FormTemplate", body)
+    result["applied"] = True
+    result["concurrency"] = guard
+    return result
+
+
+def _delete_element_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="form template id")
+    p.add_argument("--element", required=True,
+                   help="the control to remove, by its `name` config or its id")
+    p.add_argument("--force-refs", dest="force_refs", action="store_true",
+                   help="delete even when the control is still referenced, or still contains "
+                        "other controls, and report what that breaks")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="report what would be removed, without saving")
+    add_force_arg(p)
+
+
 def _update_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="form template id")
@@ -191,6 +223,22 @@ ACTIONS = {
             "into Data.elements AND the data model without regenerating what is already there - "
             "so every existing field path, and every process map that references one, survives. "
             "--parent places them in a container by name or id; --dry-run previews."
+        ),
+    ),
+    "form-delete-element": ActionDef(
+        func=form_delete_element,
+        add_args=_delete_element_args,
+        needs_client=True,
+        description=(
+            "Remove one control from a LIVE form: out of Data.elements, out of the form's data "
+            "model, and out of its container's own list - leaving every other element's id and "
+            "field path untouched, the same property that makes form-add-element safe. REFUSES "
+            "by default when the control still contains other controls or is still referenced "
+            "(an event, a RUN_PROCESS input/output map, a visibility condition), because a "
+            "dangling field path is saved without any error and the control that pointed at it "
+            "then silently launches nothing; --force-refs deletes anyway and reports what it "
+            "broke. References are found by element id, so one made by NAME is not detected. "
+            "--dry-run previews."
         ),
     ),
     "form-update": ActionDef(

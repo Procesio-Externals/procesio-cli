@@ -26,6 +26,12 @@ Checks (per action, against the DESIGNER customData layer):
      (hand-rolled flow edits bypassing the builder's _apply_values_to_config) -> the designer can't resolve
      the token and paints it RED. (Caught three times in review before the rule was written down.)
 
+  8. UNREADABLE_STATEMENT / UNREADABLE_SCRIPT — a Query Store or Execute Query statement, or a
+     Node script, stored as ONE long line. It runs perfectly and no one can read it: a Query
+     Store node IS its statement, and the designer shows a single row that scrolls sideways off
+     the screen. The builder lays Query Store SQL out on the way in (tools/procesio/sqlformat.py);
+     this catches everything that reached the flow another way.
+
 Born 2026-07-05; rebuilt 2026-07-06 after runtime-only versions repeatedly reported false "clean".
 """
 from __future__ import annotations
@@ -35,8 +41,10 @@ import re
 
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.handlers.common import add_profile_arg
+from tools.procesio.sqlformat import is_unreadable
 
 CODE_PID = "1e6a5523-2091-6c4c-94ac-c7984074673d"
+QUERY_STORE_SQL_PID = "02577ada-0000-0200-0000-00000000b102"
 NULL_GUID = "00000000-0000-0000-0000-000000000000"
 _SUB_TEMPLATES = ("Call Subprocess", "Trigger Subprocess")
 OUTPUT_TYPE = 30  # subprocess variables exposed as outputs
@@ -95,6 +103,13 @@ def _execquery_output(action: dict):
     return "__absent__"
 
 
+_SQL_WORDS = re.compile(r"(?i)(select|insert|update|delete|merge|with)")
+
+
+def _looks_like_sql(value: str) -> bool:
+    return bool(_SQL_WORDS.search(value))
+
+
 def lint_flow_dto(flow: dict, template_sidepanel_ids: dict, target_vars_of) -> list[dict]:
     """Pure lint over a flow DTO.
     template_sidepanel_ids: {"Call Subprocess": id, "Trigger Subprocess": id} (current template).
@@ -117,6 +132,23 @@ def lint_flow_dto(flow: dict, template_sidepanel_ids: dict, target_vars_of) -> l
                     f"designer setting '{s.get('label')}' still holds a <%N%> placeholder "
                     f"(customData must carry the variable GUID, not the runtime placeholder - the "
                     f"designer paints it red); param->customData mirror was not applied")
+
+        # A statement or a script stored as ONE long line runs perfectly and cannot be read:
+        # the designer shows a single row that scrolls off the screen. Flagged, not rewritten,
+        # because reflowing someone else's code is not the lint's job.
+        for prm in a.get("parameters") or []:
+            pid, val = prm.get("tabPropertyId"), prm.get("value")
+            if not isinstance(val, str) or not is_unreadable(val):
+                continue
+            if pid == QUERY_STORE_SQL_PID or (tmpl in ("Execute Query", "Execute Command")
+                                              and _looks_like_sql(val)):
+                add(nm, "UNREADABLE_STATEMENT",
+                    f"the SQL is {len(val.strip())} characters on ONE line; lay it out over "
+                    f"lines so a reader can see the clauses")
+            elif pid == CODE_PID:
+                add(nm, "UNREADABLE_SCRIPT",
+                    f"the script is {len(val.strip())} characters on ONE line; keep a script "
+                    f"body multi-line, one statement per line")
 
         if tmpl == "Node":
             cp = next((p for p in a.get("parameters") or [] if p.get("tabPropertyId") == CODE_PID), None)

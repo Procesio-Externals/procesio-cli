@@ -734,3 +734,36 @@ can even carry a real user as `createdBy` (the account that first opened the wor
 the id nor the author tells you. Treat 452 as the answer: **an unreferenced model that refuses to
 delete is the platform's, not a leftover of yours.** A tidy-the-workspace pass should report those
 rather than keep retrying them.
+
+## ProcessInfo is a declared variable, not an ambient object
+
+The platform's per-run facts are reached through a flow variable, so a flow that never
+references them does not have it:
+
+    {"Id": "<per-flow guid>", "ContextId": null,
+     "DataType": "10c6ac59-3929-49e6-99dc-121212121221",   // SystemDataModel
+     "Type": 40, "Name": "ProcessInfo",
+     "DefaultValue": null, "IsList": false, "IsError": false, "IsRequired": false}
+
+Its fields are attributes of `SystemDataModel`:
+
+| field | attribute id |
+|---|---|
+| `workspaceId` | `75044bb4-7c70-40f2-8756-21c03de655c8` |
+| `instanceId` | `d3c32b47-df62-4376-8a82-f8f9aff7d6d0` |
+| `templateId` | `3a36d9ea-0fd8-4d4a-a89b-8f297c5d0098` |
+| `name` | `0a5d51bc-2550-4291-a56c-cb027f8db966` |
+| `startedOn` | `75044bb4-7c70-40f2-8756-21c03de655c9` |
+
+Bind a field like any model-typed variable: a `<%N%>` placeholder whose `variable[]` entry is
+`{variableId: <the flow's ProcessInfo id>, attribute: <the attribute id>}`.
+
+**The designer adds it the first time something references it, which makes it easy to lose.**
+A flow rebuilt from a compact config keeps only the variables the config lists, so a rebuild
+drops ProcessInfo from every flow that had it, silently, because nothing references it
+afterwards. Declare it with `direction: "processinfo"`.
+
+**Prefer `ProcessInfo.workspaceId` over any stored copy of the workspace id.** It is always
+right, needs no configuration, and survives an import into another workspace - where a literal
+in an action parameter does not, since an import rewrites a resource's own `workspaceId`
+metadata but never a value inside a parameter.

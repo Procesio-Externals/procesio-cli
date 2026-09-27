@@ -80,7 +80,9 @@ def _select_cfg():
 def test_query_chips_and_placeholders():
     node = _qs_node(pb.build(_select_cfg(), _ctx()))
     q = _param(node, "b102")
-    assert q["Value"] == "select <%0%> from <%1%> where <%2%> <= @maxTier"  # @param stays literal
+    # Each chip becomes a positional placeholder and `@param` stays literal; the statement is
+    # laid out over lines so the node can be read in the designer.
+    assert q["Value"].splitlines() == ["select <%0%>", "from <%1%>", "where <%2%> <= @maxTier"]
     chips = q["Variable"]
     assert chips[0] == {"id": 0, "type": "dataStoreColumn", "variableId": None,
                         "dataStoreId": _STORE, "columnId": _C_NAME, "attribute": None}
@@ -120,7 +122,11 @@ def test_one_id_sequence_across_node():
 def test_designer_mirror():
     node = _qs_node(pb.build(_select_cfg(), _ctx()))
     q = _cd(node, "b102")["value"]                              # code-editor -> ds.<id>[.<col>]
-    assert q == f"select ds.{_STORE}.{_C_NAME} from ds.{_STORE} where ds.{_STORE}.{_C_TIER} <= @maxTier"
+    # Laid out over lines on the way in, so the node is readable in the designer. The clauses,
+    # the chips and the parameter are unchanged; only the whitespace between them is new.
+    assert q.splitlines() == [f"select ds.{_STORE}.{_C_NAME}",
+                              f"from ds.{_STORE}",
+                              f"where ds.{_STORE}.{_C_TIER} <= @maxTier"]
     prow = _cd(node, "b103")["value"][0]                        # map-parameters designer row
     assert prow["destination"] == "maxTier" and prow["source"]                       # var id
     assert _cd(node, "b105")["value"] and _cd(node, "b106")["value"]                  # output var ids
