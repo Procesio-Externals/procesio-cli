@@ -67,6 +67,25 @@ add-credential --name qa-me --type userpass --username … --environment Interna
 are derived from the `<Client>-<ENV>` name when omitted. Built-in `Internal-*` cannot be
 removed. Names are matched case-insensitively.
 
+## The form-code-key is per environment too
+
+A form's "Switch to code" CSS and JavaScript (`Data.code`) is AES-encrypted with a key
+the installation's web app holds. The platform team confirmed it is one key per
+INSTALLATION: the same on every workspace of it, not guaranteed to match on another. So
+the tool stores it per environment, `form-code-key@<environment>`, and resolves it from
+the call's environment like everything else here (`form_code_keys.py`):
+
+- `form-code-key@<env>` when stored;
+- else, for the DEFAULT environment only, the bare legacy `form-code-key` (the same
+  backward-compatible rule as an unbound credential);
+- else an error naming the secret to store. Never another environment's key: a blob
+  encrypted with the wrong installation's key is one its renderer cannot open, and the
+  form goes blank.
+
+```
+python scripts/set-credential.py procesio form-code-key@Internal-QA
+```
+
 ## Tests / isolation
 
 The suite's autouse `_isolate_userdata` fixture (conftest) pins `AAT_USERDATA_DIR` to a

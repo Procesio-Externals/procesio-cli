@@ -41,8 +41,10 @@ Stored encrypted in `Data.code`. **Scheme (verified by decrypting real exports):
 `code = AES_encrypt( JSON.stringify({"JAVASCRIPT":js,"CSS":css}) )` using CryptoJS
 `AES.encrypt(text, passphrase)` = OpenSSL AES-256-CBC, key+IV via EVP_BytesToKey(MD5,1),
 output `base64("Salted__"+salt+ct)`. Passphrase = a static key.
-- **Key is in Credential Manager** at `agents-and-tools:procesio / form-code-key` — NEVER
-  in any file (Hard rule 1). Declared in `tool.yaml` secrets.
+- **Key is in Credential Manager**, one per installation, stored per environment as
+  `agents-and-tools:procesio:form-code-key@<environment>` (the bare `form-code-key` is
+  the default environment's; `tools/procesio/form_code_keys.py`) — NEVER in any file
+  (Hard rule 1). Declared in `tool.yaml` secrets.
 - Build via `css:"..."` / `javascript:"..."` (or `code:{css,javascript}`) on the form
   config. Empty → `code:""` (forms render fine without it). Impl: `code_cipher.py`
   (`encrypt_code`/`decrypt_code`) + `builder._build_code`.
