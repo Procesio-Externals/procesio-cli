@@ -76,15 +76,33 @@ worse bug than a visible one.
 **Cause.** The form's own logic hides them inside a click handler that has never run.
 **Rule.** Gate on an observable phase, e.g. "the stepper is on screen".
 
+### The native form shows for about a second before any script runs
+**Cause.** The renderer draws the form first and runs the form-load event about a
+second later (measured: 1.0 s on a live form). Every script sits behind an event,
+including the `Data.code` JavaScript, which the front end injects as a form event. So
+no script, however small or early in the list, can hide anything from the first frame.
+Setting `visible = false` from a load script is no faster, and it removes the node from
+the page within milliseconds ([01](01-ANATOMY.md) §4), which breaks any field a script
+reads or clicks in the DOM.
+**Rule.** Make the form presentable without its scripts. The first element is a plain
+line that says what is loading; hidden helper fields come after it. If something must be
+invisible from the first frame, the form-level CSS in `Data.code` is the only surface
+applied at render that can hide it. Per-element `style` takes only theme variables
+([01](01-ANATOMY.md) §4), and writing `Data.code` needs the right key
+([07](07-DEPLOY-WORKFLOW.md) §2).
+
 ---
 
 ## Values and Vue
 
 ### Writing `info-text` from the field model does nothing at all
 **Cause.** The runtime renders `info-text` from the element's STATIC config array, not
-from the reactive field object. `ProcesioForm.data.fields.<name>` exposes only `value`,
-`visible`, `required` and `readonly`, so assigning `infoText` is a silent no-op, and no
-`setConfigValue`-style API is exposed to form JS.
+from the reactive field object, so assigning `infoText` on
+`ProcesioForm.data.fields.<name>` changes nothing on screen, and no
+`setConfigValue`-style API is exposed to form JS. (The field object itself is wider
+than `value`, `visible`, `required` and `readonly`: on a select built through the API it
+carried 15 properties, `label` and `placeholder` among them. What it carries follows the
+form's data model; see *A script reads a select's options and gets nothing*.)
 **Rule.** Drive live text — counters, running totals, quota hints — by writing the DOM
 node. Note that when `info-text` is empty the message component is never rendered at all
 (`v-if` on a truthy value), so there is no node to write into: either set a non-empty
@@ -172,6 +190,40 @@ parallel with the chain that wrote it. JS blocks of concurrent chains share one
 sandbox iframe, so they can cancel each other.
 **Rule.** A field that must trigger logic is written by exactly one party. Keep
 flags that MAPs reset apart from the field that triggers work.
+
+### A script reads a select's options and gets nothing
+**Cause.** Two gaps, both silent. On a form built through the API, the select's field
+object has no `sourceType` and no `sourceValue`: `form-create` writes them as element
+configs but leaves them out of the form's data model, and only data-model attributes
+reach `ProcesioForm`. A save in the designer adds them. The page is no fallback either:
+the option nodes are not drawn until the list is opened once (none before, the
+options after). A local replica that draws its own select hides both gaps, so the list is fine
+in every test and empty on the live form.
+**Rule.** Do not read a list back from the select. Hand the script the list directly:
+write it in at build time, or return it from a process call the form already makes.
+Opening the select from code so that it draws works, but it leans on markup and timing.
+The builder gap is specified in `todo/procesio-form-create-select-source-in-data-model.md`.
+
+### Field reads that worked stop working after a designer save
+**Cause.** A form built through the API keeps its field names exactly as written, and
+`ProcesioForm.data.fields` is keyed by them. A save in the designer re-keys them: it
+splits each name on underscores, lowercases the parts and joins them in camelCase, so
+`orderList` becomes `orderlist` and `order_id` becomes `orderId`. A read that
+worked for weeks returns `undefined` the first time anyone saves the form in the
+designer, and a lowercase snake_case name is not safe either.
+**Rule.** Read fields through a lookup that ignores case and separators
+([`../dto/form/description.md`](../dto/form/description.md)). Only a name that is a single
+lowercase word survives a designer save unchanged.
+
+### A designer save changes far more than the edit you made
+**Cause.** Saving in the designer rewrites the whole definition. On an API-built form, one
+save with no edit at all re-keyed the field names (above), added an encrypted `Data.code`
+blob, gave every element a `class` config, replaced the theme layout, swapped `type` for
+`rows` on text fields and removed `disabledIfFormIsInvalid` from buttons. The form-load
+scripts survived it.
+**Rule.** Treat a designer save of an API-built form as a migration: export the definition
+before and after and diff them, rerun the form's live checks, and Publish. Better still,
+change API-built forms only through the builder.
 
 ## Mapping and processes
 
@@ -371,6 +423,52 @@ sent where PascalCase is required.
 **Cause.** It was published straight to the live process.
 **Rule.** Duplicate, change the copy, test the copy, promote. And when something
 does break: revert fully and immediately, then re-approach.
+
+### `form-set-code` succeeds and the form goes blank
+**Cause.** The `form-code-key` stored on this machine is not the one the installation's
+renderer uses. The write encrypts with it anyway; the renderer cannot open the blob, logs
+`Malformed UTF-8 data` and never mounts the form. It is easy to read this as "the CLI
+cannot write form CSS", which is the wrong conclusion.
+**Rule.** Before the first write on an installation, decrypt the code of a form whose CSS
+was written in the designer there ([07](07-DEPLOY-WORKFLOW.md) §2). If that fails, the
+key is wrong; do not write. `form-set-code --clear` repairs a form already blanked.
+
+### A form answers "Form not found" after someone edited it in the designer
+**Cause.** A designer **Save** without **Publish** turns a published form into a draft,
+and a draft's page answers "Form not found". The draft is not closed, though: its data
+stays reachable through the API, anonymous `rows/filter` included.
+**Rule.** Publish after every designer save, and confirm the status through the API
+(`status` 1 = published, 0 = draft). To take a form offline, make it private or disable
+it. A draft takes the page down and leaves the data up.
+
+### A form takes seconds to open, and much longer at busy times
+**Cause.** The whole definition, scripts included, is sent on every open, uncompressed.
+A 499 KB form took 4 s at good times and up to 20 s at bad ones. Minifying cut the
+script by about a quarter but the form by only 9-15 %, because most of the weight is
+elements and their data model (about 260 KB of them beside 100 KB of script, in one
+case).
+**Rule.** Few hidden helper fields: one request field and one result field per process,
+holding JSON, rather than one field per value. Minify at build time and keep the
+readable source in the repository. Check a form's size before it ships, the way you
+check its contrast.
+
+### The first open on a fresh browser takes most of a minute
+**Cause.** Not the form. On a cold browser the forms site's own stylesheet, about 2 MB,
+took 31-62 s to download in one measurement, while the form and its first process call
+together took about 11 s.
+**Rule.** Before a demo, open each form once on the presenting machine so the platform's
+files are cached. Load the opening view with one process call, not several. Report
+platform slowness with numbers: in the same measurement a neutral CDN served 1 MB in
+about a second.
+
+### Each process call from a form takes three to four seconds
+**Cause.** Every `RUN_PROCESS` from a form went through a platform publish step
+(1.8-3.0 s) before the launch itself (1.2-1.4 s). Calls made one after another add up:
+a view that read three items with one call each spent 16.5 s on them, about half of its
+31.7 s load.
+**Rule.** Give each view one call that returns everything it needs. Whether the publish
+step can be skipped for a process that has not changed is a question for the platform
+team.
 
 ---
 

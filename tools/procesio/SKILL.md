@@ -376,12 +376,15 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `node-add-binding` | `--id`, `--node`, `--property` | Add bindings to ONE node parameter, optionally editing its text in the same write - the edit neither node-bind-var nor node-replace-text can make.… |
 | `node-bind-var` | `--id`, `--node`, `--property`, `--bind` | Bind a process variable into one node parameter's value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable… |
 | `node-delete` | `--id`, `--node` | Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) ->… |
 | `node-insert` | `--id`, `--after`, `--action` | Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor's successor and the anchor is repointed at… |
 | `node-params` | `--id` | List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only). |
 | `node-replace-text` | `--id`, `--node`, `--find`, `--replace` | Replace an EXACT literal in every string leaf of a node's runtime parameters AND designer settings on a live process - the safe way to reach a value nested… |
+| `node-set-error-port` | `--id`, `--node` | Wire ONE node's error port to a handler action on a live process, so a fault routes instead of killing the run. Writes all THREE parts the engine needs (the… |
 | `node-set-param` | `--id`, `--node`, `--property` | Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime… |
+| `node-set-query` | `--id`, `--node` | Replace a Query Store node's STATEMENT and its Data Store chips together on a live process, writing the SQL with the same {{ds:Store}} / {{col:Store.Column}}… |
 
 ### patch
 

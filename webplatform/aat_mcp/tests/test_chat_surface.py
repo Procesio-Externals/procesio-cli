@@ -182,10 +182,17 @@ def test_the_two_surfaces_do_not_import_each_other():
     assert "chat_server" not in _imports(_HERE / "server.py")
 
 
+def test_the_shared_protocol_module_imports_neither_surface():
+    """protocol.py is shared so that negotiation has ONE implementation - two copies are how
+    both servers came to agree to any version asked for. It must stay below both surfaces:
+    if it imported one, a change to that surface would reach the other through it."""
+    assert not _imports(_HERE / "protocol.py") & {"server", "chat_server", "bridge", "gate"}
+
+
 def test_the_published_surface_reaches_only_the_shared_substrate():
     """Whatever this surface imports is what a change elsewhere can reach it through.
     Keeping the list short is the isolation; asserting it is what keeps it short."""
-    allowed = {"bridge", "gate", "yaml", "json", "os", "sys", "pathlib", "__future__"}
+    allowed = {"bridge", "gate", "protocol", "yaml", "json", "os", "sys", "pathlib", "__future__"}
     assert _imports(_HERE / "chat_server.py") <= allowed
 
 

@@ -9,6 +9,13 @@
     "source": "github"
   },
   "website_url": "https://procesio.com",
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "com.procesio/toolsDigest": {
+        "procesio-mcp-chat": "sha256:06c9decb20c56e9e823597e587d1b168ab14eebc84b37911244dac874ab97d8c"
+      }
+    }
+  },
   "packages": [
     {
       "registry_type": "pypi",

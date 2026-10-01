@@ -366,3 +366,156 @@ it out. Keep a script multi-line, one statement per line; a single line is fine 
 genuinely one short expression (`return String(x || '')`).
 
 The same rules apply to the external SQL actions.
+
+## A column comes back base64 when its EXPRESSION resolves to binary
+
+Symptom: a text column arrives as one base64 blob. Decoded, it is the right sentence with raw
+bytes sitting where a value should be. It reaches wherever that column was going - a calendar
+event description, an email body - so it is the user who finds it, not a test.
+
+The encoding follows the SQL type of the WHOLE expression, and MySQL derives that by collation
+coercibility, so WHICH arguments are present decides it. Measured over a real store:
+
+| Expression | Comes back as |
+| --- | --- |
+| `<Guid column>` alone, or `CONCAT('', <Guid column>)` alone | the canonical GUID text |
+| `CONCAT(<varchar column>, CHAR(10), <Guid column>)` | **base64**, the guid as 16 raw bytes |
+| `CONCAT('x', '
+', 'id=', CONCAT('', <Guid column>))` | **base64**, same |
+| `CONCAT('a', CHAR(10), 'b')` - literals only | **base64** |
+| `CONCAT(<varchar column>, CHAR(10), 'b')` | text |
+| `CONCAT('a', CHAR(10), <varchar column>)` | text |
+| `CONCAT(<varchar column>, CHAR(10 USING utf8mb4), 'b')` | text |
+| `CONCAT('url?id=', <the conversion below>, '&x=1')` | text, canonical GUID |
+
+Two rules, in order of how often they bite:
+
+- **A Guid column inside a larger expression forces the whole column binary.** It renders as text
+  only when it IS the column - `CONCAT('', g)` works alone because the layer can still attribute
+  the result to a Guid chip, and contributes raw bytes the moment anything else is concatenated,
+  even with character columns present. This is the one that actually breaks things, and nothing
+  warns.
+- **`CHAR(n)` returns a binary string, but only decides the result when every other argument is a
+  literal.** One real character column in the expression keeps it character. So `CHAR(n)` is a
+  latent hazard rather than the usual cause: a statement that reads fine today turns binary the
+  day someone simplifies the surrounding columns out of it. `CHAR(n USING utf8mb4)` removes the
+  hazard and costs nothing, which is worth doing on sight - but do not diagnose a base64 column by
+  blaming it first; look for the Guid.
+
+### Converting a Guid column to text inside an expression
+
+The storage is `BINARY(16)` in .NET `Guid.ToByteArray()` order, so the first three groups are
+little-endian and `BIN_TO_UUID` does not agree with the designer. `HEX()` is what makes the result
+CHARACTER data, which is the point:
+
+```sql
+LOWER(CONCAT_WS('-',
+  HEX(REVERSE(SUBSTR(g, 1, 4))),
+  HEX(REVERSE(SUBSTR(g, 5, 2))),
+  HEX(REVERSE(SUBSTR(g, 7, 2))),
+  HEX(SUBSTR(g, 9, 2)),
+  HEX(SUBSTR(g, 11, 6))))
+```
+
+Verified against the same row read through the rows API, and the text it produces MATCHES the
+binary column in a filter or a typed parameter - which is what makes it usable in a link the
+product later looks the row up by.
+
+**A placeholder is not reusable, so this needs five chips per Guid.** `<%N%>` indices bind
+`Variable[]` positionally and nothing substitutes the same index twice; the way to name one column
+five times is five chips pointing at it, which a config's `{{col:Store.Column}}` token does
+naturally (one index per occurrence). `node-set-param` refuses this edit by design - it holds the
+placeholder set fixed - so reach for `node-set-query`, which rewrites the statement and
+regenerates its chips together.
+
+### Why it matters beyond cosmetics
+
+A link assembled this way carries the identifiers the product will later match the row by. Get the
+encoding wrong and the link is not merely ugly: the bytes land raw, they include characters that
+cannot survive a URL (quotes, newlines, control bytes), and the page the link opens can never find
+the record. A customer then has a cancel link that does nothing - and the way that surfaces is a
+second booking next to the first, with the first still marked active.
+
+## JSON_VALID does NOT protect a CAST ... AS JSON in the same expression
+
+Reading a JSON payload that came from an HTTP response is the normal case, and an HTTP response
+is not always JSON: an auth failure answers with a page, a gateway answers with text, a timeout
+answers with nothing. So the parse has to be defended, and the obvious defence does not work:
+
+```sql
+-- STILL ERRORS on a non-JSON payload: the guard does not stop the cast being evaluated
+JSON_VALID(@payload) AND EXISTS (SELECT 1 FROM JSON_TABLE(CAST(@payload AS JSON), ...) AS t ...)
+```
+
+Measured: with `@payload` = `Unauthorized`, or empty, the step fails with "The query could not be
+executed." A statement that only runs every few minutes inside a scheduled flow then takes the
+whole flow down, repeatedly, for a reason that has nothing to do with the data it was written for.
+
+Sanitise the VALUE before it reaches the cast instead, so the cast never sees anything else:
+
+```sql
+CAST(IF(JSON_VALID(@payload), @payload, '{}') AS JSON)
+```
+
+With that, the same six payloads (a valid object, a valid array, an object with the array missing,
+plain text, an empty string, and the real thing) all evaluate to a plain false and the step
+succeeds. Worth probing with exactly that spread before shipping a JSON predicate: the two that
+break are the two nobody writes a test for.
+
+## A scheduled reconciler should key on the remote's own state, not on a notification
+
+A pattern that works, from a booking product whose calendar events live in a third-party
+calendar: the reconciling flow re-reads each future record's remote object every couple of
+minutes and releases the local record when the remote says it is gone. Three signals, and all
+three are needed:
+
+| Remote says | Means |
+| --- | --- |
+| HTTP 404 / 410 | the object was deleted outright |
+| 200 with the object's own status `cancelled` | cancelled in place |
+| 200, status still live, but the invited party's `responseStatus` is `declined` | the person is not coming, though the object survives |
+
+The third is the one usually missed, and it is the only one that distinguishes "they declined" from
+"nothing happened". Match the decline on the invited party's OWN address rather than on "any
+attendee declined", or one guest's decline cancels the host's meeting. The guard costs one extra
+parameter and is worth it.
+
+The broader point: no webhook is involved and none is needed. The remote object IS the state, so
+re-reading it converges no matter which of the two sides acted, and a missed notification cannot
+desynchronise anything. The cost is that a reader who looks between two ticks sees the old value -
+so when verifying, re-read after a tick rather than concluding the mechanism is broken.
+
+## A value injected into a JSON body must carry the JSON escape, not the character
+
+A statement that builds text for an HTTP body is building part of a JSON document, because a Call
+API body template substitutes the value RAW into a string:
+
+```json
+{ "description": "<%7%>" }
+```
+
+So a real newline in that value is a literal newline inside a JSON string, which is invalid JSON.
+The request is then malformed and the call does nothing - and because the loop around it carries
+on, the flow still reports success. The symptom is an absence: no event, no error, nothing in the
+logs.
+
+The value therefore has to contain the two characters `\` and `n`, which the JSON parser turns
+back into a newline. From MySQL that means a doubled backslash in the literal, `'\n'`, since
+`'\n'` is MySQL's own escape and produces the character itself. Easy to get wrong through a
+generator: check the stored statement, not the generator's input - `\n` and `\n` look identical
+in most error-reporting and one of them silently means "newline".
+
+Keep the real character where the text is PARSED rather than embedded: splitting a pasted list on
+newlines still wants `CHAR(10 USING utf8mb4)`. Same statement, two different answers, decided by
+where the string is going.
+
+### Why this one hides: one bug can mask another
+
+The same statement had the base64 fault described above, and base64 contains no newlines and no
+quotes - so while the column was being base64-encoded, the body it fed was always valid JSON and
+the create worked. Fixing the encoding is what made the newlines real and broke the call. Neither
+bug was visible while the other stood.
+
+The lesson is procedural: after repairing how a value is ENCODED, re-test every consumer of that
+value, not just the one whose output looked wrong. The repair changes the bytes, and something
+downstream was relying on the broken shape without anyone knowing.

@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**136 rules across 7 notes.**
+**137 rules across 7 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -141,6 +141,7 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [changed is the intent, put is the outcome](PROCESIO-API-NOTES.md#changed-is-the-intent-put-is-the-outcome)
 - [Variable substitution into a script is LITERAL, and a json variable IS the escaping mechanism](PROCESIO-API-NOTES.md#variable-substitution-into-a-script-is-literal-and-a-json-variable-is-the-escaping-mechanism)
 - [Consequence: a form field cannot feed a json-typed process input](PROCESIO-API-NOTES.md#consequence-a-form-field-cannot-feed-a-json-typed-process-input)
+- [PROCESIO webhook handshake-response is NOT persistent - cannot reliably serve Meta inbound (2026-10-01, refines the earlier claim)](PROCESIO-API-NOTES.md#procesio-webhook-handshake-response-is-not-persistent---cannot-reliably-serve-meta-inbound-2026-10-01-refines-the-earlier-claim)
 
 ## Procesio Instance History Notes
 

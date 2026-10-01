@@ -6696,6 +6696,49 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+- name: node-add-binding
+  description: Add bindings to ONE node parameter, optionally editing its text in the same write - the edit neither node-bind-var nor node-replace-text can make. node-bind-var takes a STRING parameter and replaces the whole binding list; node-replace-text refuses a replacement that contains a <%N%>. This one reaches inside a STRUCTURED parameter (an HTTP body template is a dict), may introduce a new placeholder, and KEEPS the bindings already there. --bind INDEX=variable.Attribute resolves the attribute by NAME against the variable's model, so a wrong one is refused with the list of real ones instead of binding to nothing at run time. Refuses an edit that leaves a <%N%> unbound or a binding unused. Validates + flow-lints before PUT; --dry-run previews.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: node
+    type: string
+    required: true
+    description: node actionName (canvas label) or id
+  - name: property
+    type: string
+    required: true
+    description: the parameter's designer label (e.g. 'Request Parameters') or its id
+  - name: bind
+    type: string
+    required: false
+    description: INDEX=variable or INDEX=variable.Attribute (repeatable). The attribute is resolved BY NAME against the variable's model, so a typo is refused rather than written
+  - name: find
+    type: string
+    required: false
+    description: exact literal to replace first (reaches every string leaf, so it works inside a structured parameter)
+  - name: replace
+    type: string
+    required: false
+    description: replacement literal; unlike node-replace-text it MAY introduce a new placeholder, which is the point
+  - name: dry-run
+    type: boolean
+    required: false
+    description: edit + validate but do not PUT
 - name: node-bind-var
   description: 'Bind a process variable into one node parameter''s value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable (repeatable); optional --find/--replace turns a mistyped literal token (e.g. a text ''<%firstName%>'' that never resolves) into ''<%0%>'' in the same write. The value''s placeholder set must equal the bound set. Regenerates the designer layer -> validate + flow-lint -> PUT. --dry-run previews.'
   args:
@@ -6879,6 +6922,41 @@ actions:
     type: boolean
     required: false
     description: replace + normalize + validate but do not PUT
+- name: node-set-error-port
+  description: Wire ONE node's error port to a handler action on a live process, so a fault routes instead of killing the run. Writes all THREE parts the engine needs (the type-1 port, the node's variableErrorId, and an isError variable of the error datatype); wiring only some of them validates clean and never fires. Reach for it when a flow a FORM launches on load must still reach Stop with one section empty. The handler is named, never inferred, because it has to tolerate a null input - the node's own successor is the usual choice. --clear removes it. Refused on Start/Stop/Join/For Each, which have no error port. Validates + flow-lints before PUT; --dry-run previews.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: node
+    type: string
+    required: true
+    description: 'the node whose error port to wire: actionName (canvas label) or id'
+  - name: handler
+    type: string
+    required: false
+    description: 'the action a fault routes to: actionName or id. Its own successor is the usual choice when that successor already tolerates a missing input'
+  - name: clear
+    type: boolean
+    required: false
+    description: remove the error port (and its error variable, if nothing else uses it)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: wire + normalize + validate but do not PUT
 - name: node-set-param
   description: Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime layer -> validate + flow-lint -> PUT. --dry-run to preview; an invalid flow is never PUT. Structured (list/dict) parameters stay process-edit territory.
   args:
@@ -6922,6 +7000,49 @@ actions:
     type: boolean
     required: false
     description: patch + normalize + validate but do not PUT
+- name: node-set-query
+  description: 'Replace a Query Store node''s STATEMENT and its Data Store chips together on a live process, writing the SQL with the same {{ds:Store}} / {{col:Store.Column}} tokens a process config uses. This is the edit node-set-param cannot make: it holds the `<%N%>` set fixed (those indices bind Variable[] positionally), so it refuses a statement that names one more column - or names the same column twice, which is unavoidable when a value must be rebuilt from several expressions over it, because a placeholder is not reusable. Each token occurrence gets its own chip. Refused when the node''s Parameters map is non-empty, since the map''s sources share the index sequence. Validates + flow-lints before PUT; --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: node
+    type: string
+    required: true
+    description: 'the Query Store node: actionName (canvas label) or id'
+  - name: sql
+    type: string
+    required: false
+    description: the statement, written with {{ds:Store}} / {{col:Store.Column}} tokens
+  - name: sql-file
+    type: string
+    required: false
+    description: read the statement from a file (needed above the argv limit, which a real statement usually is)
+  - name: params
+    type: string
+    required: false
+    description: 'the Parameters map as JSON {name: source}, where a source is {"keep": true} (reuse the live source verbatim, attribute path included), {"var": "name"}, {"raw": {...}} or a literal. REQUIRED when the node''s map is non-empty, because the whole node is renumbered'
+  - name: params-file
+    type: string
+    required: false
+    description: read the Parameters map JSON from a file
+  - name: dry-run
+    type: boolean
+    required: false
+    description: render + validate but do not PUT
 - name: patch-actions-folders-rename
   description: 'PATCH /api/Actions/folders/rename  [Actions] - Permission required: ProcessDesigner.Update'
   args:

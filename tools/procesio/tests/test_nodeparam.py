@@ -506,3 +506,288 @@ def test_handler_variable_set_default_rejects_clear_with_a_value():
     with pytest.raises(UsageError, match="do not combine it with"):
         nodeparams.variable_set_default(_Client(), args)
 
+
+
+# --------------------------------------------------------------------------- error ports
+
+def _err_flow():
+    """Two nodes in a line: a Call API that can fault, and the Node that consumes its response.
+
+    Shaped like the live DTO on the detail that matters here - ports live on the SOURCE action and
+    carry `destinationId` - because an error port written on the wrong side validates and never
+    fires.
+    """
+    return {
+        "id": "flow-e", "title": "Bootstrap",
+        "variables": [{"id": "var-res", "name": "response", "type": 20}],
+        "actions": [
+            {"id": "call-1", "actionName": "List the workspace credentials",
+             "actionTemplateName": "Call API", "variableErrorId": None,
+             "parameters": [], "customData": {},
+             "ports": [{"id": "p1", "flowId": "flow-e", "sourceId": "call-1",
+                        "destinationId": "node-1", "type": 0, "state": 1, "data": {}}]},
+            {"id": "node-1", "actionName": "Keep only the calendar ones",
+             "actionTemplateName": "Node", "parameters": [], "customData": {}, "ports": []},
+            {"id": "join-1", "actionName": "Join", "actionTemplateName": "Join",
+             "parameters": [], "customData": {}, "ports": []},
+        ],
+    }
+
+
+def test_an_error_port_is_written_as_all_three_parts():
+    flow = _err_flow()
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    handler = nodeparam.find_node(flow, "Keep only the calendar ones")
+    report = nodeparam.set_error_port(flow, node, handler)
+
+    err = [p for p in node["ports"] if p["type"] == 1]
+    assert len(err) == 1
+    assert err[0]["destinationId"] == "node-1"
+    assert err[0]["data"] == {"isDefault": "error"}          # the port
+    var = next(v for v in flow["variables"] if v["id"] == node["variableErrorId"])
+    assert var["isError"] is True                             # the variable
+    assert var["dataType"] == nodeparam.ERROR_DATA_MODEL      # of the only accepted datatype
+    assert report["handler"] == "Keep only the calendar ones"
+    assert report["variable_created"] is True
+
+
+def test_the_normal_port_is_left_alone():
+    flow = _err_flow()
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    nodeparam.set_error_port(flow, node, nodeparam.find_node(flow, "Keep only the calendar ones"))
+    normal = [p for p in node["ports"] if p["type"] == 0]
+    assert len(normal) == 1 and normal[0]["id"] == "p1" and normal[0]["destinationId"] == "node-1"
+
+
+def test_rewiring_replaces_the_port_rather_than_adding_a_second():
+    flow = _err_flow()
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    nodeparam.set_error_port(flow, node, nodeparam.find_node(flow, "Keep only the calendar ones"))
+    first_var = node["variableErrorId"]
+    report = nodeparam.set_error_port(flow, node, nodeparam.find_node(flow, "Join"))
+    assert len([p for p in node["ports"] if p["type"] == 1]) == 1
+    assert report["handler_before"] == "node-1"
+    assert node["variableErrorId"] == first_var               # the variable is reused, not duplicated
+    assert len([v for v in flow["variables"] if v.get("isError")]) == 1
+
+
+def test_a_half_wired_error_variable_is_repaired_not_trusted():
+    """A plain string variable in that slot validates and the port never fires, so the shape is
+    corrected on the way past rather than left as the caller found it."""
+    flow = _err_flow()
+    flow["variables"].append({"id": "var-bad", "name": "oops", "type": 20,
+                              "dataType": "0317bfee-b2f5-4bde-bfe8-121212121214", "isError": False})
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    node["variableErrorId"] = "var-bad"
+    nodeparam.set_error_port(flow, node, nodeparam.find_node(flow, "Keep only the calendar ones"))
+    var = next(v for v in flow["variables"] if v["id"] == "var-bad")
+    assert var["isError"] is True and var["dataType"] == nodeparam.ERROR_DATA_MODEL
+
+
+def test_clear_removes_the_port_and_its_now_unused_variable():
+    flow = _err_flow()
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    nodeparam.set_error_port(flow, node, nodeparam.find_node(flow, "Keep only the calendar ones"))
+    report = nodeparam.set_error_port(flow, node, None, clear=True)
+    assert [p for p in node["ports"] if p["type"] == 1] == []
+    assert node["variableErrorId"] is None
+    assert [v for v in flow["variables"] if v.get("isError")] == []
+    assert report["cleared"] is True and report["handler_before"] == "node-1"
+
+
+def test_a_template_without_an_error_port_is_refused():
+    flow = _err_flow()
+    with pytest.raises(ValueError) as e:
+        nodeparam.set_error_port(flow, nodeparam.find_node(flow, "Join"),
+                                 nodeparam.find_node(flow, "Keep only the calendar ones"))
+    assert "no error port" in str(e.value)
+
+
+def test_a_node_cannot_handle_its_own_error():
+    flow = _err_flow()
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    with pytest.raises(ValueError) as e:
+        nodeparam.set_error_port(flow, node, node)
+    assert "its own error" in str(e.value)
+
+
+def test_a_handler_outside_the_flow_is_refused():
+    flow = _err_flow()
+    node = nodeparam.find_node(flow, "List the workspace credentials")
+    with pytest.raises(ValueError) as e:
+        nodeparam.set_error_port(flow, node, {"id": "elsewhere", "actionName": "Other"})
+    assert "not in this flow" in str(e.value)
+
+
+# --------------------------------------------------------------------------- Query Store nodes
+
+def _qs_node(statement="SELECT <%0%>\nFROM <%1%>", chips=None, pmap=None):
+    return {"id": "qs-1", "actionName": "Read the meetings 1",
+            "actionTemplateName": "Query Store", "customData": {}, "ports": [],
+            "parameters": [
+                {"tabPropertyId": "02577ada-0000-0200-0000-00000000b102", "value": statement,
+                 "variable": chips if chips is not None else [{"id": 0}, {"id": 1}]},
+                {"tabPropertyId": "02577ada-0000-0200-0000-00000000b103", "value": pmap or [],
+                 "variable": []},
+                {"tabPropertyId": "02577ada-0000-0200-0000-00000000b104", "value": "1800",
+                 "variable": []},
+            ]}
+
+
+def test_the_statement_and_its_params_map_are_found_by_property_suffix():
+    node = _qs_node()
+    query, pmap = nodeparam.find_query_params(node)
+    assert query["value"].startswith("SELECT")
+    assert pmap["value"] == []
+
+
+def test_a_node_with_no_statement_reports_none():
+    node = {"id": "n", "actionName": "Some node", "actionTemplateName": "Node",
+            "parameters": [{"tabPropertyId": "whatever-else", "value": "x"}]}
+    assert nodeparam.find_query_params(node) == (None, None)
+
+
+def test_a_non_empty_params_map_is_visible_to_the_caller():
+    """The guard that protects a bound @param lives in the handler, so the model has to hand the
+    map back rather than hide it."""
+    node = _qs_node(pmap=[{"id": 0, "source": {"value": "<%7%>"},
+                           "destination": {"value": "e", "variable": []}}])
+    _, pmap = nodeparam.find_query_params(node)
+    assert pmap["value"] and pmap["value"][0]["destination"]["value"] == "e"
+
+
+def _qs_full():
+    """A Query Store node shaped like the live release step: statement chips 0-4, a parameters map
+    on 5-7, and an output binding on 8 - one sequence across three parameters."""
+    return {"id": "qs", "actionName": "Update the meetings 3", "actionTemplateName": "Query Store",
+            "customData": {}, "ports": [], "parameters": [
+                {"tabPropertyId": "x-b102",
+                 "value": "UPDATE <%0%>\nSET <%1%> = 'Cancelled', <%2%> = NULL\n"
+                          "WHERE <%3%> = @mid\nAND <%4%> = 'Confirmed'",
+                 "variable": [{"id": i} for i in range(5)]},
+                {"tabPropertyId": "x-b103", "value": [
+                    {"id": 0, "source": {"value": "<%5%>", "variable": [{"id": 5, "variableId": "v-row"}]},
+                     "destination": {"value": "mid", "variable": []}},
+                    {"id": 1, "source": {"value": "<%6%>", "variable": [{"id": 6, "variableId": "v-st"}]},
+                     "destination": {"value": "status", "variable": []}},
+                ], "variable": []},
+                {"tabPropertyId": "x-b104", "value": "1800", "variable": []},
+                {"tabPropertyId": "x-b106", "value": "<%7%>",
+                 "variable": [{"id": 7, "variableId": "v-out"}]},
+            ]}
+
+
+def test_renumbering_keeps_one_sequence_across_every_parameter():
+    node = _qs_full()
+    query, pmap = nodeparam.find_query_params(node)
+    nxt = nodeparam.renumber_node_placeholders(node, [query, pmap])
+    assert nxt == 8
+    assert node["parameters"][0]["value"].startswith("UPDATE <%0%>")
+    rows = node["parameters"][1]["value"]
+    assert [r["source"]["value"] for r in rows] == ["<%5%>", "<%6%>"]
+    assert node["parameters"][3]["value"] == "<%7%>"      # the output keeps its place at the end
+
+
+def test_growing_the_map_pushes_the_output_binding_along():
+    """The failure this exists to stop: two more map rows and the output index moves, so an output
+    left at its old number is written back to the wrong variable."""
+    node = _qs_full()
+    query, pmap = nodeparam.find_query_params(node)
+    pmap["value"].append({"id": 2, "source": {"value": "<%99%>",
+                                              "variable": [{"id": 99, "variableId": "v-new"}]},
+                          "destination": {"value": "event", "variable": []}})
+    nodeparam.renumber_node_placeholders(node, [query, pmap])
+    rows = node["parameters"][1]["value"]
+    assert [r["source"]["value"] for r in rows] == ["<%5%>", "<%6%>", "<%7%>"]
+    assert [r["source"]["variable"][0]["id"] for r in rows] == [5, 6, 7]
+    out = node["parameters"][3]
+    assert out["value"] == "<%8%>" and out["variable"][0]["id"] == 8
+
+
+def test_binding_ids_and_their_value_stay_in_step():
+    node = _qs_full()
+    query, pmap = nodeparam.find_query_params(node)
+    nodeparam.renumber_node_placeholders(node, [query, pmap])
+    for p in node["parameters"]:
+        for b in p.get("variable") or []:
+            if isinstance(b.get("id"), int) and isinstance(p.get("value"), str):
+                assert ("<%%%d%%>" % b["id"]) in p["value"] or p["tabPropertyId"].endswith("b102")
+
+
+# --------------------------------------------------------------------------- structured bindings
+
+def _body_node():
+    """A Call API node whose Request Parameters is a dict holding a JSON template - the shape that
+    bind_param_var refuses and that an HTTP body always has."""
+    return {"id": "api-1", "actionName": "Create the calendar event",
+            "actionTemplateName": "Call API", "customData": {}, "ports": [],
+            "parameters": [{
+                "tabPropertyId": "x-0003",
+                "value": {"body": {"type": "RAW", "value": {"RAW": {
+                    "format": "json",
+                    "value": '{\n  "summary": "<%4%>",\n  "start": {\n    "dateTime": "<%8%>"\n  }\n}'}}},
+                          "headers": [], "queryParams": []},
+                "variable": [{"id": 4, "variableId": "v-row",
+                              "attribute": {"attributeId": "a-name", "nextAttribute": None}},
+                             {"id": 8, "variableId": "v-row",
+                              "attribute": {"attributeId": "a-start", "nextAttribute": None}}],
+            }]}
+
+
+def test_a_binding_can_be_added_inside_a_structured_parameter():
+    node = _body_node()
+    p = node["parameters"][0]
+    report = nodeparam.add_param_bindings(
+        node, p, {12: {"variableId": "v-row", "attributeId": "a-zone"}},
+        find='"dateTime": "<%8%>"',
+        replace='"dateTime": "<%8%>",\n    "timeZone": "<%12%>"')
+    raw = p["value"]["body"]["value"]["RAW"]["value"]
+    assert '"timeZone": "<%12%>"' in raw
+    assert report["replacements"] == 1 and report["bindings_total"] == 3
+    new = next(b for b in p["variable"] if b["id"] == 12)
+    assert new["attribute"] == {"attributeId": "a-zone", "nextAttribute": None}
+
+
+def test_the_existing_bindings_are_kept_with_their_attribute_paths():
+    node = _body_node()
+    p = node["parameters"][0]
+    nodeparam.add_param_bindings(node, p, {12: {"variableId": "v-row", "attributeId": "a-zone"}},
+                                 find='"dateTime": "<%8%>"',
+                                 replace='"dateTime": "<%8%>",\n    "timeZone": "<%12%>"')
+    by_id = {b["id"]: b for b in p["variable"]}
+    assert by_id[4]["attribute"]["attributeId"] == "a-name"
+    assert by_id[8]["attribute"]["attributeId"] == "a-start"
+
+
+def test_a_placeholder_left_unbound_is_refused():
+    node = _body_node()
+    p = node["parameters"][0]
+    with pytest.raises(ValueError) as e:
+        nodeparam.add_param_bindings(node, p, {}, find='"<%8%>"',
+                                     replace='"<%8%>", "timeZone": "<%12%>"')
+    assert "exactly one binding" in str(e.value)
+
+
+def test_a_binding_with_no_placeholder_is_refused():
+    node = _body_node()
+    p = node["parameters"][0]
+    with pytest.raises(ValueError) as e:
+        nodeparam.add_param_bindings(node, p, {99: {"variableId": "v-row", "attributeId": "a-x"}})
+    assert "exactly one binding" in str(e.value)
+
+
+def test_a_binding_with_no_attribute_is_written_as_the_whole_variable():
+    node = _body_node()
+    p = node["parameters"][0]
+    nodeparam.add_param_bindings(node, p, {12: {"variableId": "v-other"}},
+                                 find='"dateTime": "<%8%>"',
+                                 replace='"dateTime": "<%8%>",\n    "tz": "<%12%>"')
+    assert next(b for b in p["variable"] if b["id"] == 12)["attribute"] is None
+
+
+def test_find_text_that_is_absent_is_refused():
+    node = _body_node()
+    p = node["parameters"][0]
+    with pytest.raises(ValueError) as e:
+        nodeparam.add_param_bindings(node, p, {}, find="nothing like this", replace="x")
+    assert "not present" in str(e.value)

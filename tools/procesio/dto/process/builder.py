@@ -532,19 +532,57 @@ def _qs_col_id(store_ref: str, store_id: str, col: str, ctx: dict) -> str:
     return cid
 
 
-def _build_query_store(template: dict, spec: dict, var_ids: dict, ctx: dict, counter: list) -> list:
-    """Query Store node Parameters (b102 Query + chips, b103 Parameters map, b104 Time Out,
-    b105 Result Rows, b106 Total Count) from a friendly spec:
-      {sql, params:{name: binding}, timeout?, resultRows?, totalCount?}
-    sql uses {{ds:StoreNameOrId}} / {{col:StoreNameOrId.ColNameOrId}} tokens (-> id chips)
-    and @param (-> Parameters map). ids resolve from ctx['datastore_meta'] or pass through
-    when already a GUID. One <%N%> id sequence across the whole node."""
-    if not isinstance(spec, dict) or not spec.get("sql"):
-        raise UsageError("queryStore needs a 'sql' string")
-    pidx = _property_index(template)
-    q_prop = _qs_prop(pidx, "query", "code-editor")
-    p_prop = _qs_prop(pidx, "parameters config tab", "map-parameters")
-    chips = []
+def fetch_datastore_meta(client) -> dict:
+    """Data Store name and column name -> id, keyed lower-case and also by id.
+
+    What a Query Store chip needs: a chip carries ids, while a statement is written with names.
+    Separate from prepare_ctx because a surgical editor needs ONLY this - prepare_ctx also pulls
+    the whole live action catalog, which is the expensive half and irrelevant when no node is
+    being built from scratch.
+
+    Failure is swallowed on purpose: with no metadata a caller can still pass GUIDs directly, and
+    the resolver says which names it knows.
+    """
+    dsmeta: dict = {}
+    try:
+        r = client.get("/api/DataStore", {"pageNumber": 1, "pageItemCount": 500})
+        items = r.get("pageItems") if isinstance(r, dict) else r
+        for it in items or []:
+            sid = it.get("id") or it.get("Id")
+            cols = {}
+            for c in (it.get("columns") or it.get("Columns") or []):
+                cn = (c.get("name") or c.get("Name") or "").strip().lower()
+                if cn:
+                    cols[cn] = c.get("columnId") or c.get("ColumnId") or c.get("id")
+            entry = {"id": sid, "columns": cols}
+            nm = (it.get("name") or it.get("Name") or "").strip().lower()
+            if nm:
+                dsmeta[nm] = entry
+            if sid:
+                dsmeta[str(sid).lower()] = entry
+    except Exception:  # noqa: BLE001 - names unresolved -> caller can pass GUIDs
+        pass
+    return dsmeta
+
+
+def render_query_tokens(sql: str, ctx: dict, counter: list | None = None) -> tuple[str, list]:
+    """Turn a Query Store statement's {{ds:Store}} / {{col:Store.Column}} tokens into the stored
+    shape: `<%N%>` placeholders plus the CHIP list their Variable[] carries.
+
+    Each token occurrence consumes its own index, so naming the same column five times yields
+    five chips pointing at it - which is how a statement converts one column several times (a
+    Guid column, for instance, has to be reassembled from its bytes, and a placeholder is not
+    reusable). The caller owns the counter because a node numbers its Query chips and its
+    Parameters-map sources from ONE sequence.
+
+    Laid out over lines before it is stored. A Query Store node IS its statement, so a statement
+    concatenated onto one line makes the node unreadable in the designer; the formatter only
+    moves whitespace outside string literals and hands back the input untouched if it cannot
+    prove that (tools/procesio/sqlformat.py).
+    """
+    if counter is None:
+        counter = [0]
+    chips: list = []
 
     def sub(m):
         kind = m.group(1).lower()
@@ -564,12 +602,23 @@ def _build_query_store(template: dict, spec: dict, var_ids: dict, ctx: dict, cou
                           "attribute": None})
         return f"<%{idx}%>"
 
-    # Laid out over lines before it is stored. A Query Store node IS its statement, so a
-    # statement concatenated onto one line makes the node unreadable in the designer; the
-    # formatter only moves whitespace outside string literals and hands back the input
-    # untouched if it cannot prove that (tools/procesio/sqlformat.py).
-    out = [{"TabPropertyId": q_prop["id"], "Variable": chips,
-            "Value": format_sql(_QS_TOKEN.sub(sub, spec["sql"]))}]
+    return format_sql(_QS_TOKEN.sub(sub, sql)), chips
+
+
+def _build_query_store(template: dict, spec: dict, var_ids: dict, ctx: dict, counter: list) -> list:
+    """Query Store node Parameters (b102 Query + chips, b103 Parameters map, b104 Time Out,
+    b105 Result Rows, b106 Total Count) from a friendly spec:
+      {sql, params:{name: binding}, timeout?, resultRows?, totalCount?}
+    sql uses {{ds:StoreNameOrId}} / {{col:StoreNameOrId.ColNameOrId}} tokens (-> id chips)
+    and @param (-> Parameters map). ids resolve from ctx['datastore_meta'] or pass through
+    when already a GUID. One <%N%> id sequence across the whole node."""
+    if not isinstance(spec, dict) or not spec.get("sql"):
+        raise UsageError("queryStore needs a 'sql' string")
+    pidx = _property_index(template)
+    q_prop = _qs_prop(pidx, "query", "code-editor")
+    p_prop = _qs_prop(pidx, "parameters config tab", "map-parameters")
+    text, chips = render_query_tokens(spec["sql"], ctx, counter)
+    out = [{"TabPropertyId": q_prop["id"], "Variable": chips, "Value": text}]
     rows = []
     for i, (pname, binding) in enumerate((spec.get("params") or {}).items()):
         srcbind = binding if isinstance(binding, dict) else {"value": binding}
@@ -1671,26 +1720,7 @@ def prepare_ctx(client, config: dict) -> dict:
 
     # resolve Data Store metadata (name/column-name -> id) for Query Store chips
     if any(a.get("queryStore") for a in config.get("actions", [])):
-        dsmeta = {}
-        try:
-            r = client.get("/api/DataStore", {"pageNumber": 1, "pageItemCount": 500})
-            items = r.get("pageItems") if isinstance(r, dict) else r
-            for it in items or []:
-                sid = it.get("id") or it.get("Id")
-                cols = {}
-                for c in (it.get("columns") or it.get("Columns") or []):
-                    cn = (c.get("name") or c.get("Name") or "").strip().lower()
-                    if cn:
-                        cols[cn] = c.get("columnId") or c.get("ColumnId") or c.get("id")
-                entry = {"id": sid, "columns": cols}
-                nm = (it.get("name") or it.get("Name") or "").strip().lower()
-                if nm:
-                    dsmeta[nm] = entry
-                if sid:
-                    dsmeta[str(sid).lower()] = entry
-        except Exception:  # noqa: BLE001 - names unresolved -> caller can pass GUIDs
-            pass
-        ctx["datastore_meta"] = dsmeta
+        ctx["datastore_meta"] = fetch_datastore_meta(client)
     return ctx
 
 

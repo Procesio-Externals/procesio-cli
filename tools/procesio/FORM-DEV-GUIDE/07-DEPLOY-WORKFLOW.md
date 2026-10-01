@@ -58,6 +58,19 @@ path pointing at that attribute.
 
 ## 2. The loop
 
+**Check the key on each installation before the first write.** `form-set-code`
+encrypts with the one `form-code-key` stored on this machine, and the tool holds a single
+key for every environment it talks to. If the installation's renderer uses another key,
+the write succeeds and the form goes blank ([08](08-PITFALLS.md)). So first read back the
+code of a form whose CSS was written in the designer, on the same installation:
+
+```bash
+python scripts/run-tool.py procesio form-get-code --id <designer-edited-form> \
+  --css-out check.css
+```
+
+If it does not decrypt, stop there: the stored key is wrong for this installation (§3).
+
 ```bash
 # 1. Pull the current code down to files
 python scripts/run-tool.py procesio form-get-code --id <form-id> \
@@ -115,6 +128,17 @@ python scripts/set-credential.py procesio form-code-key
 The form-code passphrase is **platform-wide**: it decrypts the code blob of every
 form on the platform, and it cannot be cheaply rotated. Treat it accordingly — never
 in a file, never in a chat, never in a log.
+
+**One stored key may not fit every installation.** A key that had decrypted real
+exports failed, on 2026-10-01, to open code written in the designer on one installation.
+Either the key differs between installations or it has changed; the platform team has
+the answer. Until then, check it per installation before writing (§2).
+
+**It is not a secret from the people who open a form.** The renderer decrypts
+`Data.code` in the visitor's browser, so the passphrase reaches every browser that loads
+a form, and anyone who can open a form can read its CSS and JavaScript. Keep the key out
+of files, chats and logs as the rules require. Treat the form code itself as public: no
+credentials, no internal names, nothing you would not print on the page.
 
 ### Diagnosing a decrypt failure
 
@@ -176,6 +200,17 @@ flight is your test.
 **State plainly what you verified.** "Verified on the local replica" and "verified on
 the live form" are different claims. Do not let one stand in for the other.
 
+**Test the code you ship.** If the build minifies or bundles the scripts, point the
+replica at the built files. A replica that loads the sources leaves the shipped code with
+no browser test at all. Static checks are weaker still on built output: one that read
+minified CSS raised a false alarm, and the rendered page, measured with
+`getComputedStyle`, settled it.
+
+**Some failures exist only on the live form, signed in.** A replica that draws its own
+select hides a list the live form never hands over, and the first-frame flash needs the
+real renderer (both in [08](08-PITFALLS.md)). Open the live form and log what the page
+does every 50 ms. That is how both were found.
+
 ## 5. Keep the source under version control — outside the framework
 
 The CSS and JS are the form's real source. `Data.code` is a deployment target, not a
@@ -189,6 +224,16 @@ this guide.
 Alongside the CSS and JS, keep the process artifacts that are equally
 un-round-trippable — prompts, request bodies, the process definition — so a rebuild
 does not start from a screenshot.
+
+**Build each form from source in every workspace. Do not import it in.** An import keeps
+the form's id ([PROCESIO-API-NOTES](../PROCESIO-API-NOTES.md), *What an API import
+carries*), so one id then lives in several workspaces, and the copies do not fail
+together. Seen once: after a platform change, two imported copies came back empty and
+would not open, while the original kept its content. Rebuilt from source with new ids,
+they were back in minutes. Deleting a form touches only its own workspace, which is what
+makes that repair safe; prove it on a throwaway form before you rely on it. Find forms by
+name, never by a stored id, and let no save write when the read before it came back
+empty. The tool's surgical actions refused in exactly that case.
 
 ## 6. Write the reasoning into the file, at the top
 

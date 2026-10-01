@@ -140,6 +140,10 @@ encrypted code blob.
 
 It runs in the **same sandbox** as an element event, so `ProcesioForm` is available.
 
+It fires about a second after the form is drawn (measured: 1.0 s on a live form), so a
+load script cannot keep the native form off the screen. See [08](08-PITFALLS.md), *The
+native form shows for about a second before any script runs*.
+
 ### The viewer's identity, addressable from any trigger
 
 The renderer generates an `instance` node into the data model and fills it from the signed-in

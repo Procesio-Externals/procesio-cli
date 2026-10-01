@@ -103,6 +103,15 @@ Bind TabPropertyId **`1def19eb-ec69-4a21-a756-4abec8ae3171`** (To) to a
   recipient list feeding a **Concatenate** action (`concatEmails` +
   `concatCrtEmail` in the same flow).
 
+- **Separator: use `;` for a LITERAL list, not `,` (verified live 2026-09-30).** A literal
+  To value `a@example.com,b@example.com` fails AT RUN with `Invalid emails a@example.com,b@example.com` (instance
+  status 40); the same value with `;` sends to both. Validation (FE + BE) passes either way, so
+  only a run catches it. Prefer `;` for variable-built lists too.
+- **SendGrid-backed SMTP credential: From (Entity) must be a verified sender.** Leaving it empty
+  (or using an unverified address) fails at run with `The from address does not match a verified
+  Sender Identity`. Find a working sender by reading an existing Send Email node that uses the
+  same credential (field `90d1ec9f-...11c6`) and reuse its From (Entity).
+
 ## 6. Built-in dataTypeIds (for typing flow variables)
 
 | Type | dataTypeId |
