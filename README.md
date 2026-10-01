@@ -134,6 +134,40 @@ The plugin launches the MCP server through `uvx`, so [uv](https://docs.astral.sh
 has to be on the machine; everything else it needs it resolves itself on first run.
 Authenticate exactly as a clone does, with `add-credential` below.
 
+**What gets installed is pinned.** The plugin passes `constraints.txt` and
+`build-constraints.txt` to `uvx`, so a fresh launch installs exactly the versions that
+were resolved and checked for this release, not whatever is newest on PyPI that day. The
+pins are checked to have prebuilt wheels for Python 3.11 to 3.14 on Windows, Linux
+(x86-64 and ARM) and Apple Silicon. Intel Macs are not covered: `cryptography` no longer
+publishes wheels for them, so installing there needs a Rust toolchain.
+
+**On Windows with Smart App Control.** Windows 11 can refuse to load a Python file
+whose publisher it cannot confirm, and shows "Part of this app has been blocked" for
+each one. The Python builds uv downloads for itself are not signed, so the plugin asks
+uv for a Python that is already installed first (`--python-preference system`, never
+older than 3.11) and uses uv's own build only when there is none. If
+you see those notifications, install Python 3.11 or newer from
+[python.org](https://www.python.org/downloads/windows/) (for example
+`winget install Python.Python.3.12`), whose files are signed, then restart Claude Code.
+Do not ignore them: when the refused file is Python's networking module, no tool call
+can reach PROCESIO.
+
+**You can check the tool list you were given.** The MCP server's published tools are
+fixed per release, and `server.json` records their digest under
+`_meta` > `io.modelcontextprotocol.registry/publisher-provided` > `com.procesio/toolsDigest`.
+That file cannot be changed once a version is in the MCP Registry. Hash the `tools` array
+a `tools/list` call returns and compare:
+
+```python
+import hashlib, json
+raw = json.dumps(tools, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+print("sha256:" + hashlib.sha256(raw.encode("utf-8")).hexdigest())
+```
+
+A mismatch means the server is not offering what was published for that version. The
+server also reports its digest in `server/discover`, but treat that only as a label: a
+server cannot vouch for itself.
+
 ### Or connect it over MCP, with no shell at all
 
 There are two MCP servers in `webplatform/aat_mcp/`, over the same substrate, for two
@@ -310,7 +344,7 @@ action is required; `--help` lists the actions a tool exposes.
 
 | Tool | Actions | What it does |
 |---|--:|---|
-| `procesio` | 391 | The platform API: processes, forms, documents, custom actions, environments, credentials, schedules. |
+| `procesio` | 394 | The platform API: processes, forms, documents, custom actions, environments, credentials, schedules. |
 | `connector-builder` | 54 | Turns API documentation into a compiled PROCESIO custom action. Custom actions are the platform's main extension point, so this is the shortest route from a third-party API to something a process can call. |
 | `mysql` | 9 | Query the MySQL database a SQL action talks to, to see what a process actually wrote. |
 | `sqlserver` | 9 | The same, for SQL Server. |

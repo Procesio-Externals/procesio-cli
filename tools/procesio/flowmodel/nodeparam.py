@@ -575,3 +575,278 @@ def delete_node(flow: dict, node: dict) -> tuple[bool, str]:
     flow["actions"] = [a for a in actions if a.get("id") != node_id]
     return True, ("deleted %r (%s); %d edge(s) rewired to its successor, %d dropped"
                   % (node.get("actionName"), template, rewired, dropped))
+
+
+# --------------------------------------------------------------------------- error ports
+
+# ErrorDataModel: the only datatype the engine accepts on an error-port variable. A plain string
+# variable there validates and the port never fires, which is the silent version of this failing.
+ERROR_DATA_MODEL = "10c6ac59-3929-49e6-99dc-121212121220"
+# Per PROCESIO these templates expose no error port at all.
+NO_ERROR_PORT = ("start", "stop", "join", "for each", "foreach")
+
+
+def set_error_port(flow: dict, node: dict, handler: dict | None, *, clear: bool = False) -> dict:
+    """Route one node's error port to `handler`, in place. Returns a report.
+
+    An error port is THREE things and wiring any two of them is worse than wiring none, because
+    the flow still validates: the port itself (`type: 1`, `data: {"isDefault": "error"}`), the
+    node's `variableErrorId`, and that variable being `isError` of the error datatype. Written
+    together here so a caller cannot produce the half-wired shape.
+
+    What this buys, and why it is not just error cosmetics: a node that faults takes the whole
+    flow down at status 40, so a flow that a FORM launches on load cannot populate the form at
+    all. Sending the fault to the node's own successor lets the flow reach Stop and the form
+    render with that one section empty - provided the successor tolerates a null input, which is
+    the caller's judgement and is why the handler is named rather than inferred.
+
+    Refused rather than guessed: a template with no error port, a handler outside this flow, and
+    a handler that is the node itself (a self-loop the designer draws and the engine follows).
+    """
+    import uuid as _uuid
+
+    template = str(node.get("actionTemplateName") or "").strip()
+    if template.lower() in NO_ERROR_PORT:
+        raise ValueError("%s has no error port, so there is nothing to route" % (template or "this action"))
+
+    node_id = node.get("id")
+    actions = flow.get("actions") or []
+    if not any(a.get("id") == node_id for a in actions):
+        raise ValueError("node %r is not in this flow" % (node.get("actionName") or node_id))
+
+    ports = [p for p in (node.get("ports") or [])]
+    existing = [p for p in ports if p.get("type") == 1]
+    before = existing[0].get("destinationId") if existing else None
+
+    if clear:
+        node["ports"] = [p for p in ports if p.get("type") != 1]
+        freed = node.get("variableErrorId")
+        node["variableErrorId"] = None
+        # Drop the variable too, but only when nothing else still points at it.
+        if freed and not any(a.get("variableErrorId") == freed for a in actions):
+            flow["variables"] = [v for v in (flow.get("variables") or []) if v.get("id") != freed]
+        return {"node": node.get("actionName"), "cleared": True, "handler_before": before,
+                "handler": None, "variable_error_id": None}
+
+    if handler is None:
+        raise ValueError("a handler is required unless clearing")
+    handler_id = handler.get("id")
+    if handler_id == node_id:
+        raise ValueError("a node cannot handle its own error - name a different action")
+    if not any(a.get("id") == handler_id for a in actions):
+        raise ValueError("handler %r is not in this flow" % (handler.get("actionName") or handler_id))
+
+    var_id = node.get("variableErrorId")
+    var = next((v for v in (flow.get("variables") or []) if v.get("id") == var_id), None)
+    if var is None:
+        base = "%s_error" % (node.get("actionName") or "node")
+        taken = {str(v.get("name")) for v in (flow.get("variables") or [])}
+        name, n = base, 2
+        while name in taken:
+            name, n = "%s_%d" % (base, n), n + 1
+        var = {"id": str(_uuid.uuid4()), "contextId": None, "dataType": ERROR_DATA_MODEL,
+               "type": 20, "name": name, "defaultValue": None, "isList": False,
+               "isError": True, "isRequired": False}
+        flow.setdefault("variables", []).append(var)
+        created_var = True
+    else:
+        # An existing binding of the wrong shape is the half-wired case: repair it rather than
+        # trusting it, since the flow validates either way.
+        var["dataType"], var["isError"] = ERROR_DATA_MODEL, True
+        created_var = False
+    node["variableErrorId"] = var["id"]
+
+    node["ports"] = [p for p in ports if p.get("type") != 1] + [{
+        "id": str(_uuid.uuid4()), "flowId": flow.get("id"), "sourceId": node_id,
+        "destinationId": handler_id, "type": 1, "state": 1,
+        "data": {"isDefault": "error"}, "errors": {}, "config": {}}]
+
+    return {"node": node.get("actionName"), "cleared": False, "handler_before": before,
+            "handler": handler.get("actionName"), "variable_error_id": var["id"],
+            "variable": var["name"], "variable_created": created_var}
+
+
+# --------------------------------------------------------------------------- Query Store nodes
+
+# The Query Store node's property ids end in these suffixes: the statement itself (a code-editor)
+# and the map that binds its @params. Matched on the suffix because the prefix is the template's.
+QUERY_PROP_SUFFIX = "b102"
+PARAMS_PROP_SUFFIX = "b103"
+
+
+def find_query_params(node: dict) -> tuple[dict | None, dict | None]:
+    """Return (statement parameter, parameters-map parameter) of a Query Store node.
+
+    Both are needed together by any caller that renumbers the statement's chips: a node numbers
+    its query chips and its Parameters-map sources from ONE `<%N%>` sequence, so a caller that
+    rewrites the statement without looking at the map can move a bound @param's source without
+    touching it.
+    """
+    query = pmap = None
+    for p in node.get("parameters") or []:
+        tab = str(p.get("tabPropertyId") or "")
+        if tab.endswith(QUERY_PROP_SUFFIX):
+            query = p
+        elif tab.endswith(PARAMS_PROP_SUFFIX):
+            pmap = p
+    return query, pmap
+
+
+def renumber_node_placeholders(node: dict, order: list[dict]) -> int:
+    """Renumber a node's `<%N%>` placeholders so one sequence runs across ALL its parameters.
+
+    A node does not number each parameter independently: the statement's chips, the
+    parameters-map sources and the output bindings draw from ONE sequence. So growing the map by
+    two rows silently moves the output bindings, and an output that still says `<%8%>` while its
+    binding moved to 10 is written back to the wrong variable - a flow that validates and quietly
+    loses its result.
+
+    `order` is the parameters in the sequence they should occupy; any parameter of the node not
+    listed keeps its place at the end, in its existing index order. Returns the next free index.
+    """
+    listed = [p for p in order if p is not None]
+    listed_ids = {id(p) for p in listed}
+    rest = [p for p in (node.get("parameters") or []) if id(p) not in listed_ids]
+
+    def first_index(p):
+        hits = placeholders(p.get("value")) if not isinstance(p.get("value"), str) else \
+            [int(x) for x in _PLACEHOLDER.findall(p.get("value") or "")]
+        return min(hits) if hits else 10 ** 6
+
+    rest.sort(key=first_index)
+
+    nxt = 0
+    for p in listed + rest:
+        mapping: dict[int, int] = {}
+        for old in sorted(_collect_indices(p)):
+            mapping[old] = nxt
+            nxt += 1
+        if mapping:
+            _apply_mapping(p, mapping)
+    return nxt
+
+
+def _collect_indices(param: dict) -> set:
+    """Every placeholder index this parameter carries.
+
+    Two sources, and only two: a `<%N%>` token in any string, and the `id` of an entry inside a
+    `variable` list. An `id` anywhere else is NOT an index - a parameters-map row carries its own
+    ordinal `id`, which collides with the low indices and would be renumbered into nonsense.
+    """
+    found: set = set()
+
+    def walk(o, in_variable=False):
+        if isinstance(o, dict):
+            if in_variable and isinstance(o.get("id"), int):
+                found.add(o["id"])
+            for k, v in o.items():
+                walk(v, in_variable=(k == "variable"))
+        elif isinstance(o, list):
+            for x in o:
+                walk(x, in_variable=in_variable)
+        elif isinstance(o, str):
+            for m in _PLACEHOLDER.findall(o):
+                found.add(int(m))
+
+    walk(param.get("value"))
+    walk(param.get("variable") or [], in_variable=True)
+    return found
+
+
+def _apply_mapping(param: dict, mapping: dict) -> None:
+    def walk(o, in_variable=False):
+        if isinstance(o, dict):
+            out = {}
+            for k, v in o.items():
+                if k == "id" and in_variable and isinstance(v, int):
+                    out[k] = mapping.get(v, v)
+                else:
+                    out[k] = walk(v, in_variable=(k == "variable"))
+            return out
+        if isinstance(o, list):
+            return [walk(x, in_variable=in_variable) for x in o]
+        if isinstance(o, str):
+            return _PLACEHOLDER.sub(
+                lambda m: "<%%%d%%>" % mapping.get(int(m.group(1)), int(m.group(1))), o)
+        return o
+
+    param["value"] = walk(param.get("value"))
+    for b in param.get("variable") or []:
+        if isinstance(b.get("id"), int):
+            b["id"] = mapping.get(b["id"], b["id"])
+
+
+def value_placeholders(value) -> set:
+    """Every `<%N%>` index in a parameter's VALUE, however deeply nested.
+
+    Separate from _collect_indices, which also counts binding ids: this answers "what does the
+    text ask for", which is the half that has to match the bindings.
+    """
+    found: set = set()
+
+    def walk(o):
+        if isinstance(o, dict):
+            for v in o.values():
+                walk(v)
+        elif isinstance(o, list):
+            for x in o:
+                walk(x)
+        elif isinstance(o, str):
+            for m in _PLACEHOLDER.findall(o):
+                found.add(int(m))
+
+    walk(value)
+    return found
+
+
+def add_param_bindings(node: dict, param: dict, bindings: dict, *,
+                       find=None, replace=None) -> dict:
+    """Add or replace bindings on a parameter, optionally editing its text in the same write.
+
+    Why this exists next to bind_param_var: that one takes a STRING parameter and REPLACES the
+    whole binding list, which is right for a small text parameter and useless for the two edits
+    that actually come up - reaching inside a STRUCTURED parameter (an HTTP body template is a
+    dict), and ADDING one binding to a parameter that already has nine without restating them.
+
+    `bindings` maps an index to {variableId, attributeId}. An attribute path matters: a binding
+    into a loop item's field is variable + attribute, and a binding with the attribute dropped
+    silently resolves to the whole object.
+
+    Refused rather than guessed: an edit that leaves a `<%N%>` with no binding (it substitutes to
+    nothing, and an empty value in a JSON body is usually accepted and then wrong) or a binding
+    with no `<%N%>` (dead weight that the next reader has to explain).
+    """
+    value = param.get("value")
+    if find is not None:
+        hits = [0]
+
+        def sub(_path, s):
+            if find in s:
+                hits[0] += s.count(find)
+                return s.replace(find, replace if replace is not None else "")
+            return s
+
+        if isinstance(value, str):
+            if find in value:
+                hits[0] += value.count(find)
+                value = value.replace(find, replace if replace is not None else "")
+            param["value"] = value
+        else:
+            _walk_strings(value, "", sub)
+        if not hits[0]:
+            raise ValueError("--find text is not present in this parameter")
+
+    kept = {b["id"]: b for b in (param.get("variable") or []) if isinstance(b.get("id"), int)}
+    for idx, spec in bindings.items():
+        kept[idx] = {"id": idx, "variableId": spec["variableId"],
+                     "attribute": ({"attributeId": spec["attributeId"], "nextAttribute": None}
+                                   if spec.get("attributeId") else None)}
+    asked = value_placeholders(param.get("value"))
+    if asked != set(kept):
+        raise ValueError(
+            "after the edit the value uses placeholders %s but the bindings cover %s - each "
+            "<%%N%%> needs exactly one binding and vice versa"
+            % (sorted(asked), sorted(kept)))
+    param["variable"] = [kept[i] for i in sorted(kept)]
+    return {"changed": True, "replacements": hits[0] if find is not None else 0,
+            "bindings_added": sorted(bindings), "bindings_total": len(kept)}

@@ -20,8 +20,10 @@ JSON in / JSON out; impure (live client). Thin wrappers over GET / validate / PU
 from __future__ import annotations
 
 import argparse
+import json
 
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.dto.process.builder import fetch_datastore_meta, render_query_tokens
 from tools.procesio.dto.process.normalize import normalize_designer_layer
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import nodeparam
@@ -645,6 +647,268 @@ def _bindvar_args(p: argparse.ArgumentParser) -> None:
                    help="patch + normalize + validate but do not PUT")
 
 
+def node_set_error_port(client, args) -> dict:
+    """Wire (or clear) ONE node's error port on a live process.
+
+    The reason this is its own action rather than a process-edit config: a desired-state rebuild
+    re-derives the whole flow, and the thing being fixed here is usually a flow nobody wants
+    re-derived - a designer-built one, or one whose canvas positions are keyed on its action names.
+    """
+    flow = _fetch_flow(client, args.id)
+    node = nodeparam.find_node(flow, args.node)
+    if not node:
+        raise UsageError(f"node not found in process {args.id}: {args.node}")
+    handler = None
+    if not args.clear:
+        if not args.handler:
+            raise UsageError("--handler is required (or pass --clear to remove the error port)")
+        handler = nodeparam.find_node(flow, args.handler)
+        if not handler:
+            raise UsageError(f"handler node not found in process {args.id}: {args.handler}")
+    try:
+        change = nodeparam.set_error_port(flow, node, handler, clear=bool(args.clear))
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+    result = {"id": args.id, "title": flow.get("title"), **change}
+    result["normalized"] = normalize_designer_layer(flow)
+    return _gate_and_put(client, flow, args, result)
+def _errorport_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--node", required=True,
+                   help="the node whose error port to wire: actionName (canvas label) or id")
+    p.add_argument("--handler",
+                   help="the action a fault routes to: actionName or id. Its own successor is the "
+                        "usual choice when that successor already tolerates a missing input")
+    p.add_argument("--clear", action="store_true",
+                   help="remove the error port (and its error variable, if nothing else uses it)")
+    p.add_argument("--dry-run", action="store_true",
+                   help="wire + normalize + validate but do not PUT")
+
+
+def _query_param_source(name: str, spec, kept: dict, flow: dict, tmp: list) -> dict:
+    """One Parameters-map source, from a friendly spec.
+
+    `keep` is the important one: a live source often carries a resolved ATTRIBUTE path into a
+    loop item's model, and re-deriving that from a name would mean re-resolving a model this
+    editor never saw. Keeping it verbatim is both safer and shorter.
+    """
+    import copy
+
+    if isinstance(spec, dict) and spec.get("keep"):
+        if name not in kept:
+            raise UsageError(
+                f"--params asks to keep @{name}, but this node's map has no such parameter "
+                f"(it has: {', '.join(sorted(k for k in kept if k)) or 'none'})")
+        return copy.deepcopy(kept[name])
+    if isinstance(spec, dict) and "raw" in spec:
+        return copy.deepcopy(spec["raw"])
+    if isinstance(spec, dict) and "var" in spec:
+        var = nodeparam.find_variable(flow, str(spec["var"]))
+        if not var:
+            raise UsageError(f"--params @{name} references unknown variable {spec['var']!r}")
+        idx = tmp[0]
+        tmp[0] += 1
+        return {"value": f"<%{idx}%>",
+                "variable": [{"id": idx, "variableId": var.get("id"), "attribute": None}]}
+    value = spec.get("value") if isinstance(spec, dict) else spec
+    return {"value": value, "variable": []}
+
+
+def node_set_query(client, args) -> dict:
+    """Replace a Query Store node's STATEMENT and its chips together, on a live process.
+
+    node-set-param can only rewrite the text, and it guards that the `<%N%>` set does not move -
+    correctly, because those indices bind Variable[] positionally. That makes it useless for the
+    edits a statement actually needs: naming one more column, or naming the same column again
+    (unavoidable when a value has to be reassembled from several expressions over it, and a
+    placeholder cannot be repeated). Here the statement is written with the same
+    {{ds:Store}} / {{col:Store.Column}} tokens a config uses, and the chips are regenerated from
+    it - so text and bindings cannot drift apart.
+    """
+    sql = args.sql
+    if args.sql_file:
+        with open(args.sql_file, encoding="utf-8") as fh:
+            sql = fh.read()
+    if not sql or not sql.strip():
+        raise UsageError("--sql or --sql-file is required")
+
+    flow = _fetch_flow(client, args.id)
+    node = nodeparam.find_node(flow, args.node)
+    if not node:
+        raise UsageError(f"node not found in process {args.id}: {args.node}")
+
+    query, pmap = nodeparam.find_query_params(node)
+    if query is None:
+        raise UsageError(
+            f"node {args.node!r} has no Query Store statement "
+            f"(template {node.get('actionTemplateName')!r})")
+    spec = None
+    if args.params or args.params_file:
+        raw = args.params
+        if args.params_file:
+            with open(args.params_file, encoding="utf-8") as fh:
+                raw = fh.read()
+        try:
+            spec = json.loads(raw)
+        except ValueError as e:
+            raise UsageError(f"--params must be a JSON object of {{name: source}}: {e}") from e
+        if not isinstance(spec, dict):
+            raise UsageError("--params must be a JSON OBJECT of {name: source}")
+    # The node numbers its query chips, its Parameters-map sources AND its output bindings from
+    # ONE sequence. Rewriting the statement alone is safe only while the map is empty; once it is
+    # not, the map has to be restated so the whole node can be renumbered together.
+    if spec is None and (pmap is not None and (pmap.get("value") or [])):
+        raise UsageError(
+            "this node's Parameters map is not empty, and its sources share one index sequence "
+            "with the statement's chips - restate the map with --params (use {\"keep\": true} "
+            "for a source you are not changing) so the node can be renumbered as a whole.")
+
+    ctx = {"datastore_meta": fetch_datastore_meta(client)}
+    before_chips = len(query.get("variable") or [])
+    before_text = query.get("value")
+    text, chips = render_query_tokens(sql, ctx)
+    query["value"] = text
+    query["variable"] = chips
+
+    before_params = [r.get("destination", {}).get("value") for r in (pmap.get("value") or [])]         if pmap is not None else []
+    if spec is not None:
+        if pmap is None:
+            raise UsageError("this node has no Parameters map to write")
+        kept = {r.get("destination", {}).get("value"): r.get("source")
+                for r in (pmap.get("value") or [])}
+        # A temporary index clear of everything already in the node: the renumber pass assigns
+        # the real ones, and it can only do that if each source starts out distinguishable.
+        used = set()
+        for p in node.get("parameters") or []:
+            used |= nodeparam._collect_indices(p)
+        tmp = [max(used) + 1000 if used else 1000]
+        rows = []
+        for i, (pname, src_spec) in enumerate(spec.items()):
+            name = str(pname).lstrip("@")
+            rows.append({"id": i, "source": _query_param_source(name, src_spec, kept, flow, tmp),
+                         "destination": {"value": name, "variable": []}})
+        pmap["value"] = rows
+
+    nodeparam.renumber_node_placeholders(node, [query, pmap])
+
+    result = {"id": args.id, "title": flow.get("title"), "node": node.get("actionName"),
+              "chips_before": before_chips, "chips_after": len(chips),
+              "changed": before_text != text,
+              "stores_referenced": sorted({c["dataStoreId"] for c in chips if c.get("dataStoreId")}),
+              "statement": text}
+    result["normalized"] = normalize_designer_layer(flow)
+    return _gate_and_put(client, flow, args, result)
+def _setquery_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--node", required=True,
+                   help="the Query Store node: actionName (canvas label) or id")
+    p.add_argument("--sql", help="the statement, written with {{ds:Store}} / "
+                                 "{{col:Store.Column}} tokens")
+    p.add_argument("--sql-file", help="read the statement from a file (needed above the argv "
+                                      "limit, which a real statement usually is)")
+    p.add_argument("--params", help="the Parameters map as JSON {name: source}, where a source "
+                                    "is {\"keep\": true} (reuse the live source verbatim, "
+                                    "attribute path included), {\"var\": \"name\"}, "
+                                    "{\"raw\": {...}} or a literal. REQUIRED when the node's "
+                                    "map is non-empty, because the whole node is renumbered")
+    p.add_argument("--params-file", help="read the Parameters map JSON from a file")
+    p.add_argument("--dry-run", action="store_true",
+                   help="render + validate but do not PUT")
+
+
+def _resolve_attr(client, flow: dict, varname: str, attrname: str) -> tuple[str, str]:
+    """(variableId, attributeId) for `variable.Attribute`, resolving the attribute BY NAME.
+
+    By name rather than by id because an id is unreadable in a command line and unverifiable by
+    the next reader, while a name is checked here against the variable's own model - so a typo is
+    refused with the list of what the model actually has, instead of writing a binding that
+    resolves to nothing at run time.
+    """
+    var = nodeparam.find_variable(flow, varname)
+    if not var:
+        raise UsageError(f"--bind references unknown variable {varname!r}")
+    model = var.get("dataType")
+    if not model:
+        raise UsageError(f"variable {varname!r} has no data model, so it has no attributes")
+    try:
+        dt = client.get(f"/api/DataTypes/{model}") or {}
+    except ProcesioAPIError as e:
+        raise UsageError(f"could not read the model of {varname!r}: {e}") from e
+    attrs = dt.get("attributes") or dt.get("Attributes") or []
+    want = attrname.strip().lower()
+    for at in attrs:
+        if str(at.get("name") or at.get("Name") or "").strip().lower() == want:
+            return var["id"], (at.get("id") or at.get("Id"))
+    known = ", ".join(sorted(str(a.get("name") or a.get("Name")) for a in attrs)) or "(none)"
+    raise UsageError(f"{varname!r} has no attribute {attrname!r}; it has: {known}")
+
+
+def node_add_binding(client, args) -> dict:
+    """Add bindings to ONE node parameter, with an optional literal edit in the same write.
+
+    The gap this fills: node-bind-var takes a string parameter and replaces the whole binding
+    list, and node-replace-text refuses a replacement containing a `<%N%>`. Neither can do the
+    edit that keeps coming up - put one more placeholder inside a STRUCTURED parameter (an HTTP
+    body template is a dict) and bind it, without restating the bindings already there.
+    """
+    flow = _fetch_flow(client, args.id)
+    node = nodeparam.find_node(flow, args.node)
+    if not node:
+        raise UsageError(f"node not found in process {args.id}: {args.node}")
+    param = nodeparam.find_param(node, args.property)
+    if param is None:
+        raise UsageError(
+            f"property not found on node '{args.node}': {args.property} "
+            f"(run node-params --node '{args.node}' to list the labels)")
+
+    bindings = {}
+    for spec in args.bind or []:
+        if "=" not in spec:
+            raise UsageError(f"--bind must be 'INDEX=variable[.Attribute]', got: {spec}")
+        idx, ref = spec.split("=", 1)
+        try:
+            idx = int(idx.strip())
+        except ValueError:
+            raise UsageError(f"--bind index must be an integer, got: {idx}")
+        ref = ref.strip()
+        if "." in ref:
+            varname, _, attrname = ref.partition(".")
+            vid, aid = _resolve_attr(client, flow, varname, attrname)
+            bindings[idx] = {"variableId": vid, "attributeId": aid}
+        else:
+            var = nodeparam.find_variable(flow, ref)
+            if not var:
+                raise UsageError(f"--bind references unknown variable {ref!r}")
+            bindings[idx] = {"variableId": var["id"], "attributeId": None}
+
+    try:
+        change = nodeparam.add_param_bindings(node, param, bindings,
+                                              find=args.find, replace=args.replace)
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+    result = {"id": args.id, "title": flow.get("title"), "node": node.get("actionName"),
+              "property": param.get("tabPropertyId"), **change}
+    return _gate_and_put(client, flow, args, result)
+def _addbinding_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--node", required=True, help="node actionName (canvas label) or id")
+    p.add_argument("--property", required=True,
+                   help="the parameter's designer label (e.g. 'Request Parameters') or its id")
+    p.add_argument("--bind", action="append",
+                   help="INDEX=variable or INDEX=variable.Attribute (repeatable). The attribute "
+                        "is resolved BY NAME against the variable's model, so a typo is refused "
+                        "rather than written")
+    p.add_argument("--find", help="exact literal to replace first (reaches every string leaf, so "
+                                  "it works inside a structured parameter)")
+    p.add_argument("--replace", help="replacement literal; unlike node-replace-text it MAY "
+                                     "introduce a new placeholder, which is the point")
+    p.add_argument("--dry-run", action="store_true",
+                   help="edit + validate but do not PUT")
+
+
 ACTIONS = {
     "node-insert": ActionDef(
         func=node_insert, add_args=_insert_args, needs_client=True,
@@ -676,6 +940,42 @@ ACTIONS = {
                     "text '<%firstName%>' that never resolves) into '<%0%>' in the same write. The "
                     "value's placeholder set must equal the bound set. Regenerates the designer layer "
                     "-> validate + flow-lint -> PUT. --dry-run previews."),
+    "node-set-error-port": ActionDef(
+        func=node_set_error_port, add_args=_errorport_args, needs_client=True,
+        description="Wire ONE node's error port to a handler action on a live process, so a fault "
+                    "routes instead of killing the run. Writes all THREE parts the engine needs (the "
+                    "type-1 port, the node's variableErrorId, and an isError variable of the error "
+                    "datatype); wiring only some of them validates clean and never fires. Reach for it "
+                    "when a flow a FORM launches on load must still reach Stop with one section empty. "
+                    "The handler is named, never inferred, because it has to tolerate a null input - "
+                    "the node's own successor is the usual choice. --clear removes it. Refused on "
+                    "Start/Stop/Join/For Each, which have no error port. Validates + flow-lints before "
+                    "PUT; --dry-run previews."),
+    "node-set-query": ActionDef(
+        func=node_set_query, add_args=_setquery_args, needs_client=True,
+        description="Replace a Query Store node's STATEMENT and its Data Store chips together on "
+                    "a live process, writing the SQL with the same {{ds:Store}} / "
+                    "{{col:Store.Column}} tokens a process config uses. This is the edit "
+                    "node-set-param cannot make: it holds the `<%N%>` set fixed (those indices "
+                    "bind Variable[] positionally), so it refuses a statement that names one more "
+                    "column - or names the same column twice, which is unavoidable when a value "
+                    "must be rebuilt from several expressions over it, because a placeholder is "
+                    "not reusable. Each token occurrence gets its own chip. Refused when the "
+                    "node's Parameters map is non-empty, since the map's sources share the index "
+                    "sequence. Validates + flow-lints before PUT; --dry-run previews."),
+    "node-add-binding": ActionDef(
+        func=node_add_binding, add_args=_addbinding_args, needs_client=True,
+        description="Add bindings to ONE node parameter, optionally editing its text in the same "
+                    "write - the edit neither node-bind-var nor node-replace-text can make. "
+                    "node-bind-var takes a STRING parameter and replaces the whole binding list; "
+                    "node-replace-text refuses a replacement that contains a <%N%>. This one "
+                    "reaches inside a STRUCTURED parameter (an HTTP body template is a dict), may "
+                    "introduce a new placeholder, and KEEPS the bindings already there. "
+                    "--bind INDEX=variable.Attribute resolves the attribute by NAME against the "
+                    "variable's model, so a wrong one is refused with the list of real ones "
+                    "instead of binding to nothing at run time. Refuses an edit that leaves a "
+                    "<%N%> unbound or a binding unused. Validates + flow-lints before PUT; "
+                    "--dry-run previews."),
     "node-replace-text": ActionDef(
         func=node_replace_text, add_args=_replace_args, needs_client=True,
         description="Replace an EXACT literal in every string leaf of a node's runtime parameters AND "

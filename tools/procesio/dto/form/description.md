@@ -70,13 +70,40 @@ fine), so forms are fully buildable server-side.
   builds the table + a row + the cell controls (wired via `childrenIdPerColumn`).
   Also `section`/`columns`(+`column`)/`tabs`(+`tab`) containers with `children`.
 
+## Submit / status messages (`Data.messages`, verified live 2026-09-30)
+
+The screen shown after submit comes from `Data.messages`, a list of
+`{type, title, text, customizable}` seeded from `data_shell.json` in ENGLISH
+(`SUBMIT_SUCCESS` = "Your message has been sent. Thank you for filling out our form!").
+Types: SUBMIT_SUCCESS, SUBMIT_FOR_APPROVAL_SUCCESS, APPROVE_SUCCESS, REJECT_SUCCESS,
+SUBMIT_FAILED, FILES_UPLOAD_FAILED, NOT_FOUND, NOT_ALLOWED, NOT_AUTHORIZED
+(`ui-builder-main/src/js/model/index.ts`). For a non-English form, localize at least
+SUBMIT_SUCCESS and SUBMIT_FAILED: `form-get`, edit the entries, then
+`form-update --data-file` with `{"messages":[...the FULL list...]}` (send the whole list).
+
+**Readable public URL.** Besides `forms.procesio.app/{tinyUrl}`, a form's CustomUrl slug is
+served at `forms.procesio.app/{masterSlug}/{workspaceSlug}/{formSlug}`; read the two parent
+slugs with `get-customurl-workspace-master` and `get-customurl-workspace`.
+
 ## Form JavaScript: fields are keyed LOWERCASE (critical, 2026-07-27)
 
 **`ProcesioForm.data.fields` keys are the field name LOWERCASED** (and a UI save re-derives them). JS is case-sensitive, so a camelCase reference like `ProcesioForm.data.fields.locuiesteDetalii` (or `.zonaFormular`, `.actProprietate`) is `undefined` — the event fires but silently does NOTHING (this cost days on Uranus 100: a UI save lowercased the keys and every camelCase visibility/hide/file-wrap toggle broke, while the config still looked perfect). **ALWAYS reference form fields case-insensitively** in any control/FORM_LOAD RUN_JAVASCRIPT. Prelude, then use `fld(name)`:
 
+**Corrected 2026-10-01, measured: a designer save re-keys the fields.** A form built through
+the API (`form-create`) keeps its names exactly as written. One save and Publish in the
+designer changed them: a camelCase name came back all lowercase, and a snake_case one came
+back camelCase (`orderList` to `orderlist`, `order_id` to `orderId`). Both fit one rule: split the name on underscores, lowercase the parts, join
+them in camelCase. A name with no separator therefore comes out all lowercase, which is
+what the note above saw. (Two names measured; hyphens and spaces were not tested.) So the
+trap springs late, the first time anyone saves an API-built form in the designer, and a
+lowercase snake_case name is not safe either. Only a single lowercase word survives
+unchanged. Read everything else through a lookup that ignores case AND separators, as
+below. The same save also adds a select's `sourceType` and `sourceValue` to the data
+model, which `form-create` leaves out (`todo/procesio-form-create-select-source-in-data-model.md`).
+
 ```js
-var F=ProcesioForm.data.fields;var _fl={};for(var _k in F){_fl[_k.toLowerCase()]=F[_k];}
-function fld(n){return _fl[String(n).toLowerCase()];}
+var F=ProcesioForm.data.fields;var _fl={};for(var _k in F){_fl[_k.toLowerCase().replace(/[_-]/g,'')]=F[_k];}
+function fld(n){return _fl[String(n).toLowerCase().replace(/[_-]/g,'')];}
 var x=fld("locuiesteDetalii"); if(x){ x.visible=need; x.required=need; }
 ```
 

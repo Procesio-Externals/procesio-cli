@@ -34,9 +34,10 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge  # noqa: E402  (sibling module)
 import gate  # noqa: E402
+import protocol  # noqa: E402  (shared MCP mechanics)
 
 SERVER_INFO = {"name": "aat-mcp", "version": "0.2.0"}
-DEFAULT_PROTOCOL = "2024-11-05"
+DEFAULT_PROTOCOL = protocol.LEGACY_VERSIONS[0]  # what `initialize` gets when it names no version
 
 _RUN_TOOL_SCHEMA = {
     "type": "object",
@@ -285,72 +286,20 @@ def _call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
         return {"error": f"{type(e).__name__}: {e}"}, True
 
 
-def handle(req: dict) -> dict | None:
+def handle(req: dict, *, modern: bool = True) -> dict | None:
     """Dispatch one JSON-RPC request. Returns a response dict, or None for a
-    notification (no response)."""
-    method = req.get("method")
-    req_id = req.get("id")
-    is_notification = "id" not in req
+    notification (no response).
 
-    def ok(result):
-        return {"jsonrpc": "2.0", "id": req_id, "result": result}
-
-    def err(code, message):
-        return {"jsonrpc": "2.0", "id": req_id, "error": {"code": code, "message": message}}
-
-    if method == "initialize":
-        params = req.get("params") or {}
-        proto = params.get("protocolVersion") or DEFAULT_PROTOCOL
-        return ok({"protocolVersion": proto,
-                   "capabilities": {"tools": {"listChanged": False}},
-                   "serverInfo": SERVER_INFO})
-    if method == "notifications/initialized" or (method or "").startswith("notifications/"):
-        return None
-    if method == "ping":
-        return ok({})
-    if method == "tools/list":
-        return ok({"tools": TOOLS})
-    if method == "tools/call":
-        params = req.get("params") or {}
-        name = params.get("name", "")
-        arguments = params.get("arguments") or {}
-        payload, is_error = _call_tool(name, arguments)
-        text = json.dumps(payload, ensure_ascii=False)
-        return ok({"content": [{"type": "text", "text": text}], "isError": is_error})
-
-    if is_notification:
-        return None
-    return err(-32601, f"method not found: {method}")
+    The protocol mechanics - version negotiation and the 2026-07-28 era - live in
+    protocol.py, shared with the chat surface; this server supplies only its tools and its
+    dispatcher. ``modern=False`` is for the HTTP transport, which serves the legacy era only."""
+    return protocol.handle(req, tools=TOOLS, call_tool=_call_tool,
+                           server_info=SERVER_INFO, modern=modern)
 
 
 def main() -> None:
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", newline="\n")
-        sys.stdin.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001 - older interpreters; best effort
-        pass
     _log("started (stdio). Waiting for JSON-RPC on stdin.")
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-        except ValueError:
-            sys.stdout.write(json.dumps(
-                {"jsonrpc": "2.0", "id": None,
-                 "error": {"code": -32700, "message": "parse error"}}) + "\n")
-            sys.stdout.flush()
-            continue
-        try:
-            resp = handle(req)
-        except Exception as e:  # noqa: BLE001
-            _log(f"handler error: {e}")
-            resp = {"jsonrpc": "2.0", "id": req.get("id"),
-                    "error": {"code": -32603, "message": f"internal error: {e}"}}
-        if resp is not None:
-            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+    protocol.serve_stdio(handle, _log)
 
 
 if __name__ == "__main__":

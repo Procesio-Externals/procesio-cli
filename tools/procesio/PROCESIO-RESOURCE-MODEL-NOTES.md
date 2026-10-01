@@ -796,12 +796,12 @@ present. Only genuinely custom models are created.
 | Absent | Consequence in the new workspace |
 | --- | --- |
 | **Data store ROWS** | every imported store arrives with the right columns and zero rows |
-| **Credentials** | excluded by default, and the ids stay baked into the nodes (below) |
+| **Credentials**, when the export names none | excluded, and the ids stay baked into the nodes (below). Name them and the records DO travel, secrets withheld - see "Ship the credentials in the pack" |
 | **Schedules** | anything time-driven simply never fires, with no error anywhere |
 | **API keys** | a key is per workspace; a setting that holds one arrives empty |
 | **CustomUrl / tinyUrl**, at workspace AND entity level | **the forms are not reachable at any address** |
 
-### The trap: a credential is a node parameter, so an import leaves 11 dangling references
+### The trap: a credential is a node parameter, so an export WITHOUT them leaves dangling references
 
 A credential slot is `CustomData.configuration[].settings[].type == "credentials"`, and the chosen
 credential lands in the node's `Parameters[].Value` as the credential INSTANCE gid. That gid is
@@ -861,3 +861,143 @@ Two rules learned from doing it wrong:
   setting that a flow READS but that no screen can WRITE, left blank by the seed, is a silent
   defect — the classic case is a cancellation link built from such a setting, which then goes out
   in customer email pointing nowhere.
+
+### Ship the credentials in the pack, and never hand-edit their secret fields
+
+Naming credentials in the export changes the install from "rebuild and rewire" to "fill in the
+blanks", and it does it without shipping a single secret:
+
+- The credential RECORDS travel **with their original gids**, so every node parameter that points
+  at one resolves in the new workspace. The 11-node rewiring job disappears.
+- With sensitive data OFF (the default), every designated secret field arrives **empty** while all
+  the non-secret configuration is kept: base URL, port, encryption mode, username, scopes, the
+  auth method, the header name, the test endpoint. The installer opens each credential and fills
+  only what is blank.
+- Verified on a real pack: the stored API key value is absent from the bundle even though the
+  credential that holds it is in it.
+
+**Do not write a placeholder into those empty fields.** It is the obvious instinct - make the
+blanks visible as `[Replace_me]` - and it silently breaks the pack: on import the credential is
+**dropped with no error and no mention**, the nodes that referenced it dangle again, and the only
+symptom is a credential missing from a list nobody thought to re-count. Measured: the untouched
+export imported 3 of 3; the same export with a placeholder typed into two secret fields imported 1
+of 3. A valid-base64 value was dropped too, so it is not a formatting problem - treat the field as
+an opaque slot that only the platform may fill. Ship the file exactly as exported.
+
+What still needs cleaning by hand, at the SOURCE, before publishing: a credential's non-secret
+fields are plaintext and are author-written, so anything personal typed into one travels. A test
+endpoint naming a real mailbox is the usual case. Fix it in the credential, not in the export.
+
+### An error port cannot go just anywhere: only a Join converges
+
+Routing a fault away from the flow's failure path needs a target, and the platform rejects almost
+every obvious one. Both refusals come from the runtime validator, so they are caught before a PUT
+rather than discovered later:
+
+| Target | Verdict |
+| --- | --- |
+| the node's own successor | `Duplicate connection port! SourceId:… DestinationId:…` - source+destination is the unique key, and the normal edge already occupies it |
+| any node that already has one inbound edge | `statusCode 383, Action has too many input ports` - this includes Stop |
+| a **Join** inserted after the successor | accepted |
+
+So the working shape is: insert a Join between the successor and whatever came next, then point the
+error port at the Join. The node that would have consumed the response simply does not run on the
+fault path, its output variable stays null, and the flow reaches Stop at status 50. That converts
+"the whole run failed" into "one section is empty", which is the difference between a page that
+cannot open and a page that opens with one dropdown blank.
+
+Worth designing for deliberately: the consumer node should already tolerate a null input (`const
+res = <%0%> || {}`), because on the error path that is exactly what it gets - and if it also checks
+the HTTP status it keeps working for the OTHER failure mode, an API that answers 401 rather than
+faulting. A Call API that returns an error STATUS does not take the error port at all; only a fault
+while building the input model does (a missing or unresolvable credential). Both need handling and
+they are not the same path.
+
+### A form has no address until a CustomUrl exists
+
+Measured against the live forms host, which serves an SPA shell (and therefore HTTP 200) for every
+path - so a status code proves nothing here and the rendered page has to be read:
+
+| URL form | Result |
+| --- | --- |
+| `{forms_base}/{masterSlug}/{workspaceSlug}/{entitySlug}` | the form renders |
+| `{forms_base}/{tinyUrl}` | the form renders |
+| `{forms_base}/forms/{formId}` | **"Form not found"** |
+| `{forms_base}/{formId}` | **"Form not found"** |
+
+A CustomUrl is what mints the tinyUrl, it is per workspace and per entity, and it does not travel
+in a transport. So an imported form is reachable at no address at all until someone creates one -
+and any link the product BUILDS from a form id is dead. A fallback chain that ends in
+`{base}/forms/{id}` looks like a safety net and is a dead link in a customer's email; leave the
+link out instead.
+
+### A seeded setting defeats COALESCE, because '' is not NULL
+
+A bootstrap that creates its settings rows with empty defaults will quietly disable every
+SQL fallback chain written over them: `COALESCE(a, b, c)` returns the first NON-NULL value, the
+seeded row exists with `''`, so the chain stops at the first branch and the two working fallbacks
+behind it are unreachable. The symptom is a blank link in generated mail while the query looks
+correct and the settings look present.
+
+Write the chain as `COALESCE(NULLIF(a,''), …)`, and for a composed branch put the `NULLIF` on the
+part that can be blank - `CONCAT` returns NULL when any argument is NULL, so
+`CONCAT(base, '/', NULLIF(slug,''))` makes the whole branch fall through by itself. The same bug
+does not exist in the JavaScript equivalent, because `||` treats `''` as falsy: a chain ported from
+a script to SQL acquires it on the way.
+
+### One `<%N%>` sequence spans ALL of a node's parameters, outputs included
+
+A node does not number each parameter separately. A Query Store node's statement chips, its
+parameters-map sources and its output bindings all draw from ONE sequence - in a live release step
+the statement held 0-4, the map 5-7 and the Result-Count output 8. So adding two parameters to the
+map moves the output binding to 10, and an output left reading `<%8%>` is written back to whatever
+now holds that index: a flow that validates clean and quietly files its result in the wrong
+variable.
+
+Anything that edits one parameter of a node therefore has to renumber the whole node, in a defined
+order (statement, then map, then the remaining placeholder-bearing parameters in their existing
+index order). Two traps when writing that:
+
+- **An `id` is only a placeholder index inside a `variable` list.** A parameters-map ROW carries
+  its own ordinal `id` (0, 1, 2 …) which collides with the low indices; renumbering those turns
+  the map into nonsense.
+- **A source's resolved ATTRIBUTE path cannot be re-derived from a name** without the model the
+  editor never loaded, so a source being carried over should be copied verbatim rather than
+  rebuilt. That is why `node-set-query --params` takes `{"keep": true}`.
+
+### A timezone belongs to the reader, availability belongs to the owner
+
+Worth stating because the natural implementation gets it half right. In a booking product the
+window maths MUST run in the owner's zone - that is where "available 09:00 to 17:00" is defined -
+while every label a visitor reads must be the visitor's. Those are different answers from the same
+instant, and the instant is the only thing both sides agree on.
+
+So a slot is correctly described by its UTC instant plus BOTH renderings, and a consumer picks.
+The failure mode to avoid is an output that carries the owner's wall clock under a field name that
+sounds like the reader's, because a page which trusts that name then shows a visitor in another
+country times that are off by the offset while labelling them as local. Keep the owner's fields,
+add the reader's, and name both for whose clock they are.
+
+### Declaring a calendar event in the invitee's own zone
+
+A timed event carries both an instant and a zone NAME, and they answer different questions. With
+`dateTime` written as UTC the instant is already unambiguous, so adding
+`start.timeZone` / `end.timeZone` moves nothing: it changes only which zone the calendar NAMES
+when it renders the event. That matters because an invitation mail is rendered in the event's
+zone, so an invitee who picked a time in their own zone otherwise reads it back in the host's and
+concludes the booking went in wrong.
+
+Two things to get right, both learned by breaking them:
+
+- **Never let that field reach the API empty.** An empty zone is rejected, and the column feeding
+  it is exactly the one a record written by something other than the form may not have. Make the
+  query yield a valid zone unconditionally (`COALESCE(NULLIF(col,''), 'UTC')`); UTC is always a
+  real zone and leaves the instant alone.
+- **A value only reaches the body if the loop item's MODEL declares it.** A query can select a
+  column, and the row will still not carry it unless the item's data model has an attribute of
+  that name - so the model attribute comes first, then the column, then the body reference. Adding
+  an attribute is additive and leaves existing attribute ids alone (verified), which is what makes
+  this safe to do to a model a live flow is iterating.
+
+The host's own calendar view is unaffected either way, because a calendar renders events in the
+VIEWER's zone; only the stored zone name and the mails generated from it change.

@@ -99,7 +99,9 @@ def _make_handler(token: str | None):
                         continue
                     if m.get("method") == "initialize":
                         is_initialize = True
-                    resp = server.handle(m)
+                    # Legacy era only: modern Streamable HTTP requires the Mcp-Method / Mcp-Name
+                    # header rules, which this transport does not implement.
+                    resp = server.handle(m, modern=False)
                     if resp is not None:
                         responses.append(resp)
             finally:

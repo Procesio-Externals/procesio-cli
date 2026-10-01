@@ -61,7 +61,11 @@ jobs:
 
           for label, argv in (
               ("plugin, per .mcp.json", plugin_argv),
-              ("full registry surface", ["uvx", "--from", ".", "procesio-mcp"]),
+              ("full registry surface", ["uvx", "--python-preference", "system",
+                                         "--python", ">=3.11",
+                                         "--from", ".", "--constraints", "constraints.txt",
+                                         "--build-constraints", "build-constraints.txt",
+                                         "procesio-mcp"]),
           ):
               proc = subprocess.run(argv, input=request, capture_output=True,
                                     text=True, timeout=600)

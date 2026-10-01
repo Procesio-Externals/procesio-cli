@@ -33,12 +33,63 @@ in `webplatform/spike/opencode.json`:
   responses flushed immediately. stdout is reconfigured to `newline="\n"` so Windows
   does not inject `\r\n` into the protocol stream. **stdout is the protocol channel —
   all logs go to stderr** (`_log`).
-- Methods handled: `initialize` (echoes the client's protocolVersion, default
-  `2024-11-05`), `notifications/*` (swallowed, no response), `ping`, `tools/list`,
-  `tools/call`. Unknown request methods → JSON-RPC `-32601`.
+- Methods handled: `server/discover`, `initialize`, `notifications/*` (swallowed, no
+  response), `ping`, `tools/list`, `tools/call`. Unknown request methods → JSON-RPC
+  `-32601`. The mechanics live once, in `protocol.py`, shared by both servers; see
+  "Protocol eras" below.
 - `tools/call` never raises: tool failures (incl. unknown capability, KeyError) come
   back as `{content:[{type:text,text:<json>}], isError:true}` so the model can read
   the error.
+
+## Protocol eras and version negotiation
+
+MCP 2026-07-28 drops the `initialize` handshake. The spec calls that revision *modern*
+and everything up to 2025-11-25 *legacy*. In the modern era:
+
+- every request carries its version in `_meta["io.modelcontextprotocol/protocolVersion"]`;
+- servers MUST answer `server/discover` (supported versions, capabilities, identity);
+- every result carries `resultType: "complete"`, and list results add `ttlMs` and
+  `cacheScope`;
+- an unsupported version gets error `-32022` with `data: {supported, requested}`.
+
+Both servers are **dual-era over stdio**. A request that names its version in `_meta`
+gets the modern shape; anything else gets the legacy shape, unchanged. A modern-only
+server would fail every legacy client, and legacy clients cannot fall forward.
+
+**Never echo the requested version.** Both servers used to answer `initialize` with
+whatever version the client sent, including dates that do not exist. The client then
+believes the server speaks a revision it has never heard of and waits for fields that
+never arrive. The answer must come from a list the server implements. `initialize`
+always selects the legacy era, so a client asking there for 2026-07-28 gets 2025-11-25.
+That case is real: at least one client release proposed the modern version inside
+`initialize`.
+
+**How a dual-era client probes** (checked against Claude Code 2.1.284 through a logging
+shim). By default it still sends `initialize`. With `MCP_PROTOCOL_NEGOTIATION=auto` it
+sends `server/discover` first and falls back to `initialize` on any error that is not a
+recognised modern one. So `-32601` on discover means "legacy server", and `-32022` means
+"modern server, retry with a listed version". A server that cannot serve modern requests
+must never return the second: a public MCP server that did had its client stop seeing
+its tools.
+
+**The HTTP transport is legacy-only** (`server.handle(m, modern=False)`). Modern
+Streamable HTTP adds `Mcp-Method` / `Mcp-Name` header rules that `http_server.py` does
+not implement, so over HTTP discover stays a plain `-32601`. Lift that only together
+with the header rules.
+
+**Not used, and deprecated in 2026-07-28 anyway:** roots, sampling, logging and dynamic
+client registration. Nothing here should start depending on them.
+
+**The tool-list digest.** `server/discover` reports `_meta["com.procesio/toolsDigest"]`:
+sha256 over the canonical JSON of the `tools` array (keys sorted, no whitespace, UTF-8,
+non-ASCII unescaped). The procesio-oss exporter writes the same value for the chat
+surface into the public `server.json`, which the MCP Registry does not allow to change
+after publication. The value a server reports about itself is a label for spotting the
+release, not a control - the spec says self-reported server information must not drive
+security decisions. The control is a client or gateway hashing the list it actually
+received and comparing it with the registry copy. Changing the canonical form in one
+place breaks every comparison, so `tests/test_pyoss_pins.py` asserts the exporter and
+`protocol.py` agree.
 
 ## Capability discovery — why it is narrow
 
@@ -146,10 +197,15 @@ surface carries no `*_confirmed` twin and instead refuses irreversible actions o
 with a test asserting nothing declared is irreversible; adding a destructive operation
 fails the build rather than growing a second, softer approval path.
 
-**Some duplication is the seam.** `chat_server.py` repeats ~50 lines of JSON-RPC loop
-rather than importing `server.py`. That is what lets it change transport or protocol
-version later without touching a server already in use. Both import `bridge` and `gate`;
-neither imports the other, and `test_chat_surface.py` asserts it by parsing the AST.
+**Shared protocol, separate surfaces.** The two servers differ in what they publish and
+to whom, so their tools, dispatchers and identities stay apart. The protocol is a
+different matter: it has one correct behaviour. It used to be duplicated, about 50 lines
+in each server, and the two copies made the same mistake - agreeing to any version a
+client named. It now lives once in `protocol.py`: negotiation, the modern and legacy
+result shapes, `server/discover` and the stdio loop. That module is standard library
+only and imports neither surface, so a change to one surface cannot reach the other
+through it. Both servers import `bridge`, `gate` and `protocol`; neither imports the
+other. `test_chat_surface.py` asserts all of this by parsing the AST.
 
 ### Design rules taken from published guidance
 
@@ -182,3 +238,7 @@ unit-tested (19 tests) + wire-tested (send refused on plain tool, executes on
 confirmed). Tool names dropped the `aat_` prefix (opencode re-adds it → clean
 `aat_run_tool`). Pending: live opencode action-count/gate check in the browser, and
 HTTP transport (spec 05).
+
+Dual-era negotiation for MCP 2026-07-28 (`protocol.py`): built, unit-tested
+(`tests/test_protocol.py`), and checked live with Claude Code in both negotiation modes
+(default `initialize`, and `MCP_PROTOCOL_NEGOTIATION=auto` via `server/discover`).

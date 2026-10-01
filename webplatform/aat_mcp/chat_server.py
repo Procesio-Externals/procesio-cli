@@ -35,11 +35,12 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge  # noqa: E402  (sibling module, shared substrate)
 import gate  # noqa: E402
+import protocol  # noqa: E402  (shared MCP mechanics)
 
 import yaml  # noqa: E402
 
 SURFACE_PATH = Path(__file__).resolve().parent / "chat_surface.yaml"
-DEFAULT_PROTOCOL = "2024-11-05"
+DEFAULT_PROTOCOL = protocol.LEGACY_VERSIONS[0]  # what `initialize` gets when it names no version
 
 
 def load_surface(path: Path = SURFACE_PATH) -> dict:
@@ -175,66 +176,18 @@ def call_tool(name: str, arguments: dict) -> tuple[dict, bool]:
     return _cap(res, spec), False
 
 
-def handle(req: dict) -> dict | None:
-    """Dispatch one JSON-RPC request; None for a notification."""
-    method = req.get("method")
-    req_id = req.get("id")
-    is_notification = "id" not in req
+def handle(req: dict, *, modern: bool = True) -> dict | None:
+    """Dispatch one JSON-RPC request; None for a notification.
 
-    def ok(result):
-        return {"jsonrpc": "2.0", "id": req_id, "result": result}
-
-    if method == "initialize":
-        params = req.get("params") or {}
-        return ok({"protocolVersion": params.get("protocolVersion") or DEFAULT_PROTOCOL,
-                   "capabilities": {"tools": {"listChanged": False}},
-                   "serverInfo": SERVER_INFO})
-    if (method or "").startswith("notifications/"):
-        return None
-    if method == "ping":
-        return ok({})
-    if method == "tools/list":
-        return ok({"tools": TOOLS})
-    if method == "tools/call":
-        params = req.get("params") or {}
-        payload, is_error = call_tool(params.get("name", ""), params.get("arguments") or {})
-        return ok({"content": [{"type": "text",
-                                "text": json.dumps(payload, ensure_ascii=False)}],
-                   "isError": is_error})
-    if is_notification:
-        return None
-    return {"jsonrpc": "2.0", "id": req_id,
-            "error": {"code": -32601, "message": f"method not found: {method}"}}
+    Protocol mechanics live in protocol.py, shared with the full surface. What stays here is
+    what is this surface's own: the published tool list and the dispatcher behind it."""
+    return protocol.handle(req, tools=TOOLS, call_tool=call_tool,
+                           server_info=SERVER_INFO, modern=modern)
 
 
 def main() -> None:
-    try:
-        sys.stdout.reconfigure(encoding="utf-8", newline="\n")
-        sys.stdin.reconfigure(encoding="utf-8")
-    except Exception:  # noqa: BLE001 - older interpreters; best effort
-        pass
     _log(f"started (stdio). surface {SURFACE['surface_version']}, {len(TOOLS)} tools.")
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            req = json.loads(line)
-        except ValueError:
-            sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": None,
-                                         "error": {"code": -32700,
-                                                   "message": "parse error"}}) + "\n")
-            sys.stdout.flush()
-            continue
-        try:
-            resp = handle(req)
-        except Exception as e:  # noqa: BLE001
-            _log(f"handler error: {e}")
-            resp = {"jsonrpc": "2.0", "id": req.get("id"),
-                    "error": {"code": -32603, "message": f"internal error: {e}"}}
-        if resp is not None:
-            sys.stdout.write(json.dumps(resp, ensure_ascii=False) + "\n")
-            sys.stdout.flush()
+    protocol.serve_stdio(handle, _log)
 
 
 if __name__ == "__main__":

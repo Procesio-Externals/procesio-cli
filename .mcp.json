@@ -3,8 +3,16 @@
     "procesio": {
       "command": "uvx",
       "args": [
+        "--python-preference",
+        "system",
+        "--python",
+        ">=3.11",
         "--from",
         "${CLAUDE_PLUGIN_ROOT}",
+        "--constraints",
+        "${CLAUDE_PLUGIN_ROOT}/constraints.txt",
+        "--build-constraints",
+        "${CLAUDE_PLUGIN_ROOT}/build-constraints.txt",
         "procesio-mcp-chat"
       ]
     }

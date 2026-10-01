@@ -6580,3 +6580,51 @@ Two gotchas building a webhook->parse->Call API chain via the process builder:
   the form field (`{"key":"data","value":"<%0%>"}`) and `vars:["theVar"]`. The builder remaps
   `<%0%>` to a global index and binds the variable. This is the RPC pattern: a Node computes
   the full request `data` string (auth + params), the Call API just ships `data=<%it%>`.
+
+### Webhook idempotency via a Data Store (dedup) - working pattern (2026-09-30)
+To make a webhook-triggered flow idempotent against provider REDELIVERY (Meta and most
+webhook sources retry on non-200/timeout), gate it on a Data Store keyed by the event id:
+- Create the store with the id column as PRIMARY KEY (`datastore-create` REFUSES a table
+  with no primary key: "At least one column must be marked as a primary key.").
+- Flow: parse -> extract the event id -> **Data Store SelectRows** (`dsWhere:[{column, op:'equals',
+  value:{var:eventId}}]`, bind `Result Rows` to a NON-LIST var) -> a Node returns
+  `rows.length===0` as a boolean -> **Decisional** `[{name, to:insertNode, when:[{left:{var:isNew},
+  op:'IS_TRUE'}]}, {to:join, default:true}]` -> new branch: **Data Store InsertRows**
+  (`dsMap:{idColumn:{var:eventId}}`) then the real work, seen branch: straight to a **Join**;
+  both branches -> Join -> Stop. Verified live: first event isNew=true+processed, a repeat of
+  the same id isNew=false+skipped (no duplicate side effect).
+
+### Meta WhatsApp inbound wiring: subscribe the APP to the WABA (2026-10-01)
+Passing the webhook VERIFICATION handshake is NOT enough for inbound events to flow. Two
+distinct subscriptions exist and BOTH are needed:
+- **App-level** (`GET /{app_id}/subscriptions` with an app token `{app_id}|{app_secret}`):
+  the `callback_url` + the subscribed `fields` (must include `messages`). Set in the app's
+  Webhooks config. Shared by every WABA under the app.
+- **WABA-level** (`POST /{WABA_id}/subscribed_apps`): the app must be subscribed to EACH WABA
+  whose events it wants. Easy to miss - a freshly added production number sits in its own WABA,
+  and until you subscribe the app there, its inbound messages never reach the callback (they go
+  to Meta's default "WA DevX Webhook Events 1P App"). Verify with `GET /{WABA}/subscribed_apps`.
+- **Templates are WABA-scoped**: a template approved in WABA A does not exist in WABA B -
+  sending it from B fails `#132001 Template name does not exist in the translation`. Create the
+  template in the sending number's WABA. API template creation can fail on a verified production
+  WABA with `#2388339 "WhatsApp accounts cannot be used with this API."` - create it in WhatsApp
+  Manager (UI) instead. `hello_world` (en_US) is auto-present in every WABA.
+- A business-verified + PUBLISHED app is still required for REAL inbound delivery (a test number
+  only delivers from its 5 verified recipients).
+
+### ⚠ PROCESIO webhook handshake-response is NOT persistent - cannot reliably serve Meta inbound (2026-10-01, refines the earlier claim)
+Measured against a live Meta WABA: a PROCESIO webhook handles POST events fine (a direct POST
+to `/api/webhooks/launch/{id}` fires the bound process, verified end-to-end), BUT its GET
+verification handshake does NOT persist. The designer's "Handshake response body" (JSONPath
+`$['hub.challenge'][0]`) echoes the challenge only DURING the designer's active "Listen handshake"
+window; afterwards the launch URL answers a GET with an EMPTY 200 (no challenge), regardless of
+verify_token. Consequence: a one-time Meta verification can be passed by clicking Verify while the
+designer is listening, but Meta periodically RE-verifies the callback and a WABA-level
+`subscribed_apps` override verification does too - both FAIL (`#2200 Callback verification failed...
+Connection timed out` / empty body), so Meta stops/never starts delivering real inbound even though
+the app shows subscribed and messages are Delivered to the number. => For RELIABLE Meta inbound a
+PROCESIO webhook is NOT sufficient on its own: either PROCESIO must make the webhook handshake
+PERSISTENT (product gap - the feature exists but only works transiently), or front it with a tiny
+always-on endpoint that answers the GET challenge synchronously and forwards POSTs to the PROCESIO
+webhook (POST side works). Earlier notes claiming a bare PROCESIO webhook can serve the Meta
+callback were based on the transient one-time verification, not persistent delivery.
