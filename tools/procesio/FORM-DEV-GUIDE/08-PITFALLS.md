@@ -192,17 +192,21 @@ sandbox iframe, so they can cancel each other.
 flags that MAPs reset apart from the field that triggers work.
 
 ### A script reads a select's options and gets nothing
-**Cause.** Two gaps, both silent. On a form built through the API, the select's field
-object has no `sourceType` and no `sourceValue`: `form-create` writes them as element
-configs but leaves them out of the form's data model, and only data-model attributes
-reach `ProcesioForm`. A save in the designer adds them. The page is no fallback either:
+**Cause.** Two gaps, both silent. On a form built through the API before 2026-10-01, the
+select's field object has no `sourceType` and no `sourceValue`: `form-create` wrote them
+as element configs but left them out of the form's data model, and only data-model
+attributes reach `ProcesioForm`. A save in the designer adds them, and `form-create` and
+`form-add-element` now write them too, for a static option list. The page is no fallback either:
 the option nodes are not drawn until the list is opened once (none before, the
 options after). A local replica that draws its own select hides both gaps, so the list is fine
 in every test and empty on the live form.
-**Rule.** Do not read a list back from the select. Hand the script the list directly:
-write it in at build time, or return it from a process call the form already makes.
-Opening the select from code so that it draws works, but it leans on markup and timing.
-The builder gap is specified in `todo/procesio-form-create-select-source-in-data-model.md`.
+**Rule.** On a form built or rebuilt since then, read a static list from the field's
+`sourceValue`, through a lookup that ignores case and separators. For an older form, a
+JSON or URL source (whose shape was never captured, so the builder leaves it out), or a
+list the page has to supply, hand the script the list directly: write it in at build
+time, or return it from a process call the form already makes. Opening the select from
+code so that it draws works, but it leans on markup and timing. Spec and the one
+remaining live check: `todo/procesio-form-create-select-source-in-data-model.md`.
 
 ### Field reads that worked stop working after a designer save
 **Cause.** A form built through the API keeps its field names exactly as written, and
@@ -213,7 +217,9 @@ worked for weeks returns `undefined` the first time anyone saves the form in the
 designer, and a lowercase snake_case name is not safe either.
 **Rule.** Read fields through a lookup that ignores case and separators
 ([`../dto/form/description.md`](../dto/form/description.md)). Only a name that is a single
-lowercase word survives a designer save unchanged.
+lowercase word survives a designer save unchanged. `form-create`, `form-edit` and
+`form-update` return a warning naming every field a designer save would re-key, and
+what it would become. They never rename: scripts in use read the names as built. When no name is given, the builder generates a single lowercase word from the label, so auto-named fields are safe by default; only a name you set yourself can trip the warning.
 
 ### A designer save changes far more than the edit you made
 **Cause.** Saving in the designer rewrites the whole definition. On an API-built form, one
@@ -425,10 +431,12 @@ sent where PascalCase is required.
 does break: revert fully and immediately, then re-approach.
 
 ### `form-set-code` succeeds and the form goes blank
-**Cause.** The `form-code-key` stored on this machine is not the one the installation's
+**Cause.** The key stored for that environment is not the one the installation's
 renderer uses. The write encrypts with it anyway; the renderer cannot open the blob, logs
 `Malformed UTF-8 data` and never mounts the form. It is easy to read this as "the CLI
-cannot write form CSS", which is the wrong conclusion.
+cannot write form CSS", which is the wrong conclusion. The tool no longer lends the
+default environment's key to another installation, which closes the commonest way in,
+but a wrong key stored under the right name still does this.
 **Rule.** Before the first write on an installation, decrypt the code of a form whose CSS
 was written in the designer there ([07](07-DEPLOY-WORKFLOW.md) §2). If that fails, the
 key is wrong; do not write. `form-set-code --clear` repairs a form already blanked.

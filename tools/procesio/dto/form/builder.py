@@ -110,6 +110,15 @@ def _slug(s: str) -> str:
     return re.sub(r"[^A-Za-z0-9_]", "", (s or "").title().replace(" ", "")) or "field"
 
 
+def _field_slug(s: str) -> str:
+    """An auto-generated field NAME: a single lowercase word. A designer save lowercases
+    and camelCases around underscores, so a single lowercase word survives it unchanged
+    and formlint.lint_field_names does not flag it. Human-readable text stays in the
+    field's label, not its name (_slug, which keeps case for flowgraph display, is left
+    for that)."""
+    return re.sub(r"[^a-z0-9]", "", (s or "").lower()) or "field"
+
+
 def _options(raw):
     """Normalize options to [{name, value}]."""
     out = []
@@ -418,7 +427,7 @@ def _build_element(spec: dict, ctx: dict, out: list) -> dict:
             c["value"] = False
         if c.get("key") in _CLEAR_DEFAULT:
             c["value"] = ""
-    field = spec.get("name") or _slug(spec.get("label") or kind)
+    field = spec.get("name") or _field_slug(spec.get("label") or kind)
     _set_config(configs, "name", field, ctx)
     _set_config(configs, "id", field, ctx)
     val_cfg = next((c for c in configs if c.get("key") == _value_key(kind)), None)
@@ -481,7 +490,7 @@ def _build_table(spec: dict, ctx: dict, out: list) -> dict:
         c["id"] = _new_id(ctx)
         if c.get("key") == "visible":
             c["value"] = True
-    name = spec.get("name") or _slug(spec.get("label") or "table")
+    name = spec.get("name") or _field_slug(spec.get("label") or "table")
     _set_config(configs, "name", name, ctx)
     _set_config(configs, "id", name, ctx)
     if spec.get("label") is not None:
@@ -507,7 +516,7 @@ def _build_table(spec: dict, ctx: dict, out: list) -> dict:
     rcfg = row.get("configs", [])
     for c in rcfg:
         c["id"] = _new_id(ctx)
-    rowname = name + "Row"
+    rowname = name + "row"
     _set_config(rcfg, "name", rowname, ctx)
     _set_config(rcfg, "id", rowname, ctx)
     out.append(row)
@@ -537,7 +546,8 @@ def _build_code(config: dict, ctx: dict) -> str:
     """Form-level CSS + JavaScript (the designer's 'Switch to code' editor) -> the
     encrypted `Data.code` blob. Accepts `css`/`javascript` (or a `code:{css,javascript}`
     object). Empty -> "" (forms render fine without it; verified live). The AES key comes
-    from ctx['form_code_key'] (tests) or Credential Manager procesio/form-code-key."""
+    from ctx['form_code_key'] (tests) or the key stored for the call's environment
+    (form_code_keys: one per installation)."""
     code = config.get("code") if isinstance(config.get("code"), dict) else {}
     css = code.get("css", config.get("css"))
     js = code.get("javascript", config.get("javascript", config.get("js")))
@@ -545,8 +555,10 @@ def _build_code(config: dict, ctx: dict) -> str:
         return ""
     key = ctx.get("form_code_key")
     if not key:
-        from tools._lib import creds  # lazy: avoid keyring import unless needed
-        key = creds.get("procesio", "form-code-key")
+        # The key stored for THIS call's environment, never another installation's:
+        # a blob encrypted with the wrong key blanks the form.
+        from tools.procesio import form_code_keys
+        key = form_code_keys.key_for(ctx.get("form_code_env"))
     from tools.procesio.dto.form import code_cipher
     return code_cipher.encrypt_code(js or "", css or "", key)
 
@@ -608,6 +620,9 @@ _INT = "0317bfee-b2f5-4bde-bfe8-121212121211"
 _DT = "0317bfee-b2f5-4bde-bfe8-121212121218"
 _FILE = "10c6ac59-3929-49e6-99dc-121212121219"
 _JSON = "0317bfee-b2f5-4bde-bfe8-121212121220"
+# PROCESIO's generic Object type. A select's STATIC option list is a list of these in
+# the data model (designer capture, 2026-10-01).
+_OBJECT = "0317bfee-b2f5-4bde-bfe8-121212121221"
 _BOOL_CFG = {"visible", "readonly", "required", "submit", "multiple", "searchable",
              "clearable", "hasNow", "disabledIfFormIsInvalid", "canAdd", "canRemove",
              "outlined", "disabled"}
@@ -629,7 +644,12 @@ def _value_is_list(el: dict) -> bool:
         return bool(next((c.get("value") for c in el.get("configs", [])
                           if c.get("key") == "multiple"), None))
     return False
-_SKIP_DM_ATTR = {"sourceValue", "sourceType", "options", "childrenIdPerColumn",
+# Configs that get NO data-model attribute. `sourceType` / `sourceValue` used to be here,
+# grouped with the layout configs, but the designer writes both into the data model, and
+# only data-model attributes reach `ProcesioForm` in form JS: with them skipped, a script
+# on an API-built form could never read a select's options (measured live 2026-10-01;
+# FORM-DEV-GUIDE/08, "A script reads a select's options and gets nothing").
+_SKIP_DM_ATTR = {"options", "childrenIdPerColumn",
                  "tableColumnsSourceValue", "tableColumnsSourceType", "rows", "columns",
                  "tabs", "style"}
 
@@ -646,6 +666,25 @@ def _dm_attr(name, aid, type_id, parent, is_list=False):
             "isDataModel": False, "isList": is_list, "isProcesio": False,
             "isPublic": False, "parentDataTypeId": parent, "jsonProperty": None,
             "attributes": [], "hidden": False}
+
+
+def _dm_shape(el: dict, c: dict) -> tuple[str, bool] | None:
+    """(dataTypeId, isList) of the data-model attribute one element config gets, or None
+    when it gets none. Shared by form-create and form-add-element, so the two can never
+    disagree about what the designer would write.
+
+    `sourceValue` follows a designer capture: a STATIC option list is a list of Objects.
+    A JSON or URL source has not been captured from the designer, so its `sourceValue`
+    stays out rather than be given a guessed type. `sourceType` is a plain string."""
+    k = c.get("key")
+    if not k or k.endswith("Events") or k in _SKIP_DM_ATTR:
+        return None
+    if k == "sourceValue":
+        return (_OBJECT, True) if isinstance(c.get("value"), list) else None
+    vkey = _value_key(el.get("type"))
+    if k == vkey:
+        return _VALUE_TYPE.get(el.get("type"), _STR), _value_is_list(el)
+    return (_BOOL if k in _BOOL_CFG else _STR), False
 
 
 def _build_data_model(form_id: str, elements: list, ctx: dict) -> dict:
@@ -678,19 +717,16 @@ def _build_data_model(form_id: str, elements: list, ctx: dict) -> dict:
                "isPublic": False, "parentDataTypeId": _FIELDS_NS, "jsonProperty": None,
                "attributes": []}
         for c in el.get("configs", []):
-            k = c.get("key")
-            if not k or k.endswith("Events") or k in _SKIP_DM_ATTR:
+            shape = _dm_shape(el, c)
+            if shape is None:
                 continue
             # The data-model attribute id MUST equal the element's config id for that
             # key (verified against real forms: every fields sub-model attr id == the
             # element's config id; 15/16 in OMS vs 0/16 with fresh ids -> "Unknown" in
             # the trigger-map UI). Reuse the config's own id.
             aid = c.get("id") or _new_id(ctx)
-            vkey = _value_key(el.get("type"))
-            tid = (_VALUE_TYPE.get(el.get("type"), _STR) if k == vkey
-                   else (_BOOL if k in _BOOL_CFG else _STR))
-            is_list = (k == vkey and _value_is_list(el))
-            sub["attributes"].append(_dm_attr(_attr_name(k), aid, tid, eid, is_list))
+            sub["attributes"].append(
+                _dm_attr(_attr_name(c["key"]), aid, shape[0], eid, shape[1]))
         submodels.append(sub)
     fields["attributes"] = submodels
     return dm
@@ -777,11 +813,14 @@ def _collect_process_ids(elements: list, out: set) -> None:
 def _prepare_ctx(client, config: dict) -> dict:
     """Impure pre-build step (has the live client): resolve every process referenced by a
     RUN_PROCESS event to its variable name->id map, so the builder can wire inputMap/
-    outputMap by GUID (the backend rejects variable names). Fail loud on a bad processId."""
+    outputMap by GUID (the backend rejects variable names). Fail loud on a bad processId.
+    Also records the call's environment, which decides the form-code-key."""
+    env = getattr(client, "env", None)
+    ctx: dict = {"form_code_env": env.get("name") if isinstance(env, dict) else None}
     pids: set = set()
     _collect_process_ids(config.get("elements"), pids)
     if not pids:
-        return {}
+        return ctx
     pvars: dict = {}
     for pid in pids:
         try:
@@ -795,7 +834,8 @@ def _prepare_ctx(client, config: dict) -> dict:
         src = flow if isinstance(flow, dict) else (body if isinstance(body, dict) else {})
         variables = src.get("variables") or []
         pvars[pid] = {v.get("name"): v.get("id") for v in variables if v.get("name")}
-    return {"process_vars": pvars}
+    ctx["process_vars"] = pvars
+    return ctx
 
 
 def _extract_id(resp, dto):
@@ -814,6 +854,14 @@ def _edit(client, resource_id, config, ctx):
     return client.get(f"/api/FormTemplate/{resource_id}")
 
 
+def _lint(resource) -> list[str]:
+    """Non-blocking formlint warnings for a built DTO (`Data`) or a fetched form (`data`)."""
+    from tools.procesio import formlint
+    if not isinstance(resource, dict):
+        return []
+    return formlint.lint_form_data(resource.get("Data") or resource.get("data"))
+
+
 COMPONENT = Component(
     name="form",
     description="PROCESIO form template: a control tree (elements) rendered at runtime.",
@@ -826,4 +874,5 @@ COMPONENT = Component(
     edit=_edit,
     patch_action="form-update",
     add_action="form-add-element",
+    lint=_lint,
 )

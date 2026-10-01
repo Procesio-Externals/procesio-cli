@@ -82,16 +82,12 @@ def build_put_body(form: dict, *, data: dict | None = None, name: str | None = N
     return dto
 
 
-def _code_key() -> str:
-    from tools._lib import creds  # lazy: avoid the keyring import unless needed
-    try:
-        return creds.get("procesio", "form-code-key")
-    except KeyError as e:
-        raise UsageError(
-            "missing credential agents-and-tools:procesio:form-code-key — the AES "
-            "passphrase for a form's Data.code blob. Store it with: "
-            "python scripts/set-credential.py procesio form-code-key"
-        ) from e
+def _code_key(client) -> str:
+    """The form-code-key for the environment this call runs against: one per
+    installation, never borrowed from another (form_code_keys)."""
+    from tools.procesio import form_code_keys
+    env = getattr(client, "env", None)
+    return form_code_keys.key_for(env.get("name") if isinstance(env, dict) else None)
 
 
 def _fetch(client, form_id: str) -> dict:
@@ -119,8 +115,9 @@ def _decode(blob: str, key: str) -> dict:
         raw = code_cipher.decrypt_code(blob, key)
     except Exception as e:  # noqa: BLE001 — wrong key and corrupt blob look alike
         raise UsageError(
-            f"could not decrypt Data.code ({e}); the stored form-code-key does not "
-            f"match the blob this form was saved with"
+            f"could not decrypt Data.code ({e}); the form-code-key stored for this "
+            f"environment does not match the blob this form was saved with (one key per "
+            f"installation: check it is THIS installation's)"
         ) from e
     return {"CSS": raw.get("CSS") or "", "JAVASCRIPT": raw.get("JAVASCRIPT") or ""}
 
@@ -138,7 +135,7 @@ def _read_text(inline, path, label: str):
 
 def get_code(client, args) -> dict:
     form = _fetch(client, args.id)
-    code = _decode(form["data"].get("code") or "", _code_key())
+    code = _decode(form["data"].get("code") or "", _code_key(client))
     css, js = code.get("CSS", ""), code.get("JAVASCRIPT", "")
     if args.css_out:
         with open(args.css_out, "w", encoding="utf-8") as f:
@@ -181,7 +178,7 @@ def set_code(client, args) -> dict:
         raise UsageError("nothing to set: pass --css/--css-file and/or --javascript/--js-file, "
                          "or --clear to remove the form's code entirely")
 
-    key = _code_key()
+    key = _code_key(client)
     form = _fetch(client, args.id)
     previous = _decode(form["data"].get("code") or "", key)
     # Omitting one side PRESERVES it — restyling should never silently drop the JS.

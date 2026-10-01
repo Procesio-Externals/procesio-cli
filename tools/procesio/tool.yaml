@@ -47,10 +47,15 @@ secrets:
   description: AES passphrase used to encrypt a form's Data.code blob (the designer's
     'Switch to code' CSS + JavaScript). Required only to build forms WITH form-level
     CSS/JS; theme, element styles, and element events do not need it. It is a STATIC
-    PLATFORM key, not a per-user credential - it is not issued or generated per
-    person, so it is obtained from someone who already holds it, or read from the
-    webapp bundle that performs the AES step. Optional because without it every
-    other procesio action works, and only form-get-code / form-set-code fail.
+    PLATFORM key, one per INSTALLATION (the same on every workspace of it, not
+    guaranteed to match on another), so it is stored PER ENVIRONMENT as
+    form-code-key@<environment> (e.g. form-code-key@Internal-QA). This bare name is the
+    DEFAULT environment's key and is never used for another one, because a blob
+    encrypted with another installation's key blanks the form. Not a per-user
+    credential - it is not
+    issued or generated per person, so it is obtained from someone who already holds
+    it, or read from the webapp bundle that performs the AES step. Optional because
+    without it every other procesio action works, and only form-level code fails.
 healthcheck:
   action: check-auth
   label: "auth check (active environment)"
@@ -2460,7 +2465,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-create
-  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
+  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string
@@ -2817,7 +2822,7 @@ actions:
     required: true
     description: form template id
 - name: form-edit
-  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO.'
+  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string

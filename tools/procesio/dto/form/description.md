@@ -55,7 +55,8 @@ fine), so forms are fully buildable server-side.
   groups (see `data_shell.json` / `docs_info/form-theme.ts`).
 - **form CSS / JavaScript** — the designer's "Switch to code" editor:
   `"css":"...", "javascript":"..."` (or `"code":{"css","javascript"}`). Encrypted into
-  `Data.code` (CryptoJS AES; key in Credential Manager `procesio/form-code-key`). Empty →
+  `Data.code` (CryptoJS AES; key in Credential Manager, one per environment:
+  `procesio/form-code-key@<environment>`). Empty →
   `code:""`. See `code_cipher.py` + `FORM-STYLING-NOTES.md`.
 - **per-component style** — on any field/container control:
   `"style":{"--h-input":"50px","--c-input-background":"--c-neutral--50"}`. Only the
@@ -99,7 +100,8 @@ trap springs late, the first time anyone saves an API-built form in the designer
 lowercase snake_case name is not safe either. Only a single lowercase word survives
 unchanged. Read everything else through a lookup that ignores case AND separators, as
 below. The same save also adds a select's `sourceType` and `sourceValue` to the data
-model, which `form-create` leaves out (`todo/procesio-form-create-select-source-in-data-model.md`).
+model. `form-create` left them out until 2026-10-01 and now writes them for a static
+option list (`todo/procesio-form-create-select-source-in-data-model.md`). When a config gives no `name`, the builder now derives a single lowercase word from the label (`Company Name` becomes `companyname`), so an auto-named field survives a designer save unchanged; an explicit name is kept verbatim, and `form-create` / `form-edit` return a `warnings` entry when a name is not a single lowercase word.
 
 ```js
 var F=ProcesioForm.data.fields;var _fl={};for(var _k in F){_fl[_k.toLowerCase().replace(/[_-]/g,'')]=F[_k];}

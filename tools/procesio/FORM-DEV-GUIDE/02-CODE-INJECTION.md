@@ -16,9 +16,10 @@ to work on first load and then quietly stops.
 
 stored **AES-encrypted**: CryptoJS `AES.encrypt(text, passphrase)` — i.e. OpenSSL
 AES-256-CBC, key + IV derived by `EVP_BytesToKey(MD5, 1 iteration)`, serialized as
-`base64("Salted__" + salt + ciphertext)`. The passphrase is a **static
-platform-wide key**, stored in the OS credential store
-(`agents-and-tools:procesio:form-code-key`) and never in a file.
+`base64("Salted__" + salt + ciphertext)`. The passphrase is a **static key, one per
+installation**, stored in the OS credential store per environment
+(`agents-and-tools:procesio:form-code-key@<environment>`, see
+[07](07-DEPLOY-WORKFLOW.md) §3) and never in a file.
 
 There is **no plaintext CSS/JS field on the DTO**. The frontend holds `code` as a
 plaintext `{JAVASCRIPT, CSS}` object in memory; the host webapp does the AES step.

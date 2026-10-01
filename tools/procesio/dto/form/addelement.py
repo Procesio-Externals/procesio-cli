@@ -51,16 +51,13 @@ def _sub_model(element: dict, fields_ns: str, ctx: dict) -> dict:
            "isDataModel": True, "isList": False, "isProcesio": False,
            "isPublic": False, "parentDataTypeId": fields_ns, "jsonProperty": None,
            "attributes": []}
-    value_key = builder._value_key(element.get("type"))
     for c in element.get("configs") or []:
-        key = c.get("key")
-        if not key or key.endswith("Events") or key in builder._SKIP_DM_ATTR:
+        shape = builder._dm_shape(element, c)     # the same rule form-create applies
+        if shape is None:
             continue
-        type_id = (builder._VALUE_TYPE.get(element.get("type"), builder._STR) if key == value_key
-                   else (builder._BOOL if key in builder._BOOL_CFG else builder._STR))
         sub["attributes"].append(
-            builder._dm_attr(builder._attr_name(key), c.get("id") or _new_id(ctx),
-                             type_id, eid, key == value_key and builder._value_is_list(element)))
+            builder._dm_attr(builder._attr_name(c["key"]), c.get("id") or _new_id(ctx),
+                             shape[0], eid, shape[1]))
     return sub
 
 
@@ -139,7 +136,7 @@ def add_elements(form: dict, specs: list, *, parent: str | None = None) -> dict:
 
     added: list = []
     for spec in specs:
-        name = spec.get("name") or builder._slug(spec.get("label") or spec.get("type") or "")
+        name = spec.get("name") or builder._field_slug(spec.get("label") or spec.get("type") or "")
         if name in existing_names:
             raise UsageError(
                 f"the form already has a control named {name!r}; two controls with one name make "

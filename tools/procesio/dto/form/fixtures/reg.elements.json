@@ -45,7 +45,7 @@
         "category": "content",
         "subCategory": "general",
         "type": "copyable-input",
-        "value": "Title",
+        "value": "title",
         "hasTopDivider": true,
         "exposed": true,
         "events": [
@@ -61,7 +61,7 @@
         "category": "content",
         "subCategory": "general",
         "type": "copyable-input",
-        "value": "Title",
+        "value": "title",
         "exposed": true
       },
       {
@@ -576,7 +576,7 @@
         "category": "content",
         "subCategory": "general",
         "type": "copyable-input",
-        "value": "Submit",
+        "value": "submit",
         "hasTopDivider": true,
         "exposed": true,
         "events": [
@@ -591,7 +591,7 @@
         "category": "content",
         "subCategory": "general",
         "type": "copyable-input",
-        "value": "Submit",
+        "value": "submit",
         "exposed": true
       },
       {

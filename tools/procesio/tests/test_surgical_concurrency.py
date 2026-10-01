@@ -63,7 +63,7 @@ def test_force_skips_the_check_and_does_not_refetch():
 
 @pytest.fixture(autouse=True)
 def _stub_key(monkeypatch):
-    monkeypatch.setattr("tools.procesio.handlers.form_code._code_key", lambda: KEY)
+    monkeypatch.setattr("tools.procesio.handlers.form_code._code_key", lambda *_a, **_k: KEY)
 
 
 def _call(action, argv, session):

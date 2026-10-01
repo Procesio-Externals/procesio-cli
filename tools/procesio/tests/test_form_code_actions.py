@@ -27,7 +27,7 @@ def _call(action, argv, session):
 
 @pytest.fixture(autouse=True)
 def _stub_key(monkeypatch):
-    monkeypatch.setattr("tools.procesio.handlers.form_code._code_key", lambda: KEY)
+    monkeypatch.setattr("tools.procesio.handlers.form_code._code_key", lambda *_a, **_k: KEY)
 
 
 def _form(code: str = "") -> dict:

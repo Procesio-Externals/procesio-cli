@@ -44,6 +44,9 @@ class Component:
     # Same reason as patch_action: "there is no add/insert call" is the right thing to
     # say for a component that has none, and a lie for one that does.
     add_action: str = ""
+    # Non-blocking warnings for a built DTO or a fetched resource, attached to
+    # <name>-create / <name>-edit output as `warnings`. Never raises, never blocks.
+    lint: Callable[[Any], list] | None = None
 
     @property
     def schema_path(self) -> Path:

@@ -58,11 +58,12 @@ path pointing at that attribute.
 
 ## 2. The loop
 
-**Check the key on each installation before the first write.** `form-set-code`
-encrypts with the one `form-code-key` stored on this machine, and the tool holds a single
-key for every environment it talks to. If the installation's renderer uses another key,
-the write succeeds and the form goes blank ([08](08-PITFALLS.md)). So first read back the
-code of a form whose CSS was written in the designer, on the same installation:
+**Check the key on each installation before the first write.** `form-set-code` encrypts
+with the key stored for the call's environment (§3), and refuses when there is none
+rather than borrow another installation's. A wrong key stored under the right name still
+gets through: the write succeeds and the form goes blank ([08](08-PITFALLS.md)). So first
+read back the code of a form whose CSS was written in the designer, on the same
+installation:
 
 ```bash
 python scripts/run-tool.py procesio form-get-code --id <designer-edited-form> \
@@ -119,20 +120,23 @@ Two different secrets that look alike — both short opaque tokens:
 | Secret | What it does |
 |---|---|
 | the workspace **API key** (name + value) | gets you **at** the form (auth) |
-| `agents-and-tools:procesio:form-code-key` | gets you **into** `Data.code` (AES passphrase) |
+| `agents-and-tools:procesio:form-code-key@<environment>` | gets you **into** `Data.code` (AES passphrase), one per installation |
 
 ```bash
-python scripts/set-credential.py procesio form-code-key
+python scripts/set-credential.py procesio form-code-key@Internal-QA
 ```
 
-The form-code passphrase is **platform-wide**: it decrypts the code blob of every
-form on the platform, and it cannot be cheaply rotated. Treat it accordingly — never
-in a file, never in a chat, never in a log.
+The form-code passphrase is **installation-wide**: it decrypts the code blob of every
+form on that installation, and it cannot be cheaply rotated. Treat it accordingly —
+never in a file, never in a chat, never in a log.
 
-**One stored key may not fit every installation.** A key that had decrypted real
-exports failed, on 2026-10-01, to open code written in the designer on one installation.
-Either the key differs between installations or it has changed; the platform team has
-the answer. Until then, check it per installation before writing (§2).
+**One key per installation, stored per environment.** The platform team confirmed it:
+the key is the same on every workspace of an installation and is not guaranteed to
+match on another. An environment is how this tool names an installation, so the key is
+stored as `form-code-key@<environment>`. The bare `form-code-key` still works as the
+default environment's key, the same rule as a credential with no environment binding,
+and the tool never uses it for any other environment. A missing key is an error that
+names the secret to store.
 
 **It is not a secret from the people who open a form.** The renderer decrypts
 `Data.code` in the visitor's browser, so the passphrase reaches every browser that loads

@@ -18,12 +18,19 @@ a debugging session to find (see PROCESIO-API-NOTES.md and FORM-DEV-GUIDE/08):
   condition treats any non-empty string as true. Measured live: default "false" or "False"
   → IS_TRUE passes and IS_FALSE fails; default null → IS_TRUE fails and IS_FALSE passes.
   A gate like `isConfirmed IS_TRUE` on such a default is always open.
+* **Field names a designer save renames** — a form built through the API keeps its field
+  names as written, but one save in the designer re-keys `ProcesioForm.data.fields`: it
+  splits each name on underscores, lowercases the parts and joins them in camelCase
+  (`orderList` -> `orderlist`, `order_id` -> `orderId`; measured on two names, hyphens and
+  spaces not tested). Form JS reading the original name then gets `undefined`. Only a
+  single lowercase word survives unchanged. One warning per form, naming them all.
 
 Pure and side-effect-free: each returns a list of human-readable warning strings.
 Warnings, never blockers — the caller attaches them to its result JSON.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 
@@ -186,9 +193,46 @@ def lint_string_boolean_conditions(data: Any) -> list[str]:
     return out
 
 
+_SINGLE_WORD = re.compile(r"[a-z0-9]+")
+_UNDERSCORED = re.compile(r"[A-Za-z0-9_]+")
+
+
+def designer_key(name: str) -> str | None:
+    """The key a designer save gives a field name, or None where that rule was not
+    measured (a name with hyphens, spaces or other characters)."""
+    if not _UNDERSCORED.fullmatch(name or ""):
+        return None
+    parts = [p.lower() for p in name.split("_") if p]
+    if not parts:
+        return None
+    return parts[0] + "".join(p[:1].upper() + p[1:] for p in parts[1:])
+
+
+def lint_field_names(data: Any) -> list[str]:
+    """One warning naming every element whose name a designer save would re-key."""
+    renamed = []
+    for el in _elements(data):
+        name = _cfg_value(el, "name")
+        if not isinstance(name, str) or not name or _SINGLE_WORD.fullmatch(name):
+            continue
+        key = designer_key(name)
+        renamed.append(f"{name} -> {key}" if key else f"{name} -> (renamed; rule not measured)")
+    if not renamed:
+        return []
+    shown = ", ".join(renamed[:8])
+    if len(renamed) > 8:
+        shown += f", and {len(renamed) - 8} more"
+    return [f"{len(renamed)} field name(s) are not a single lowercase word, and a save in the "
+            f"designer re-keys them in ProcesioForm.data.fields: {shown}. Form JS that reads "
+            f"the original name then gets undefined. Read fields through a lookup that ignores "
+            f"case and underscores, or name them as single lowercase words "
+            f"(FORM-DEV-GUIDE/08-PITFALLS.md)."]
+
+
 def lint_form_data(data: Any) -> list[str]:
     """All structural (element-level) lints for a form's Data."""
     return (lint_phantom_parent(data)
             + lint_duplicate_configs(data)
             + lint_multiple_select_islist(data)
-            + lint_string_boolean_conditions(data))
+            + lint_string_boolean_conditions(data)
+            + lint_field_names(data))

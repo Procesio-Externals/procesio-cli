@@ -83,9 +83,15 @@ def _make_create(component):
             oracle = component.save_gate(client, dto, gate_ctx)
         else:
             oracle = framework.run_validate(component, client, dto, ctx)
+        # Non-blocking lint of what is about to be saved (for a form: field names a
+        # designer save would rename, phantom parents, ...). Reported, never enforced.
+        warnings = component.lint(dto) if component.lint else []
         if args.dry_run:
-            return {"dry_run": True, "component": component.name, "dto": dto,
-                    "validation": oracle}
+            out = {"dry_run": True, "component": component.name, "dto": dto,
+                   "validation": oracle}
+            if warnings:
+                out["warnings"] = warnings
+            return out
         resp = framework.run_create(component, client, dto, ctx)
         rid = component.extract_id(resp, dto)
         verified = framework.run_get(component, client, rid, ctx) if rid else None
@@ -93,6 +99,8 @@ def _make_create(component):
                "validation": oracle, "result": verified if verified is not None else resp}
         if isinstance(resp, dict) and resp.get("_capture"):   # AUTO webhook listen+capture log
             out["capture"] = resp["_capture"]
+        if warnings:
+            out["warnings"] = warnings
         return out
     return func
 
@@ -107,13 +115,21 @@ def _make_edit(component):
         if args.dry_run:
             # Build it the way the EDIT would, so the preview shows the ids the edit would keep.
             dto = framework.build_edit_dto(component, client, args.id, config, ctx)
-            return {"dry_run": True, "edit": True, "component": component.name,
-                    "id": args.id, "dto": dto}
+            out = {"dry_run": True, "edit": True, "component": component.name,
+                   "id": args.id, "dto": dto}
+            warnings = component.lint(dto) if component.lint else []
+            if warnings:
+                out["warnings"] = warnings
+            return out
         if not component.edit:
             raise UsageError(f"{component.name} does not support edit yet")
         framework.validate_config(component, config)
         resp = component.edit(client, args.id, config, ctx)
-        return {"edited": True, "component": component.name, "id": args.id, "result": resp}
+        out = {"edited": True, "component": component.name, "id": args.id, "result": resp}
+        warnings = component.lint(resp) if component.lint else []
+        if warnings:
+            out["warnings"] = warnings
+        return out
     return func
 
 
@@ -187,6 +203,7 @@ def build_actions() -> dict[str, ActionDef]:
                 + (f": put all of {listed} in it up front" if lists else "")
                 + ". There is no separate add/insert step afterwards. "
                 f"--dry-run previews the DTO without creating."
+                + (" Non-blocking lint findings come back as `warnings`." if comp.lint else "")
             ),
             arg_schemas=arg_schemas, examples=examples,
         )
@@ -221,6 +238,7 @@ def build_actions() -> dict[str, ActionDef]:
                    f"{comp.patch_action} instead - it deep-merges a patch."
                    if getattr(comp, "patch_action", "") else "")
                 + " --dry-run previews the DTO."
+                + (" Non-blocking lint findings come back as `warnings`." if comp.lint else "")
             ),
             arg_schemas=arg_schemas, examples=examples,
         )
