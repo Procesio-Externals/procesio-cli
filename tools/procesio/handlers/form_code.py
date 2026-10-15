@@ -49,7 +49,7 @@ _PUT_KEYS = {
 
 def build_put_body(form: dict, *, data: dict | None = None, name: str | None = None,
                    status: int | None = None, state: bool | None = None,
-                   is_private: bool | None = None) -> dict:
+                   is_private: bool | None = None, assignees: list | None = None) -> dict:
     """The single canonical GET-echo -> accepted-PUT-body transform for form surgery.
 
     `PUT /api/FormTemplate` binds top-level keys by PascalCase (`Id`/`Name`/`Data`);
@@ -79,6 +79,8 @@ def build_put_body(form: dict, *, data: dict | None = None, name: str | None = N
         dto["State"] = bool(state)
     if is_private is not None:
         dto["IsPrivate"] = bool(is_private)
+    if assignees is not None:      # re-derived task routing (dto.form.builder.reconcile_assignees)
+        dto["Assignees"] = assignees
     return dto
 
 

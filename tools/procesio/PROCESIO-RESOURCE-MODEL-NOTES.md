@@ -1001,3 +1001,56 @@ Two things to get right, both learned by breaking them:
 
 The host's own calendar view is unaffected either way, because a calendar renders events in the
 VIEWER's zone; only the stored zone name and the mails generated from it change.
+
+### A form publishes only TOP-LEVEL variables: a data-model input never arrives
+
+The hardest fault to see in a form-driven panel, because every layer reports success and the
+mapping looks right in the designer.
+
+A `RUN_PROCESS` event can map a form field onto an **attribute of a data-model variable**
+(`Row.Name`, `Row.DurationMinutes`, ...). The designer accepts it, the left side resolves to a real
+attribute, the flow validates, and the map reads correctly when you print it back. At runtime the
+browser does not send it. The publish call carries only the process's **top-level** variables; every
+attribute-path entry is dropped, so the whole model variable arrives NULL.
+
+Why it is so hard to attribute:
+
+- The process looks healthy. Called with a JSON payload through the run endpoint, the same model
+  input works perfectly, so every API-side test passes. Only the browser path fails, which is why
+  "the process runs but the page does not work" is the honest description of the symptom - and the
+  reason to insist on testing through the page rather than through the process.
+- A guard hides it. A sane statement checks its inputs, so the write is skipped rather than
+  failing: the run ends successfully with an affected-row count of 0 and no error. The page then
+  reports its own generic failure, which points at the page.
+- Removing the guard diagnostically finally speaks, but it accuses the wrong parameter: the write
+  fails on whichever NOT NULL column it reaches first, so the fault reads as "one field does not
+  arrive" when in fact none of them do. Do not conclude from one named column; check every
+  parameter sourced from the same variable.
+- Nothing in the attribute's own type matters. The attributes that appear to work are the ones a
+  guard does not test, not the ones with a convenient type. Retyping an attribute is a dead end.
+
+**How to see it in one step.** Install a tiny interceptor over `fetch` and `XMLHttpRequest.send`
+in the page before clicking, recording the body of every request whose URL looks like a publish or
+launch, then click the control for real and read what was recorded. The publish body is a flat list
+of `{id, value}` pairs, one per variable the form actually sends. Compare those ids against the
+process's variables: whatever is missing is what never left the browser. This is worth reaching for
+early on any "the page says it failed but the process is fine" report, because it replaces a chain
+of inference with one measurement.
+
+**The fix, and the convention.** Give the process **flat, top-level** input variables - one per
+field - and bind the statement's parameters to those. Declare them String and coerce in SQL, since
+a panel's values are text on the wire anyway (and the id of an existing record arrives as a JSON
+number, not a string, so a cast is needed regardless). Rebuild the event map to the flat variables
+and the same click starts working with no other change.
+
+A data model is still the right shape for a value passed **between processes**, or for a list a
+process returns. The restriction is specific to what a form publishes inward.
+
+**Worth checking as a one-pass audit** rather than a click at a time: list every process the form
+calls, expand each input variable, and flag any that is a data model rather than a primitive. If
+one panel is broken and the others are not, this difference alone usually explains it - and the
+working panels show the convention the broken one should follow.
+
+A related restriction has the same flavour and the same cause: a control added to a table row
+through the API is not part of that row's own field model, so its value path reads nothing and has
+to be carried to a plain field before a save can see it.

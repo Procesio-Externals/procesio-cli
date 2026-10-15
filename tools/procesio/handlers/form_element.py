@@ -30,9 +30,11 @@ touched, so an overwrite is recoverable from the tool output alone.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.dto.form.builder import reconcile_assignees
 from tools.procesio.errors import UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
 from tools.procesio.handlers.form_code import _fetch, build_put_body
@@ -123,11 +125,16 @@ def set_element_config(client, args) -> dict:
             f"element {args.element!r} has no config {', '.join(missing)}; "
             f"it carries {', '.join(c.get('key') for c in el.get('configs') or [])}")
 
+    before = copy.deepcopy(elements)
     previous = {}
     for key, value in updates.items():
         c = _cfg(el, key)
         previous[key] = c.get("value")
         c["value"] = value          # the config's own id is preserved
+
+    # Changing an assignee/approver (or a dynamic row's approval steps) changes who the form
+    # routes to; the designer would re-derive the top-level Assignees on save, so do the same.
+    assignees, routing = reconcile_assignees(form.get("assignees") or [], before, elements)
 
     result = {
         "form_id": args.id,
@@ -137,11 +144,14 @@ def set_element_config(client, args) -> dict:
         "previous": previous,
         "elements": len(elements),
     }
+    if routing:
+        result["assignees"] = routing
     if args.dry_run:
         return {"dry_run": True, **result}
 
     guard = guard_unchanged(lambda: _fetch(client, args.id), form, force=args.force)
-    client.put("/api/FormTemplate", build_put_body(form, data=form["data"]))
+    client.put("/api/FormTemplate", build_put_body(form, data=form["data"],
+                                                   assignees=assignees if routing else None))
     return {"updated": True, "concurrency": guard, **result}
 
 
@@ -181,6 +191,9 @@ ACTIONS = {
         func=set_element_config, add_args=_set_args, needs_client=True,
         description="Set one element's plain configs in place (surgical: only that "
                     "element's config values change, ids preserved; returns the previous "
-                    "values). Event configs go through form-set-element-event.",
+                    "values). Event configs go through form-set-element-event. Changing who "
+                    "works or approves a step (assignee/approver configs, a dynamic row's "
+                    "approvalSteps) re-derives the form's top-level Assignees as the designer "
+                    "would, reported under `assignees`; any other change leaves it untouched.",
     ),
 }

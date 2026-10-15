@@ -29,6 +29,7 @@ from tools.procesio.actiondef import ActionDef
 from tools.procesio.errors import UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
 from tools.procesio.dto.form import addelement
+from tools.procesio.dto.form.builder import reconcile_assignees
 from tools.procesio.handlers.form_code import _fetch, build_put_body
 
 
@@ -126,7 +127,10 @@ def form_add_element(client, args) -> dict:
     data = addelement.add_elements(form, specs, parent=args.parent)
 
     lints = formlint.lint_form_data(data)
-    body = build_put_body(form, data=data)
+    assignees, routing = reconcile_assignees(
+        form.get("assignees") or [], (form.get("data") or {}).get("elements") or [],
+        data.get("elements") or [])
+    body = build_put_body(form, data=data, assignees=assignees if routing else None)
     added = [e for e in data["elements"] if e not in (form.get("data") or {}).get("elements", [])]
     result = {
         "id": form.get("id"), "name": body["Name"],
@@ -140,6 +144,8 @@ def form_add_element(client, args) -> dict:
                                            addelement._resolve_parent(data["elements"], args.parent))
     if warning:
         result["warning"] = warning
+    if routing:
+        result["assignees"] = routing
     if lints:
         result["lints"] = lints
     if args.dry_run:
@@ -168,9 +174,14 @@ def form_delete_element(client, args) -> dict:
     data, report = addelement.delete_element(form, args.element, force=bool(args.force_refs))
 
     lints = formlint.lint_form_data(data)
-    body = build_put_body(form, data=data)
+    assignees, routing = reconcile_assignees(
+        form.get("assignees") or [], (form.get("data") or {}).get("elements") or [],
+        data.get("elements") or [])
+    body = build_put_body(form, data=data, assignees=assignees if routing else None)
     result = {"id": form.get("id"), "name": body["Name"], **report,
               "dry_run": bool(args.dry_run), "applied": False}
+    if routing:
+        result["assignees"] = routing
     if lints:
         result["lints"] = lints
     if args.dry_run:
@@ -222,7 +233,9 @@ ACTIONS = {
             "Add one or more controls to a LIVE form (authoring-config elements), splicing them "
             "into Data.elements AND the data model without regenerating what is already there - "
             "so every existing field path, and every process map that references one, survives. "
-            "--parent places them in a container by name or id; --dry-run previews."
+            "--parent places them in a container by name or id; --dry-run previews. A new "
+            "control with an assignee or approver is routed: the form's top-level Assignees is "
+            "re-derived as the designer would, reported under `assignees`."
         ),
     ),
     "form-delete-element": ActionDef(
@@ -238,6 +251,8 @@ ACTIONS = {
             "dangling field path is saved without any error and the control that pointed at it "
             "then silently launches nothing; --force-refs deletes anyway and reports what it "
             "broke. References are found by element id, so one made by NAME is not detected. "
+            "Removing a control that routes a step (an approval control, an assigned section) "
+            "re-derives the form's top-level Assignees, reported under `assignees`. "
             "--dry-run previews."
         ),
     ),

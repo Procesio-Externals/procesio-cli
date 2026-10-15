@@ -519,3 +519,222 @@ bug was visible while the other stood.
 The lesson is procedural: after repairing how a value is ENCODED, re-test every consumer of that
 value, not just the one whose output looked wrong. The repair changes the bytes, and something
 downstream was relying on the broken shape without anyone knowing.
+
+## Coerce EVERY parameter, or the one you skipped is the one that breaks
+
+A write statement fed from a form usually wraps its parameters defensively - `CAST(@n AS SIGNED)`,
+`NULLIF(@s,'')`, `COALESCE(CAST(NULLIF(CAST(@n AS CHAR),'') AS SIGNED), 0)`. The failure mode is
+the single parameter that was left bare, because a form does not send typed values: it sends
+strings, and an untouched control sends an EMPTY string. An empty string into a boolean or numeric
+column answers:
+
+```
+One or more values are incompatible with the column type.
+```
+
+The step fails, the flow ends at status 40, and every output variable is null.
+
+Two things make this hard to spot from the outside. The statement looks careful - eight parameters
+guarded, one not - so a reader skims past it. And the user-visible symptom is not an error message
+but a false negative: a page that reads an output variable to decide what to say gets null and
+reports that nothing happened, which is true but says nothing about why. Reproduce by sending
+every parameter as `""`, which is what a form with untouched controls actually sends; typed values
+will keep passing and hide it.
+
+Coerce a boolean by VALUE, not by cast: `CAST('true' AS SIGNED)` is 0 in MySQL, so casting the
+string a select sends would silently deactivate everything. Map it:
+
+```sql
+CASE WHEN LOWER(CAST(@flag AS CHAR)) IN ('1','true','yes')  THEN 1
+     WHEN LOWER(CAST(@flag AS CHAR)) IN ('0','false','no')  THEN 0
+     ELSE <the default> END
+```
+
+And pick the ELSE per statement, not once: on an INSERT a blank should take the form's own default,
+while on an UPDATE a blank means "the control did not come through", so it must keep the stored
+value (`ELSE <the column>`) - otherwise editing a name silently re-activates something the owner
+had switched off. Keeping the column there needs a second chip for it, since a placeholder cannot
+be repeated.
+
+### A related trap in the page, not the query
+
+When a statement's result is the only thing a page inspects to decide its message, check what that
+result MEANS. A chain of guarded statements where each one is a no-op unless its branch applies
+will report the affected-row count of whichever node is bound to the output - typically the last
+one - so a successful INSERT can report 0 while an UPDATE reports 1. A page that treats
+"not null" as success is then right by accident, and a page that treats "greater than zero" as
+success calls every create a failure.
+
+### Auditing a panel for both faults at once
+
+Worth doing in one pass rather than discovering them a click at a time. Two checks, and the first
+needs the column type or it drowns in noise:
+
+- **Uncoerced writes.** List every `@param` sitting in an INSERT value position or an UPDATE SET,
+  resolve the chip it is written to, and report only those whose column is NOT a string. A string
+  parameter into a string column is harmless; everything else is a statement waiting for an empty
+  control. On a real panel this cut 56 raw hits down to 2 genuine ones, and a comparison in a
+  WHERE is not a write - exclude it or it reads as a false alarm.
+- **New-record guards.** Find every create guarded on an id and check what the panel sends for a
+  NEW record. `IS NULL` only accepts an empty field; a panel that marks "new" with `0` never
+  inserts, and a panel that marks it with `''` works - the same codebase can contain both, so the
+  guard has to be read against its own page, not in the abstract. `COALESCE(..., 0) = 0` accepts
+  either and is the form to standardise on.
+
+- **A data-model input.** Before auditing the statements at all, check whether the process takes a
+  data model as a form-facing input: a form publishes only top-level variables, so those parameters
+  are NULL no matter how the SQL is written. See "A form publishes only TOP-LEVEL variables" in
+  PROCESIO-RESOURCE-MODEL-NOTES.md. This one outranks the other two, because it makes a correct
+  statement look wrong.
+
+A third pattern shows up in the same audit and is worth knowing even though it is not a failure:
+when several guarded statements share one flow, only one of them is usually bound to the output,
+so the page sees that statement's row count and nothing else. A create then reports 0 while
+succeeding. That is survivable if the page treats "no value at all" as the failure signal, since a
+genuine fault ends the flow and leaves every output unset - but it means the row count itself
+carries no information, and anyone who later tests it for `> 0` turns every create into a reported
+failure.
+
+### "It stopped showing" is a data question before it is a code question
+
+A page that deliberately hides a block when its value is empty looks exactly like a page
+that has broken. Both show nothing, and the second reading is the tempting one because
+something was changed recently. Read the stored value first; it costs one query and it
+decides which half of the system to open.
+
+Two cheap checks settle it, in this order:
+
+- **Is the value there?** If the row is empty, the renderer is probably doing its job.
+  Hiding a block whose text is missing is normal and correct - it stops a half-filled
+  settings page from showing an orphan image or a stray heading - so an empty block is
+  evidence about the data, not about the code.
+- **Was it EVER there?** A key-value settings table carries a per-row updated timestamp,
+  and that is the whole history you need. Rows written seconds apart in one run are the
+  seed. If the fields in question still carry the seed timestamp, nothing erased them:
+  they were never filled, and "it used to work" is a memory of a different build. If they
+  carry a later timestamp than their neighbours, something did write over them, and the
+  timestamp says when.
+
+The same timestamps answer a bigger question for free: **if no two keys that a single save
+would touch share a timestamp, that save has never successfully run.** A panel whose save
+has never run is worth knowing about before trusting it with real content.
+
+### A settings save erases what the page did not send
+
+The sibling of the rule above, and the reason to check the statement before inviting
+anyone to use the page. A settings panel usually writes every key in one `CASE` over the
+key column. Each branch that writes its parameter straight through will blank its row
+whenever that control arrives empty - and a control arrives empty for ordinary reasons: a
+collapsed section, a tab the page never populated, a field the person never opened. So
+pressing Save to change one field can quietly clear a dozen others.
+
+Guard every branch, not the few that look important:
+
+```sql
+WHEN '<key>' THEN COALESCE(NULLIF(@p<n>,''), <the value column>)
+```
+
+A partly guarded statement is the dangerous shape, because the protected keys survive
+every test and hide the behaviour of the rest. Count the branches against the key list and
+make the guarded number equal the total.
+
+The cost is that a value can no longer be cleared from the page, since a blank control and
+a deliberate erase arrive identically over the wire. That is the right trade for settings:
+clearing is rare and recoverable, silent mass erasure is neither. Where clearing must be
+offered, give it its own explicit control rather than inferring it from emptiness.
+
+**Verify it the way it will fail:** run the save with every field empty and diff the table
+before and after. Nothing may change. That test fails loudly on a partly guarded statement
+and passes on a fully guarded one, which is exactly the distinction no amount of reading
+reliably catches.
+
+### A setting that holds a URL rots, and a dead one is worse than an empty one
+
+The same renderer that politely hides a block with no text will happily emit an
+`<img>` for a URL that no longer resolves, so the careful empty-value handling buys
+nothing once a stale address is stored. Addresses taken from a marketing site or a
+social network are the ones that go: a CDN path changes on the next site rebuild
+(`410 Gone`), and an image served from a social profile is signed and hotlink-blocked
+(`403`), so it works in the browser where it was copied and nowhere else.
+
+Check the address before writing it, not after someone reports the page looks broken:
+one request for the status, the content type and the size. Prefer an asset served from
+somewhere under the owner's control, and when there is no good address, store nothing -
+a block that hides itself reads as deliberate, a broken image reads as neglect.
+
+Worth re-checking whenever restoring content from an older record: the text survives
+indefinitely, the links beside it usually have not.
+
+#### When there is no stable host, embed the image instead of linking it
+
+A small decorative asset - a logo mark, an avatar - does not need a host. Encoded as a
+`data:` URI it travels inside the setting itself, so there is no address to go stale, no
+CDN to block the request, and nothing to re-point after a site rebuild. It is the honest
+answer to the previous rule rather than a workaround for it.
+
+Two things make it practical:
+
+- **Size the image to the box it is drawn in, not to the file you were handed.** A
+  portrait rendered in a 56px circle needs 112px for a high-density screen and no more.
+  A 1.8 MB source became under 7 KB of `data:` text at that size; the same image embedded
+  at its original resolution would be unusable. Encode to a format with alpha that
+  compresses well, and the result is smaller than most of the page around it.
+- **The field's own validation will refuse it.** A URL control typically carries a
+  pattern like `^https?://.+$`, which a `data:` URI fails, so the panel rejects a value
+  the renderer would have been perfectly happy with. Widen the pattern to accept both
+  shapes when adopting this, or the setting can only ever be written from behind the page.
+
+Verify it the same way as a link: read the row back and compare it byte for byte with
+what was sent (a long value is exactly the kind that gets truncated silently), then load
+the page and check the image reports a non-zero natural size rather than merely existing.
+
+### A reconciler's lag reads as a broken integration
+
+When the remote record is created by a sweep rather than at the moment of the action, the
+page says "done" and the calendar, inbox or ledger stays empty for a minute or two. The
+person checks straight away, sees nothing, and reports it broken. Two separate sweeps in
+series double it: an end-to-end wait of two to four minutes is normal with two reconcilers
+on a two-minute timer, and it is not a fault.
+
+Before touching anything, settle it with the data: **the id the remote system returns on
+creation, stored on the row, is proof the record exists.** If every row carries one, the
+integration is working and the complaint is about latency. Only a row that is finished but
+has no remote id is a real miss, and that distinction takes one query.
+
+The timestamps then measure the lag directly: the gap between the row being written and
+the field the sweep fills tells you what the real wait is, per booking, without
+instrumenting anything.
+
+The design choice is worth stating where users can see it. A page that promises a calendar
+invitation should say it arrives within a couple of minutes, or the work should move into
+the action itself. Silence about the delay is what turns a normal wait into a bug report,
+and it costs nothing to fix in the confirmation text.
+
+### A table column can show a field the query never returned
+
+Worth knowing before concluding a filter is ignored. A list is often painted through a
+mapping step that computes display-only fields - a formatted timestamp in the reader's
+zone, a label resolved from a code - which exist nowhere in the query result.
+
+That makes a table fragile in a specific way: when several controls refill the same table
+and only some of them run the mapping, the others hand over rows that are correct but
+missing the one field the column renders. The column comes back blank, or the control
+keeps what it had, and it reads as "the button did nothing" rather than "the button
+painted unformatted rows".
+
+So when a filter looks ignored, check in this order, because each step is cheaper than the
+one after it:
+
+1. **The data.** A filter that matches nothing and a filter that never ran look identical
+   on screen. Run the query behind it with the same argument and count the rows first.
+2. **The parameter.** Whether the control's value reaches the query at all.
+3. **The repaint.** Whether the control that refills the list computes the same display
+   fields as the path that first filled it. Every writer of one list should go through one
+   shared mapping; two writers that format differently is a defect waiting for a user to
+   find it.
+
+A related trap in the same family: a filter whose value is read from a hidden carrier
+field rather than from the visible control. The carrier exists because the visible control
+holds a different shape (a timestamp where the query wants a day), but nothing copies one
+into the other unless a step is wired to do it, and a filter reading an empty carrier
+silently returns everything.

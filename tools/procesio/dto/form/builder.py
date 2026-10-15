@@ -729,7 +729,127 @@ def _build_data_model(form_id: str, elements: list, ctx: dict) -> dict:
                 _dm_attr(_attr_name(c["key"]), aid, shape[0], eid, shape[1]))
         submodels.append(sub)
     fields["attributes"] = submodels
+    # Every top-level attribute (instance, flow, fields, preventFormSubmit, browserTitle — the
+    # set the designer's generateFormDataModel writes) hangs off the root.
+    for a in attrs:
+        a["parentDataTypeId"] = form_id
     return dm
+
+
+# The designer writes "1" for a form it creates (user-playground Builder.component.vue: a new
+# form gets FormDataModelAttributeFormatVersion.VERSION_1 = "same attribute as name"). A form
+# with NO version is read as the legacy "0" format, and the designer's next save lower-cases
+# every field attribute (measured on QA 2026-09-25: `RequestText` -> `requesttext`), which
+# breaks any form script that addresses the field by its real name. This builder names field
+# attributes exactly as the element name, i.e. format "1", so it must say so.
+_DM_FORMAT_VERSION = "1"
+
+# Who works a step and who approves it, read the way the designer does before it saves
+# (ui-builder form-builder/assignee::getElementAssignees and approval::getElementApprovers).
+_ASSIGNEE_KEYS = ("assignee", "assigneeReplacement", "additionalAssignment")
+_APPROVER_KEYS = ("approver", "approverReplacement", "additionalApprovers")
+_ASSIGNEE, _APPROVER = 1, 2
+
+
+def _unique_ids(values) -> list:
+    users: list = []
+    for uid in values:
+        if isinstance(uid, str) and uid.strip() and uid not in users:
+            users.append(uid)
+    return users
+
+
+def _step_users(el: dict, keys: tuple) -> list:
+    values: list = []
+    for key in keys:
+        value = _config_value(el, key)
+        values.extend(value if isinstance(value, list) else [value])
+    return _unique_ids(values)
+
+
+def _hidden_by_config(el: dict) -> bool:
+    # ui-builder elementAvailability::isElementHiddenByConfig: hidden only when `visible` is
+    # present and falsy.
+    visible = next((c.get("value") for c in el.get("configs", []) if c.get("key") == "visible"),
+                   None)
+    return any(c.get("key") == "visible" for c in el.get("configs", [])) and not visible
+
+
+def _approver_steps(el: dict, by_id: dict) -> list:
+    """[(stepId, users)] for one element, as ui-builder approval::getElementApproversByStepId.
+
+    A dynamic table row does not approve as itself: each entry of its `approvalSteps` with a
+    `rowIndex` is its own step (id = the step id, users = approver + approverReplacement), and
+    only while the row sits in a table and is not hidden (model/config/table/approvals.ts::
+    getDynamicRowApprovalSteps). Every other element is one step under its own id.
+    """
+    if el.get("type") != "dynamic-table-row":
+        return [(el["id"], _step_users(el, _APPROVER_KEYS))]
+    parent = by_id.get(el.get("parentId"))
+    if not parent or parent.get("type") != "table" or _hidden_by_config(el):
+        return []
+    steps = _config_value(el, "approvalSteps") or []
+    out = []
+    for step in steps if isinstance(steps, list) else []:
+        if not isinstance(step, dict) or step.get("rowIndex") is None or not step.get("id"):
+            continue
+        replacement = step.get("approverReplacement") or []
+        out.append((step["id"], _unique_ids([step.get("approver"), *replacement])))
+    return out
+
+
+def derive_assignees(elements: list) -> list:
+    """The form's top-level `Assignees`, built like the designer's save.
+
+    ASSIGNEE (1) steps first, then APPROVER (2) steps, `orderId` counting 1, 2, 3 within each
+    list, a step only when it has users, each step id once, users sent as `{userId}` only (the
+    platform fills in the names). Mirrors ui-builder utils/formBuilder/payload.ts::
+    getFormBuilderUsersFullData and user-playground Builder.component.vue::save. Checked against
+    19 designer-saved forms on QA (2026-10-05), dynamic-row approvals included: identical.
+    The designer also drops users who are not in the workspace; that needs a live lookup and is
+    not done here.
+    """
+    by_id = {e.get("id"): e for e in elements}
+    out: list = []
+    for kind in (_ASSIGNEE, _APPROVER):
+        order, seen = 0, set()
+        for el in elements:
+            steps = ([(el["id"], _step_users(el, _ASSIGNEE_KEYS))] if kind == _ASSIGNEE
+                     else _approver_steps(el, by_id))
+            for step_id, users in steps:
+                if not users or step_id in seen:
+                    continue
+                seen.add(step_id)
+                order += 1
+                out.append({"stepId": step_id, "orderId": order, "type": kind,
+                            "users": [{"userId": u} for u in users]})
+    return out
+
+
+def _assignee_key(rows) -> list:
+    """Assignees compared by what routes a step (names and key casing ignored)."""
+    out = []
+    for r in rows or []:
+        g = {str(k).lower(): v for k, v in r.items()}
+        users = [str({str(k).lower(): v for k, v in u.items()}.get("userid")) for u in g.get("users") or []]
+        out.append((str(g.get("stepid")), int(g.get("orderid") or 0), int(g.get("type") or 0), tuple(users)))
+    return out
+
+
+def reconcile_assignees(current: list, before: list, after: list) -> tuple[list, dict | None]:
+    """(the Assignees to save, a report or None) for a surgical change from `before` to `after`
+    elements.
+
+    The designer re-derives the list on every save, so a surgical edit that echoes the old list
+    leaves a removed approver still routed, or a new approval control unrouted. Only a change
+    that alters the derived routing re-derives it, and then the WHOLE list is saved as the
+    designer would save it; any other edit keeps `current` byte-for-byte, so it never rewrites
+    routing it did not touch."""
+    derived = derive_assignees(after)
+    if _assignee_key(derive_assignees(before)) == _assignee_key(derived):
+        return current, None
+    return derived, {"rederived": True, "before": _assignee_key(current),
+                     "after": _assignee_key(derived)}
 
 
 def build(config: dict, ctx: dict) -> dict:
@@ -764,6 +884,7 @@ def build(config: dict, ctx: dict) -> dict:
         "variables": shell.get("variables"),
         "browserTitle": config.get("browserTitle", config["name"]),
         "hideBranding": bool(config.get("hideBranding", False)),
+        "dataModelAttributeFormatVersion": _DM_FORMAT_VERSION,
     }
     if config.get("chainConfig") is not None:
         data["chainConfig"] = config["chainConfig"]
@@ -785,7 +906,16 @@ def build(config: dict, ctx: dict) -> dict:
     _bad = [p for p in ctx["field_paths"].values() if not str(p).startswith(f"{_fv}.")]
     if _bad:
         raise UsageError(f"form field paths must start with the form root {_fv!r}: {_bad[:3]}")
-    ftype = config.get("type", "general")
+    # An explicit `assignees` list still wins verbatim; otherwise derive it the way the
+    # designer's save does, so an approver actually receives the approval step.
+    assignees = config["assignees"] if "assignees" in config else derive_assignees(elements)
+    # The designer saves a form that involves users as a USER_TASK. Only fill the gap when
+    # the caller did not choose a type.
+    if "type" in config:
+        ftype = config["type"]
+    else:
+        involves_users = bool(assignees) or any(e.get("type") == "assignee" for e in elements)
+        ftype = "usertask" if involves_users else "general"
     return {
         "Id": ctx["form_id"],
         "Name": config["name"],
@@ -793,7 +923,7 @@ def build(config: dict, ctx: dict) -> dict:
         "Type": _FORM_TYPE.get(str(ftype).strip().lower(), ftype),
         "Status": 1 if config.get("publish", True) else 0,
         "State": bool(config.get("enabled", True)),
-        "Assignees": config.get("assignees", []),
+        "Assignees": assignees,
         "Data": data,
         "CustomUrl": None,
     }

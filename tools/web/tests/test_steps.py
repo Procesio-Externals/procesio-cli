@@ -155,7 +155,7 @@ def test_validation_happens_before_any_driver_call(fake_driver):
 def test_known_steps_constant_matches_schema():
     assert KNOWN_STEPS == {
         "goto", "click", "fill", "press", "type", "wait", "wait_for",
-        "extract_text", "extract_attr", "eval", "screenshot",
+        "extract_text", "extract_attr", "eval", "viewport", "screenshot",
         "upload", "upload_via_chooser",
     }
 
@@ -196,3 +196,15 @@ def test_click_can_be_forced_through_an_overlay(fake_driver):
     run_steps(fake_driver, [{"do": "click", "selector": "button.save", "force": True}])
     assert ("click", {"selector": "button.save", "timeout": None,
                       "force": True}) in fake_driver.calls
+
+
+def test_viewport_step_dispatches_resize(fake_driver):
+    run_steps(fake_driver, [{"do": "viewport", "width": 1920, "height": 1080}])
+    sizes = [kw for m, kw in fake_driver.calls if m == "set_viewport"]
+    assert sizes == [{"width": 1920, "height": 1080}]
+
+
+def test_viewport_requires_width_and_height():
+    with pytest.raises(UsageError) as e:
+        validate_steps([{"do": "viewport", "width": 1920}])
+    assert "missing required key" in str(e.value)

@@ -220,6 +220,13 @@ designer, and a lowercase snake_case name is not safe either.
 lowercase word survives a designer save unchanged. `form-create`, `form-edit` and
 `form-update` return a warning naming every field a designer save would re-key, and
 what it would become. They never rename: scripts in use read the names as built. When no name is given, the builder generates a single lowercase word from the label, so auto-named fields are safe by default; only a name you set yourself can trip the warning.
+**Why it happens, and the 2026-10-05 fix.** The re-key is the designer's legacy format
+`"0"`, which it applies to a form with no `dataModelAttributeFormatVersion`; under `"1"` (what
+the designer writes for its own new forms) it keeps every name as written. The builder wrote
+no version until 2026-10-05 and now writes `"1"`, so a form built since then keeps
+`orderList`, `order_id` and `Customer_First_Name` through a designer save (measured on QA,
+read back by form JS) and draws no warning. The lookup above is still right for a script that
+may run on an older form.
 
 ### A designer save changes far more than the edit you made
 **Cause.** Saving in the designer rewrites the whole definition. On an API-built form, one

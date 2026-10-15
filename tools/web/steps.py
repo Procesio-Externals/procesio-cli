@@ -15,6 +15,7 @@ Step schema (mini-language)
   {"do": "wait_for",     "selector": "..."[, "timeout": ms]}
   {"do": "extract_text", "selector": "..."(optional), "name": "field"[, "timeout": ms]}
   {"do": "extract_attr", "selector": "...", "attr": "href", "name": "field"[, "timeout": ms]}
+  {"do": "viewport",     "width": 1920, "height": 1080}
   {"do": "screenshot",   "path": "out.png"[, "full_page": true]}
   {"do": "upload",       "selector": "input[type=file]", "path": "a.png" | ["a.png", ...][, "timeout": ms]}
   {"do": "upload_via_chooser", "selector": "button.attach", "path": "a.png" | [...][, "timeout": ms]}
@@ -56,6 +57,7 @@ _SCHEMA: dict[str, dict[str, set[str]]] = {
     "extract_text": {"required": set(), "optional": {"selector", "name", "timeout"}},
     "extract_attr": {"required": {"selector", "attr"}, "optional": {"name", "timeout"}},
     "eval": {"required": {"script"}, "optional": {"name", "arg"}},
+    "viewport": {"required": {"width", "height"}, "optional": set()},
     "screenshot": {"required": {"path"}, "optional": {"full_page"}},
     "upload": {"required": {"selector", "path"}, "optional": {"timeout"}},
     "upload_via_chooser": {"required": {"selector", "path"}, "optional": {"timeout"}},
@@ -122,6 +124,8 @@ def run_steps(driver, steps: Any) -> dict:
                              timeout=_timeout(step))
         elif do == "wait":
             driver.wait(int(step["ms"]))
+        elif do == "viewport":
+            driver.set_viewport(int(step["width"]), int(step["height"]))
         elif do == "wait_for":
             driver.wait_for(step["selector"], timeout=_timeout(step))
         elif do == "extract_text":

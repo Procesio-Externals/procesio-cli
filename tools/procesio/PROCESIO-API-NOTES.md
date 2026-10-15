@@ -35,6 +35,14 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   `workspaceState == "active"` (deleted ones carry `workspaceState: "removed"`,
   `userCount: 0`). Detail: `GET /api/Workspace/{parentId}/subworkspaces/{id}`.
 - `GET /api/Workspace` (singular) has **no GET** — don't use it for listing.
+- ⚠ **`hasAccess: false` on a `Master` row = you can see its sub-workspaces but cannot act AT
+  master scope.** Measured (2026-10, userpass session): with the `workspaceid` header set to such a
+  master, `GET /api/Workspace/{parentId}/subworkspaces`, `GET /api/UserPermissions/usertypes` and
+  `POST /api/Workspace` all answer **401 `Unauthorized`**. The gateway refuses before any domain
+  logic, so nothing lands (read-back of `GET /api/Workspaces` unchanged). Without the header the
+  subworkspaces read answers **403**. So a sub-workspace CANNOT be created under that master from
+  this account: check the flag before planning a create, and ask a master admin instead of
+  retrying the API.
 
 ## Processes (a.k.a. Flows / Projects)
 
@@ -2498,6 +2506,10 @@ and a settings page whose fields "populated one by one" (three async loads each 
 happened to return). `syncRun: true` fixes both. Use async only when nothing reads the result.
 
 ## Forms: `ProcesioForm.data.fields` keys are re-derived in LOWER CASE by a designer save
+
+(2026-10-05: this happens only to a form without `dataModelAttributeFormatVersion: "1"`, which the
+designer reads as its legacy "0" format; the builder writes "1" since that date, so forms built since
+then keep their names. Older forms and their scripts still need the lookup below.)
 
 Documented in the form sub-tool notes and worth repeating here because it silently disarms handlers
 that were working: after a save from the designer, `ProcesioForm.data.fields.DefaultTimeZone` is
@@ -6628,3 +6640,18 @@ PERSISTENT (product gap - the feature exists but only works transiently), or fro
 always-on endpoint that answers the GET challenge synchronously and forwards POSTs to the PROCESIO
 webhook (POST side works). Earlier notes claiming a bare PROCESIO webhook can serve the Meta
 callback were based on the transient one-time verification, not persistent delivery.
+
+### Meta WhatsApp: template creation via Graph API is gated on business verification
+Creating a message template on a real (owned) WABA with `POST /v22.0/{WABA}/message_templates` returns error #2388339 ("WhatsApp accounts cannot be used with this API") while the Business is UNVERIFIED and the app UNPUBLISHED. The SAME call succeeds (returns `{"id":..,"status":"PENDING"}`) once business verification passes AND the app is published - no code change, just the account gate lifting. UTILITY templates then move PENDING -> APPROVED on Meta's side (minutes, sometimes longer); do NOT point a live send flow at a PENDING template (send fails "template does not exist"), keep it on an APPROVED one (e.g. hello_world) and switch after approval. Template language code is the plain locale ("ro", "en_US"); a {{1}} placeholder needs a `components:[{type:'body',parameters:[{type:'text',text:...}]}]` on send.
+
+### Meta WhatsApp: free-form text vs template is a 24h-window rule (server-enforced)
+A non-template message (`type:'text'`, also image/audio/etc. with your own content) delivers ONLY inside the 24-hour customer-service window - the 24h since the recipient's LAST inbound message to your number. Inside it, `POST /{phone_id}/messages` returns 200 + a `messages[0].id` and the text arrives. Outside it Meta returns #131047 ("more than 24 hours since the customer last replied") and nothing is delivered; a pre-approved template is then the ONLY way to open contact. Design consequence for a CRM/agent use case: an AI REPLYING in a live conversation should send free text (custom, no template approval, cheapest) - the window is open because the client just wrote; a PROACTIVE cold nudge (e.g. a deal stage-change with no recent inbound) MUST use a template. Same endpoint and 200 shape either way. So "send a custom AI-composed message" is fully supported for the reply path - build the Node to emit `{messaging_product,to,type:'text',text:{preview_url:false,body:<composed>}}` and feed `body` from the AI's output variable.
+
+### Download WhatsApp (Meta) inbound media into a PROCESIO File variable — proven recipe
+Meta delivers a media message with a media **id** (in `messages[0].<type>.id`, type one of image/document/audio/video/sticker), plus `mime_type`, and for image/document a `caption`, for document also `filename`. Downloading it is TWO hosts, so TWO `Call API` nodes and (because one REST credential reaches one host) TWO credentials:
+1. **Resolve URL** — `Call API` on the Meta credential (base `https://graph.facebook.com`), `Verb GET`, `Endpoint /v22.0/<%0%>` with `<%0%>` bound to the media id → `Response Body` (json) carries `{url, mime_type, file_size, ...}`. The `url` is on `lookaside.fbsbx.com`, short-lived (~5 min), and REQUIRES the same Bearer token.
+2. **Download bytes** — `Call API` on a SECOND credential whose base URL is `https://lookaside.fbsbx.com` and which carries the SAME `Authorization: Bearer <token>` API-key header, `Verb GET`, `Endpoint <%0%>` bound to the URL's **path+query** (strip the scheme+host: `url.replace(/^https?:\/\/[^/]+/,'')`, the query passes through) → bind **`Response File`** (Call API output property id suffix `...7790008`, the live unversioned Call API `cd8bd0bc-...804de`) to a variable whose datatype is the **File model `10c6ac59-3929-49e6-99dc-121212121219`**. That is the whole "HTTP binary → File var" mechanism; `file-download --instance-id/--variable-id` (or `--from-run`) pulls the exact bytes back (verified byte-identical, sha256).
+Builder facts that make this expressible: the process builder's `refdata.primitive_type_id` has NO `file` primitive, so declare the File var with `{"model": "10c6ac59-...-121212121219"}` (not `type:"file"` — that alias only exists in `flowmodel/nodeparam`); a `Call API` `Verb` may be written as the word `"GET"` (builder resolves it to the option GUID `3ab385bd-f8ae-b641-9176-e7db886aec01`) and a bodyless GET needs no Request Parameters (builder seeds the empty payload); gate the download with a `Decisional` `IS_NOT_EMPTY` on the extracted media-id string (no boolean node needed); a param value given as `{"template","vars"}` binds `<%N%>` for ANY param including `Endpoint`, not just a body. Token rotation now touches THREE stores (the graph credential, the lookaside credential, and the OS secret) — refresh all three.
+
+### Send a WhatsApp document/image FROM a process (Meta Cloud API) + reusable media id
+To reply on WhatsApp with a file: upload it to Meta ONCE with `POST /v{ver}/{phone_number_id}/media` (multipart: `messaging_product=whatsapp`, `type=<mime>`, `file=@path`) -> returns `{id}` (an uploaded-media id, valid ~30 days, reusable across sends). Then send with a normal `Call API` POST to `/{phone_number_id}/messages`, RAW json body `{messaging_product:'whatsapp', to:<e164>, type:'document', document:{id:<media_id>, filename:'X.pdf', caption:'...'}}` (image/video/audio analogous with their own object). Bake the media id as a process-var DEFAULT so the flow just references it; refresh when it expires. A keyword branch (e.g. reply with an offer PDF when the inbound text matches `/ofert/i`) is a `Node` returning a boolean -> `Decisional IS_TRUE` -> a build-body `Node` -> the send `Call API`. Same 24h-window rule as any free-form message (the inbound that triggered it opens the window, so a reply always delivers). The RAW body param shape is `{"body":{"type":"RAW","value":{"RAW":{"format":"json","value":"<%0%>"}, "BINARY":"","FORM_DATA":[],"X_WWW_FORM_URLENCODED":[]}},"headers":[{"key":"Content-Type","value":"application/json","type":"TEXT"}],"queryParams":[]}` with `<%0%>` bound to the JSON-string variable the build Node produced.
