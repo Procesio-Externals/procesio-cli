@@ -21,6 +21,7 @@ unknown name fails before anything is written.
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import uuid
 
@@ -32,7 +33,7 @@ from tools.procesio.handlers.form_code import _fetch, build_put_body
 # Trigger -> (config key, event type) comes from the DTO builder's own maps, which
 # were verified against the ui-builder source. Re-deriving them here would let the
 # two drift, and a wrong event type is silently accepted by the API.
-from tools.procesio.dto.form.builder import _EVENT_KEY, _EVENT_TYPE  # noqa: E402
+from tools.procesio.dto.form.builder import _EVENT_KEY, _EVENT_TYPE, _golden  # noqa: E402
 
 # The value-path rule itself is shared with the builder, so the action that CHECKS a path and
 # the one that WRITES one cannot disagree.
@@ -74,6 +75,42 @@ def _cfg(element: dict, key: str):
         if c.get("key") == key:
             return c
     return None
+
+
+def _template_slot(el_type: str, key: str):
+    """(index, config) of `key` in the element type's golden template, or (None, None)."""
+    try:
+        template = _golden(str(el_type))
+    except UsageError:
+        return None, None
+    for i, c in enumerate(template.get("configs") or []):
+        if c.get("key") == key:
+            return i, c
+    return None, None
+
+
+def _backfill_slot(element: dict, key: str) -> dict:
+    """Add a missing trigger slot to `element`, the way the runtime does on load.
+
+    An element saved before a trigger existed (every approval control saved before ~Sep
+    2025 has no onBefore*/onAfter* slots) carries no config for it. The form runtime
+    back-fills missing configs from the element template on every load
+    (ui-builder utils/formBuilder/elements.ts::actualizeElements) and the designer persists
+    them on its next save, so an absent slot means "old element", not "cannot raise this
+    trigger". Only when the TEMPLATE lacks the key is the trigger really unavailable.
+    """
+    index, template = _template_slot(element.get("type"), key)
+    configs = element.setdefault("configs", [])
+    if template is None:
+        raise UsageError(
+            f"element type {element.get('type')!r} has no {key!r} config, so it cannot raise "
+            f"that trigger; available: "
+            f"{', '.join(c.get('key', '') for c in configs if 'vent' in c.get('key', ''))}")
+    slot = copy.deepcopy(template)
+    slot["id"] = str(uuid.uuid4())
+    slot["value"] = None
+    configs.insert(min(index, len(configs)), slot)
+    return slot
 
 
 def _find_element(elements: list, ref: str) -> dict:
@@ -254,11 +291,10 @@ def set_element_event(client, args) -> dict:
         raise UsageError("RUN_JAVASCRIPT config needs a 'code' string")
 
     slot = _cfg(element, cfg_key)
+    backfilled = []
     if slot is None:
-        raise UsageError(
-            f"element {args.element!r} has no {cfg_key!r} config, so it cannot raise that "
-            f"trigger; available: "
-            f"{', '.join(c.get('key','') for c in element.get('configs') or [] if 'vent' in c.get('key',''))}")
+        slot = _backfill_slot(element, cfg_key)     # refuses when the type has no such slot
+        backfilled.append(cfg_key)
 
     current = slot.get("value") or {}
     previous = list(current.get("events") or [])
@@ -312,9 +348,15 @@ def set_element_event(client, args) -> dict:
         "trigger": cfg_key, "action": action,
         "previous_events": previous, "event_count": len(events),
         "elements": len(elements),
+        "backfilled": backfilled,
     }
     if warning:
         result["warning"] = warning
+    if backfilled:
+        result["note"] = (
+            f"{args.element!r} was saved before its {', '.join(backfilled)} slot existed, so the "
+            f"slot was added from the element template (the form runtime and designer do the "
+            f"same on load/save); every other config is unchanged.")
     if args.dry_run:
         return {"dry_run": True, "event": event, **result}
 
@@ -346,7 +388,10 @@ def _common(p: argparse.ArgumentParser) -> None:
 def _set_args(p: argparse.ArgumentParser) -> None:
     _common(p)
     p.add_argument("--on", required=True,
-                   help="trigger: click | input | stepChange | paginationChanged | rowAdded")
+                   help="trigger: " + " | ".join(sorted(_EVENT_KEY)) + " (case, '-' and '_' "
+                        "are ignored). A slot missing from an element saved before that "
+                        "trigger existed is added from the element template and reported "
+                        "under `backfilled`")
     p.add_argument("--action", required=True,
                    help="RUN_PROCESS | RUN_JAVASCRIPT | RUN_DATA_STORE_OPERATION")
     p.add_argument("--config", help="event config as JSON")
@@ -382,6 +427,9 @@ ACTIONS = {
                     "the form value path; if you pass one it is CHECKED against the live form "
                     "and refused when wrong, because a wrong path is saved without any error "
                     "and the control then launches nothing. A DataStore op takes "
-                    "--data-store-id + --operation.",
+                    "--data-store-id + --operation. An element saved before the trigger "
+                    "existed (e.g. an approval control from before Sep 2025, no "
+                    "onBeforeApprove slot) gets the missing slot added from the element "
+                    "template, listed in `backfilled`.",
     ),
 }

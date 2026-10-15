@@ -69,7 +69,8 @@ actions:
       goto{url,timeout?} | click{selector,timeout?,force?} | fill{selector,text,timeout?} |
       press{key,selector?} | type{text,selector?,timeout?} | wait{ms} |
       wait_for{selector,timeout?} | extract_text{selector?,name,timeout?} |
-      extract_attr{selector,attr,name,timeout?} | screenshot{path,full_page?}.
+      extract_attr{selector,attr,name,timeout?} | viewport{width,height} |
+      screenshot{path,full_page?}.
       'type' drives real keyboard events (canvas grids like Google Sheets where
       cells aren't DOM); 'wait' is a fixed ms delay (autosave settle).
       Headless by default; --headed to watch. --hold-seconds keeps a headed

@@ -35,7 +35,13 @@ fine), so forms are fully buildable server-side.
   number-input, datetime-input, select, dropdown, radiobox, checkbox, button,
   divider, section, columns, column, tabs, tab, table, image, file-upload,
   file-viewer, icon, list, approval, … (see `dto/form/elements/`).
-- **type** — `general` (1) or `usertask` (0). **publish** — Status PUBLISHED(1)/DRAFT(0).
+- **type** — `general` (1) or `usertask` (0). When omitted, a form whose controls carry an
+  assignee or approver (or that has an `assignee` control) is built as `usertask`, like the
+  designer saves it; otherwise `general`. **publish** — Status PUBLISHED(1)/DRAFT(0).
+- **data model** — the builder writes the same form data model the designer writes for a NEW
+  form: top-level `instance, flow, fields, preventFormSubmit, browserTitle` and
+  `dataModelAttributeFormatVersion: "1"` (field attributes named exactly as the element name).
+  Captured from a designer save on QA, 2026-09-25.
 
 ## Events, triggers, tasks, themes (Phase 2)
 
@@ -49,7 +55,19 @@ fine), so forms are fully buildable server-side.
   inputs:[{to,from}],outputs`), **js** (`code`), **form** → EventAction.TRIGGER_FORM
   (`formId`,`mapping`).
 - **tasks/assignees** — `assignee`/`assigneeReplacement` on section/tabs/table;
-  `approver`/`approverReplacement` on the `approval` control.
+  `approver`/`approverReplacement` on the `approval` control. The form's top-level
+  **`Assignees`** list is what the designer shows as the task routing: rows
+  `{StepId, OrderId, Type, Users:[{UserId}]}`, `StepId` = the element id (or a dynamic table
+  row's approval-step id), `Type 1` = assignee, `Type 2` = approver. It is DERIVED from those
+  configs the way the designer's save does (`builder.derive_assignees`): one ASSIGNEE step per
+  control with assignee users, then one APPROVER step per approval control and per visible
+  dynamic-row approval step, `OrderId` 1, 2, 3… within each list, users as `{userId}` (the
+  platform adds the names). `form-create` / `form-edit` write it; `form-add-element`,
+  `form-delete-element` and `form-set-element-config` re-derive it when the change touches who
+  works or approves a step, and report the before/after. A config-level `assignees` list still
+  wins verbatim. Checked against 19 designer-saved forms on QA (2026-10-05): identical lists.
+  (Until 2026-10-05 the builder left the list empty and the workaround was to PUT the GET echo
+  with `Assignees` added; that is no longer needed.)
 - **theme** — `"theme":{"--c-primary":"#0039e3","--p-form":"24px"}` overrides the
   form theme variables (colors, fonts, spacing, per-control styling). ~190 vars in 18
   groups (see `data_shell.json` / `docs_info/form-theme.ts`).
@@ -88,6 +106,19 @@ slugs with `get-customurl-workspace-master` and `get-customurl-workspace`.
 
 ## Form JavaScript: fields are keyed LOWERCASE (critical, 2026-07-27)
 
+> **Cause found (2026-09-25, confirmed 2026-10-05).** The re-key below comes from the data
+> model's `dataModelAttributeFormatVersion`. The designer reads a form with no version as the
+> legacy format `"0"` (user-playground `Builder.component.vue`), and under `"0"` its save
+> renames every field attribute to camelCase-of-lowercase (`Form.model.ts::
+> generateFormDataModel`; measured: `RequestText` → `requesttext`, and the 2026-10-01
+> measurements below). Under `"1"` it keeps the name as written. Designer-made forms carry
+> `"1"`; this builder wrote no version until 2026-10-05, which is why API-built forms were
+> re-keyed on their first designer save. **It now writes `"1"`**: measured on QA 2026-10-05,
+> `orderList`, `order_id` and `Customer_First_Name` survived a designer re-publish and form JS
+> read them as written. So `formlint.lint_field_names` warns only for a form WITHOUT the
+> version. Forms already saved as `"0"` keep their re-keyed names, so the case-insensitive
+> lookup below is still the safe way to read fields in a script that may run on such a form.
+
 **`ProcesioForm.data.fields` keys are the field name LOWERCASED** (and a UI save re-derives them). JS is case-sensitive, so a camelCase reference like `ProcesioForm.data.fields.locuiesteDetalii` (or `.zonaFormular`, `.actProprietate`) is `undefined` — the event fires but silently does NOTHING (this cost days on Uranus 100: a UI save lowercased the keys and every camelCase visibility/hide/file-wrap toggle broke, while the config still looked perfect). **ALWAYS reference form fields case-insensitively** in any control/FORM_LOAD RUN_JAVASCRIPT. Prelude, then use `fld(name)`:
 
 **Corrected 2026-10-01, measured: a designer save re-keys the fields.** A form built through
@@ -101,7 +132,7 @@ lowercase snake_case name is not safe either. Only a single lowercase word survi
 unchanged. Read everything else through a lookup that ignores case AND separators, as
 below. The same save also adds a select's `sourceType` and `sourceValue` to the data
 model. `form-create` left them out until 2026-10-01 and now writes them for a static
-option list (`todo/procesio-form-create-select-source-in-data-model.md`). When a config gives no `name`, the builder now derives a single lowercase word from the label (`Company Name` becomes `companyname`), so an auto-named field survives a designer save unchanged; an explicit name is kept verbatim, and `form-create` / `form-edit` return a `warnings` entry when a name is not a single lowercase word.
+option list (`todo/procesio-form-create-select-source-in-data-model.md`). When a config gives no `name`, the builder now derives a single lowercase word from the label (`Company Name` becomes `companyname`), so an auto-named field survives a designer save unchanged; an explicit name is kept verbatim, and `form-create` / `form-edit` return a `warnings` entry when a name is not a single lowercase word. (Since 2026-10-05 the builder writes `dataModelAttributeFormatVersion: "1"`, under which a designer save keeps names as written, so that warning now fires only for a form without the version; see the note at the top of this section.)
 
 ```js
 var F=ProcesioForm.data.fields;var _fl={};for(var _k in F){_fl[_k.toLowerCase().replace(/[_-]/g,'')]=F[_k];}
@@ -302,6 +333,9 @@ Applies to EVERY field reference: visibility toggles, submit-button hide/show, f
   the control's config `name` (the field/binding name), NOT the DOM `id`/`name` (which are
   empty on the rendered `<input>`). Use this to seed a form from a link (e.g. a per-record
   token). Unmatched params are ignored.
+  **Also works on a PRIVATE form** (one with an approval control) opened by a signed-in user: measured
+  2026-10, six `?name=value` params pre-filled their inputs with no console or network errors. Use it
+  to hand an approver a link that carries the record's data when the triggering action cannot.
 
 ## How it builds (template-merge)
 

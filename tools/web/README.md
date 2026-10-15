@@ -107,6 +107,7 @@ Unknown `do` values or keys, or missing required keys, fail fast with
 | `eval`         | `script` | `name`, `arg` | Run JS in the page (Playwright `evaluate`) and store the JSON result in `results[name]`. It reads live state `extract_attr` cannot see (an input's `.value` property, `disabled`). An `async () => {...}` script can click and poll, which times an interaction. |
 | `extract_text` | (none) | `selector`, `name`, `timeout` | Read text (a selector, or whole page body) into `results[name]`. |
 | `extract_attr` | `selector`, `attr` | `name`, `timeout` | Read an attribute into `results[name]`. |
+| `viewport`     | `width`, `height` | | Resize the live page viewport (default 1280x720), e.g. 1920x1080 for video-grade captures. Put it before the `goto` so the page lays out at the new size. |
 | `screenshot`   | `path` | `full_page` | Save a screenshot; path collected into `screenshots`. |
 | `upload`       | `selector`, `path` | `timeout` | Set files on an `<input type=file>` (often hidden). `path` is a path or list of paths. |
 | `upload_via_chooser` | `selector`, `path` | `timeout` | Attach files behind a NATIVE chooser: clicks `selector` while expecting the chooser, then hands it the files. |

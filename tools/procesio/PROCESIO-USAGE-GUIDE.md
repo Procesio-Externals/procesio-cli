@@ -16,13 +16,14 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**137 rules across 7 notes.**
+**138 rules across 7 notes.**
 
 ## The API, and what its answers actually mean
 
 Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 
 - [DTO casing — live API is camelCase, exports are PascalCase (bites parsers)](PROCESIO-API-NOTES.md#dto-casing-live-api-is-camelcase-exports-are-pascalcase-bites-parsers)
+- [Workspaces](PROCESIO-API-NOTES.md#workspaces)
 - [Export / Import — the .procesio bundle (Transport)](PROCESIO-API-NOTES.md#export-import-the-procesio-bundle-transport)
 - [Validation oracles (use before committing a create/edit)](PROCESIO-API-NOTES.md#validation-oracles-use-before-committing-a-createedit)
 - [Auth & client gotchas](PROCESIO-API-NOTES.md#auth-client-gotchas)

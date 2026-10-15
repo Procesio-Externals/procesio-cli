@@ -97,6 +97,9 @@ class FakeDriver:
     def wait(self, ms):
         self.calls.append(("wait", {"ms": ms}))
 
+    def set_viewport(self, width, height):
+        self.calls.append(("set_viewport", {"width": width, "height": height}))
+
     def wait_for(self, selector, *, timeout=None):
         self.calls.append(("wait_for", {"selector": selector, "timeout": timeout}))
 

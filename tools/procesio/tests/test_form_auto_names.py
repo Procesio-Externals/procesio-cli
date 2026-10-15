@@ -41,7 +41,12 @@ def test_unnamed_elements_get_lowercase_names_that_do_not_trip_the_lint():
     assert formlint.lint_field_names(data) == []
 
 
-def test_an_explicit_mixed_case_name_is_left_as_written_and_still_warns():
+def test_an_explicit_mixed_case_name_is_left_as_written():
+    """Kept verbatim. Since 2026-10-05 the builder writes dataModelAttributeFormatVersion "1",
+    and a designer save keeps names at "1" (measured on QA: orderList, order_id and
+    Customer_First_Name survived a designer re-publish and form JS saw them as written), so a
+    builder-made form draws no warning. The same names on a form WITHOUT the version (legacy
+    "0", e.g. one built before that date) still warn."""
     dto = fb.build({"name": "F", "elements": [
         {"type": "input", "label": "x", "name": "OrderList"},
     ]}, _ctx())
@@ -49,4 +54,7 @@ def test_an_explicit_mixed_case_name_is_left_as_written_and_still_warns():
     names = [c["value"] for e in data["elements"] for c in e.get("configs", [])
              if c.get("key") == "name"]
     assert "OrderList" in names, names
-    assert formlint.lint_field_names(data), "an explicit mixed-case name must still warn"
+    assert data["dataModelAttributeFormatVersion"] == "1"
+    assert formlint.lint_field_names(data) == []
+    legacy = {k: v for k, v in data.items() if k != "dataModelAttributeFormatVersion"}
+    assert formlint.lint_field_names(legacy), "a form without the version must still warn"

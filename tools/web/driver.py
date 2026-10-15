@@ -84,6 +84,8 @@ class BrowserDriver(Protocol):
     def set_files_via_chooser(self, trigger_selector: str, files: Any,
                               *, timeout: int | None = None) -> None: ...
 
+    def set_viewport(self, width: int, height: int) -> None: ...
+
     def screenshot(self, path: str, *, full_page: bool = True) -> str: ...
 
     def render_pdf(self, html: str, path: str, *, fmt: str = "A4") -> str: ...
@@ -700,6 +702,14 @@ class PlaywrightDriver:
                     "trigger_result": trigger_result}
         except Exception as exc:  # noqa: BLE001
             raise _wrap(exc, {"download": True})
+
+    def set_viewport(self, width: int, height: int) -> None:
+        """Resize the page viewport (e.g. 1920x1080 for video-grade captures).
+        The context default is 1280x720; this changes only the live page."""
+        try:
+            self.page.set_viewport_size({"width": int(width), "height": int(height)})
+        except Exception as exc:  # noqa: BLE001
+            raise _wrap(exc, {"viewport": f"{width}x{height}"})
 
     def screenshot(self, path: str, *, full_page: bool = True) -> str:
         try:

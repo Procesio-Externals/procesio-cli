@@ -60,13 +60,24 @@ def test_the_form_lint_includes_it():
     assert any("designer re-keys" in w for w in formlint.lint_form_data(_data("orderList")))
 
 
-def test_form_create_dry_run_reports_it_without_renaming():
+def test_a_form_at_format_version_1_keeps_its_names_so_draws_no_warning():
+    """The re-key is the designer's legacy "0" rule, applied to a form with no version. A form
+    at "1" keeps its names through a designer save (measured 2026-09-25: RequestText kept;
+    2026-10-05: orderList and order_id kept)."""
+    assert formlint.lint_field_names({**_data("orderList", "order_id"),
+                                      "dataModelAttributeFormatVersion": "1"}) == []
+    assert formlint.lint_field_names({**_data("orderList"),
+                                      "dataModelAttributeFormatVersion": "0"}) != []
+
+
+def test_form_create_writes_version_1_so_names_survive_and_are_not_warned_about():
     cfg = {"name": "F", "elements": [{"type": "input", "label": "Order", "name": "orderList"}]}
     out = main.dispatch(
         "form-create", ["--config", json.dumps(cfg), "--dry-run"],
         client_builder=lambda prof: ProcesioClient(profile=APIKEY, name="t",
                                                    session=FakeSession()))
-    assert any("orderList -> orderlist" in w for w in out["warnings"])
+    assert out["dto"]["Data"]["dataModelAttributeFormatVersion"] == "1"
+    assert not any("orderList" in w for w in out.get("warnings") or [])
     names = [c["value"] for e in out["dto"]["Data"]["elements"]
              for c in e["configs"] if c["key"] == "name"]
-    assert "orderList" in names          # warned about, not renamed
+    assert "orderList" in names          # kept verbatim, and a designer save keeps it too

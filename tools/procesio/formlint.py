@@ -24,6 +24,11 @@ a debugging session to find (see PROCESIO-API-NOTES.md and FORM-DEV-GUIDE/08):
   (`orderList` -> `orderlist`, `order_id` -> `orderId`; measured on two names, hyphens and
   spaces not tested). Form JS reading the original name then gets `undefined`. Only a
   single lowercase word survives unchanged. One warning per form, naming them all.
+  That re-key happens only to a form whose `dataModelAttributeFormatVersion` is not "1": the
+  designer reads a missing version as the legacy "0" format (user-playground
+  Builder.component.vue; Form.model.ts::generateFormDataModel lower-cases under "0" and keeps
+  the name under "1"). A form at "1" keeps its names through a designer save (measured
+  2026-09-25 and 2026-10-05), so it draws no warning; form-create writes "1" since 2026-10-05.
 
 Pure and side-effect-free: each returns a list of human-readable warning strings.
 Warnings, never blockers — the caller attaches them to its result JSON.
@@ -209,7 +214,11 @@ def designer_key(name: str) -> str | None:
 
 
 def lint_field_names(data: Any) -> list[str]:
-    """One warning naming every element whose name a designer save would re-key."""
+    """One warning naming every element whose name a designer save would re-key.
+
+    None for a form at dataModelAttributeFormatVersion "1": the designer keeps its names."""
+    if isinstance(data, dict) and str(data.get("dataModelAttributeFormatVersion") or "") == "1":
+        return []
     renamed = []
     for el in _elements(data):
         name = _cfg_value(el, "name")
