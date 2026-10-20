@@ -228,3 +228,50 @@ a ticked box or acceptance by conduct, because the absence of a checkbox is itse
 - An affiliate link is never the person's website: it is reported under
   `affiliate_links` and filed as `other`, so nothing follows it as if it were their
   site.
+
+## Third-party "Sign in with Google" blank in a captured session: log in with plain Chrome, reuse the profile
+
+**Symptom.** In a `save-session --persistent --channel chrome` window, a site's own
+"Sign in with Google" button opens a Google page that stays blank white and never
+completes. Retrying `save-session` does not help: Google will not serve its sign-in to a
+browser it detects as automation-controlled, and the stealth launch flags are not enough
+for that page.
+
+**Fix (proven live).** Let the human log in through an ordinary, non-automated Chrome that
+writes into the session's profile directory, then let Playwright reuse that directory:
+
+1. Find the sessions dir (`web list-sessions` returns it as `dir`) and launch Chrome
+   directly, not through Playwright:
+   `chrome.exe --user-data-dir="<sessions dir>/<name>.profile" --no-first-run --no-default-browser-check --new-window <login url>`
+   A separate `--user-data-dir` starts its own Chrome instance, even while the user's
+   everyday Chrome is running.
+2. The human logs in. Then close that window **gracefully** (`CloseMainWindow()`, not a
+   kill) so the cookie store is flushed, and wait until no `chrome.exe` process has that
+   `--user-data-dir` on its command line. Playwright cannot open a profile Chrome still
+   holds.
+3. Drive it with `web run --session <name> --channel chrome ...`. `open_session`
+   auto-detects `<name>.profile`. Pass `--channel chrome`: it is the binary that wrote the
+   profile, and Chrome's cookie encryption is tied to it. Bundled Chromium cannot read the
+   cookies.
+
+A supervised (child) Google account may ask for parent approval in the new browser. Once
+the login works, the profile holds a live login for the site **and** for the Google
+account, so delete it (`web delete-session --name <name> --confirm`) when the job is done.
+
+## Capturing a logged-in page as evidence
+
+`archive-document` fetches anonymously, so it cannot see a page behind a login. Until it
+takes a session, capture with `web run` against the logged-in session:
+
+- `screenshot` steps, both `full_page: true` and the viewport;
+- an `eval` returning `document.documentElement.outerHTML` (the DOM as rendered);
+- an `eval` with `async () => (await fetch(location.href, {credentials: 'include'})).text()`
+  (the HTML the server sent, the closest to the original bytes).
+
+Then write the strings to files and record a sha256 for each. Two traps:
+
+- **Decode the `web run` output as UTF-8.** On Windows a Python reader that takes it from
+  stdin defaults to cp1252 and turns diacritics into mojibake (`ă` becomes `Ä`) without
+  raising. Set `PYTHONIOENCODING=utf-8`, or read the bytes and decode them yourself.
+- **A login check by page text is unreliable.** Many account pages do not print the user's
+  name. Check for an element only a logged-in user gets, or look at the screenshot.
