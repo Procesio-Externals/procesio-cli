@@ -62,7 +62,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 |---|---|---|
 | `customaction-delete` | `--id` | Uninstall a custom action (DELETE /api/actions/{id}). |
 | `customaction-list` | — | List the workspace's custom actions (--all for the full catalog). |
-| `customaction-test` | — | Test a custom action (POST /api/Actions/test). |
+| `customaction-test` | — | Run a single action in TEST mode and return its resolved result (--action + --values builds the request from the catalog, incl. a workspace custom action; or… |
 | `customaction-upload` | `--file` | Install a custom action from a .nupkg package (POST /api/actions multipart). |
 
 ### datastore

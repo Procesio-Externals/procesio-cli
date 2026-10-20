@@ -1348,7 +1348,11 @@ UNCONDITIONALLY, so ANY custom action installed in the workspace resolves by nam
 actionId with no per-action code, even when the full fetch is slow or omits it. Both
 calls are scoped by the `workspaceid` header, so a `process-create` that references a
 connector MUST pass `--workspace-id <the workspace that holds the connector>` or the
-action will not be found.
+action will not be found. A workspace's custom actions are, by their nature,
+undocumented, so when a request might map to one, DISCOVER what the workspace has with
+`customaction-list --workspace-id <ws>` (name + ports + id) and use it in the process;
+`process-create`/`-edit` and `customaction-test` all resolve those actions
+automatically through this same merged catalog.
 
 **A killed shell does not kill the tool's Python child.** Wrapping a long PROCESIO
 call in a shell timeout leaves the worker running against the API; several
@@ -1727,12 +1731,22 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    empty. Actions that null-check the manager or client will pass the guard and then
    fail deep in the HTTP layer with `Invalid URL: <relative path>`. Check `Host`.
 
-6. **`POST /api/Actions/test` (the side-panel test) returns its result over SignalR**,
-   not in the HTTP response — it takes a `ConnectionId`. For headless verification,
-   build a real process and run it with `run-process --synchronous`, which returns
-   `{instanceId, status, variable, error}` directly. `status` 50 = finished, 40 =
-   error, and `error[].errorMessage` carries the action's exception text verbatim —
-   which makes it the practical oracle for testing an action's guards.
+6. **`POST /api/Actions/test` (the side-panel test) delivers its result ASYNCHRONOUSLY**
+   — over SignalR to the designer, OR via a polling GET for a headless caller. The
+   POST only STARTS the test and returns `{testActionInstance: {gid}}` with a
+   SERVER-assigned gid (NOT the `Gid` you send). Poll `GET /api/Actions/test/{that
+   gid}` until a terminal status: **40 = finished (outputs in `testResult`), 90 =
+   failed (`errorMessage` = the exception, `errorCode` the code, outputs null)**; the
+   result row 500s until it is written, so treat a 500 as "not ready, keep polling".
+   `testResult` is a JSON string mapping each OUTPUT variable id to its value. The
+   request mirrors a process node: declare a VariableDto per input/output (Type 10
+   INPUT / 30 OUTPUT), bind each `Action.parameters[].TabPropertyId` to its variable
+   (`Value="<%N%>"`, `Variable=[{id:N, variableId}]`), and put the input values in
+   `TestValues` (`{VariableId, Value}`). `customaction-test --action <name|id>
+   --values '{label: value}'` builds all of that from the catalog (built-in OR a
+   workspace custom action) and polls; `--body` passes a raw DetailedTestAction.
+   Building a process and running it `run-process --synchronous` (status 50/40)
+   remains a fine end-to-end oracle too.
 
 7. **A public form URL requires a real workspace.** `POST /api/CustomUrl/FormTemplate`
    fails with statusCode **1008** ("Not working on workspace") unless the call is
@@ -5229,7 +5243,7 @@ Decode `e` before blaming the form: `datetime.fromtimestamp(e, UTC)`.
 
 **The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
 though they are valid and route normally. Worth knowing before using one as a test address.
-Re-measured 2026-10-17 (`Invalid emails name+tag@gmail.com`, run status 40). The working route
+Re-measured 2026-10-17 (`Invalid emails name+tag@example.com`, run status 40). The working route
 for a plus address: a `Call API` POST to SendGrid's REST `/v3/mail/send` with a REST credential
 (API key in an `Authorization: Bearer ...` header) and a Node-built JSON body
 (`personalizations[0].to[0].email`, `from` = a SendGrid-verified sender, `content[0]` text/html).

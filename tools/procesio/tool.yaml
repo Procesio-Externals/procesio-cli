@@ -442,7 +442,7 @@ actions:
     required: false
     description: list the full catalog (built-in + custom); default is custom only
 - name: customaction-test
-  description: Test a custom action (POST /api/Actions/test).
+  description: Run a single action in TEST mode and return its resolved result (--action + --values builds the request from the catalog, incl. a workspace custom action; or pass --body). Polls GET /api/Actions/test/{id}; returns status, errorMessage and testResult.
   args:
   - name: profile
     type: string
@@ -464,6 +464,22 @@ actions:
     type: string
     required: false
     description: path to the request JSON
+  - name: action
+    type: string
+    required: false
+    description: action to test by name or template id (built-in or a workspace custom action); the request is built from the catalog
+  - name: values
+    type: string
+    required: false
+    description: 'input values as a JSON object {property label or id: value}'
+  - name: values-file
+    type: string
+    required: false
+    description: path to the input-values JSON
+  - name: timeout
+    type: integer
+    required: false
+    description: seconds to poll for the result (default 60)
 - name: customaction-upload
   description: Install a custom action from a .nupkg package (POST /api/actions multipart).
   args:
