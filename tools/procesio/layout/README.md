@@ -175,3 +175,22 @@ was removed on 2026-07-07 (`todo/done/procesio-retire-builder-layout.md`): it co
 positions that the engine then overwrote, so deleting it left the built DTOs byte-identical
 (the `greet.dto.json` golden and the full layout suite pass unchanged). The engine is now the
 sole source of canvas positions at build time.
+
+## Default arrangement on every save
+
+Every process the tool writes is arranged with the classic engine and clustering, the same
+arrangement `relayout-process` applies by default:
+
+- `process-create` lays the canvas out in full (as before).
+- `process-edit` now ALSO lays the whole canvas out. It used to place only NEW actions and keep
+  every existing position, so a process that was created once and then edited many times
+  drifted into an unarranged canvas and never got the default arrangement again.
+- The live-edit actions that save through `fevalidate.save_flow` (`node-*`, `sql-parameterize`,
+  `rename-actions`, the FE fix) arrange the flow before the PUT.
+
+Opt out to protect a hand-arranged canvas: `process-edit --keep-layout` (= config `relayout:
+"new"`), or `PROCESIO_KEEP_LAYOUT=1` for every save. A layout failure never blocks a save: the
+flow is saved as it was and the save result says `layout: not arranged (...)`.
+
+When validating a change to this package through `run-tool.py`, bypass the warm worker pool with
+`AAT_RUNNER_DIRECT=1`; the pool can keep serving the previous code.

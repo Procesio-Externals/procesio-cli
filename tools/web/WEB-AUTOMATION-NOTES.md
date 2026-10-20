@@ -208,3 +208,23 @@ application presents at sign-up and sign-in can live on a different host from th
 links in its footer, with no path between them. Crawling the website alone will miss the operative
 contract. Read the sign-up and sign-in screens as first-class sources, and record whether acceptance is
 a ticked box or acceptance by conduct, because the absence of a checkbox is itself a finding.
+
+## Reading a link-in-bio page without a browser (`page-contacts`)
+
+- **Next.js link-in-bio services render no anchors server-side.** On Linktree
+  (verified live, 2026-10) the HTML a plain GET receives has zero `<a href>`
+  elements: the creator's buttons are in the `<script id="__NEXT_DATA__">` JSON at
+  `props.pageProps.links[].url`, the social icons at `props.pageProps.socialLinks[].url`
+  (`pinnedLinks` too), the bio at `props.pageProps.description`. An email button is a
+  `mailto:` URL in the same `links` array. `tools/_lib/contacts.next_data_links` reads
+  exactly those keys.
+- **The same JSON carries the platform's own noise.** Sponsored offers (affiliate
+  network links such as CJ and Impact hosts) and dozens of asset URLs on the
+  platform's own subdomains. Scanning the whole source for URLs therefore reports
+  affiliate links the creator never placed. Rule: take destinations, sites and
+  affiliate links only from anchors, visible text and the creator-chosen keys;
+  take nothing but profile URLs (LinkedIn, X, Instagram, ...) from raw source; drop
+  links back to the page's own site and anything that looks like a static file.
+- An affiliate link is never the person's website: it is reported under
+  `affiliate_links` and filed as `other`, so nothing follows it as if it were their
+  site.

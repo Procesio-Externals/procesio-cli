@@ -311,6 +311,20 @@ parameter, and a refused statement routed to an error branch.
 - The generated node's designer config mirrors the runtime (Query -> `ds.<id>[.<col>]`,
   Parameters -> `{id,destination,source}`), so it shows configured in the Process Designer.
 
+## Upsert, guarded writes, and SELECT * keys (measured 2026-10-17)
+
+- `SELECT * FROM {{ds:Store}}` returns rows keyed by the columns' display names, plus the
+  system columns (`CreatedOn`, `UpdatedOn`, `CreatedById`, `UpdatedById`); strip those in the
+  Node that shapes the result.
+- An upsert keyed on the primary key is one statement:
+  `REPLACE INTO {{ds:Store}} ({{col:Store.Key}}, {{col:Store.A}}, CreatedById, UpdatedById, CreatedOn, UpdatedOn)
+  VALUES (@k, @a, @uid, @uid, UTC_TIMESTAMP(), UTC_TIMESTAMP())`, with `@uid` a user GUID parameter.
+- A write that must only happen when an upstream check passed can carry the check in SQL:
+  `REPLACE INTO ... SELECT @a, @b, ... FROM DUAL WHERE @flag <> '__invalid__'` (the Node that
+  validates returns the sentinel for every column when invalid), so no Decisional branch is needed.
+- `UPDATE ... SET col = CASE WHEN (col IS NULL OR col = '') THEN @t ELSE col END` keeps a
+  first-set timestamp (e.g. when a lead was first acknowledged).
+
 ## Seeding a store from one statement, idempotently
 
 An export carries a Data Store's COLUMNS and not its ROWS, so any pack meant to run elsewhere
@@ -738,3 +752,17 @@ field rather than from the visible control. The carrier exists because the visib
 holds a different shape (a timestamp where the query wants a day), but nothing copies one
 into the other unless a step is wired to do it, and a filter reading an empty carrier
 silently returns everything.
+
+#### A step that reads the run's output needs the run marked synchronous
+
+In an event chain, the flag that makes a process run synchronously is a tri-state in
+practice: true, false, and never set. Never set is not the same as true. A chain written as
+"run the query, then paint what it returned" works on a fast day and paints the previous
+result on a slow one, which is the worst kind of defect to chase because it reproduces
+only under load.
+
+So whenever a later step in a chain reads a variable the run fills, check the flag on the
+run rather than assuming it, and set it explicitly. It costs one field and removes a whole
+class of intermittent "the button shows stale data" reports. The same check is worth
+running across every chain at once: a list of each run with its flag takes seconds to
+produce and the odd one out is usually the one nobody set.

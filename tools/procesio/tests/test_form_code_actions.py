@@ -12,7 +12,7 @@ import pytest
 from tools.procesio import main
 from tools.procesio.client import ProcesioClient
 from tools.procesio.dto.form import code_cipher
-from tools.procesio.errors import UsageError
+from tools.procesio.errors import NotPersisted, UsageError
 from tools.procesio.tests.conftest import FakeResp, FakeSession
 
 APIKEY = {"type": "apikey", "key": "N", "value": "V"}
@@ -168,3 +168,21 @@ def test_put_keys_track_the_form_builder_top_level_shape():
     cfg = _json.loads((fb.DIR / "fixtures" / "reg.config.json").read_text(encoding="utf-8"))
     dto = fb.build(cfg, ctx)
     assert set(dto) - {"Data"} == set(_PUT_KEYS)
+
+
+def test_set_code_reads_back_and_reports_verified():
+    sent = code_cipher.encrypt_code("new();", ".new{}", KEY)
+    s = FakeSession(queue=[FakeResp(200, _form("")), FakeResp(200, {}), FakeResp(200, _form(sent))])
+    out = _call("form-set-code", ["--id", "F1", "--css", ".new{}", "--javascript", "new();"], s)
+    assert out["updated"] is True and out["verified"] is True
+
+
+def test_set_code_fails_when_the_server_keeps_the_previous_code():
+    # PROCESIO has answered 2xx while dropping the form's Data, leaving the old code in place
+    old = code_cipher.encrypt_code("old();", ".old{}", KEY)
+    big_js = "new();"
+    s = FakeSession(queue=[FakeResp(200, _form(old)), FakeResp(200, {}), FakeResp(200, _form(old))])
+    with pytest.raises(NotPersisted) as e:
+        _call("form-set-code", ["--id", "F1", "--javascript", big_js], s)
+    assert e.value.details["kept_previous"] is True
+    assert "PREVIOUS code" in str(e.value)

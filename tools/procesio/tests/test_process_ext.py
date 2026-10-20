@@ -243,16 +243,33 @@ def test_create_uses_engine_layout():
     assert _by_cid(dto)["Start"]["CustomData"]["position"] == {"x": 80.0, "y": 80.0}
 
 
-def test_edit_default_preserves_everyone_when_nothing_new():
+def test_edit_default_rearranges_the_whole_canvas(monkeypatch):
+    # an edit gets the same full arrangement as a create (classic engine + clustering),
+    # so a process edited many times never drifts into an unarranged canvas
+    monkeypatch.delenv("PROCESIO_KEEP_LAYOUT", raising=False)
     ctx = {**_ctx(), "existing_positions": _EXISTING}
     nodes = _by_cid(pb.build(_two_action_cfg(), ctx))
+    assert nodes["Start"]["CustomData"]["position"] == {"x": 80.0, "y": 80.0}       # re-tidied
+    assert nodes["Generate GUID"]["CustomData"]["position"] != {"x": 999, "y": 111}
+
+
+def test_edit_keep_layout_preserves_everyone_when_nothing_new():
+    ctx = {**_ctx(), "existing_positions": _EXISTING}
+    nodes = _by_cid(pb.build({**_two_action_cfg(), "relayout": "new"}, ctx))
     assert nodes["Generate GUID"]["CustomData"]["position"] == {"x": 999, "y": 111}
     assert nodes["Map Data"]["CustomData"]["position"] == {"x": 1500, "y": 222}
     assert nodes["Start"]["CustomData"]["position"] == {"x": 10, "y": 20}
 
 
-def test_edit_default_places_new_action_preserves_existing():
-    cfg = {"title": "t", "actions": [
+def test_edit_keep_layout_env_preserves_existing(monkeypatch):
+    monkeypatch.setenv("PROCESIO_KEEP_LAYOUT", "1")
+    ctx = {**_ctx(), "existing_positions": _EXISTING}
+    nodes = _by_cid(pb.build(_two_action_cfg(), ctx))
+    assert nodes["Start"]["CustomData"]["position"] == {"x": 10, "y": 20}
+
+
+def test_edit_keep_layout_places_new_action_preserves_existing():
+    cfg = {"title": "t", "relayout": "new", "actions": [
         {"id": "a", "action": "Generate GUID"},
         {"id": "c", "action": "Add"}]}            # 'c' is new (not in existing)
     existing = {"a": {"x": 999, "y": 111}, "start": {"x": 10, "y": 20},

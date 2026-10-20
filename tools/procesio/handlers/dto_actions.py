@@ -105,9 +105,19 @@ def _make_create(component):
     return func
 
 
+def _process_edit_args(p: argparse.ArgumentParser) -> None:
+    _edit_args(p)
+    p.add_argument("--keep-layout", dest="keep_layout", action="store_true",
+                   help="keep the current canvas positions and place only new actions "
+                        "(default: re-arrange the whole canvas, classic engine + clustering, "
+                        "exactly as process-create does)")
+
+
 def _make_edit(component):
     def func(client, args):
         config = _load_config(args)
+        if getattr(args, "keep_layout", False) and isinstance(config, dict) and "actions" in config:
+            config.setdefault("relayout", "new")   # processes only: keep positions, place new actions
         ctx = framework.prepare(component, client, config)
         ctx["_force"] = getattr(args, "force", False)
         ctx["_no_types"] = getattr(args, "no_types", False)
@@ -214,7 +224,7 @@ def build_actions() -> dict[str, ActionDef]:
         # the first sentence, and the search that goes looking for "add node" lands on
         # this action and reads the answer.
         out[f"{name}-edit"] = ActionDef(
-            func=_make_edit(comp), add_args=_edit_args, needs_client=True,
+            func=_make_edit(comp), add_args=_process_edit_args if name == "process" else _edit_args, needs_client=True,
             description=(
                 f"Edit a PROCESIO {name} (--id required). DESIRED STATE: the --config you "
                 f"send REPLACES the whole definition"

@@ -174,3 +174,34 @@ def test_no_process_writer_anywhere_puts_a_flow_without_stamping_it():
             assert bad not in src, (
                 f"{name} PUTs a fetched flow directly; route it through "
                 "fevalidate.save_flow so the mark is stamped and re-read")
+
+
+def test_save_arranges_the_canvas_by_default(monkeypatch):
+    from tools.procesio.handlers import fevalidate
+    monkeypatch.delenv("PROCESIO_KEEP_LAYOUT", raising=False)
+    called = {}
+    monkeypatch.setattr(fevalidate, "arrange", lambda f: (called.setdefault("flow", f), "arranged"))
+
+    class Srv:
+        def put(self, path, body):
+            self.body = body
+
+        def get(self, path, query=None):
+            return {"flow": {"isValid": True}}
+    out = fevalidate.save_flow(Srv(), {"id": "p1"}, flow_id="p1", valid=True)
+    assert called and out["layout"] == "arranged"
+
+
+def test_save_keeps_the_canvas_when_asked(monkeypatch):
+    from tools.procesio.handlers import fevalidate
+    monkeypatch.setenv("PROCESIO_KEEP_LAYOUT", "1")
+    monkeypatch.setattr(fevalidate, "arrange", lambda f: (_ for _ in ()).throw(AssertionError("must not arrange")))
+
+    class Srv:
+        def put(self, path, body):
+            pass
+
+        def get(self, path, query=None):
+            return {"flow": {"isValid": True}}
+    out = fevalidate.save_flow(Srv(), {"id": "p1"}, flow_id="p1", valid=True)
+    assert out["layout"] == "kept"

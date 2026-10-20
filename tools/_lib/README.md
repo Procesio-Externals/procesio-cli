@@ -91,6 +91,19 @@ consent screen is in **Testing** mode, each extra account's email must be added
 as a **Test user** in Google Cloud Console before its `auth-login` will succeed.
 
 
+## contacts.py — published contact details in text or HTML
+
+Pure functions shared by the tools that read what a person publishes about
+themselves (`youtube extract-contacts`, `web page-contacts`, the `creator-scout`
+agent): `find_emails` (including `name [at] domain [dot] com`), `find_urls`,
+`classify_url` (linkedin / x / youtube / instagram / ... / link_in_bio / website),
+`affiliate_info` (PartnerStack and Impact tracking hosts, Rewardful `via`,
+FirstPromoter `fpr`, generic `ref` / `pc` / `aff` parameters), `extract`, `merge`,
+`collect` (several labelled texts, keeping where each find came from) and
+`extract_html` (mailto links, anchors, visible text, plus profile links embedded
+as JSON by link-in-bio services). Only what is literally on the page counts: no
+guessed addresses, no redirect resolution.
+
 ## webserialize/ — serializing brokers for web-profile tools
 
 One broker process per tool owns its browser session/profile and executes

@@ -525,3 +525,49 @@ element). It keeps the existing validator blocks by id and builds the MAP blocks
 and conditions from element and variable names. Prove the mechanism on a small
 public copy of the flow before touching a live form. [07](07-DEPLOY-WORKFLOW.md) §4
 has the recipe.
+
+## An interactive map (Leaflet) inside a form page
+
+A slippy map works in a form page that is drawn by injected code (the installer
+pattern in 02-CODE-INJECTION). Load the library from a CDN at runtime, the same
+way as any other viewer: a `<link>` for `leaflet.css` added to the parent
+document's head, then the script through the runtime's script loader. Nothing
+needs to ship inside the form's own code, which matters because the code budget
+per form is finite.
+
+Rules that each cost a debugging round:
+
+- **Measure the container before every camera move.** The form host shows the
+  page only after its own bootstrap, so a map created during build reads its
+  container as 0 x 0. Leaflet caches that size, and the first `flyTo` /
+  `flyToBounds` computes the zoom from it: the map lands at maximum zoom
+  somewhere in the ocean. Call `map.invalidateSize(false)` at the start of every
+  programmatic move, retry later if the size is still 0, and keep a
+  `ResizeObserver` on the container that calls `invalidateSize`.
+- **Listen for `moveend` as well as `zoomend`.** An `invalidateSize` that lands
+  during a fly animation can stop it without a `zoomend`, so layers that are
+  toggled by zoom never appear. Bind the zoom-dependent logic to
+  `'zoomend moveend'` and run it once after the map is built.
+- **Do not let the page reset size map tiles.** A rule such as
+  `img { max-width: 100% }` scoped to the page root breaks tile layout. Exempt the
+  map container: `#root .map img { max-width: none; max-height: none; }`.
+- **Contain the map's stacking.** Leaflet panes use z-index 400 and up, and any
+  card positioned over the map needs more. Without a stacking context on the map
+  section those layers rise above the page's own modals. Give the section
+  `position: relative; z-index: 0; isolation: isolate`.
+- **The page root is the scroller, so keep wheel zoom off until the map is
+  clicked** (`scrollWheelZoom: false`, enabled on the first map click), or
+  scrolling the page zooms the map instead. On touch devices, disable one-finger
+  dragging and drive the map with buttons, or it traps page scrolling.
+- **Keep map objects on the map's own state, not on the data object.** When the
+  page renders from a cached copy first and then from fresh data, the fresh object
+  replaces the cached one. Markers stored on the old objects (for example
+  `amenity.marker`) silently stop updating. Copy the list into the map's own
+  state when the map is built.
+- **Free satellite tiles without a key:** Esri World Imagery
+  (`server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}`)
+  plus the `Reference/World_Boundaries_and_Places` overlay for place names. The
+  attribution ("Imagery © Esri, Maxar, Earthstar Geographics") must stay visible.
+- **Page-specific CSS.** When only one page of a multi-page app uses the map,
+  ship its stylesheet with that page alone. Concatenate a per-page CSS file at
+  build time instead of growing the shared stylesheet that every page carries.

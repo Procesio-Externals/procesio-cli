@@ -85,6 +85,29 @@ first occurrence — but do not build on that.)
 through form configuration on a shared host. It is a property of the installation, not of the
 form DTO. Establish which host a customer will be on before promising a white-labelled app.
 
+### Form CSS CAN hide the topbar (measured 2026-10-17)
+
+"Unconditional" above is about configuration: no DTO flag removes the topbar. Form-level CSS
+does. On a public form opened anonymously, `.pds-c-topbar { display: none !important; }`
+removed it completely (computed `display: none`, nothing left on screen). Only the branding
+class is scrubbed from form CSS, and the topbar does not carry it, so the bottom
+"Built with PROCESIO" banner is the one piece of host chrome that stays.
+
+### Drawing a whole web page over a form (measured 2026-10-17)
+
+A form can serve as a website: keep the native controls as an off-screen bridge and draw the
+visible page yourself from the form-JS runtime ([02](02-CODE-INJECTION.md) §4).
+- Move the form off screen, do not remove it: `.form-builder--form { position: absolute;
+  left: -10000px; }`. Its controls must stay registered to carry values to a process.
+- **The host page scrolls inside its own container, not the body.** A node appended to
+  `document.body` renders below the fold and the screen looks empty. Pin the page over the
+  viewport (`position: fixed; top: 0; left: 0; right: 0; bottom: 32px; overflow-y: auto`)
+  so it scrolls itself; the 32px leaves the branding banner visible.
+- Inter-page links work with context in the query string (`?visitor=…&unit=…`): the target
+  form pre-fills the matching controls and its runtime reads them.
+- Measured on the public host: the drawn page appeared about 2.2 s after navigation and the
+  first process-backed results about 3.1 s after. Show a skeleton, not a blank screen.
+
 ## 4. Private forms and anonymous visitors
 
 A private form opened without a session returns 401 and renders a dead end — *"Form not

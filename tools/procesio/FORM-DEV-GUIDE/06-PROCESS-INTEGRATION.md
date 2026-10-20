@@ -93,6 +93,27 @@ Because it resolves names, `event.json` can be written readably:
 
 It also defaults `syncRun` to `true`, so you cannot forget it.
 
+## 3b. Driving a RUN_PROCESS from script: wait out the debounce (measured 2026-10-17)
+
+When a custom UI writes a control's value from script (native value setter + `input`
+event) and then clicks the control's RUN_PROCESS button with `element.click()`, the
+process receives the value the field had BEFORE the write unless the script waits first.
+Measured on a public form: a 300 ms wait, with or without a blur, sent the stale value;
+600, 800 and 1000 ms sent the new one every time. A finer run put the threshold at the form's
+~500 ms debounce: at 100, 250 and 400 ms 18 of 18 launches got the old value, at 500 and 650 ms
+11 of 11 got the new one. So write, wait about 560 ms, then click.
+Serialise these calls (one queue), or two writes interleave and each click sends the other's
+value. The click works on a button that is off screen. A process round trip from click to
+the output landing in the field took 0.7 to 1.0 s for a small Node-only flow. It is two
+sequential requests: `POST /api/formProcess/{formId}/{processId}/publish` (creates the instance,
+~300-470 ms) then `POST /api/formProcess/{formId}/{instanceId}/launch?runSynchronous=true`
+(~670-800 ms for ~260 ms of execution), so roughly 1.1-1.2 s per call whatever the flow does. A
+Node action costs ~56-85 ms of execution each and a Query Store ~16 ms: keep form-facing flows to
+few Nodes (pass one JSON value into SQL and unpack it with `JSON_EXTRACT` rather than one Node
+per column). For a live
+"N results" count while the visitor is still choosing, filter a cached copy in the browser
+and keep the process for the authoritative search and the logging.
+
 ## 4. Design rule: **one output variable per field, all primitives**
 
 The tempting design is one structured output variable (a data model, or a JSON blob)

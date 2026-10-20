@@ -158,7 +158,7 @@ def relayout_process(client, args) -> dict:
     fe = run_fe_validation(client, new_flow)
     be_ok = validated is not False
     try:
-        saved = save_flow(client, new_flow, flow_id=args.id, valid=bool(fe["clean"] and be_ok))
+        saved = save_flow(client, new_flow, flow_id=args.id, valid=bool(fe["clean"] and be_ok), layout=False)
     except ProcesioAPIError as e:
         raise UsageError(f"save (PUT) failed for {args.id}: {e.details}")
     out = {"result": {**summary, "validated": validated, "saved": True}}

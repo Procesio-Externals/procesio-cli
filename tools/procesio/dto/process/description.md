@@ -67,6 +67,12 @@ per-action code.
   injects as a BARE token, not a quoted literal — wrap it yourself: `const s='<%0%>';`.
   Without quotes you get `const s=SDSDX0GM6L;` → ReferenceError → the Node returns null
   silently (verified 2026-07-22, Uranus 100 P1).**
+  **For arbitrary text (quotes, apostrophes, newlines, JSON, HTML) read it as a raw template
+  literal: `` const s = String.raw`<%0%>`; ``.** Single quotes break on the first apostrophe and
+  on any newline; `String.raw` keeps everything verbatim and only breaks on a backtick or `${`
+  in the value, so keep those out of strings you generate yourself. A string variable that holds
+  JSON text can be injected bare (`const o = <%0%>;`) and lands as an object literal (measured
+  2026-10-17 building a multi-process demo: event batches, AI responses and email HTML).
   **ALWAYS bind the scripting action's `Error` OUTPUT property to a (string) variable**
   (`"Error": {"var": "myErr"}`, alongside `Single Result`/`List Result`) — a script failure
   is captured there so it can be debugged. This is a STANDING directive for every Node /
@@ -144,11 +150,18 @@ per-action code.
 - **Canvas** is auto-laid-out left-to-right by the deterministic layout engine
   (`tools/procesio/layout/`) as the final build step — happy path straight, branches
   fanned, error handlers on a low lane, For-Each frames sized to their body.
-- **Edit keeps the layout stable.** On an edit, existing actions stay where they are
-  (positions carried over by name + array order); only the `relayout` scope is re-tidied.
-  `relayout`: `"all"` (re-tidy everything) | `"none"` | `"new"` | `[actionId,…]` |
-  `{new:bool, actions:[…], edited:[…]}`. Default on edit: place NEW actions only, leave
-  the rest untouched. (For a one-off tidy of a specific action on an existing process, the
+- **Every save is arranged.** A create AND an edit lay the whole canvas out with the
+  default arrangement: the classic engine with clustering (long chains fold into shelves,
+  error/default branches drop perpendicular). The live-edit actions (`node-*`,
+  `sql-parameterize`, `rename-actions`, the FE fix) arrange through the same save path.
+  Opt out to protect a hand-arranged canvas: `process-edit --keep-layout` (= `relayout:
+  "new"`: existing actions keep their positions, only new ones are placed), or
+  `PROCESIO_KEEP_LAYOUT=1` for every save. `relayout`: `"all"` | `"none"` | `"new"` |
+  `[actionId,…]` | `{new:bool, actions:[…], edited:[…]}`.
+- **Actions are named by what they do.** An explicit `name` wins; otherwise the builder
+  derives one: Query Store "Read OMN Units" / "Save to Leads" / "Update Settings" (from the
+  `{{ds:...}}` stores in its SQL), Node from its leading comment or else "Compute <output
+  variable>", Call API "GET /path", For Each "For each <list>", Execute Query "SELECT table". (For a one-off tidy of a specific action on an existing process, the
   `layout-flow --only <id>` tool is the zero-ambiguity path — it uses real action ids.)
 
 ## Invariants

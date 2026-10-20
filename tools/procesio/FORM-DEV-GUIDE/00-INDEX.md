@@ -20,7 +20,7 @@ day of debugging.
 | [01-ANATOMY.md](01-ANATOMY.md) | understand the FormTemplate DTO: elements, configs, sections, the data model, value paths, steppers |
 | [02-CODE-INJECTION.md](02-CODE-INJECTION.md) | write ANY form-level JavaScript — this is the one non-negotiable prerequisite |
 | [03-DOM-CONTRACT.md](03-DOM-CONTRACT.md) | write CSS or query the DOM — the selector reference and what the renderer guarantees |
-| [04-INTERACTION-RECIPES.md](04-INTERACTION-RECIPES.md) | read/write a field, hide a field, gate a button, build a custom control, validate, toast |
+| [04-INTERACTION-RECIPES.md](04-INTERACTION-RECIPES.md) | read/write a field, hide a field, gate a button, build a custom control, validate, toast, embed an interactive map (Leaflet) |
 | [05-STEPPER-AND-MOTION.md](05-STEPPER-AND-MOTION.md) | build a custom stepper, a step transition, a loader veil, entrance animations |
 | [06-PROCESS-INTEGRATION.md](06-PROCESS-INTEGRATION.md) | trigger a process from the form and land its results back in fields |
 | [07-DEPLOY-WORKFLOW.md](07-DEPLOY-WORKFLOW.md) | actually ship the CSS/JS to a live form, and test before you do |

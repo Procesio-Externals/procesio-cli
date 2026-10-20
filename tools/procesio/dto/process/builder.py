@@ -1462,11 +1462,22 @@ def build(config: dict, ctx: dict) -> dict:
     }
 
 
+def keep_layout_requested() -> bool:
+    """PROCESIO_KEEP_LAYOUT=1 turns the automatic full layout off for every save."""
+    import os
+    return os.environ.get("PROCESIO_KEEP_LAYOUT", "").strip().lower() in ("1", "true", "yes")
+
+
 def _resolve_subset(relayout, new_cids, all_cids):
     """Map a relayout directive to a list of config ids to re-tidy, or None for a full
-    layout. new_cids/all_cids are config-local ids."""
+    layout. new_cids/all_cids are config-local ids.
+
+    DEFAULT on edit = a FULL layout (classic engine + clustering), the same arrangement a
+    create gets, so a process edited many times never drifts into an unarranged canvas.
+    Keeping the current positions is the opt-out: relayout "new" (or --keep-layout, or
+    PROCESIO_KEEP_LAYOUT=1) places only the new actions, for a hand-arranged canvas."""
     if relayout is None:
-        return new_cids
+        return list(new_cids or []) if keep_layout_requested() else None
     if relayout == "all":
         return None
     if relayout in ("none", []):
@@ -1619,7 +1630,7 @@ def _fetch_live_catalog(client, seconds: int = _CATALOG_FETCH_SECONDS):
     def _work():
         try:
             box["r"] = client.get("/api/Actions", {"getFullAction": "true"},
-                                  timeout=seconds)
+                                  read_timeout=seconds, deadline=seconds)
         except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
             box["err"] = exc
 
@@ -1634,16 +1645,68 @@ def _fetch_live_catalog(client, seconds: int = _CATALOG_FETCH_SECONDS):
     return box.get("r")
 
 
+_CUSTOM_FETCH_SECONDS = 20
+
+
+def _fetch_custom_actions(client, seconds: int = _CUSTOM_FETCH_SECONDS):
+    """The workspace's CUSTOM (connector) actions, full config, on a wall-clock
+    deadline: `GET /api/Actions/node?getFullAction=true&isCustom=true`.
+
+    This is the narrow, fast counterpart to `_fetch_live_catalog`. It serialises
+    only the handful of connectors installed in the workspace, never the whole
+    catalog, so it stays quick where the full fetch is occasionally pathologically
+    slow. `prepare_ctx` merges its result into the catalog UNCONDITIONALLY, which
+    is what lets a config reference ANY custom action in the workspace (by name or
+    by actionId) with no per-action code - even when the full-catalog fetch times
+    out and the build would otherwise be left with the bundled, built-in-only
+    catalog. Same daemon-thread deadline as `_fetch_live_catalog`, for the same
+    reason: a trickling response must not outlive the caller's fallback."""
+    import threading
+    box: dict = {}
+
+    def _work():
+        try:
+            box["r"] = client.get("/api/Actions/node",
+                                  {"getFullAction": "true", "isCustom": "true"},
+                                  read_timeout=seconds, deadline=seconds)
+        except Exception as exc:  # noqa: BLE001 - surfaced to the caller below
+            box["err"] = exc
+
+    t = threading.Thread(target=_work, daemon=True)
+    t.start()
+    t.join(seconds)
+    if t.is_alive():
+        raise TimeoutError(f"custom-action fetch exceeded {seconds}s")
+    if "err" in box:
+        raise box["err"]
+    return box.get("r")
+
+
 def prepare_ctx(client, config: dict) -> dict:
     """Fetch the live workspace action catalog (custom/connector actions included)
     and resolve any `model:` variable references to live data-model ids."""
     ctx: dict = {}
+    # The catalog is the bundled built-ins plus whatever the live workspace adds.
+    # Two live sources, fetched independently so one failing never costs the
+    # other: (1) the full live catalog (built-ins + custom) - authoritative but
+    # frequently slow, so it may time out to nothing; (2) the workspace's custom
+    # /connector actions alone - small and fast. Merging (2) in unconditionally is
+    # what makes ANY custom action installed in the workspace resolvable by name
+    # or actionId, with no per-action code, even when (1) times out and would
+    # otherwise leave only the built-in catalog.
+    live: list = []
     try:
         r = _fetch_live_catalog(client)
-        live = r.get("actions") if isinstance(r, dict) else r
-        ctx["catalog"] = catalog_index(extra=live or [])
-    except Exception:  # noqa: BLE001 - fall back to the bundled catalog offline
-        ctx["catalog"] = catalog_index()
+        live = (r.get("actions") if isinstance(r, dict) else r) or []
+    except Exception:  # noqa: BLE001 - offline / slow: lean on bundled + the custom fetch
+        live = []
+    custom: list = []
+    try:
+        rc = _fetch_custom_actions(client)
+        custom = (rc.get("actions") if isinstance(rc, dict) else rc) or []
+    except Exception:  # noqa: BLE001 - no custom actions reachable: built-ins still resolve
+        custom = []
+    ctx["catalog"] = catalog_index(extra=list(live) + list(custom))
     refs = {v["model"].strip().lower() for v in config.get("variables", []) if v.get("model")}
     if refs:
         models: dict[str, str] = {}
