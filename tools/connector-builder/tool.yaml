@@ -466,6 +466,13 @@ actions:
     type: string
     required: true
     description: Build UUID
+- name: revise
+  description: Re-open a COMPLETED build to the generate pause for a small fix (then regenerate-file + approve-generate); bumps the version.
+  args:
+  - name: build-id
+    type: string
+    required: true
+    description: Build UUID
 - name: retry
   description: Retry the pipeline from a step (or last failed).
   args:
