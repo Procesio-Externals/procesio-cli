@@ -139,7 +139,10 @@ def render_pdf(driver_factory, args) -> dict:
             raise UsageError(f"cannot read --html-file {args.html_file!r}: {exc}")
     else:
         html = args.html
+    if bool(args.width) != bool(args.height):
+        raise UsageError("--width and --height go together (a custom sheet needs both)")
     return api.render_pdf(html, args.out, fmt=args.format,
+                          width=args.width, height=args.height, margin=args.margin,
                           driver_factory=driver_factory)
 
 
@@ -150,6 +153,13 @@ def _render_pdf_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--out", required=True, help="Output PDF path (.pdf)")
     p.add_argument("--format", default="A4",
                    help="Paper size: A4 (default) / Letter / Legal ...")
+    p.add_argument("--width", default=None,
+                   help="Custom page width as a CSS length (e.g. 1000mm); needs --height, overrides --format")
+    p.add_argument("--height", default=None,
+                   help="Custom page height as a CSS length (e.g. 2000mm); needs --width")
+    p.add_argument("--margin", default=None,
+                   help="One CSS length for all four margins (0 for full-bleed artwork); "
+                        "default keeps the document margins 12/14/12/12 mm")
 
 
 ACTIONS = {

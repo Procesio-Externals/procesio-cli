@@ -27,6 +27,22 @@ def test_render_pdf_sessionless_writes_pdf(tmp_path, driver_factory):
     assert out.read_bytes().startswith(b"%PDF")
 
 
+def test_render_pdf_custom_sheet_passes_size_and_margin(tmp_path, driver_factory):
+    # A roll-up / poster needs an exact sheet, not a paper name.
+    out = tmp_path / "rollup.pdf"
+    api.render_pdf("<div>x</div>", str(out), width="1000mm", height="2000mm", margin="0",
+                   driver_factory=driver_factory)
+    call = [kw for m, kw in driver_factory.built[0].calls if m == "render_pdf"][0]
+    assert (call["width"], call["height"], call["margin"]) == ("1000mm", "2000mm", "0")
+
+
+def test_render_pdf_defaults_keep_paper_format(tmp_path, driver_factory):
+    out = tmp_path / "doc.pdf"
+    api.render_pdf("<p>x</p>", str(out), driver_factory=driver_factory)
+    call = [kw for m, kw in driver_factory.built[0].calls if m == "render_pdf"][0]
+    assert call["fmt"] == "A4" and call["width"] is None and call["margin"] is None
+
+
 def test_open_session_loads_state_and_starts(isolated_sessions, driver_factory):
     _seed()
     d = api.open_session("linkedin", url="https://x.test", driver_factory=driver_factory)
