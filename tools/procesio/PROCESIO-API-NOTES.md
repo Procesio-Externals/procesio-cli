@@ -1699,6 +1699,20 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    package stem) and `--icon-path`. The icon likewise comes from the `path` header, not
    the package: `--icon-path` takes a Material icon name (e.g. `assignment`,
    `description`, `insert_drive_file`, `text_snippet`) or a PROCESIO `icon-*` name
+   (e.g. `icon-html`, `icon-pdf`). Omit it and the action shows no icon, so
+   `customaction-upload` DEFAULTS the `path` header to `icon-custom-action` and
+   returns a `warnings` entry; pass a relevant icon. Discover valid names from the
+   `icon` field of existing actions in `GET /api/Actions`.
+
+   **The upload does NOT stamp `createdOn`/`updatedOn`** on the new action template,
+   so a custom action's date shows as `0001-01-01T00:00:00` (.NET `DateTime.MinValue`)
+   in the designer - built-in actions carry a real `updatedOn`, so the gap is the
+   `POST /api/actions` registration path specifically. This is a BACKEND bug: it hits
+   ANY custom action (the designer's "Create custom action" uses the same endpoint),
+   it is NOT caused by the `.nupkg` or the source, and there is NO action-template
+   PUT/PATCH to correct the date afterward - only the BE can stamp it at registration. The icon likewise comes from the `path` header, not
+   the package: `--icon-path` takes a Material icon name (e.g. `assignment`,
+   `description`, `insert_drive_file`, `text_snippet`) or a PROCESIO `icon-*` name
    (e.g. `icon-html`, `icon-pdf`). Omit it and the action shows no icon. Discover valid
    names from the `icon` field of existing actions in `GET /api/Actions` — that is the
    exact vocabulary the designer's icon picker accepts.

@@ -30,21 +30,28 @@ def test_upload_posts_nupkg_as_multipart_package(tmp_path):
     # The backend takes the designer display name off the `name` header, so an
     # upload with no --action-name still has to carry one (the package stem).
     assert call["headers"]["name"] == "MyConnector.1.0.0"
-    assert out == {"uploaded": True, "id": "NEWID",
-                   "name": "MyConnector.1.0.0.nupkg",
-                   "actionName": "MyConnector.1.0.0", "bytes": len(NUPKG)}
+    # No --icon-path: a generic icon is defaulted (never iconless) and a warning returned.
+    assert call["headers"]["path"] == "icon-custom-action"
+    assert out["uploaded"] is True and out["id"] == "NEWID"
+    assert out["name"] == "MyConnector.1.0.0.nupkg"
+    assert out["actionName"] == "MyConnector.1.0.0"
+    assert out["iconPath"] == "icon-custom-action"
+    assert out["bytes"] == len(NUPKG)
+    assert out["warnings"] and "icon" in out["warnings"][0].lower()
 
 
 def test_upload_action_name_sets_display_name_header(tmp_path):
     pkg = tmp_path / "MyConnector.1.0.0.nupkg"
     pkg.write_bytes(NUPKG)
     sess = FakeSession(queue=[FakeResp(200, {"id": "X"})])
-    main.dispatch("customaction-upload",
-                  ["--workspace-id", "WS1", "--file", str(pkg),
-                   "--action-name", "Prelude", "--icon-path", "icons/prelude.svg"],
-                  client_builder=_builder(sess))
+    out = main.dispatch("customaction-upload",
+                        ["--workspace-id", "WS1", "--file", str(pkg),
+                         "--action-name", "Prelude", "--icon-path", "icons/prelude.svg"],
+                        client_builder=_builder(sess))
     assert sess.calls[0]["headers"]["name"] == "Prelude"
     assert sess.calls[0]["headers"]["path"] == "icons/prelude.svg"
+    # an explicit icon is used verbatim and raises no warning
+    assert out["iconPath"] == "icons/prelude.svg" and "warnings" not in out
 
 
 def test_upload_name_override(tmp_path):

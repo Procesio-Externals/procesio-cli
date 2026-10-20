@@ -156,6 +156,9 @@ actions:
       - {name: html-file, type: string, description: "Path to an HTML file to render"}
       - {name: out, type: string, required: true, description: "Output PDF path (.pdf)"}
       - {name: format, type: string, default: A4, description: "Paper size: A4 (default) / Letter / Legal"}
+      - {name: width, type: string, description: "Custom page width as a CSS length, e.g. 1000mm (needs --height; overrides --format) - large-format print such as a roll-up or poster"}
+      - {name: height, type: string, description: "Custom page height as a CSS length, e.g. 2000mm (needs --width)"}
+      - {name: margin, type: string, description: "One CSS length for all four margins; 0 for full-bleed artwork. Default keeps the document margins (12/14/12/12 mm)"}
     output_schema: '{ "out": "...", "bytes": 12345 }'
 
 examples:

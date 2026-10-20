@@ -192,6 +192,30 @@ python scripts/run-tool.py web screenshot --session linkedin --url https://examp
 `--viewport-only` captures just the viewport (default is full page); `--wait`
 awaits a selector first.
 
+## Render HTML to a print PDF (`render-pdf`)
+
+`render-pdf` lays an HTML file out with Chromium's print engine. By default it prints on a
+paper format (`--format A4`, Letter, ...) with document margins of 12/14/12/12 mm.
+
+Large-format print (a roll-up, a poster, a banner) needs an exact sheet instead of a paper name:
+
+```powershell
+python scripts/run-tool.py web render-pdf --html-file rollup.html --out rollup.pdf --width 1000mm --height 2000mm --margin 0
+```
+
+- `--width` / `--height` take CSS lengths and go together; they override `--format`.
+  `--margin 0` is for full-bleed artwork.
+- Chromium rounds the sheet to whole CSS pixels (96 px per inch), so 1000 x 2000 mm comes out
+  as about 1000.17 x 2000.25 mm. When the printer checks dimensions, trim the PDF's MediaBox to
+  the exact size afterwards; keep the outermost fraction of a millimetre background-only.
+- Make the HTML self-contained: the page is loaded with `set_content` (from `about:blank`), so
+  inline fonts and images as `data:` URIs. The driver waits for `document.fonts.ready` before
+  printing, so an inlined web font is used rather than a silent fallback.
+- SVG images stay vector in the PDF; PNGs stay raster, so check their effective resolution at
+  the printed size (a logo of ~600 px printed 14 cm wide is ~110 dpi).
+- `text-wrap: pretty` was seen not to stop a lone last word in the headless print engine; bind
+  the last words with `&nbsp;` when a widow matters.
+
 ## Persistent storage is granted at start-up
 
 Automated Chromium answers `navigator.storage.persist()` and a persisted Storage Bucket

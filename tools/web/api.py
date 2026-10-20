@@ -192,6 +192,8 @@ def screenshot(name: str, url: str, out: str, *, full_page: bool = True,
 
 
 def render_pdf(html: str, out: str, *, fmt: str = "A4",
+               width: str | None = None, height: str | None = None,
+               margin: str | None = None,
                driver_factory: Callable = _default_factory) -> dict:
     """Render an HTML string to a PDF file — no session, no navigation.
 
@@ -199,6 +201,8 @@ def render_pdf(html: str, out: str, *, fmt: str = "A4",
     headless-only), sets the page content to ``html``, writes the PDF to ``out``,
     and tears the browser down. Reusable HTML→PDF for deterministic document
     generation (e.g. the invoice-collector reconstructing a Ryver invoice).
+    ``width`` + ``height`` give a custom sheet (e.g. a 1000mm x 2000mm roll-up)
+    instead of ``fmt``; ``margin`` overrides the default document margins.
     Returns ``{"out": path, "bytes": n}``.
     """
     import os
@@ -206,7 +210,7 @@ def render_pdf(html: str, out: str, *, fmt: str = "A4",
     driver = driver_factory(storage_state=None, headless=True)
     driver.start()
     try:
-        driver.render_pdf(html, out, fmt=fmt)
+        driver.render_pdf(html, out, fmt=fmt, width=width, height=height, margin=margin)
     finally:
         _safe_close(driver)
     try:

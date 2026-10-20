@@ -130,8 +130,9 @@ class FakeDriver:
         self.calls.append(("screenshot", {"path": path, "full_page": full_page}))
         return path
 
-    def render_pdf(self, html, path, *, fmt="A4"):
-        self.calls.append(("render_pdf", {"html": html, "path": path, "fmt": fmt}))
+    def render_pdf(self, html, path, *, fmt="A4", width=None, height=None, margin=None):
+        self.calls.append(("render_pdf", {"html": html, "path": path, "fmt": fmt,
+                                          "width": width, "height": height, "margin": margin}))
         # Write a minimal stub so callers that stat the output see bytes.
         with open(path, "wb") as fh:
             fh.write(b"%PDF-1.4 fake\n")

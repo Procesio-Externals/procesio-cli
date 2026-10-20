@@ -29,9 +29,15 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from tools._lib.io import log
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.errors import UsageError
 from tools.procesio.handlers.common import add_profile_arg
+
+# An action installs with NO icon when the upload's `path` header is empty, which
+# leaves it hard to spot in the designer toolbar. Default to the generic custom-action
+# glyph so an upload is never iconless, and warn so the caller sets a RELEVANT one.
+_DEFAULT_ICON = "icon-custom-action"
 
 
 def _summary(a: dict) -> dict:
@@ -46,7 +52,9 @@ def upload_customaction(client, args) -> dict:
     multipart field `package`. Returns the new action id.
 
     `--action-name` sets the name the designer shows; without it the action
-    installs nameless (see the module docstring)."""
+    installs nameless (see the module docstring). `--icon-path` sets the toolbar
+    icon; without it a generic default (`icon-custom-action`) is applied and a
+    warning is returned, so pass a RELEVANT icon."""
     path = Path(args.file)
     if not path.is_file():
         raise UsageError(f"package file not found: {args.file}")
@@ -57,13 +65,27 @@ def upload_customaction(client, args) -> dict:
     # The backend reads the display name off the `name` header. Default it to the
     # package's stem so an upload is never nameless in the designer.
     action_name = args.action_name or path.stem
+    warnings = []
+    icon = args.icon_path
+    if not icon:
+        icon = _DEFAULT_ICON
+        msg = (f"no --icon-path given; defaulted to {_DEFAULT_ICON!r}. Set a RELEVANT "
+               "icon (a Material name like 'description' / 'table_chart' / 'email', or "
+               "another PROCESIO 'icon-*' name) so the action is recognizable in the "
+               "toolbar; the valid vocabulary is the `icon` field of existing actions "
+               "in GET /api/Actions.")
+        log(msg)
+        warnings.append(msg)
     resp = client.request_multipart(
         "/api/actions",
         files={"package": (filename, data, "application/x-compressed")},
-        headers={"name": action_name, "path": args.icon_path or ""})
+        headers={"name": action_name, "path": icon})
     action_id = resp.get("id") if isinstance(resp, dict) else None
-    return {"uploaded": True, "id": action_id, "name": filename,
-            "actionName": action_name, "bytes": len(data)}
+    out = {"uploaded": True, "id": action_id, "name": filename,
+           "actionName": action_name, "iconPath": icon, "bytes": len(data)}
+    if warnings:
+        out["warnings"] = warnings
+    return out
 
 
 def delete_customaction(client, args) -> dict:
@@ -94,7 +116,10 @@ def _upload_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--action-name",
                    help="display name shown in the designer (sent as the 'name' header; "
                         "default: the package filename without its extension)")
-    p.add_argument("--icon-path", help="icon path for the action (sent as the 'path' header)")
+    p.add_argument("--icon-path",
+                   help="toolbar icon (sent as the 'path' header): a Material name "
+                        "(e.g. description, table_chart, email) or a PROCESIO 'icon-*' "
+                        "name. Defaults to 'icon-custom-action' with a warning if omitted.")
 
 
 def _delete_args(p: argparse.ArgumentParser) -> None:

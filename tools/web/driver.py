@@ -88,7 +88,9 @@ class BrowserDriver(Protocol):
 
     def screenshot(self, path: str, *, full_page: bool = True) -> str: ...
 
-    def render_pdf(self, html: str, path: str, *, fmt: str = "A4") -> str: ...
+    def render_pdf(self, html: str, path: str, *, fmt: str = "A4",
+                   width: str | None = None, height: str | None = None,
+                   margin: str | None = None) -> str: ...
 
     def current_url(self) -> str: ...
 
@@ -757,19 +759,36 @@ class PlaywrightDriver:
         except Exception as exc:  # noqa: BLE001
             raise _wrap(exc, {"path": path})
 
-    def render_pdf(self, html: str, path: str, *, fmt: str = "A4") -> str:
+    def render_pdf(self, html: str, path: str, *, fmt: str = "A4",
+                   width: str | None = None, height: str | None = None,
+                   margin: str | None = None) -> str:
         """Render an HTML string to a PDF file via Chromium's print engine.
 
         ``page.pdf()`` is Chromium/headless-only (the driver's default); it lays
         the HTML out with print CSS and writes ``path``. Used for deterministic
         document generation (e.g. reconstructing an invoice) with no live site.
+
+        ``width`` + ``height`` (CSS lengths such as ``"1000mm"``) set a custom
+        page size and take precedence over ``fmt`` - large-format print (a
+        roll-up, a poster) needs an exact sheet, not a paper name. ``margin``
+        (one CSS length, all four sides; ``"0"`` for full-bleed artwork)
+        replaces the default document margins.
         """
         try:
             self.page.set_content(html, wait_until="load")
-            self.page.pdf(
-                path=path, format=fmt, print_background=True,
-                margin={"top": "12mm", "bottom": "14mm", "left": "12mm", "right": "12mm"},
-            )
+            # Web fonts may still be decoding after "load"; printing before they
+            # are ready silently falls back to a system font.
+            self.page.evaluate("document.fonts.ready.then(() => true)")
+            opts = {"path": path, "print_background": True}
+            if width and height:
+                opts.update(width=width, height=height)
+            else:
+                opts["format"] = fmt
+            if margin is None:
+                opts["margin"] = {"top": "12mm", "bottom": "14mm", "left": "12mm", "right": "12mm"}
+            else:
+                opts["margin"] = {"top": margin, "bottom": margin, "left": margin, "right": margin}
+            self.page.pdf(**opts)
             return path
         except Exception as exc:  # noqa: BLE001
             raise _wrap(exc, {"path": path})
