@@ -175,6 +175,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `revise` | `--build-id` | Re-open a COMPLETED build to the generate pause for a small fix (then regenerate-file + approve-generate); bumps the version. |
 | `revise-plan` | `--build-id`, `--feedback` | Revise the plan with free-text feedback. |
 
 ### revoke

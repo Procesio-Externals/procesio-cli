@@ -160,6 +160,10 @@ def reset(client, args) -> dict:
     return client.post(f"/builds/{args.build_id}/reset")
 
 
+def revise(client, args) -> dict:
+    return client.post(f"/builds/{args.build_id}/revise")
+
+
 def set_version(client, args) -> dict:
     return client.patch(
         f"/builds/{args.build_id}/version",
@@ -375,6 +379,8 @@ ACTIONS: dict[str, ActionDef] = {
                                 description="Jump the build to a target step/status."),
     "reset": ActionDef(reset, _build_id_only,
                        description="Reset a failed/clarifying/planning build to pending."),
+    "revise": ActionDef(revise, _build_id_only,
+                        description="Re-open a COMPLETED build to the generate pause for a small fix (then regenerate-file + approve-generate); bumps the version."),
     "set-version": ActionDef(set_version, _set_version_args,
                              description="Set Major.Minor.Patch (at Plan/waiting_user)."),
     "archive": ActionDef(archive, _build_id_only, description="Archive a build (admin)."),
