@@ -1704,13 +1704,19 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    returns a `warnings` entry; pass a relevant icon. Discover valid names from the
    `icon` field of existing actions in `GET /api/Actions`.
 
-   **The upload does NOT stamp `createdOn`/`updatedOn`** on the new action template,
-   so a custom action's date shows as `0001-01-01T00:00:00` (.NET `DateTime.MinValue`)
-   in the designer - built-in actions carry a real `updatedOn`, so the gap is the
-   `POST /api/actions` registration path specifically. This is a BACKEND bug: it hits
-   ANY custom action (the designer's "Create custom action" uses the same endpoint),
-   it is NOT caused by the `.nupkg` or the source, and there is NO action-template
-   PUT/PATCH to correct the date afterward - only the BE can stamp it at registration. The icon likewise comes from the `path` header, not
+   **A custom action registered via `POST /api/actions` is stored with
+   `createdOn`/`updatedOn` = `0001-01-01T00:00:00` (.NET `DateTime.MinValue`) and
+   shows "created on year 1" in the designer.** This is a BACKEND bug, confirmed with
+   a designer HAR: the UI's upload is BYTE-IDENTICAL to the CLI's (multipart `package`
+   + `name`/`path`/`workspaceid` headers, no date field), and the UI-uploaded action
+   comes back with the SAME `updatedOn=0001-01-01`, `createdOn=null` - so it is NOT
+   client-controllable (UI and CLI send the same request). Tellingly the registration
+   DOES set `createdById`/`updatedById` (a real user id) but leaves the matching `*On`
+   dates unset; built-in actions carry a real `updatedOn`. Nothing on our side fixes
+   it (date as headers and as multipart form fields are both ignored; the `.nupkg`
+   entry timestamps are ignored; there is no action-template PUT/PATCH). The fix is
+   BE: stamp `createdOn`/`updatedOn = UtcNow` on custom-action registration, next to
+   where it already sets `createdById`/`updatedById`. The icon likewise comes from the `path` header, not
    the package: `--icon-path` takes a Material icon name (e.g. `assignment`,
    `description`, `insert_drive_file`, `text_snippet`) or a PROCESIO `icon-*` name
    (e.g. `icon-html`, `icon-pdf`). Omit it and the action shows no icon. Discover valid
