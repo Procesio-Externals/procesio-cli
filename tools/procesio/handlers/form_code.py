@@ -29,7 +29,7 @@ from __future__ import annotations
 import argparse
 
 from tools.procesio.actiondef import ActionDef
-from tools.procesio.errors import UsageError
+from tools.procesio.errors import NotPersisted, UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
 
 # Top-level DTO keys PUT /api/FormTemplate expects (PascalCase), mapped from the
@@ -203,7 +203,34 @@ def set_code(client, args) -> dict:
     data = dict(form["data"])
     data["code"] = blob
     client.put("/api/FormTemplate", build_put_body(form, data=data))
-    return {"updated": True, "concurrency": guard, **result}
+    verified = _verify_persisted(client, args.id, key, css, js, previous)
+    return {"updated": True, "verified": verified, "concurrency": guard, **result}
+
+
+# Seen live (2026-10-18, Internal-PROD): POST /api/FormTemplate, PUT /api/FormTemplate and
+# .../duplicate all answered 2xx while dropping Data entirely: a new form or a duplicate came back
+# with data: null, and an update moved updatedOn but left every Data field (code, browserTitle)
+# as it was. A 2xx alone therefore proves nothing about a form write; read it back.
+def _verify_persisted(client, form_id: str, key: str, css: str, js: str, previous: dict):
+    """Read the form back and compare. True = stored as sent; None = the read-back was not a
+    form payload (cannot tell); raises NotPersisted when the server kept something else."""
+    try:
+        after = _fetch(client, form_id)
+    except UsageError:
+        return None
+    got = _decode(after["data"].get("code") or "", key)
+    if got["CSS"] == css and got["JAVASCRIPT"] == js:
+        return True
+    kept_previous = got["CSS"] == previous["CSS"] and got["JAVASCRIPT"] == previous["JAVASCRIPT"]
+    raise NotPersisted(
+        "the PUT was accepted but the form still holds "
+        + ("its PREVIOUS code. " if kept_previous else "different code. ")
+        + ("PROCESIO has been seen accepting form writes while dropping Data altogether: create a tiny "
+           "test form and read it back - data: null there means the platform is not storing form "
+           "content, and no retry will help. Otherwise another editor saved the form at the same time."),
+        {"sent_bytes": len(css.encode("utf-8")) + len(js.encode("utf-8")),
+         "stored_bytes": len(got["CSS"].encode("utf-8")) + len(got["JAVASCRIPT"].encode("utf-8")),
+         "kept_previous": kept_previous})
 
 
 def _get_args(p: argparse.ArgumentParser) -> None:
@@ -236,7 +263,9 @@ ACTIONS = {
     "form-set-code": ActionDef(
         func=set_code, add_args=_set_args, needs_client=True,
         description="Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; "
-                    "omitted side is preserved; returns the previous code). --clear removes the code "
+                    "omitted side is preserved; returns the previous code). Reads the form back after the "
+                    "write and fails with not_persisted if the server kept other code (PROCESIO has been seen "
+                    "answering 2xx while dropping the form's Data). --clear removes the code "
                     "entirely WITHOUT decrypting it, which is the only repair for a blob the stored "
                     "form-code-key cannot open."),
 }

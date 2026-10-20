@@ -442,7 +442,7 @@ actions:
     required: false
     description: list the full catalog (built-in + custom); default is custom only
 - name: customaction-test
-  description: Test a custom action (POST /api/Actions/test).
+  description: Run a single action in TEST mode and return its resolved result (--action + --values builds the request from the catalog, incl. a workspace custom action; or pass --body). Polls GET /api/Actions/test/{id}; returns status, errorMessage and testResult.
   args:
   - name: profile
     type: string
@@ -464,6 +464,22 @@ actions:
     type: string
     required: false
     description: path to the request JSON
+  - name: action
+    type: string
+    required: false
+    description: action to test by name or template id (built-in or a workspace custom action); the request is built from the catalog
+  - name: values
+    type: string
+    required: false
+    description: 'input values as a JSON object {property label or id: value}'
+  - name: values-file
+    type: string
+    required: false
+    description: path to the input-values JSON
+  - name: timeout
+    type: integer
+    required: false
+    description: seconds to poll for the result (default 60)
 - name: customaction-upload
   description: Install a custom action from a .nupkg package (POST /api/actions multipart).
   args:
@@ -2978,7 +2994,7 @@ actions:
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
 - name: form-set-code
-  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open.'
+  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back after the write and fails with not_persisted if the server kept other code (PROCESIO has been seen answering 2xx while dropping the form''s Data). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open.'
   args:
   - name: profile
     type: string
@@ -9144,7 +9160,7 @@ actions:
         customResponse:
           description: 'synchronous webhook response: {var: <process var name>} returns that variable''s value to the caller (or {value: literal})'
         relayout:
-          description: 'canvas re-tidy scope on EDIT (create always lays out fully). One of: "all" | "none" | "new" | [actionId,...] | {new:bool, actions:[...], edited:[...]}. Default on edit: place NEW actions only, leave existing actions where they are.'
+          description: 'canvas re-tidy scope on EDIT (create always lays out fully). One of: "all" | "none" | "new" | [actionId,...] | {new:bool, actions:[...], edited:[...]}. Default on edit: re-arrange the WHOLE canvas (classic engine + clustering), exactly like a create. "new" (or process-edit --keep-layout, or PROCESIO_KEEP_LAYOUT=1) keeps existing positions and places only new actions, for a hand-arranged canvas.'
         _webhooks:
           type: array
           description: 'internal: WebhookInstanceDto[] passthrough'
@@ -9559,6 +9575,10 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  - name: keep-layout
+    type: boolean
+    required: false
+    description: 'keep the current canvas positions and place only new actions (default: re-arrange the whole canvas, classic engine + clustering, exactly as process-create does)'
   examples: *id010
 - name: process-fe-validate
   description: 'Front-end (designer-layer) ''Process Errors'' validation on a live process — the client-side check that BLOCKS designer Save but which POST /api/Projects/validate does NOT catch: unconnected actions, missing Start/Stop, empty node names, required-empty fields, leftover placeholders, bad number/integer values, out-of-range limits, duplicate/primitive-named variables, and unmapped required subprocess inputs. clean=true when no blocking errors. Data-type mismatches are reported as (non-blocking) warnings. This same check auto-runs before every process-create / process-edit. Add --include-be for the BE layer.'

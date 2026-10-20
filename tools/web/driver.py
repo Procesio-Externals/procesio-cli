@@ -97,6 +97,31 @@ class BrowserDriver(Protocol):
     def add_cookies(self, cookies: list) -> None: ...
 
 
+_PERSISTENT_STORAGE_JS = r"""
+(() => {
+  try {
+    const sm = navigator.storage;
+    if (sm) {
+      sm.persist = () => Promise.resolve(true);
+      sm.persisted = () => Promise.resolve(true);
+    }
+    const sb = navigator.storageBuckets;
+    if (sb && sb.open) {
+      const open = sb.open.bind(sb);
+      sb.open = async (name, opts) => {
+        const bucket = await open(name, Object.assign({}, opts || {}, { persisted: false }));
+        try {
+          bucket.persist = () => Promise.resolve(true);
+          bucket.persisted = () => Promise.resolve(true);
+        } catch (e) {}
+        return bucket;
+      };
+    }
+  } catch (e) {}
+})();
+"""
+
+
 class PlaywrightDriver:
     """Production ``BrowserDriver`` backed by Playwright's sync API.
 
@@ -247,6 +272,20 @@ class PlaywrightDriver:
             self._context.add_init_script(
                 "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
             )
+        except Exception:  # noqa: BLE001 - best-effort hardening
+            pass
+        # Persistent storage. Automated Chromium answers navigator.storage.persist() and a
+        # persisted Storage Bucket with "denied", and WhatsApp Web (since 2026-10) halts on
+        # its loading splash with "[storage] storage bucket persistence denied
+        # (aquire-persistent-storage-denied)". Grant the real permission over CDP, and make
+        # the page-side checks agree for engines where the grant is not honoured.
+        try:
+            cdp = self._context.new_cdp_session(self._page)
+            cdp.send("Browser.grantPermissions", {"permissions": ["durableStorage"]})
+        except Exception:  # noqa: BLE001 - best-effort hardening
+            pass
+        try:
+            self._context.add_init_script(_PERSISTENT_STORAGE_JS)
         except Exception:  # noqa: BLE001 - best-effort hardening
             pass
         try:

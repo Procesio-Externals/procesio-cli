@@ -79,6 +79,17 @@ class DeadlineExceeded(Exception):
         self.elapsed_s = elapsed_s
 
 
+class NotPersisted(Exception):
+    """A write returned 2xx but a read-back shows the server kept the OLD value. PROCESIO does
+    this silently in places (a FormTemplate write that drops Data: the PUT succeeds, updatedOn
+    moves, the previous content stays). Maps to 'not_persisted', exit code 1. Carries what was
+    sent vs what is stored."""
+
+    def __init__(self, message: str, details: dict | None = None):
+        super().__init__(message)
+        self.details = details or {}
+
+
 _HTTP_CODES = {
     400: ("invalid_argument", "bad request - check the parameters/body"),
     401: ("auth_required", "authentication failed - token or api-key rejected"),
@@ -135,6 +146,8 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
         return "invalid_argument", str(exc), {}, 2
     if isinstance(exc, ValidationBlocked):
         return "validation_failed", str(exc), exc.report, 2
+    if isinstance(exc, NotPersisted):
+        return "not_persisted", str(exc), exc.details, 1
     if isinstance(exc, RemovalBlocked):
         return "removal_blocked", str(exc), exc.removed, 2
     if isinstance(exc, DeadlineExceeded):

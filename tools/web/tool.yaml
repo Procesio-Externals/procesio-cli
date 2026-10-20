@@ -136,6 +136,19 @@ actions:
       - {name: no-self-contained, type: boolean, default: false, description: "Skip the stylesheet-inlined copy (original + extraction only)"}
     output_schema: '{ "name": "...", "dir": "...", "url": "...", "final_url": "...", "status": 200, "kind": "html|pdf", "title": "...", "fetched_at": "...", "bytes": 0, "stylesheets_inlined": 0, "chars_extracted": 0, "document_date_candidates": [{"date": "...", "context": "..."}], "files": {"original": "...", "self_contained": "...", "extraction": "..."}, "sha256": {"original": "...", "self_contained": "...", "extraction": "..."} }'
 
+  - name: page-contacts
+    description: >
+      The contact details a PUBLIC page publishes, read with one plain HTTP GET (no
+      browser, no session, nothing clicked): emails from mailto links and visible
+      text (including "name [at] domain [dot] com"), profile links grouped by
+      platform (linkedin, x, youtube, instagram, ...), link-in-bio pages, and
+      affiliate-shaped links. Meant for link-in-bio pages and personal sites. A
+      4xx/5xx page returns reachable=false instead of an error.
+    args:
+      - {name: url, type: string, required: true, description: "Public page to read (link-in-bio, personal site)"}
+      - {name: timeout, type: integer, default: 20, description: "Request timeout in seconds"}
+    output_schema: '{ "url": "...", "final_url": "...", "status": 200, "content_type": "...", "reachable": true, "title": "...", "emails": ["..."], "links": {"linkedin": [], "x": [], "website": [], "link_in_bio": [], "...": []}, "affiliate_links": [ {url, host, network, program, param} ] }'
+
   - name: render-pdf
     description: "Render an HTML string/file to a PDF (session-less, headless Chromium page.pdf)."
     args:

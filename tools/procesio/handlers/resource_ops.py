@@ -99,11 +99,133 @@ def credential_test(client, args) -> dict:
 
 
 def customaction_test(client, args) -> dict:
-    """Test a custom action (POST /api/Actions/test). --body is the DetailedTestAction
-    request {variables, gid, testValues, action, connectionId}."""
-    body = parse_json_arg(args.body, "body") if args.body else \
-        json.loads(Path(args.body_file).read_text(encoding="utf-8"))
-    return {"result": client.post("/api/Actions/test", body)}
+    """Run a single action in TEST mode and return its resolved result.
+
+    Two ways to say what to test:
+      --body / --body-file : a full DetailedTestAction request (power users).
+      --action + --values  : friendly - the request is built from the live catalog
+                             (a built-in action OR any custom action in the
+                             workspace), binding each supplied input and every
+                             output to a fresh test variable, exactly as the
+                             designer's side-panel "Test" does.
+
+    `POST /api/Actions/test` only STARTS the test and hands back a server-assigned
+    test id; the result is produced asynchronously (the designer receives it over
+    SignalR). This polls `GET /api/Actions/test/{id}` until it resolves and returns
+    `{status, errorMessage, errorCode, testResult, variables}`. `testResult` maps
+    each OUTPUT variable id to the value the action produced; `errorMessage` carries
+    the action's exception text when it failed."""
+    timeout = getattr(args, "timeout", None) or 60
+    if args.body or args.body_file:
+        body = parse_json_arg(args.body, "body") if args.body else \
+            json.loads(Path(args.body_file).read_text(encoding="utf-8"))
+    else:
+        if not getattr(args, "action", None):
+            raise UsageError("provide --body/--body-file, or --action (+ --values)")
+        values = {}
+        if getattr(args, "values", None):
+            values = parse_json_arg(args.values, "values")
+        elif getattr(args, "values_file", None):
+            values = json.loads(Path(args.values_file).read_text(encoding="utf-8"))
+        body = _build_test_request(client, args.action, values)
+    return _run_test_action(client, body, timeout)
+
+
+def _build_test_request(client, action_ref, values) -> dict:
+    """Build a DetailedTestAction request from the live catalog. Each supplied input
+    value and every output is bound to a fresh test variable (VariableDto Type 10
+    for input, 30 for output), mirroring what the designer sends."""
+    import uuid
+    from tools.procesio.dto.process import builder as pb
+
+    # Catalog = bundled built-ins + the workspace's custom actions (fast, scoped
+    # fetch). This is what lets --action name ANY custom action in the workspace.
+    try:
+        rc = pb._fetch_custom_actions(client)
+        custom = (rc.get("actions") if isinstance(rc, dict) else rc) or []
+    except Exception:  # noqa: BLE001 - built-ins still resolve from the bundled catalog
+        custom = []
+    ctx = {"catalog": pb.catalog_index(extra=list(custom))}
+    template = pb._resolve_template(str(action_ref), ctx)
+    gtid = template.get("actionId") or template.get("id")
+
+    props = pb._property_index(template)
+    by_id = {}
+    for prop in props.values():
+        pid = prop.get("id")
+        if pid:
+            by_id[pid] = prop
+
+    # map each supplied value (by label or id) to a property id
+    want = {}
+    for key, val in (values or {}).items():
+        prop = props.get(str(key).strip().lower()) or by_id.get(str(key))
+        if not prop:
+            raise UsageError(
+                f"test value {key!r} does not match any property of {action_ref!r}")
+        want[prop["id"]] = val
+
+    variables, parameters, test_values = [], [], []
+    counter = 0
+    for pid, prop in by_id.items():
+        direction = prop.get("direction")
+        dtid = prop.get("dataTypeId")
+        name = prop.get("label") or pid
+        if direction == 1:            # input: only bind what the caller supplied
+            if pid not in want:
+                continue
+            vid = str(uuid.uuid4())
+            variables.append({"Id": vid, "DataType": dtid, "Type": 10, "Name": name,
+                              "IsList": False, "IsError": False, "IsRequired": False})
+            parameters.append({"TabPropertyId": pid, "Value": f"<%{counter}%>",
+                               "Variable": [{"id": counter, "variableId": vid, "attribute": None}]})
+            test_values.append({"VariableId": vid, "Value": want[pid], "Attribute": None})
+            counter += 1
+        elif direction == 3:          # output: bind so its value comes back in testResult
+            vid = str(uuid.uuid4())
+            variables.append({"Id": vid, "DataType": dtid, "Type": 30, "Name": name,
+                              "IsList": False, "IsError": False, "IsRequired": False})
+            parameters.append({"TabPropertyId": pid, "Value": f"<%{counter}%>",
+                               "Variable": [{"id": counter, "variableId": vid, "attribute": None}]})
+            counter += 1
+
+    return {"variables": variables, "Gid": str(uuid.uuid4()),
+            "Action": {"gtid": gtid, "parameters": parameters},
+            "TestValues": test_values, "ConnectionId": None}
+
+
+def _run_test_action(client, body, timeout) -> dict:
+    """POST the test, then poll GET /api/Actions/test/{id} until it resolves."""
+    import time
+    started = client.post("/api/Actions/test", body,
+                          read_timeout=min(int(timeout), 60) + 30, deadline=None)
+    inst = started.get("testActionInstance") if isinstance(started, dict) else None
+    gid = (inst or {}).get("gid") if isinstance(inst, dict) else None
+    if not gid:                       # fall back to the request Gid if the shape differs
+        gid = (body or {}).get("Gid")
+    deadline = time.monotonic() + timeout
+    last = None
+    while time.monotonic() < deadline:
+        time.sleep(3)
+        try:
+            g = client.get(f"/api/Actions/test/{gid}")
+        except Exception:  # noqa: BLE001 - not ready yet (the result row 500s until written)
+            continue
+        last = g
+        # Test-action terminal codes: 40 = done (result in testResult), 90 = failed
+        # (errorMessage set); 50 is accepted defensively. errorMessage also ends it.
+        if isinstance(g, dict) and (g.get("status") in (40, 50, 90) or g.get("errorMessage")):
+            break
+    result = last if isinstance(last, dict) else {}
+    tr = result.get("testResult")
+    if isinstance(tr, str):
+        try:
+            tr = json.loads(tr)
+        except Exception:  # noqa: BLE001 - leave it as the raw string
+            pass
+    return {"tested": True, "gid": gid, "status": result.get("status"),
+            "errorMessage": result.get("errorMessage"), "errorCode": result.get("errorCode"),
+            "testResult": tr, "variables": result.get("variables")}
 
 
 def webhook_launch(client, args) -> dict:
@@ -191,7 +313,16 @@ def _cred_test_args(p: argparse.ArgumentParser) -> None:
 
 def _ca_test_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
-    p.add_argument("--body", help="DetailedTestAction request as a JSON object")
+    p.add_argument("--action",
+                   help="action to test, by name or template id (built-in or a "
+                        "workspace custom action); the request is built from the catalog")
+    p.add_argument("--values",
+                   help="input values as a JSON object {property label or id: value}")
+    p.add_argument("--values-file", dest="values_file",
+                   help="path to the input-values JSON")
+    p.add_argument("--timeout", type=int, default=60,
+                   help="seconds to poll for the result (default 60)")
+    p.add_argument("--body", help="full DetailedTestAction request as a JSON object")
     p.add_argument("--body-file", dest="body_file", help="path to the request JSON")
 
 

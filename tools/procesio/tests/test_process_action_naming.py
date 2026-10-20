@@ -151,3 +151,20 @@ def test_ai_decisional_branch_named_from_condition():
     ai = _template(dto, "AI Decisional")
     names = [c["name"] for c in _cases_config(ai, "ai-decisional-case")]
     assert names == ["bear", "Is it a fish?"]              # explicit wins, else condition
+
+
+def test_query_store_named_after_its_store_and_verb():
+    d = naming.derive_action_name
+    assert d({"queryStore": {"sql": "SELECT * FROM {{ds:OMN Units}}"}}, "Query Store") == "Read OMN Units"
+    assert d({"queryStore": {"sql": "REPLACE INTO {{ds:Leads}} (a) VALUES (1)"}}, "Query Store") == "Save to Leads"
+    assert d({"queryStore": {"sql": "UPDATE {{ds:Settings}} SET v = 1"}}, "Query Store") == "Update Settings"
+    assert d({"queryStore": {"sql": "DELETE FROM {{ds:Events}} WHERE 1"}}, "Query Store") == "Delete from Events"
+    assert d({"queryStore": {"sql": "SELECT a FROM {{ds:A}} JOIN {{ds:B}} ON 1"}}, "Query Store") == "Read A + 1 more"
+
+
+def test_node_named_from_template_comment_or_its_output():
+    d = naming.derive_action_name
+    tpl = {"Code": {"template": "// score the visitor\nreturn 1;", "vars": ["x"]}}
+    assert d({"params": tpl}, "Node") == "score the visitor"
+    out = {"Code": {"template": "const a = 1;", "vars": []}, "Single Result": {"var": "catalogueJson"}}
+    assert d({"params": out}, "Node") == "Compute catalogueJson"

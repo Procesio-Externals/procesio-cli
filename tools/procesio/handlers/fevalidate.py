@@ -180,7 +180,20 @@ ACTIONS = {
 
 # -- saving a fetched flow ----------------------------------------------------
 
-def save_flow(client, flow: dict, *, flow_id: str, valid: bool) -> dict:
+def arrange(flow: dict) -> tuple[dict, str]:
+    """The flow laid out with the default arrangement (classic engine + clustering).
+
+    Returns (flow, note). Layout only moves positions and frame sizes; if it fails on an
+    unusual graph the save goes ahead with the canvas as it was, and the note says so."""
+    from tools.procesio.layout import adapter
+    try:
+        res = adapter.layout_flow(flow, cluster=True)
+        return res["bundle"], "arranged"
+    except Exception as e:  # noqa: BLE001 - a layout problem must never block a save
+        return flow, f"not arranged ({type(e).__name__}: {e})"
+
+
+def save_flow(client, flow: dict, *, flow_id: str, valid: bool, layout: bool | None = None) -> dict:
     """PUT a flow with its validity mark stamped to `valid`, and report what the server KEPT.
 
     Two measured facts about the platform put this in one place rather than a bare PUT at
@@ -203,8 +216,14 @@ def save_flow(client, flow: dict, *, flow_id: str, valid: bool) -> dict:
     the PUT already landed, so failing the whole call here would misreport a save that
     succeeded.
     """
+    if layout is None:   # default: arrange on every save; PROCESIO_KEEP_LAYOUT=1 opts out
+        from tools.procesio.dto.process.builder import keep_layout_requested
+        layout = not keep_layout_requested()
+    note = "kept"
+    if layout:
+        flow, note = arrange(flow)
     flow["isValid"] = bool(valid)
-    out: dict = {"stamped": bool(valid)}
+    out: dict = {"stamped": bool(valid), "layout": note}
     client.put("/api/Projects", flow)
     try:
         stored = client.get(f"/api/Projects/{flow_id}")

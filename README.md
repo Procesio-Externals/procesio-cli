@@ -348,7 +348,7 @@ action is required; `--help` lists the actions a tool exposes.
 | `connector-builder` | 54 | Turns API documentation into a compiled PROCESIO custom action. Custom actions are the platform's main extension point, so this is the shortest route from a third-party API to something a process can call. |
 | `mysql` | 9 | Query the MySQL database a SQL action talks to, to see what a process actually wrote. |
 | `sqlserver` | 9 | The same, for SQL Server. |
-| `web` | 8 | Drive a real browser: render, click, fill, screenshot, read runtime diagnostics. |
+| `web` | 9 | Drive a real browser: render, click, fill, screenshot, read runtime diagnostics. |
 | `xlsx` | 3 | Read a workbook outside a process. PROCESIO's Node allowlist ships no xlsx library. |
 | `framework-map` | 2 | Render everything installed as one bilingual page: `python scripts/run-tool.py framework-map build`. |
 

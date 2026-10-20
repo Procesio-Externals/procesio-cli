@@ -32,7 +32,7 @@
       }
     },
     "customResponse": {"description": "synchronous webhook response: {var: <process var name>} returns that variable's value to the caller (or {value: literal})"},
-    "relayout": {"description": "canvas re-tidy scope on EDIT (create always lays out fully). One of: \"all\" | \"none\" | \"new\" | [actionId,...] | {new:bool, actions:[...], edited:[...]}. Default on edit: place NEW actions only, leave existing actions where they are."},
+    "relayout": {"description": "canvas re-tidy scope on EDIT (create always lays out fully). One of: \"all\" | \"none\" | \"new\" | [actionId,...] | {new:bool, actions:[...], edited:[...]}. Default on edit: re-arrange the WHOLE canvas (classic engine + clustering), exactly like a create. \"new\" (or process-edit --keep-layout, or PROCESIO_KEEP_LAYOUT=1) keeps existing positions and places only new actions, for a hand-arranged canvas."},
     "_webhooks": {"type": "array", "description": "internal: WebhookInstanceDto[] passthrough"},
     "_customResponse": {"description": "internal: CustomResponseDto"}
   },

@@ -1325,6 +1325,35 @@ built DTO would break. The live fetch exists only to pick up custom/connector
 actions; a flow built purely from stock actions is served correctly by the bundled
 catalog alone.
 
+**The client's HTTP knobs are `read_timeout=` and `deadline=`, NEVER `timeout=`.**
+`ProcesioClient.request()` (and `.get/.post/...`) take `read_timeout` (per-socket
+read) and `deadline` (TOTAL wall-clock; class-aware default ~90s GET / ~180s write;
+raises `DeadlineExceeded`). There is no `timeout` parameter, so passing `timeout=`
+raises `TypeError: request() got an unexpected keyword argument 'timeout'` on the
+FIRST call, before any HTTP. This bit the DTO builder's catalog fetch SILENTLY:
+`prepare_ctx` wraps the live-catalog call in `except Exception` and falls back to the
+bundled (built-in-only) catalog, so a `timeout=` typo there meant the live fetch
+ALWAYS raised and custom/connector actions NEVER loaded. The only symptom was
+`process-create` / `process-edit` failing with `unknown action '<name>' - not in the
+action catalog` for every connector (by name AND by actionId). When a build cannot
+see a custom action, suspect the fetch raised (wrong kwarg, auth, or scope) before
+suspecting the endpoint.
+
+**Custom/connector actions are merged into the build catalog from a SEPARATE, narrow
+fetch - not just the full catalog.** `prepare_ctx` fetches two live sources
+independently: the full `GET /api/Actions?getFullAction=true` (built-ins + custom,
+slow) AND the scoped `GET /api/Actions/node?getFullAction=true&isCustom=true` (only
+the workspace's connectors, small and fast). The scoped result is merged in
+UNCONDITIONALLY, so ANY custom action installed in the workspace resolves by name or
+actionId with no per-action code, even when the full fetch is slow or omits it. Both
+calls are scoped by the `workspaceid` header, so a `process-create` that references a
+connector MUST pass `--workspace-id <the workspace that holds the connector>` or the
+action will not be found. A workspace's custom actions are, by their nature,
+undocumented, so when a request might map to one, DISCOVER what the workspace has with
+`customaction-list --workspace-id <ws>` (name + ports + id) and use it in the process;
+`process-create`/`-edit` and `customaction-test` all resolve those actions
+automatically through this same merged catalog.
+
 **A killed shell does not kill the tool's Python child.** Wrapping a long PROCESIO
 call in a shell timeout leaves the worker running against the API; several
 abandoned workers then compete for the same session. Check for and reap orphans
@@ -1568,6 +1597,13 @@ Live example: `social_media/Set Decision`'s `editedCopy` (multi-line captions wi
   header, empty body). `Response File` turns the body into a File var (works with Drive
   `files/{id}?alt=media` for real binaries — do NOT use the public thumbnail endpoint from code;
   it 302s into HTML error pages for non-browser clients).
+- **`Response File` cannot capture a CHUNKED binary response.** An API that streams its audio/binary
+  with `Transfer-Encoding: chunked` and no `Content-Length` (OpenAI `POST /v1/audio/speech` does, for
+  every `response_format`) fails the node with `File upload failed for file.<ext>`, and the same call
+  with `Response Body` instead returns HTTP 200 and an EMPTY body. It is not the format or the file
+  name: wav and mp3 both fail, while Drive `alt=media` (sized response) works. Workaround: call such an
+  endpoint outside the process (a local script or a custom action that buffers the stream), or use a
+  provider endpoint that returns base64 in JSON. (Seen 2026-10-18 voicing a property video.)
 - **Path parameters containing URNs must be pre-encoded** (`encodeURIComponent` in a Node) before
   endpoint injection — raw `urn:li:...` colons in the path 400.
 - **LinkedIn REST versioning:** `LinkedIn-Version` header is REQUIRED (YYYYMM); an inactive version
@@ -1660,7 +1696,12 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    `Tooltip`, `Shape`, `Classification` and `IsTestable` DO come from the decorator —
    only the name is header-driven, which is why the omission looks like a package bug.
    `customaction-upload` now always sends a name (`--action-name`, defaulting to the
-   package stem) and `--icon-path`.
+   package stem) and `--icon-path`. The icon likewise comes from the `path` header, not
+   the package: `--icon-path` takes a Material icon name (e.g. `assignment`,
+   `description`, `insert_drive_file`, `text_snippet`) or a PROCESIO `icon-*` name
+   (e.g. `icon-html`, `icon-pdf`). Omit it and the action shows no icon. Discover valid
+   names from the `icon` field of existing actions in `GET /api/Actions` — that is the
+   exact vocabulary the designer's icon picker accepts.
 
 2. **A failed upload still burns the version.** Package validation runs AFTER the
    package is pushed to the internal NuGet repository, so a rejected upload leaves that
@@ -1690,12 +1731,22 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    empty. Actions that null-check the manager or client will pass the guard and then
    fail deep in the HTTP layer with `Invalid URL: <relative path>`. Check `Host`.
 
-6. **`POST /api/Actions/test` (the side-panel test) returns its result over SignalR**,
-   not in the HTTP response — it takes a `ConnectionId`. For headless verification,
-   build a real process and run it with `run-process --synchronous`, which returns
-   `{instanceId, status, variable, error}` directly. `status` 50 = finished, 40 =
-   error, and `error[].errorMessage` carries the action's exception text verbatim —
-   which makes it the practical oracle for testing an action's guards.
+6. **`POST /api/Actions/test` (the side-panel test) delivers its result ASYNCHRONOUSLY**
+   — over SignalR to the designer, OR via a polling GET for a headless caller. The
+   POST only STARTS the test and returns `{testActionInstance: {gid}}` with a
+   SERVER-assigned gid (NOT the `Gid` you send). Poll `GET /api/Actions/test/{that
+   gid}` until a terminal status: **40 = finished (outputs in `testResult`), 90 =
+   failed (`errorMessage` = the exception, `errorCode` the code, outputs null)**; the
+   result row 500s until it is written, so treat a 500 as "not ready, keep polling".
+   `testResult` is a JSON string mapping each OUTPUT variable id to its value. The
+   request mirrors a process node: declare a VariableDto per input/output (Type 10
+   INPUT / 30 OUTPUT), bind each `Action.parameters[].TabPropertyId` to its variable
+   (`Value="<%N%>"`, `Variable=[{id:N, variableId}]`), and put the input values in
+   `TestValues` (`{VariableId, Value}`). `customaction-test --action <name|id>
+   --values '{label: value}'` builds all of that from the catalog (built-in OR a
+   workspace custom action) and polls; `--body` passes a raw DetailedTestAction.
+   Building a process and running it `run-process --synchronous` (status 50/40)
+   remains a fine end-to-end oracle too.
 
 7. **A public form URL requires a real workspace.** `POST /api/CustomUrl/FormTemplate`
    fails with statusCode **1008** ("Not working on workspace") unless the call is
@@ -5192,6 +5243,21 @@ Decode `e` before blaming the form: `datetime.fromtimestamp(e, UTC)`.
 
 **The Send Email action rejects plus-addressed recipients** (`name+tag@domain`) as "Invalid emails",
 though they are valid and route normally. Worth knowing before using one as a test address.
+Re-measured 2026-10-17 (`Invalid emails name+tag@example.com`, run status 40). The working route
+for a plus address: a `Call API` POST to SendGrid's REST `/v3/mail/send` with a REST credential
+(API key in an `Authorization: Bearer ...` header) and a Node-built JSON body
+(`personalizations[0].to[0].email`, `from` = a SendGrid-verified sender, `content[0]` text/html).
+SendGrid answers 202 and the mail arrives. Wrap it in a small sub-process (to, subject, html) and
+call it with `Trigger Subprocess` so the caller does not wait for delivery.
+
+**Copying a credential between workspaces.** `GET /api/Credentials/{id}` (tool:
+`credential-get`) returns every stored property value in clear for a user who can read it,
+including API-key values and SMTP passwords, so treat its output as a secret and never print it.
+`POST /api/Credentials` with `{properties, gtid, gtpid, type, status, name, workspaceId}` taken
+from that GET recreates the credential in another workspace (measured 2026-10-17 for a REST
+API-key credential and an SMTP one). Test a copied API key before relying on it: several old
+copies of the same provider key in different workspaces had been revoked (401) while one still
+worked.
 
 
 ## `datatype-add-attribute` on a store-backing model: reported destructive, NOT reproduced (B-048 cluster 4a)

@@ -80,12 +80,12 @@ def _form(updated_on):
 
 
 def test_set_code_proceeds_when_the_form_is_unchanged():
-    # GET (read) -> GET (guard re-read, same token) -> PUT
+    # GET (read) -> GET (guard re-read, same token) -> PUT -> GET (read-back)
     s = FakeSession(queue=[FakeResp(200, _form("T1")), FakeResp(200, _form("T1")),
                            FakeResp(200, {})])
     out = _call("form-set-code", ["--id", "F1", "--css", ".x{}"], s)
     assert out["updated"] is True and out["concurrency"] == {"checked": True, "token": "T1"}
-    assert s.calls[-1]["method"] == "PUT"
+    assert [c["method"] for c in s.calls] == ["GET", "GET", "PUT", "GET"]
 
 
 def test_set_code_aborts_when_the_form_changed_since_read():
@@ -97,12 +97,11 @@ def test_set_code_aborts_when_the_form_changed_since_read():
 
 
 def test_set_code_force_overwrites_without_re_reading():
-    # force -> no guard GET: GET (read) -> PUT
+    # force -> no guard GET: GET (read) -> PUT -> GET (read-back of what was stored)
     s = FakeSession(queue=[FakeResp(200, _form("T1")), FakeResp(200, {})])
     out = _call("form-set-code", ["--id", "F1", "--css", ".x{}", "--force"], s)
     assert out["updated"] is True and out["concurrency"]["forced"] is True
-    assert sum(1 for c in s.calls if c["method"] == "GET") == 1   # single read, no guard GET
-    assert s.calls[-1]["method"] == "PUT"
+    assert [c["method"] for c in s.calls] == ["GET", "PUT", "GET"]   # single read before the PUT, no guard GET
 
 
 # -- integration through rename-actions (the other guarded writer) ------------

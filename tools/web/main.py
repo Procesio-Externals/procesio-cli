@@ -47,10 +47,11 @@ class _Parser(argparse.ArgumentParser):
 
 def collect_actions() -> dict[str, ActionDef]:
     actions: dict[str, ActionDef] = {}
-    from tools.web.handlers import archive, browse, sessmgmt
+    from tools.web.handlers import archive, browse, contacts, sessmgmt
     actions.update(sessmgmt.ACTIONS)
     actions.update(browse.ACTIONS)
     actions.update(archive.ACTIONS)
+    actions.update(contacts.ACTIONS)
     return actions
 
 

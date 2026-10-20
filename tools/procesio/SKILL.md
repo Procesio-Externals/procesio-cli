@@ -62,7 +62,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 |---|---|---|
 | `customaction-delete` | `--id` | Uninstall a custom action (DELETE /api/actions/{id}). |
 | `customaction-list` | — | List the workspace's custom actions (--all for the full catalog). |
-| `customaction-test` | — | Test a custom action (POST /api/Actions/test). |
+| `customaction-test` | — | Run a single action in TEST mode and return its resolved result (--action + --values builds the request from the catalog, incl. a workspace custom action; or… |
 | `customaction-upload` | `--file` | Install a custom action from a .nupkg package (POST /api/actions multipart). |
 
 ### datastore
@@ -188,7 +188,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (id or name). |
 | `form-get-element-events` | `--id`, `--element` | List one element's event handlers, by trigger. |
 | `form-list` | — | List forms (GET /api/FormTemplate/all/basic). |
-| `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). --clear removes the… |
+| `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back… |
 | `form-set-element-chains` | `--id` | Rewrite the ORDERED event chains of one or more elements on a live form in ONE save (surgical: only the listed element triggers change). Each chain lists its… |
 | `form-set-element-config` | `--id`, `--element` | Set one element's plain configs in place (surgical: only that element's config values change, ids preserved; returns the previous values). Event configs go… |
 | `form-set-element-event` | `--id`, `--element`, `--on`, `--action` | Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element's event config changes). In a… |

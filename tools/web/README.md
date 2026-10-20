@@ -171,6 +171,18 @@ python scripts/run-tool.py web get-text --session linkedin --url https://example
 `--selector` (optional) reads one element; without it, the whole page body.
 `--wait` (optional selector) is awaited first — handy for single-page apps.
 
+### page-contacts — published contacts on a public page (no browser)
+
+```powershell
+python scripts/run-tool.py web page-contacts --url https://linktr.ee/someone
+```
+
+One plain GET with a browser User-Agent, no session. Returns the emails (mailto
+links, visible text, `name [at] domain [dot] com`), profile links grouped by
+platform, link-in-bio pages and affiliate-shaped links, via the shared extractor
+`tools/_lib/contacts.py`. A 4xx/5xx page comes back as `reachable: false`, not an
+error. For pages that need a login or JavaScript, use `get-text` with a session.
+
 ### screenshot
 
 ```powershell
@@ -179,6 +191,21 @@ python scripts/run-tool.py web screenshot --session linkedin --url https://examp
 
 `--viewport-only` captures just the viewport (default is full page); `--wait`
 awaits a selector first.
+
+## Persistent storage is granted at start-up
+
+Automated Chromium answers `navigator.storage.persist()` and a persisted Storage Bucket
+with "denied". WhatsApp Web (since 2026-10) halts on its loading splash when that happens,
+with `[storage] storage bucket persistence denied (aquire-persistent-storage-denied)` in the
+console, and every action then times out waiting for `#pane-side`. The driver grants the
+`durableStorage` permission over CDP (`Browser.grantPermissions`) and makes the page-side
+persistence checks agree (`_PERSISTENT_STORAGE_JS`). If a site again stalls on its splash,
+read the console diagnostics before suspecting selectors.
+
+A logged-out WhatsApp profile shows "Scan to log in" (re-link with `whatsapp-personal
+relink`). After a re-link WhatsApp may open a "What's new on WhatsApp Web" dialog that
+covers the search box until **Continue** is clicked, and a freshly linked device holds only
+the most recent messages of a chat until the phone syncs history.
 
 ## Runtime diagnostics (verification)
 

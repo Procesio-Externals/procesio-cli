@@ -13,9 +13,11 @@ Load-bearing rules:
     blank. On an edit the derived name is recomputed, so it always reflects the
     CURRENT config (the "re-evaluate on edit" contract) — an explicit label the
     user set stays put.
-  * A name is derived ONLY from LITERAL config (a plain string/number). A param
-    bound to a variable/template is unknowable at build time, so the deriver
-    returns ``None`` and the caller keeps the template label — never a guess.
+  * A name is derived ONLY from config known at build time: a literal value, the
+    TEXT of a code template (its placeholders are filled at run time, the text is
+    not), a Query Store's SQL, or the NAME of the variable an action writes. A
+    param bound to a variable's VALUE is unknowable at build time, so it never
+    feeds a name — never a guess.
   * A name is COSMETIC — every reference in a flow is by id (ports, Decisional
     cases, parameter bindings) — so naming can only ever change a label, never
     wiring.
@@ -66,6 +68,16 @@ def _literal(params, *labels):
     return None
 
 
+def _template_text(params, *labels):
+    """The source text of a param authored as a code template ({"template": text, ...})."""
+    low = {str(k).strip().lower(): v for k, v in (params or {}).items()}
+    for lb in labels:
+        v = low.get(lb.strip().lower())
+        if isinstance(v, dict) and isinstance(v.get("template"), str):
+            return v["template"]
+    return None
+
+
 def _var_name(params, *labels):
     """The variable NAME a param is bound to ({"var": name}), or None."""
     low = {str(k).strip().lower(): v for k, v in (params or {}).items()}
@@ -107,6 +119,37 @@ def _sql_summary(query):
     verb = mv.group(1).upper().replace("EXECUTE", "EXEC")
     mt = _SQL_TABLE.search(q)
     return f"{verb} {mt.group(1)}" if mt else verb
+
+
+_DS_REF = re.compile(r"\{\{ds:([^}]+)\}\}")
+_QS_VERB = re.compile(r"^\s*(?:--[^\n]*\n|/\*.*?\*/|\s)*(SELECT|WITH|INSERT|REPLACE|UPDATE|DELETE|MERGE)\b",
+                      re.IGNORECASE | re.DOTALL)
+_QS_WORD = {"SELECT": "Read", "WITH": "Read", "INSERT": "Save to", "REPLACE": "Save to",
+            "UPDATE": "Update", "DELETE": "Delete from", "MERGE": "Merge into"}
+
+
+def _query_store_summary(sql):
+    """"Read OMN Units" / "Update OMN Leads" from a Query Store statement.
+
+    Query Store SQL names its data stores as {{ds:Store Name}} placeholders; that name is
+    what a reader of the canvas recognises, so it wins over a raw table token. A statement
+    over several stores reads "Read A + 2 more"."""
+    q = str(sql or "")
+    m = _QS_VERB.search(q)
+    if not m:
+        return None
+    word = _QS_WORD[m.group(1).upper()]
+    stores = []
+    for st in _DS_REF.findall(q):
+        st = st.strip()
+        if st and st not in stores:
+            stores.append(st)
+    if not stores:
+        mt = _SQL_TABLE.search(q)
+        stores = [mt.group(1)] if mt else []
+    if not stores:
+        return word.split()[0]
+    return word + " " + stores[0] + (f" + {len(stores) - 1} more" if len(stores) > 1 else "")
 
 
 def _leading_comment(code):
@@ -155,8 +198,18 @@ def derive_action_name(spec, template_name):
         return _cap(f"For each {lst}") if lst else None
 
     if tn == "node":
-        code = _literal(params, "Code")
-        return _cap(_leading_comment(code)) if code else None
+        # the author's leading comment names it best; otherwise say what it produces
+        code = _literal(params, "Code") or _template_text(params, "Code")
+        named = _leading_comment(code) if code else None
+        if named:
+            return _cap(named)
+        out = _var_name(params, "Single Result", "List Result")
+        return _cap(f"Compute {out}") if out else None
+
+    if tn == "query store":
+        qs = spec.get("queryStore") if isinstance(spec.get("queryStore"), dict) else {}
+        summ = _query_store_summary(qs.get("sql") or _literal(params, "Query", "SQL") or "")
+        return _cap(summ) if summ else None
 
     if tn in ("execute query", "execute command"):
         summ = _sql_summary(_literal(params, "Query", "Command") or "")

@@ -113,6 +113,21 @@ python scripts/run-tool.py procesio form-set-code --id <form-id> \
   --js-file form.js > /tmp/last-write.json
 ```
 
+### A 2xx is not a save: `form-set-code` reads the form back
+
+The platform has answered form writes with 2xx while storing nothing: `PUT /api/FormTemplate`
+moved `updatedOn` but left every `Data` field as it was (the code, even `browserTitle`), and
+`POST /api/FormTemplate` and `.../duplicate` returned forms with `data: null` (seen on
+Internal-PROD 2026-10-18, every payload shape, PascalCase and camelCase alike; the designer UI
+saves through the same endpoint, so it is not a client bug). The public page then keeps serving
+the old code, which looks exactly like a CDN cache that never expires.
+
+So `form-set-code` re-reads the form after the PUT and returns `verified: true`, or fails with
+**`not_persisted`** (details: `sent_bytes`, `stored_bytes`, `kept_previous`). On that error,
+create a tiny scratch form (`POST /api/FormTemplate` with `data: {elements: []}`) and read it
+back: `data: null` means the platform is not storing form content at all, so stop retrying and
+report it; real data means another editor saved the form between your read and your write.
+
 ## 3. Credentials
 
 Two different secrets that look alike — both short opaque tokens:
