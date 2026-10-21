@@ -538,7 +538,7 @@ constructs. All verified via `flowpatch validate` (POST /api/Projects/validate â
 Adding a NEW node to a flow via `PUT /api/Projects` works with the default userpass `account` profile.
 No designer UI needed. The one trap: do NOT copy an existing node to make a new one - a copied node
 carries the source flow's stale variable bindings in `customData.configuration`, and the validator then
-throws a diagnostic-free `HTTP 500 "Object reference not set to an instance of an object"`. Instead:
+throws a diagnostic-free `HTTP 500 "Object reference not set to an instance of an object"` (changed in v3.0.0, 2026-10: an unhandled 500 no longer carries the exception text; the body is now the generic `[{"statusCode":100,"value":"An unexpected error occurred.","target":null}]`, so treat that body on a flow PUT as the same symptom). Instead:
 
 1. Fetch the CLEAN action template: `GET /api/Actions?getFullAction=true`, find by `actionId`/`name`.
    `copy.deepcopy(template.configuration)` and fill only your setting values. A clean config makes the
@@ -1054,3 +1054,47 @@ working panels show the convention the broken one should follow.
 A related restriction has the same flavour and the same cause: a control added to a table row
 through the API is not part of that row's own field model, so its value path reads nothing and has
 to be carried to a plain field before a save can see it.
+
+### A date picker hands back an INSTANT, not a day
+
+The control the visitor clicks a day on does not store that day. It stores local midnight of
+it, and what travels to the server is that moment in UTC. For every zone east of Greenwich
+the UTC calendar day is then the day BEFORE the one that was clicked, so the oldest trick in
+the book - taking the first ten characters of the ISO string - silently reads the wrong day.
+
+It hides well because it is not a crash and not even always visible. The page moves one day
+back; when that earlier day happens to be a valid choice it is simply shown instead, and the
+report that comes back is "my selection resets when I change something else" rather than
+"the date is off by one". West of Greenwich the same code is correct, so whoever wrote it
+may never have seen it fail.
+
+Convert the instant in the zone the picker used, which is the VISITOR's zone, not the
+organisation's:
+
+```js
+new Intl.DateTimeFormat('en-GB', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' })
+  .formatToParts(new Date(Date.parse(value)))
+```
+
+A page that shows times to a visitor already detects that zone for its own labels, so it is
+usually available to send alongside the date rather than something new to obtain. Keep the
+bare-day case first (a value that is already `YYYY-MM-DD` carries no instant and must not be
+shifted), and fall back to the raw slice inside a `catch` so a missing timezone database
+degrades to the old behaviour instead of dropping the choice entirely.
+
+Worth testing explicitly in both directions, because one direction passes by luck: the same
+instant must resolve to different days under an eastern and a western zone. If it does not,
+the zone argument is being ignored and the conversion only appeared to work.
+
+### Adding a binding to a node: take the next FREE index, not the next one
+
+A consequence of one `<%N%>` sequence spanning all of a node's parameters, outputs included,
+and the thing that makes adding a binding look harder than it is. A script using `<%0%>`
+through `<%2%>` whose node also has two output bindings is already using indices 3 and 4, so
+introducing `<%3%>` collides with an output and the edit has to renumber the whole node.
+
+It does not have to. The indices identify bindings, they are not required to be contiguous
+per parameter or to follow reading order, so the new placeholder can simply take the next
+index free across the WHOLE node. The script then reads `<%0%>`, `<%1%>`, `<%2%>`, `<%5%>`,
+which looks odd and is correct, and no existing binding moves. Read every parameter of the
+node before choosing the number; the outputs are the ones that get forgotten.

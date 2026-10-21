@@ -27,6 +27,7 @@ from __future__ import annotations
 import argparse
 from typing import Any
 
+from tools.procesio import errors
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import parse_json_arg
 from tools.procesio.handlers.common import add_paging_args, add_profile_arg
@@ -145,6 +146,31 @@ def _apply_cron(body: dict, args) -> dict:
     return body
 
 
+# Recurrences that read `recurrence.timeZone`: DAILY..YEARLY evaluate their weekday /
+# day-of-month / time-of-day rules on that zone's local clock, CRON evaluates its
+# expression there. ONCE / MINUTES / HOURS never read it. An absent zone means UTC; an id
+# the server cannot resolve fails the whole recurrence.
+_ZONED_RECURRENCES = {4, 5, 6, 7, _RECURRENCE_CRON}
+
+
+def _apply_timezone(body: dict, args) -> dict:
+    """Set --timezone on a calendar recurrence (the cron path already carries it).
+
+    Refuses it on a recurrence type that ignores the zone, rather than writing a key the
+    server silently drops."""
+    tz = getattr(args, "timezone", None)
+    if not tz or getattr(args, "cron", None):
+        return body
+    rec = body.get("recurrence")
+    kind = rec.get("recurrence") if isinstance(rec, dict) else None
+    if kind not in _ZONED_RECURRENCES:
+        raise errors.UsageError(
+            f"--timezone has no effect on recurrence type {kind!r}: only daily (4), weekly (5), "
+            f"monthly (6), yearly (7) and cron (8) schedules are evaluated in a time zone")
+    rec["timeZone"] = tz
+    return body
+
+
 def _payload_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--payload", required=True,
@@ -153,20 +179,25 @@ def _payload_args(p: argparse.ArgumentParser) -> None:
                    help="5-field crontab expression (min hour day month weekday); sets "
                         "the recurrence to CRON (type 8) over the --payload. Preview it "
                         "first with validate-crontab. BE rule (PRC-5406): 5 fields only "
-                        "(no seconds), @-macros like @daily are REJECTED, max 100 chars, "
-                        "and the schedule's times are UTC.")
-    p.add_argument("--timezone", help="IANA timezone id for the cron (e.g. Europe/Bucharest)")
+                        "(no seconds), @-macros like @daily are REJECTED, max 100 chars. "
+                        "The expression runs on --timezone's clock (UTC when omitted); "
+                        "startDate / endDate are always UTC.")
+    p.add_argument("--timezone",
+                   help="IANA timezone id (e.g. Europe/Bucharest) the recurrence runs in. "
+                        "Applies to cron and to daily / weekly / monthly / yearly "
+                        "recurrences, whose day and time rules follow that zone's local "
+                        "clock, DST included; absent means UTC")
     p.add_argument("--recurrence-info", dest="recurrence_info",
                    help="human-readable recurrence label (optional)")
 
 
 def create_schedule(client, args) -> dict:
-    body = _apply_cron(parse_json_arg(args.payload, "payload"), args)
+    body = _apply_timezone(_apply_cron(parse_json_arg(args.payload, "payload"), args), args)
     return {"result": client.post("/api/Schedules", body)}
 
 
 def update_schedule(client, args) -> dict:
-    body = _apply_cron(parse_json_arg(args.payload, "payload"), args)
+    body = _apply_timezone(_apply_cron(parse_json_arg(args.payload, "payload"), args), args)
     return {"result": client.put("/api/Schedules", body)}
 
 

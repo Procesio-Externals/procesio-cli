@@ -279,3 +279,31 @@ def test_list_project_schedules_requires_id():
     with pytest.raises(errors.UsageError):
         main.dispatch("list-project-schedules", [],
                       client_builder=_builder(APIKEY, FakeSession()))
+
+
+# -- time zone on calendar recurrences (Scheduler v3: rules run on the zone's local clock) --
+
+def test_timezone_is_set_on_a_daily_recurrence():
+    sess = FakeSession(queue=[FakeResp(200, {"id": "NEW"})])
+    body = '{"name":"n","recurrence":{"recurrence":4,"every":1}}'
+    main.dispatch("create-schedule", ["--payload", body, "--timezone", "Europe/Bucharest"],
+                  client_builder=_builder(APIKEY, sess))
+    rec = _last(sess)["json"]["recurrence"]
+    assert rec == {"recurrence": 4, "every": 1, "timeZone": "Europe/Bucharest"}
+
+
+def test_timezone_is_refused_on_a_recurrence_that_ignores_it():
+    sess = FakeSession(queue=[FakeResp(200, {})])
+    body = '{"name":"n","recurrence":{"recurrence":2,"every":15}}'
+    with pytest.raises(errors.UsageError, match="no effect"):
+        main.dispatch("update-schedule", ["--payload", body, "--timezone", "UTC"],
+                      client_builder=_builder(APIKEY, sess))
+    assert sess.calls == []
+
+
+def test_a_payload_timezone_is_left_alone_without_the_flag():
+    sess = FakeSession(queue=[FakeResp(200, {})])
+    body = '{"name":"n","recurrence":{"recurrence":5,"timeZone":"Europe/Berlin"}}'
+    main.dispatch("create-schedule", ["--payload", body],
+                  client_builder=_builder(APIKEY, sess))
+    assert _last(sess)["json"]["recurrence"]["timeZone"] == "Europe/Berlin"

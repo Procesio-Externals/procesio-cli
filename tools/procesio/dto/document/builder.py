@@ -17,10 +17,31 @@ from pathlib import Path
 
 from tools.procesio.dto import refdata
 from tools.procesio.dto.framework import Component
+from tools.procesio.errors import UsageError
 
 DIR = Path(__file__).resolve().parent
 
 _ORIENTATION = {"portrait": 0, "landscape": 1}
+
+# The document designer's page sizes (its saved `documentPageSize` keys; "" is its "Default",
+# A4). The designer matches them EXACTLY and case-sensitively, and any other value is silently
+# reset to Default the next time someone re-saves the document in the UI. So a size is mapped to
+# its canonical spelling here, and an unknown one is refused instead of being written.
+_PAGE_SIZES = ("", "A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9",
+               "B0", "B1", "B2", "B3", "B4", "B5", "B6", "B7", "B8", "B9", "B10",
+               "C5E", "Comm10E", "DLE", "Executive", "Folio", "Ledger", "Legal",
+               "Letter", "Tabloid")
+_PAGE_SIZE_BY_KEY = {s.lower(): s for s in _PAGE_SIZES}
+
+
+def _page_size(value) -> str:
+    key = "" if value is None else str(value).strip()
+    canon = _PAGE_SIZE_BY_KEY.get(key.lower())
+    if canon is None:
+        valid = ", ".join(s or '""' for s in _PAGE_SIZES)
+        raise UsageError(f"unknown pageSize {value!r}: the document designer resets it to Default "
+                         f"on the next save. Use one of: {valid}")
+    return canon
 
 
 def _new_id(ctx) -> str:
@@ -100,7 +121,7 @@ def build(config: dict, ctx: dict) -> dict:
         "body": body,
         "placeholderDelimiterStart": _esc(config.get("placeholderStart", "<%")),
         "placeholderDelimiterStop": _esc(config.get("placeholderStop", "%>")),
-        "documentPageSize": config.get("pageSize", "A4"),
+        "documentPageSize": _page_size(config.get("pageSize", "A4")),
         "documentPageOrientation": orient_code,
         "variables": variables,
     }

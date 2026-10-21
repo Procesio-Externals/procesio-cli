@@ -27,7 +27,7 @@ _PLACEHOLDER = re.compile(r"<%(\d+)%>")
 _GUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 _SQL = re.compile(r"\s*(select|insert|update|delete|exec|execute|with|declare|merge|create|alter)\b", re.I)
 _B64 = re.compile(r"^[A-Za-z0-9+/=\s]+$")
-_DIRECTION = {10: "input", 20: "process", 30: "output", 40: "system"}
+_DIRECTION = {10: "input", 20: "process", 30: "output", 40: "system", 50: "auto"}
 _BUILTIN_TYPES = {
     "0317bfee-b2f5-4bde-bfe8-121212121210": "Boolean",
     "0317bfee-b2f5-4bde-bfe8-121212121211": "Integer",

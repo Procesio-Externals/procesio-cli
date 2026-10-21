@@ -3,8 +3,9 @@
 WHY THIS EXISTS. A statement authored by concatenating strings arrives as ONE line. It runs
 perfectly and it is unreadable: the designer shows a single row that scrolls off the screen, and
 a reviewer cannot see a WHERE clause, a JOIN or a CASE without dragging sideways through three
-thousand characters. Readability is not a nicety here, because the statement IS the logic: a
-Query Store node is one statement, so the statement is the whole node.
+thousand characters. Readability is not a nicety here, because the SQL IS the logic: a Query
+Store node's SQL (one statement, or since PROCESIO v3.0.0 a `;`-separated script) is the whole
+node.
 
 WHAT IT GUARANTEES. Only whitespace OUTSIDE string literals ever changes:
 

@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import sqlparam
 from tools.procesio.handlers.common import add_profile_arg
@@ -56,7 +57,7 @@ def _lint(client, flow: dict) -> list[dict]:
 
     def target_vars_of(fid: str) -> dict:
         try:
-            r = client.get(f"/api/Projects/{fid}")
+            r = client.get(f"/api/Projects/{fid}", VARIABLES_ONLY)
             f = r.get("flow", r) if isinstance(r, dict) else r
             return {v["id"]: v for v in f.get("variables") or []}
         except Exception:  # noqa: BLE001 - unreadable target -> can't assert its contract

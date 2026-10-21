@@ -28,7 +28,8 @@ variables, rendered to PDF/DOCX by the **Generate Document** action in a process
   `isInput` (default **false** — template vars are destinations FILLED BY Generate
   Document, not flow inputs; `isInput:true` stops the designer expanding a `list<model>`
   var's attributes, so the repeating table can't bind), `isOutput`.
-- **orientation** — `portrait` (0) or `landscape` (1). **pageSize** — e.g. `A4`.
+- **orientation** — `portrait` (0) or `landscape` (1). **pageSize** — e.g. `A4` (valid values
+  below).
 
 ## API contract (verified live 2026-06-24)
 
@@ -57,6 +58,10 @@ render test in `PHASE4-E2E-NOTES.md`). A single `<tbody><tr>` whose `<td>`s carr
 once per list element — that one `<tr>` IS the repeating syntax. The fresh-model run
 emitted one row per list item (3 hits -> 3 rows), zero "Unknown".
 
+**Put the header row in `<thead>` and the repeating `<tr>` in `<tbody>`.** Generate
+Document fails a list table whose header row sits in `<tbody>` with "Sequence contains no
+elements" (checked at v3.0.0, 2026-10).
+
 **Feed the typed list — no scripting required.** Declare a process variable typed as
 the item model with `isList:true` and a `DefaultValue` that is a JSON array of
 objects (or supply any already-populated list var); it hydrates into the typed list
@@ -84,3 +89,36 @@ fully dynamic, not just the rows):
 3. Generate Document `docMap`: `htmlContent <- {var: htmlEnv, path: [result_attr_id]}`.
 The `<%htmlContent%>` placeholder substitutes the raw HTML -> the PDF renders the full
 branded layout, table and image. (Proven live: `AAT_BriefShell` + `AAT_Process_SearchGenerate`.)
+
+## The designer re-save normalises the HTML (Tiptap, v3.0.0, 2026-10)
+
+The document designer replaced Froala with **Tiptap 3**. The save payload is unchanged
+(entity-encoded `body`, delimiters, `documentPageSize`, `documentPageOrientation`,
+`variables`), but saving a template from the UI NORMALISES its HTML, so a body the tool
+wrote is not byte-stable once someone opens and saves it in the designer:
+
+- header rows move into `<thead>` (also leading all-`<th>` rows found in `<tbody>`);
+- runs of spaces become `&nbsp;`, and empty blocks get a `<br>`;
+- `break-*` CSS becomes `page-break-*`;
+- `on*`, `srcdoc` and `javascript:` attributes are stripped;
+- `<style>`, `<script>`, `<form>` and `<svg>` are kept verbatim as raw HTML;
+- placeholders inside attributes or raw HTML are left as written;
+- `fr-*` classes are kept (the PDF is still styled with Froala's stylesheet);
+- a leaf `<section>` / `<header>` becomes a `<div>`;
+- entities are no longer double-decoded.
+
+Compare a template before and after a designer save by these rules, not byte for byte.
+
+**Header, footer and page-number markers.** The body carries them as a LEADING
+`<style class="pup-c-template-page-number">`, a LEADING
+`<header class="pup-c-template-header" data-height>`, and a TRAILING
+`<footer class="pup-c-template-footer">`. Keep each in its position when editing a body.
+
+**Valid `documentPageSize` values** (the config's `pageSize`): `A0`-`A9`, `B0`-`B10`, `C5E`,
+`Comm10E`, `DLE`, `Executive`, `Folio`, `Ledger`, `Legal`, `Letter`, `Tabloid`, and `""` (the
+designer's Default). An unknown value is silently reset to Default on the next UI save, so the
+builder maps a size to its canonical spelling and refuses an unknown one.
+
+**PDF styling is pinned.** Generate Document and HTML to PDF embed the **Froala 5.5.0** CSS in
+the PDF, and the HTML-string output links the `froala-editor` package at version 5.5.0 instead of `@latest`. Document
+CSS is kept as written, and a `url(data:image/png;base64,...)` is no longer truncated.

@@ -208,6 +208,16 @@ python scripts/run-tool.py web render-pdf --html-file rollup.html --out rollup.p
 - Chromium rounds the sheet to whole CSS pixels (96 px per inch), so 1000 x 2000 mm comes out
   as about 1000.17 x 2000.25 mm. When the printer checks dimensions, trim the PDF's MediaBox to
   the exact size afterwards; keep the outermost fraction of a millimetre background-only.
+  PDF y runs bottom-up, so a trimmed MediaBox written as `[0 0 W H]` cuts that fraction off the
+  TOP of the artwork and shifts it against any TrimBox; anchor it at the top-left instead
+  (`[0, y1-H, W, y1]` from the rendered box's `y1`).
+- Bleed: render the sheet at trim + 2 x bleed (a 1000 x 2000 mm roll-up with 3 mm bleed is
+  `--width 1006mm --height 2006mm`), place the artwork 3 mm in, run any background that touches
+  an edge 3 mm past it, then write `TrimBox` = the sheet inset by the bleed and `BleedBox` =
+  the sheet. A full-bleed band printed without bleed can show a white hairline after cutting.
+- Gradient-filled text prints as the glyph outlines used as a clip over a raster gradient: the
+  edges stay vector-sharp at any size, only the colour ramp is pixels. An SVG `<text>` with a
+  gradient `fill` keeps the word as real text with the embedded font.
 - Make the HTML self-contained: the page is loaded with `set_content` (from `about:blank`), so
   inline fonts and images as `data:` URIs. The driver waits for `document.fonts.ready` before
   printing, so an inlined web font is used rather than a silent fallback.

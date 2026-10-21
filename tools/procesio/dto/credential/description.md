@@ -68,7 +68,8 @@ by the connector: `80808080-0001-0000-0000-aaaaaaaaaaaa`.
 > seeded in DataBase-Update, so `Redis` does not yet appear in `GET /api/Credentials/types`
 > (only 34 types today; MySQL via `SQL` is live). The contract above is stable and will
 > work as-is once activated; until then a Redis credential cannot be created. Verify with
-> the property/option names before relying on the literals above. (Outbound DB hosts are
+> the property/option names before relying on the literals above. Still not activated at
+> the v3.0.0 release (2026-10-21). (Outbound DB hosts are
 > also SSRF-guarded by a host blacklist — `DbHostBlacklistChecker` — so a blacklisted /
 > private host is rejected at connect time.)
 
@@ -76,6 +77,26 @@ by the connector: `80808080-0001-0000-0000-aaaaaaaaaaaa`.
 token, base `https://platform.prelude.so`, driving the Prelude connector (phone
 verification + lookup). It IS live in `GET /api/Credentials/types` (verified 2026-09-21,
 35 types). See `PROCESIO-CONNECTORS-NOTES.md`.
+
+**Azure Storage Account** is a standalone ROOT credential type since v3.0.0 (2026-10):
+`CredentialsType.AZURE_STORAGE = 10`, template name `Azure Storage Account`, live in
+`GET /api/Credentials/types`. It drives the **Azure Storage** connector (id
+`83838383-0000-0000-0000-aaaaaaaaaaaa`). Fields (`be_id`):
+
+| be_id | Notes |
+| --- | --- |
+| `AuthenticationType` | radio; the option values are GUIDs, their `be_value`s are `SharedKey` / `ServicePrincipal` |
+| `AccountName` | |
+| `AccountKey` | secret |
+| `TenantId` | |
+| `ClientId` | |
+| `ClientSecret` | secret |
+| `BlobEndpoint` | |
+
+Resolve the `AuthenticationType` option from the live template rather than hardcoding its
+GUID, and send only the fields the chosen method needs (see the conditional-property gotcha
+below). Do not confuse it with the older derived template **"OAuth2 (REST API) / Azure
+Storage"** (`REST_API_OAUTH_PREDEFINED`), which is an OAuth2 REST credential, not this root type.
 
 > ⚠ **A credential read returns its secrets in plaintext (PRC-5556):** `credential-get`
 > and the read API hand back stored secret values, not a masked placeholder. Never log,
@@ -115,6 +136,10 @@ is bound by passing the credential **id** as the param value:
 
 - `gtid`/`gtpid` are stable per template; the builder reads them from the live
   template so it never hardcodes ids.
+- A credential type resolves to its ROOT template (changed in v3.0.0, 2026-10). Before, a
+  derived template that kept its parent's `Type` (the `REST API/ Prelude` template, for one)
+  made every custom-action upload whose action had a `Credentials_Rest` property fail with
+  `TEMPLATE_ERROR`. A derived template and its root now report the same root type.
 - Some required properties are *conditional* (depend on a radio choice, e.g.
   Basic-auth fields only matter when Basic auth is selected) — send only what your
   chosen path needs.

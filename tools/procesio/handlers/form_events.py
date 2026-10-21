@@ -26,6 +26,7 @@ import json
 import uuid
 
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.errors import UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
 from tools.procesio.handlers.form_code import _fetch, build_put_body
@@ -133,7 +134,7 @@ def _find_element(elements: list, ref: str) -> dict:
 def _process_vars(client, process_id: str) -> dict:
     """{variable name: the variable DTO}. The whole DTO, not just the id, because a map row also
     has to know whether the variable is a LIST - see _is_list_of."""
-    body = client.get(f"/api/Projects/{process_id}")
+    body = client.get(f"/api/Projects/{process_id}", VARIABLES_ONLY)
     if isinstance(body, dict) and "flow" not in body and isinstance(body.get("result"), dict):
         body = body["result"]
     flow = body.get("flow") if isinstance(body, dict) else None

@@ -40,6 +40,7 @@ import argparse
 import re
 
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.handlers.common import add_profile_arg
 from tools.procesio.sqlformat import is_unreadable
 
@@ -245,7 +246,7 @@ def flow_lint(client, args) -> dict:
     def target_vars_of(fid: str) -> dict:
         if fid not in cache:
             try:
-                r = client.get(f"/api/Projects/{fid}")
+                r = client.get(f"/api/Projects/{fid}", VARIABLES_ONLY)
                 f = r.get("flow", r) if isinstance(r, dict) else r
                 cache[fid] = {v["id"]: v for v in f.get("variables") or []}
             except Exception:  # noqa: BLE001 - unreadable target -> can't assert its contract

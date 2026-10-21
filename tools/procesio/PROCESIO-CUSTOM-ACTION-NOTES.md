@@ -11,14 +11,56 @@ sandbox facts that **were** probed live.
 
 - **C# only**, class library, implementing `IAction` from `Ringhel.Procesio.Action.Core`
   with `ClassDecorator` / `FEDecorator` / `BEDecorator` / `Validator` attributes.
-- **Runtime is documented contradictorily**: the rules page and the guide prose say
-  .NET Core 3.1, while both `.csproj` samples say `<TargetFramework>net6.0</TargetFramework>`
-  and a third page says ".Net 6". Upload runs server-side validations, so a wrong target
-  fails late, at upload, not at build. **Target `net6.0` and keep 3.1 as the fallback.**
+- **Target framework (changed in v3.0.0, 2026-10).** The hosts run on **net10.0**. Target
+  `net10.0` for a new build (preferred), or multi-target
+  `<TargetFrameworks>net8.0;net10.0</TargetFrameworks>`; a `net8.0` package still loads. The
+  public docs still say .NET Core 3.1 / net6.0 in places, which is stale, and the earlier advice
+  here ("target net6.0, keep 3.1 as the fallback") is withdrawn: Action-Core 2.x ships only
+  `net8.0;net10.0`, so there is no net6 build of the core package to compile against. Upload
+  runs server-side validations, so a wrong target fails late, at upload, not at build. See
+  "Runtime, loader and upload (v3.0.0)" below.
 - The core package comes from a **GitHub Packages feed** and needs a GitHub PAT with
   `read:packages`. It is not on nuget.org.
 - The `.csproj` must set `CopyLocalLockFileAssemblies`, `GeneratePackageOnBuild` and an
   `IncludeDepsInPackage` target, because **dependencies ship inside the `.nupkg`**.
+
+## Runtime, loader and upload (v3.0.0, 2026-10)
+
+Unlike the rest of this note, this section comes from the platform's own v3.0.0 release
+(Action-Core 2.0 / 2.1, Action-Execution v3, Test-Action v2, the Web-Api upload validator), not
+from the public docs.
+
+- **Which lib folder loads.** Action-Execution v3 loads the package's `lib/<tfm>` folder closest
+  to the host at or below net10.0, so net8, net6 and netstandard packages still load. (Before, it
+  probed only netcoreapp3.1 / net6 / net8 and loaded nothing from a net10-only package.)
+  Assemblies the host already holds (Action-Core, Newtonsoft.Json) are skipped, so a package
+  built against Action-Core 1.x binds to the host's 2.1 at run time.
+- **Multi-targeting passes upload.** The validator reads only the lib folder the host would
+  load, so a `net8.0;net10.0` package no longer fails with `MULTIPLE_ACTIONS`. The whitelist,
+  the blacklist and the codes are unchanged: `MULTIPLE_ACTIONS`, `FORBIDDEN_NAMESPACE`,
+  `FORBIDDEN_ASSEMBLY`, `INVALID_NUGET_PACKAGE`.
+- **The one breaking change (Action-Core 2.1):** `AiCredentialsManager`,
+  `AiCredentialsConfiguration` and `StructuredOutputMode` moved from namespace
+  `...Models.Credentials.API` to `...Models.Credentials.AI_API`. A package compiled against 2.1
+  must use the new namespace; a 1.x package that uses the AI credential types may fail to bind
+  on a 2.1 host, so rebuild it. The REST and DB credential types did not move.
+- **Additive in Action-Core 2.x:** `FeComponentType.Auto = 102`, `FeTextFormat.DATASTORE = 8`,
+  and the Azure Storage credential models (`AzureStorageCredentialsManager`,
+  `IAzureStorageClient`, `AzureStorageAuthenticationType`). Newtonsoft.Json is 13.0.4.
+- **The NuGet store is switchable per environment** (`ActiveNugetStore` = `None` /
+  `CodeArtifact` / `GitHub`). With `None`, upload and delete fail with `statusCode` 1013
+  (`FEATURE_DISABLED`), value "This feature is disabled on this environment.", target
+  `Action Library`; custom-action lists come back empty and the front end hides the feature. So
+  an empty custom-action list is not proof that nothing was uploaded: an upload answering 1013
+  means the environment has no store. Action-Execution downloads each package from the store
+  path recorded on its own template.
+- **Upload and delete stamp `UpdatedOn` / `UpdatedById`** on the action template.
+- **`Credentials_Rest` uploads no longer fail with `TEMPLATE_ERROR`.** A credential type now
+  resolves to its ROOT template. Before v3.0.0 a derived template that kept its parent's `Type`
+  (the REST API / Prelude template, for one) made every upload whose action had a
+  `Credentials_Rest` property fail with `TEMPLATE_ERROR`.
+- **Test-Action v2** is .NET 10 only, with no API change: `/api/Actions/test` and
+  `/api/Credentials/test` are unchanged.
 
 ## Lifecycle — plan for it, it is unusually rigid
 

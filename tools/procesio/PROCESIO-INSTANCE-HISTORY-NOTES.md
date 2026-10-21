@@ -19,9 +19,21 @@ API facts; no client data. Measured live against Internal-PROD, 28/08/2026.
   **primary result reader**. `flowTemplateId` required; `isArchived`/`getActions`/
   `getVariables`/`getInternalVariables`/`addExtras` default true. Returns
   `{"instance": {...}}`.
+  Status-poll cost (changed in v3.0.0, 2026-10): `addExtras=true` costs 2-6 extra backend
+  look-ups per call (starter name, webhook, schedule, form names, resource usage). A poll
+  loop that only reads `status` should send all four flags as `false` and fetch the values
+  once at the end (the tool's `run-process` poll does this, then reads `/output`).
 
 **List envelope:** `{result:{totalItemCount, pageNumber, pageItemCount, pageItems[]}}`.
 Read `totalItemCount`, not the row count, to know the true size (page cap hides the rest).
+
+**Paging past the end (changed in v3.0.0, 2026-10).** A `pageNumber` beyond the last page
+no longer returns an empty page: it returns the LAST page again, and `pageNumber` in the
+envelope echoes the page actually served. A paging loop over `/instances`, `/history` or
+`/archive` must stop at `ceil(totalItemCount / <requested page size>)` (use the size you
+sent, not the echoed `pageItemCount`, which shrinks to the total on page 1); waiting for an
+empty page never terminates while rows exist. With `totalItemCount: 0` and `pageNumber > 1`
+the envelope can report `pageNumber: 0`.
 
 ## Traps (each cost a real diagnosis)
 
@@ -40,8 +52,16 @@ Read `totalItemCount`, not the row count, to know the true size (page cap hides 
   40 `STATUS_RUNNING_WITH_ERRORS`, 6 `STATUS_STOP_BY_USER`). The **outcome is not in the
   row** — read it per instance from `/status`.
 - ⚠ **`/status` `instance.variables[]` is VariableDto SCHEMA, not runtime values on a
-  historical read.** Each element has `id, name, type` (10 INPUT / 20 PROCESS / 30 OUTPUT),
-  `dataType, isList, isError, isRequired, defaultValue` — **no `value` field**. So a past
+  historical read.** Each element has `id, name, type` (10 INPUT / 20 PROCESS / 30 OUTPUT /
+  40 SYSTEM / 50 AUTO),
+  `dataType, isList, isError, isRequired, defaultValue` — **no `value` field**.
+  Type 50 AUTO (new in v3.0.0, 2026-10) is engine-written and read-only: the engine creates
+  it on the INSTANCE from action settings meant for it, named `{ActionName}_{PropertyName}`
+  (suffix `_2`, `_3` on a clash, 64-char cap), with the value in `defaultValue`. Today only
+  Call Subprocess uses it (e.g. `Call_Subprocess_ChildInstanceId`, plus a child instance id
+  list). AUTO and SYSTEM variables are always returned on instance / history / archive reads
+  (no `getInternalVariables` needed) and survive data-retention cleanup; PROCESS (20) values
+  are still deleted by it. Clients cannot create or retype either. So a past
   run's `/status` gives the run record + the variable *definitions*; the concrete output
   *values* are not on that path (use `isArchived=true` or the `Get Instance Outputs`
   action). `/output` (`GetInstanceOutput`) is deprecated ("Not used by FE+BE"); prefer
@@ -84,6 +104,15 @@ Read `totalItemCount`, not the row count, to know the true size (page cap hides 
 - **Consequence for a run-history feature:** history is durable by default, so it can back a
   log — but a customer's per-workspace/per-process retention policy or HIPAA Mode can delete
   it, and a silently-aged-out history turns "did we process this?" into a confident wrong "no".
+
+### Process-History v3.0.0 fixes (2026-10, shipped without an announcement)
+
+- A failed history insert no longer deletes the runtime row. Before, such an instance vanished
+  from BOTH `/instances` and `/history`; an instance missing from both on an older run may be
+  this defect, not retention.
+- A retry of the move no longer overwrites the archived variables with an empty list.
+- Instances move from `/instances` to `/history` faster, so the window in which a fresh run is
+  visible only in `/instances` is shorter. Still read both tiers before calling a run unlisted.
 
 ## `Get Recent Instances` at RUNTIME — measured, and it corrects the action doc
 
@@ -193,6 +222,9 @@ instance points at the action in flight.
 **`instance.variables[]` — 9 fields:** `contextId, dataType, defaultValue, id, isError, isList,
 isRequired, name, type`. **No `value` field**, confirming that a historical read yields the variable
 SCHEMA and not runtime values. Values need the `Get Instance Outputs` native action or a synchronous run.
+`type` takes 10 INPUT / 20 PROCESS / 30 OUTPUT / 40 SYSTEM / 50 AUTO (50 added in v3.0.0, 2026-10:
+engine-written, value in `defaultValue`, always returned, survives retention cleanup; see the
+Traps section above). **Measured live in prod on 2026-10-21:** the engine already creates these variables on the instance with the new readable names (`Call_Subprocess_InstanceId`, `Call_Subprocess_ChildInstanceId` holding the child's id, `Call_Subprocess_ChildInstanceIdList`), but types them **20 (PROCESS), not 50**, because the Call Subprocess template still declares those settings as `ignore`. So read them by NAME, not by `type == 50`, and do not rely on them surviving data-retention cleanup until prod serves the settings as `auto`.
 
 **`/history` row — 26 fields:** as listed earlier in this note, plus confirmed presence of
 **`currentActionId` and `workspaceId` on the row itself**, so a sweep can shortlist candidates without a

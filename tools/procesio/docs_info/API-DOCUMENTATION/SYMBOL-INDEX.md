@@ -12,13 +12,13 @@
 
 | enum | defined at | values |
 |---|---|---|
-| **`ActionStatus`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:910` | — |
+| **`ActionStatus`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:911` | — |
 | **`DebuggerOperationType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:879` | `RESUME`=0 · `STEP`=1 |
-| **`FlowDataRetentionType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:894` | — |
+| **`FlowDataRetentionType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:895` | — |
 | **`FlowStatus`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:860` | `STATUS_NONE`=1 · `INACTIVE`=5 · `STATUS_STOP_BY_USER`=6 · `STATUS_INITIALIZING`=15 · `STATUS_DISPATCHED_ACTIONS`=20 · `STATUS_RUNNING`=30 · `STATUS_RUNNING_WITH_ERRORS`=40 · `BREAK_POINT`=45 · `STATUS_FINISH`=50 · `STATUS_TEMPORARY_WAITING`=60 |
 | **`ProcessTimeSpanFilterType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:875` | — |
-| **`VariableOrientation`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:886` | `INPUT`=10 · `PROCESS`=20 · `OUTPUT`=30 |
-| **`WebhookVariableType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:902` | — |
+| **`VariableOrientation`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:886` | `INPUT`=10 · `PROCESS`=20 · `OUTPUT`=30 · `AUTO`=50 (engine-written) |
+| **`WebhookVariableType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:903` | — |
 
 ## DTOs (137)
 

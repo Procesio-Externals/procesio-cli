@@ -490,7 +490,7 @@ Audit/ownership base for list responses.
 - `Id` — `string (uuid)`, required — variable id.
 - `ContextId` — `string (uuid)`, optional — context id.
 - `DataType` — `string (uuid)`, required — data type id.
-- `Type` — `string|number (enum: VariableOrientation)`, required — `INPUT=10`, `PROCESS=20`, `OUTPUT=30`.
+- `Type` — `string|number (enum: VariableOrientation)`, required — `INPUT=10`, `PROCESS=20`, `OUTPUT=30`, `AUTO=50` (engine-written, read-only).
 - `Name` — `string`, optional — variable name.
 - `DefaultValue` — `object`, optional — default value.
 - `IsList` — `boolean`, required — whether the value is a list.
@@ -585,6 +585,7 @@ Audit/ownership base for list responses.
 - `INPUT = 10`
 - `PROCESS = 20`
 - `OUTPUT = 30`
+- `AUTO = 50` (engine-written, read-only; added in v3.0.0, 2026-10)
 
 #### `AuthorizationActionType` (`number`) — permission action (context, not a wire field)
 - `None = 1`, `Read = 2`, `Update = 3`, `Create = 4`, `Delete = 5`, `Admin = 6`

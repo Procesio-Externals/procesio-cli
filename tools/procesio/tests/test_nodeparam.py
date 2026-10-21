@@ -791,3 +791,36 @@ def test_find_text_that_is_absent_is_refused():
     with pytest.raises(ValueError) as e:
         nodeparam.add_param_bindings(node, p, {}, find="nothing like this", replace="x")
     assert "not present" in str(e.value)
+
+
+def _engine_owned_flow():
+    return {"id": "f", "title": "T", "actions": [], "variables": [
+        {"id": "v-sys", "name": "processInfo", "type": 40,
+         "dataType": "0317bfee-b2f5-4bde-bfe8-121212121220", "isList": False},
+        {"id": "v-auto", "name": "Call_Subprocess_ChildInstanceId", "type": 50,
+         "dataType": "0317bfee-b2f5-4bde-bfe8-121212121222", "isList": False,
+         "defaultValue": None},
+    ]}
+
+
+@pytest.mark.parametrize("name", ["processInfo", "Call_Subprocess_ChildInstanceId"])
+def test_an_engine_owned_variable_cannot_be_retyped_even_with_the_override(name):
+    f = _engine_owned_flow()
+    v = nodeparam.find_variable(f, name)
+    with pytest.raises(ValueError, match="the engine writes it"):
+        nodeparam.set_variable_type(f, v, OBJECT, allow_contract_change=True)
+    assert v["dataType"] != OBJECT
+
+
+@pytest.mark.parametrize("name", ["processInfo", "Call_Subprocess_ChildInstanceId"])
+def test_an_engine_owned_variable_cannot_be_given_a_default(name):
+    f = _engine_owned_flow()
+    v = nodeparam.find_variable(f, name)
+    before = v.get("defaultValue")
+    with pytest.raises(ValueError, match="the engine writes it"):
+        nodeparam.set_variable_default(f, v, "x", allow_contract_change=True)
+    assert v.get("defaultValue") == before
+
+
+def test_auto_is_a_known_direction():
+    assert nodeparam.VAR_DIRECTION[50] == "auto"

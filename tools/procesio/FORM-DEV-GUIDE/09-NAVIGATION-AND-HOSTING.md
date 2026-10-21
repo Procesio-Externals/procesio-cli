@@ -201,6 +201,11 @@ runtime. Two rules decide the key:
 A write that lands on a readonly attribute is not an error: the sandbox logs *"Readonly property
 … can not be set!"* and moves on.
 
+Element **functions** are reached the same way and called. The stepper's are
+`goToNextStep()` and `goToPreviousStep()` (renamed from `next` / `previous` in v3.0.0,
+2026-10, so a script still calling the old names needs updating):
+`ProcesioForm.data.fields.<stepperName>.goToNextStep()`.
+
 ### Two rules for any form-load script
 
 1. **Wrap the whole body in `try`/`catch`.** An unhandled top-level throw stops the sandbox
@@ -243,7 +248,7 @@ from page script, so the form could capture the password but never establish the
   back on your form. So the round trip is: signpost → login → dashboard → the user opens
   the form link (bookmark). You cannot auto-forward them onto the form after login.
 - **No role from the client.** `GET /api/Users/me` returns only `userId / username /
-  firstName / lastName / email` — **no role, no userType, no per-workspace permissions** —
+  firstName / lastName / email` (plus `otpEnabled` since v3.0.0, 2026-10) — **no role, no userType, no per-workspace permissions** —
   and `ProcesioForm.data.instance.currentUser` exposes only id/name/email (empty when
   anonymous). So a form cannot branch "runner vs admin" client-side. Offer both
   destinations as buttons and let the **permission profile refuse server-side** (a runner

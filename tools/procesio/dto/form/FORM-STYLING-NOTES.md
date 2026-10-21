@@ -76,11 +76,22 @@ mistaken overwrite is recoverable from the tool output alone.
   tokens); the API key gets you *at* the form, the passphrase gets you *into* `Data.code`.
 
 ## 6. What the CSS and the JS can actually reach at runtime
-- **CSS is injected as a `<style>` PREPENDED INSIDE the form root**, but a style element
-  styles the whole document, so `body` and other page-level selectors do work.
-- **The only CSS that is filtered** is the branding class (`js/form-builder/css.ts`
-  replaces that literal string with a random number so it cannot be hidden). Everything
-  else — `@keyframes`, `@media`, custom properties — passes through untouched.
+- **CSS is injected as a `<style>` PREPENDED INSIDE the form root, and SCOPED to it**
+  (changed in v3.0.0, 2026-10; before, it styled the whole document and page-level
+  selectors worked). Every selector is rewritten to
+  `sel:where([data-form-css-scope=<id>], ...)`, matching the form root and its
+  descendants only. So rules for `body`, `:root`, `html`, the host chrome and the builder
+  match nothing, `:root` custom properties no longer reach the form, and tooltips and
+  date-picker popups no longer get the form CSS. Comments and unparsable CSS are dropped;
+  `@keyframes` / `@font-face` are moved into a layer. Still global: a `<style>` inside
+  paragraph/heading HTML, `@import`, and JS that injects a `<style>` into
+  `window.parent.document`. JS that renders UI OUTSIDE the form container (appended to
+  `document.body`, a modal or overlay, a full-page app) gets no styles, and `:root` /
+  `html` / `body` rules stop applying: before mounting, copy the container's
+  `data-form-css-scope` value onto `<html>` (inside the wait-for-render loop). Full rules
+  and the snippet in `tools/procesio/FORM-DEV-GUIDE/02-CODE-INJECTION.md` §2.
+- **The branding class is also filtered** (`js/form-builder/css.ts` replaces that literal
+  string with a random number so it cannot be hidden).
 - **Form-level JS is replayed as a synthetic RUN_JAVASCRIPT event on mount and on every
   re-trigger, inside a throwaway sandbox iframe whose window is destroyed and rebuilt each
   time.** So anything that must OUTLIVE one run (listeners, MutationObservers, timers)

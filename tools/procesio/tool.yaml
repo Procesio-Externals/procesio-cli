@@ -211,11 +211,11 @@ actions:
   - name: cron
     type: string
     required: false
-    description: '5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab. BE rule (PRC-5406): 5 fields only (no seconds), @-macros like @daily are REJECTED, max 100 chars, and the schedule''s times are UTC.'
+    description: '5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab. BE rule (PRC-5406): 5 fields only (no seconds), @-macros like @daily are REJECTED, max 100 chars. The expression runs on --timezone''s clock (UTC when omitted); startDate / endDate are always UTC.'
   - name: timezone
     type: string
     required: false
-    description: IANA timezone id for the cron (e.g. Europe/Bucharest)
+    description: IANA timezone id (e.g. Europe/Bucharest) the recurrence runs in. Applies to cron and to daily / weekly / monthly / yearly recurrences, whose day and time rules follow that zone's local clock, DST included; absent means UTC
   - name: recurrence-info
     type: string
     required: false
@@ -456,18 +456,10 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
-  - name: body
-    type: string
-    required: false
-    description: DetailedTestAction request as a JSON object
-  - name: body-file
-    type: string
-    required: false
-    description: path to the request JSON
   - name: action
     type: string
     required: false
-    description: action to test by name or template id (built-in or a workspace custom action); the request is built from the catalog
+    description: action to test, by name or template id (built-in or a workspace custom action); the request is built from the catalog
   - name: values
     type: string
     required: false
@@ -480,6 +472,14 @@ actions:
     type: integer
     required: false
     description: seconds to poll for the result (default 60)
+  - name: body
+    type: string
+    required: false
+    description: full DetailedTestAction request as a JSON object
+  - name: body-file
+    type: string
+    required: false
+    description: path to the request JSON
 - name: customaction-upload
   description: Install a custom action from a .nupkg package (POST /api/actions multipart).
   args:
@@ -510,7 +510,7 @@ actions:
   - name: icon-path
     type: string
     required: false
-    description: icon path for the action (sent as the 'path' header)
+    description: 'toolbar icon (sent as the ''path'' header): a Material name (e.g. description, table_chart, email) or a PROCESIO ''icon-*'' name. Defaults to ''icon-custom-action'' with a warning if omitted.'
 - name: datastore-add-rows
   description: Insert rows (POST /api/DataStore/{id}/rows) from a JSON --rows array.
   args:
@@ -1665,6 +1665,56 @@ actions:
     type: boolean
     required: false
     description: compose and return the request without sending it
+- name: delete-datastore-by-datastoreid-rows
+  description: DELETE /api/DataStore/{dataStoreId}/rows  [DataStore] - Delete rows from a data store from the viewer
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: delete-datastore-by-id
+  description: DELETE /api/DataStore/{id}  [DataStore] - Delete a data store by id
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: delete-datatypes-attribute-by-rootdatatypeid-by-attributeid
   description: 'DELETE /api/DataTypes/attribute/{rootDataTypeId}/{attributeId}  [DataTypes] - Permission required: DataModels.Update'
   args:
@@ -1763,6 +1813,79 @@ actions:
     description: compose and return the request without sending it
 - name: delete-form-by-id
   description: 'DELETE /api/Form/{id}  [Form] - Permission required: FormInstance.Delete'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: delete-form-datastore-by-datastoreid-rows
+  description: DELETE /api/Form/dataStore/{dataStoreId}/rows  [FormDataStore] - Delete one or more data store rows for form instance operations.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: delete-form-signing-envelope-by-id
+  description: 'DELETE /api/form/signing/envelope/{id}  [FormSigning] - Discard a DRAFT: it is deleted with its document (Remove document / Cancel signing).'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: delete-form-signing-public-envelope-by-id
+  description: 'DELETE /api/form/signing/public/envelope/{id}  [FormSigningPublic] - Discard the DRAFT: it is deleted, with its document and the signer''s details.'
   args:
   - name: profile
     type: string
@@ -2994,7 +3117,7 @@ actions:
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
 - name: form-set-code
-  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back after the write and fails with not_persisted if the server kept other code (PROCESIO has been seen answering 2xx while dropping the form''s Data). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open.'
+  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back after the write and fails with not_persisted if the server kept other code (PROCESIO has been seen answering 2xx while dropping the form''s Data). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open. Returns `warnings` when the code mounts UI on document.body or styles :root/html/body without propagating the form''s CSS scope attribute (those styles do not apply).'
   args:
   - name: profile
     type: string
@@ -3497,6 +3620,10 @@ actions:
     type: string
     required: false
     description: query parameter
+  - name: workspaceId
+    type: string
+    required: false
+    description: query parameter
   - name: dry-run
     type: boolean
     required: false
@@ -3547,6 +3674,29 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-apikeymaster-by-subworkspaceid
+  description: 'GET /api/ApiKeyMaster/{subWorkspaceId}  [ApiKeyMaster] - Permission required: MasterWorkspace.Read'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: subWorkspaceId
+    type: string
+    required: true
+    description: path segment {subWorkspaceId}
   - name: dry-run
     type: boolean
     required: false
@@ -3989,6 +4139,176 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-datastore
+  description: GET /api/DataStore  [DataStore] - Get all data stores with pagination
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: pageNumber
+    type: string
+    required: false
+    description: query parameter
+  - name: pageItemCount
+    type: string
+    required: false
+    description: query parameter
+  - name: searchName
+    type: string
+    required: false
+    description: query parameter
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-datastore-by-datastoreid-data-model
+  description: GET /api/DataStore/{dataStoreId}/data-model  [DataStore] - Get the internal data model associated with a data store
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-datastore-by-datastoreid-export-download-by-jobid
+  description: GET /api/DataStore/{dataStoreId}/export-download/{jobId}  [DataStore] - Download a completed CSV export job
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: jobId
+    type: string
+    required: true
+    description: path segment {jobId}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-datastore-by-datastoreid-import-failures-by-jobid
+  description: GET /api/DataStore/{dataStoreId}/import-failures/{jobId}  [DataStore] - Download failed rows for a completed CSV import job
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: jobId
+    type: string
+    required: true
+    description: path segment {jobId}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-datastore-by-id
+  description: GET /api/DataStore/{id}  [DataStore] - Get a data store by id
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-datastore-restricted
+  description: 'GET /api/DataStore/restricted  [DataStore] - Get all restricted data stores with pagination.
+
+    Works signed in and anonymously: an anonymous caller is scoped by the owner of the public, enabled
+
+    form it passes in formTemplateId, looked up in f'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: pageNumber
+    type: string
+    required: false
+    description: query parameter
+  - name: pageItemCount
+    type: string
+    required: false
+    description: query parameter
+  - name: formTemplateId
+    type: string
+    required: false
+    description: query parameter
+  - name: formWorkspaceId
+    type: string
+    required: false
+    description: query parameter
   - name: dry-run
     type: boolean
     required: false
@@ -4601,6 +4921,220 @@ actions:
     type: boolean
     required: false
     description: compose and return the request without sending it
+- name: get-form-signing-envelope-by-id
+  description: GET /api/form/signing/envelope/{id}  [FormSigning] - Envelope with spots, parties, and derived effective status.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-envelope-by-id-document
+  description: 'GET /api/form/signing/envelope/{id}/document  [FormSigning] - Stream a document rendition: current (default), signed, source, or my-step -
+
+    the caller''s step-scoped view (their order group and earlier; parties only, 404 otherwise).'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: version
+    type: string
+    required: false
+    description: query parameter
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-envelope-by-id-my-session
+  description: GET /api/form/signing/envelope/{id}/my-session  [FormSigning] - The signer's scoped session view (marks first view). Party membership is the boundary.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-public-envelope-by-id
+  description: GET /api/form/signing/public/envelope/{id}  [FormSigningPublic] - Envelope with spots, its one party, and derived effective status.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-public-envelope-by-id-document
+  description: 'GET /api/form/signing/public/envelope/{id}/document  [FormSigningPublic] - Stream a rendition: current (default), signed, or source; my-step reads as current.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: version
+    type: string
+    required: false
+    description: query parameter
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-public-envelope-by-id-my-session
+  description: GET /api/form/signing/public/envelope/{id}/my-session  [FormSigningPublic] - The signer's session view (their own spots and turn).
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-public-template-document-by-workspaceid-by-formtemplateid-by-fileid
+  description: 'GET /api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}  [FormSigningPublic] - Stream the PDF the form''s designer attached to its signing element: the document the
+
+    person filling it starts from. The form must'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: workspaceId
+    type: string
+    required: true
+    description: path segment {workspaceId}
+  - name: formTemplateId
+    type: string
+    required: true
+    description: path segment {formTemplateId}
+  - name: fileId
+    type: string
+    required: true
+    description: path segment {fileId}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: get-form-signing-template-document-by-formtemplateid-by-fileid
+  description: 'GET /api/form/signing/template-document/{formTemplateId}/{fileId}  [FormSigningTemplate] - Stream a template''s signing document: one the form keeps as its document, or - for a
+
+    submission made before it was replaced - one its submission form'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: formTemplateId
+    type: string
+    required: true
+    description: path segment {formTemplateId}
+  - name: fileId
+    type: string
+    required: true
+    description: path segment {fileId}
+  - name: formId
+    type: string
+    required: false
+    description: query parameter
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: get-formapplication-all
   description: 'GET /api/FormApplication/all  [FormApplication] - Permission required: FormTemplate.None'
   args:
@@ -5085,6 +5619,10 @@ actions:
     type: string
     required: true
     description: path segment {id}
+  - name: variablesOnly
+    type: string
+    required: false
+    description: query parameter
   - name: dry-run
     type: boolean
     required: false
@@ -7157,6 +7695,33 @@ actions:
     type: boolean
     required: false
     description: compose and return the request without sending it
+- name: patch-datastore-by-datastoreid-column
+  description: PATCH /api/DataStore/{dataStoreId}/column  [DataStore] - Modify a column in a data store (rename, retype, or update constraints)
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: patch-form-chain-by-chainid-by-forminstanceid
   description: 'PATCH /api/Form/chain/{chainId}/{formInstanceId}  [FormChain] - Permission required: FormInstance.Update'
   args:
@@ -7838,6 +8403,195 @@ actions:
     type: boolean
     required: false
     description: compose and return the request without sending it
+- name: post-datastore
+  description: POST /api/DataStore  [DataStore] - Create a new data store
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-datastore-by-datastoreid-export-start
+  description: POST /api/DataStore/{dataStoreId}/export-start  [DataStore] - Start a CSV export job for a data store
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-datastore-by-datastoreid-import-start
+  description: POST /api/DataStore/{dataStoreId}/import-start  [DataStore] - Import CSV data into a data store
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-datastore-by-datastoreid-rows
+  description: POST /api/DataStore/{dataStoreId}/rows  [DataStore] - Add one or more rows to a data store from the viewer
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-datastore-by-datastoreid-rows-filter
+  description: 'POST /api/DataStore/{dataStoreId}/rows/filter  [DataStore] - Get paginated rows from a data store for the data viewer.
+
+    The optional body carries a recursive filter tree with AND/OR grouping and arbitrary nesting,
+
+    plus multi-column sorting,'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: pageNumber
+    type: string
+    required: false
+    description: query parameter
+  - name: pageItemCount
+    type: string
+    required: false
+    description: query parameter
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-datastore-from-data-model
+  description: 'POST /api/DataStore/from-data-model  [DataStore] - Create a new data store from an existing data model.
+
+    First-level primitive attributes become typed columns; complex attributes become JSON columns.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-datastore-from-json
+  description: 'POST /api/DataStore/from-json  [DataStore] - Create a new data store by inferring its column schema from a JSON payload or URL.
+
+    Top-level properties become typed columns. At least one must be designated as a primary key by name.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: post-datatypes
   description: 'POST /api/DataTypes  [DataTypes] - Permission required: DataModels.Write'
   args:
@@ -8147,6 +8901,334 @@ actions:
     description: compose and return the request without sending it
 - name: post-form
   description: 'POST /api/Form  [Form] - Permission required: None'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-datastore-by-datastoreid-rows
+  description: POST /api/Form/dataStore/{dataStoreId}/rows  [FormDataStore] - Add one or more rows to a data store for form instance operations.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-datastore-by-datastoreid-rows-filter
+  description: 'POST /api/Form/dataStore/{dataStoreId}/rows/filter  [FormDataStore] - Get paginated rows from a data store for form instance operations.
+
+    The optional body carries a recursive filter tree with AND/OR grouping and arbitrary nesting,
+
+    plus mult'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: pageNumber
+    type: string
+    required: false
+    description: query parameter
+  - name: pageItemCount
+    type: string
+    required: false
+    description: query parameter
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-envelope
+  description: POST /api/form/signing/envelope  [FormSigning] - Create a signing envelope from a PDF dropped into a form's signing element.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-envelope-by-id-my-session-decline
+  description: POST /api/form/signing/envelope/{id}/my-session/decline  [FormSigning] - Decline signing; the envelope stops circulating and the sender is notified.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-envelope-by-id-my-session-sign
+  description: 'POST /api/form/signing/envelope/{id}/my-session/sign  [FormSigning] - Sign: applies the adopted signature to every spot assigned to the caller.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-envelope-by-id-send
+  description: 'POST /api/form/signing/envelope/{id}/send  [FormSigning] - Send for signing: freezes spots/parties, activates the first order group, dispatches emails.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: formId
+    type: string
+    required: false
+    description: query parameter
+  - name: rowVersion
+    type: string
+    required: false
+    description: query parameter
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-envelope-from-template
+  description: 'POST /api/form/signing/envelope/from-template  [FormSigning] - Create the signing envelope of the designer''s document of a form''s signing element, seeded
+
+    with the designer''s signers and blocks. Such an element takes no upload.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-public-envelope
+  description: POST /api/form/signing/public/envelope  [FormSigningPublic] - Create the envelope from the PDF the form's signing element holds; returns the access token once.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-public-envelope-by-id-my-session-sign
+  description: 'POST /api/form/signing/public/envelope/{id}/my-session/sign  [FormSigningPublic] - Sign: applies the drawn signature to every spot of the signer; a replay returns 200 with current state.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-public-envelope-by-id-send
+  description: POST /api/form/signing/public/envelope/{id}/send  [FormSigningPublic] - Send after the public submit, bound to the instance it created (of this envelope's form only).
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: formId
+    type: string
+    required: false
+    description: query parameter
+  - name: rowVersion
+    type: string
+    required: false
+    description: query parameter
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-public-envelope-from-template
+  description: 'POST /api/form/signing/public/envelope/from-template  [FormSigningPublic] - Create the envelope of the designer''s document of the form''s signing element, with the
+
+    blocks of the signer''s slots; returns the access token once.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-form-signing-template-document
+  description: POST /api/form/signing/template-document  [FormSigningTemplate] - Store the designer's PDF for a signing element of the form template.
   args:
   - name: profile
     type: string
@@ -8606,6 +9688,29 @@ actions:
     description: compose and return the request without sending it
 - name: post-schedules-notifications
   description: 'POST /api/Schedules/notifications  [Schedules] - Permission required: Schedule.Update'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: post-schedules-validate-crontab
+  description: POST /api/Schedules/validate-crontab  [Schedules] - Validate a crontab expression and preview its next occurrences
   args:
   - name: profile
     type: string
@@ -9676,6 +10781,56 @@ actions:
     type: string
     required: true
     description: process (project) id
+- name: put-apikey-by-id-label
+  description: 'PUT /api/ApiKey/{id}/label  [ApiKey] - Permission required: ApiKey.Update'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: put-apikeymaster-by-subworkspaceid-by-id-label
+  description: 'PUT /api/ApiKeyMaster/{subWorkspaceId}/{id}/label  [ApiKeyMaster] - Permission required: MasterWorkspace.Update'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: subWorkspaceId
+    type: string
+    required: true
+    description: path segment {subWorkspaceId}
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: put-by-masterworkspaceurl-by-workspaceurl-by-entityurl
   description: PUT /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrlLaunch]
   args:
@@ -9861,6 +11016,56 @@ actions:
     type: boolean
     required: false
     description: compose and return the request without sending it
+- name: put-datastore
+  description: PUT /api/DataStore  [DataStore] - Update an existing data store
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: put-datastore-by-datastoreid-rows
+  description: PUT /api/DataStore/{dataStoreId}/rows  [DataStore] - Update rows in a data store from the viewer
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: put-datatypes
   description: 'PUT /api/DataTypes  [DataTypes] - Permission required: DataModels.Update'
   args:
@@ -9976,6 +11181,87 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: put-form-datastore-by-datastoreid-rows
+  description: PUT /api/Form/dataStore/{dataStoreId}/rows  [FormDataStore] - Update a single data store row for form instance operations.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: dataStoreId
+    type: string
+    required: true
+    description: path segment {dataStoreId}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: put-form-signing-envelope-by-id
+  description: PUT /api/form/signing/envelope/{id}  [FormSigning] - DRAFT-only update of spots, signers, and order (echo RowVersion from the last read).
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
+  - name: body
+    type: string
+    required: false
+    description: request body as JSON (object or array)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
+- name: put-form-signing-public-envelope-by-id
+  description: PUT /api/form/signing/public/envelope/{id}  [FormSigningPublic] - DRAFT-only update of the signer's own spots (parties and order mode in the payload are ignored).
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: path segment {id}
   - name: body
     type: string
     required: false
@@ -10769,11 +12055,11 @@ actions:
   - name: cron
     type: string
     required: false
-    description: '5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab. BE rule (PRC-5406): 5 fields only (no seconds), @-macros like @daily are REJECTED, max 100 chars, and the schedule''s times are UTC.'
+    description: '5-field crontab expression (min hour day month weekday); sets the recurrence to CRON (type 8) over the --payload. Preview it first with validate-crontab. BE rule (PRC-5406): 5 fields only (no seconds), @-macros like @daily are REJECTED, max 100 chars. The expression runs on --timezone''s clock (UTC when omitted); startDate / endDate are always UTC.'
   - name: timezone
     type: string
     required: false
-    description: IANA timezone id for the cron (e.g. Europe/Bucharest)
+    description: IANA timezone id (e.g. Europe/Bucharest) the recurrence runs in. Applies to cron and to daily / weekly / monthly / yearly recurrences, whose day and time rules follow that zone's local clock, DST included; absent means UTC
   - name: recurrence-info
     type: string
     required: false

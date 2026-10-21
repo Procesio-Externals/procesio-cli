@@ -35,7 +35,7 @@ OBFUSCATED_EMAIL_RE = re.compile(
 )
 _DOT_TOKEN_RE = re.compile(_DOT, re.IGNORECASE)
 
-# File extensions that look like a TLD in "logo@2x.png"-style asset names.
+# File extensions that look like a TLD in retina asset names (an "@2x" suffix before ".png").
 _NOT_TLDS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "css", "js", "ico", "mp4", "pdf"}
 # Placeholder / infrastructure domains that are never a person's inbox.
 _JUNK_EMAIL_DOMAINS = {

@@ -1,16 +1,17 @@
 # PROCESIO Query Store action - authoring & usage contract
 
 The **Query Store** action (`DataStoreQueryAction`, actionId `02577ada-0000-0200-0000-00000000b001`,
-config tab "Configure Query") runs **exactly one SQL statement** against the workspace's Data
-Stores as a single process step. Data Stores are MySQL-backed, so the dialect is **MySQL**.
+config tab "Configure Query") runs **one SQL statement, or a `;`-separated script of several**
+(multi-statement since v3.0.0, 2026-10; see "Multi-statement scripts" below) against the
+workspace's Data Stores as a single process step. Data Stores are MySQL-backed, so the dialect is **MySQL**.
 There is no credential, connection string or external database. It does both **reads and
 writes** (see the accepted-statements matrix below).
 
 Two different datastore actions, do not confuse them:
 - **Data Store action** (the `DataStoreConnector`, TemplateId `02577ada-0000-0100-0000-00000000a001`):
   point-and-click CRUD on ONE store (SelectAll/SelectWhere/Insert/Update/Delete), no SQL.
-- **Query Store** (this note): one SQL statement, for filtering, joins, totals/reports, and
-  bulk writes across a condition.
+- **Query Store** (this note): SQL (one statement or a `;`-separated script), for filtering,
+  joins, totals/reports, and bulk writes across a condition.
 - **Execute Query** is unrelated: it targets your own external Microsoft SQL Server.
 
 Sources: docs.procesio.com/query-store (read 2026-09-22), a real process export (the node
@@ -20,15 +21,20 @@ Where they disagree, the matrix + platform owner win.
 ## Availability
 Runs in **personal AND organisation** workspaces. (The public doc still says organisation-only,
 "not available on a personal workspace"; that line is STALE as of 2026-09-22.)
+Personal (no-workspace) Data Stores live in their own MySQL database named
+`dsi_<base64 of the user id>`, and since v3.0.0 (2026-10) saving, validating, duplicating and
+testing a Query Store node on a personal workspace no longer returns error 1008.
 
 ## I/O (as the catalog serves it)
 - Input `Query` - code-editor, TextFormat `datastore` (chips, see encoding below).
 - Input `Parameters` - map-parameters (`@name` -> value/variable), **bound as data** (safe).
 - Input `Time Out` - seconds, **60..1800, default 1800**; out of range is refused at validate.
+  It applies per row-returning statement, not to the whole script (v3.0.0).
 - Output `Result Rows` - a list of JSON objects, one per row; keys are the column names (or
   your `AS` aliases). **Empty for INSERT/UPDATE/DELETE/REPLACE.** Map to a **list of Json**.
 - Output `Total Count` - for a SELECT, rows returned; for INSERT/UPDATE/DELETE/REPLACE, rows
   affected (REPLACE that overwrites reports 2 = delete+insert). Map to an **Integer**.
+  In a multi-statement script the affected-rows count covers the whole script (v3.0.0).
 - **No row limit.** A SELECT with no WHERE/LIMIT returns the whole table; add `LIMIT`.
 
 ## Saved node encoding (verified from a real export) - what a builder must emit
@@ -81,6 +87,16 @@ A list variable arrives in the query as a **JSON array**. `IN (@list)` runs but 
 A Data Store `Guid` column is a MySQL `BINARY(16)`: `LENGTH(col)` returns 16 and `CHARSET(col)`
 returns `binary`. Everything below follows from that, and from the binding layer typing a
 parameter by the SHAPE of its value rather than by the column it is written to.
+
+**Converting a guid outside SQL:** the **GUID Converter** action (Utilitary, after Generate
+GUID, actionId `77f61c6d-0000-0200-0000-00000000b001`, added in v3.0.0, 2026-10) converts
+between the standard text form, the `0x` hex literal PROCESIO stores in a `BINARY(16)` column
+(its `Hex` output), a decimal number and Base64, in both byte orders (`HexBigEndian`,
+`Base64DotNet`). Input `Input` plus `InputFormat` (AutoDetect / Standard / Hex / HexBigEndian /
+Number / Base64 / Base64DotNet); outputs Standard, Guid, Hex, HexBigEndian, Number, Base64,
+Base64DotNet. AutoDetect refuses ambiguous input (codes 1009-1012), so name the format when
+the source is known. Use it in a process when a value has to cross between the designer's
+spelling and the stored bytes, instead of the SQL byte reorder below.
 
 **A parameter whose value looks like a GUID (`8-4-4-4-12` hex) is typed Guid and packed to its 16
 bytes before it reaches the column**, including when the column is a String. Two outcomes, both
@@ -238,8 +254,38 @@ lookup silently finds nothing the second time.
 When two Data Stores share a column name, give each an alias and prefix every column
 (`FROM A AS c JOIN B AS o ON o.k = c.k`); without aliases the join is **refused** (ambiguous).
 
+## Multi-statement scripts (changed in v3.0.0, 2026-10)
+
+The `Query` value now runs as ONE batch of `;`-separated MySQL statements. Before v3.0.0 a run
+took exactly one statement and anything stacked was refused. No inputs or outputs were added; the
+catalog tooltip reads "The MySQL statements to run against the Data Store, separated by ;. At
+most one may return rows."
+
+- **No transaction.** The statements run with autocommit, so when one fails, the statements
+  before it stay committed. `START TRANSACTION` / `BEGIN` / `COMMIT` are still refused, so a
+  script that must be all-or-nothing has to be written so a partial run is harmless (idempotent
+  guards, a repair path on the error port).
+- **At most ONE statement may return rows.** More than one fails with error 2003 *"Expected
+  maximum one table but received N tables!"*, and that check runs AFTER the script: every write
+  in it has already happened by the time the step fails.
+- **User variables** (`SET @v = ...`, `SELECT ... INTO @v`, `@v := ...`) are allowed by the
+  Data-Store service's own validator so a value one statement computes can feed the next. **Measured live in prod on 2026-10-21: `SET @v = ...` FAILS through the Query Store action** with the generic *"The query could not be executed."*, with a literal or a parameter on the right-hand side, while a script without user variables (INSERT + SELECT) runs fine. The action's own `@param` binding most likely claims every `@name` before MySQL sees it. Until that is fixed, do not use user variables in a Query Store script: compute the value in an earlier statement's WHERE / a subquery, or bind it as a parameter.
+- **Session statements stay refused**: session `SET`, `START`, `BEGIN`, `LOCK`, `PREPARE` and
+  similar. When one statement of a script is refused, the message is prefixed `Statement N: `
+  so it names the offender.
+- **Hazard: a misspelled `@param` is now silently NULL.** Before v3.0.0 an `@name` with no
+  mapping was a 400. Now it reads as an unset user variable, which is NULL: `WHERE col = @thresold`
+  matches nothing and `SET col = @vlaue` writes NULL, with no error at all. Check every `@name`
+  in the SQL against the Parameters map (and the script's own `SET @...`) before shipping.
+- **Time Out applies per row-returning statement**, not to the whole script.
+- **Total Count** for writes counts the affected rows of the whole script.
+- MySQL `1049` (the workspace has no Data Store database yet) now reads *"Create a Data Store
+  first."*
+- The Data Store service response carries a `resultSetCount`.
+
 ## Accepted statements (QA matrix, run completes / status 50)
-Exactly one statement per run. Accepted:
+Each statement of a script is checked against these lists on its own (changed in v3.0.0,
+2026-10: before, exactly one statement per run). Accepted:
 - **SELECT** - plain, `AS` alias, `WHERE`, `IN (subquery)`, `EXISTS`.
 - **JOIN** - incl. table-aliased `a.col = b.col`.
 - **WITH ... AS** (CTE), incl. **WITH RECURSIVE**.
@@ -250,6 +296,10 @@ Exactly one statement per run. Accepted:
 - **DELETE FROM ... WHERE** (affected-rows count).
 - **REPLACE INTO** (delete+insert; reports 2 affected on an overwrite).
 - `@parameter` binding - constant and variable, bound as data.
+- **User variables** (v3.0.0, service side): `SET @v = ...`, `SELECT ... INTO @v`, `@v := ...`.
+  Not usable through the Query Store action in prod yet: `SET @v` fails (measured 2026-10-21,
+  see Multi-statement scripts).
+- **Several of the above in one `;`-separated script** (v3.0.0), at most one returning rows.
 
 ## Write mechanics
 - **INSERT and REPLACE must fill `CreatedById` and `UpdatedById`** (pass a user GUID as a
@@ -259,11 +309,18 @@ Exactly one statement per run. Accepted:
 - A `REPLACE` counts as a new row, so it **resets** the created-by / created-on values.
 
 ## Refused (QA matrix, status 40 / done-with-errors) - each with a clear message, never a raw DB error
-- **Multi-statement / stacked**: `SELECT ...; DROP ...`, comment-hidden (`--`, `#`), `; SELECT 1`.
+- **Multi-statement / stacked**: NO LONGER refused for being stacked (changed in v3.0.0,
+  2026-10). Each statement is checked on its own, so `SELECT ...; DROP ...` is still refused,
+  for the `DROP`, with the message prefixed `Statement N: `. More than one row-returning
+  statement fails with error 2003 after the script ran (see "Multi-statement scripts"). The
+  pre-v3.0.0 matrix also refused comment-hidden stacking (`--`, `#`) and `; SELECT 1`; those
+  cases were not re-measured on v3.0.0.
 - **DDL**: `DROP/ALTER/TRUNCATE/RENAME/CREATE TABLE`, incl. case-obfuscated (`dRoP`).
 - **Privileges**: `GRANT`.
-- **Session / txn / lock / prepare**: `SET`, `START TRANSACTION`, `COMMIT`, `LOCK TABLES`,
-  `HANDLER`, `PREPARE`, `USE`.
+- **Session / txn / lock / prepare**: session `SET`, `START TRANSACTION`, `BEGIN`, `COMMIT`,
+  `LOCK TABLES`, `HANDLER`, `PREPARE`, `USE`. Still refused in v3.0.0; only a user-variable
+  assignment (`SET @v = ...`) became allowed by the service, and that still fails through
+  the action in prod (measured 2026-10-21).
 - **File / advisory lock / system schema**: `INTO OUTFILE`, `INTO DUMPFILE`, `LOAD_FILE()`,
   `GET_LOCK()`, `information_schema.*`, `mysql.user`, `performance_schema.*` - including
   UPPERCASE / backtick / spaced / comment-split spellings.
@@ -357,7 +414,8 @@ destination. The error when they are missing is unusually good - it names the co
 
 ## Write the statement over lines, always
 
-A Query Store node IS one statement, so an unreadable statement is an unreadable node. SQL built
+A Query Store node's SQL IS the node (one statement, or since v3.0.0 a `;`-separated script),
+so unreadable SQL is an unreadable node. SQL built
 by concatenating strings arrives as a single line, runs perfectly, and shows in the designer as
 one row scrolling off the screen - 3375 characters in the worst case measured here.
 
