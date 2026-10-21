@@ -38,6 +38,12 @@ START_TEMPLATE = "c0e32108-6e3e-4ab8-96bd-cd61be6edb33"
 STOP_TEMPLATE = "c0e32108-6e3e-4ab8-96bd-cd61be6edb34"
 JOIN_TEMPLATE = "fb6a9d14-dd15-420d-a2b2-fc637c0c37c6"   # flow-control Join (inputPorts=-1)
 NULL_GUID = "00000000-0000-0000-0000-000000000000"
+# Setting types the designer never binds a variable to: it saves the template's own value
+# verbatim. `auto` (engine-written, read-only) joined `ignore` with the Auto variable type;
+# the designer treats the two identically, so the builder must too.
+_HIDDEN_SETTING_TYPES = ("ignore", "auto")
+_STARTED_FLOW_SUFFIX = "a03fe2"      # Call Subprocess: the started-flow (instance id) slot
+_BUILTIN_MODELS = {"file": "10c6ac59-3929-49e6-99dc-121212121219"}   # the platform File model
 _GUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
                       r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
 ERROR_MODEL = "10c6ac59-3929-49e6-99dc-121212121220"    # ErrorDataModel (error-port variable type)
@@ -680,7 +686,12 @@ def _build_subprocess(template: dict, spec: dict, var_ids: dict, ctx: dict, coun
     mapper ({id, source, destination}); the designer shape is {id, subprocess, process}."""
     pidx = _property_index(template)
     out: list[dict] = []
-    started = next((s for s in pidx.values() if s.get("type") == "ignore"), None)
+    # The started-flow slot is the hidden property `...a03fe2`. Match it by id: the template
+    # now declares further hidden slots (the child-instance-id outputs), so "the first hidden
+    # property" only holds while the catalog keeps them in that order.
+    hidden = [s for s in pidx.values() if s.get("type") in _HIDDEN_SETTING_TYPES]
+    started = next((s for s in hidden if str(s.get("id", "")).endswith(_STARTED_FLOW_SUFFIX)),
+                   hidden[0] if hidden else None)
     if started:
         out.append({"TabPropertyId": started["id"], "Variable": [], "Value": NULL_GUID})
     flowlist = next((s for s in pidx.values() if s.get("type") == "flow-list"), None)
@@ -779,10 +790,12 @@ def _is_template_default_output(s: dict) -> bool:
     body zero times (measured: iterations went 0→3 when exactly the two are
     restored, and the drop was located here). A list/dict `value` is a nested
     side-panel container, not a default; None/'' is no default, both skipped.
-    Empirically, over the live 233-action catalog, this class is exactly three settings
-    across two actions: `For Each` (`61724e`=-1, `808b0d`=the datetime sentinel)
-    and `Call Subprocess` (`a03fe2`=the null-guid started-flow slot)."""
-    if not ((s.get("direction") == 2) or (s.get("type") == "ignore")):
+    Empirically, over the live 238-action catalog (2026-10), this class is exactly four
+    settings across two actions: `For Each` (`61724e`=-1, `808b0d`=the datetime sentinel)
+    and `Call Subprocess` (`a03fe2`=the null-guid started-flow slot, `a03fe3`=the
+    null-guid child-instance-id output the engine fills; its list sibling `a03fe4` has no
+    default and is skipped)."""
+    if not ((s.get("direction") == 2) or (s.get("type") in _HIDDEN_SETTING_TYPES)):
         return False
     v = s.get("value")
     if v is None or isinstance(v, (list, dict)):
@@ -1073,7 +1086,7 @@ def _ensure_engine_state_properties(template: dict, params: list) -> list:
     extra = []
     for cfg in template.get("configuration") or []:
         for s in cfg.get("settings") or []:
-            if s.get("type") == "ignore" and s.get("id") not in have:
+            if s.get("type") in _HIDDEN_SETTING_TYPES and s.get("id") not in have:
                 extra.append({"TabPropertyId": s["id"], "Variable": [], "Value": s.get("value")})
     return params + extra if extra else params
 
@@ -1709,7 +1722,9 @@ def prepare_ctx(client, config: dict) -> dict:
     ctx["catalog"] = catalog_index(extra=list(live) + list(custom))
     refs = {v["model"].strip().lower() for v in config.get("variables", []) if v.get("model")}
     if refs:
-        models: dict[str, str] = {}
+        # Platform models the workspace list never returns, so `{"model": "File"}` resolves by
+        # name like a workspace model does. A workspace model of the same name still wins.
+        models: dict[str, str] = dict(_BUILTIN_MODELS)
         r = client.get("/api/DataTypes", {"addProperties": False, "pageNumber": 1,
                                           "pageItemCount": 500, "includeProcesioEntries": True,
                                           "includeExternalEntries": True})
@@ -1733,6 +1748,10 @@ def prepare_ctx(client, config: dict) -> dict:
         except Exception:  # noqa: BLE001 - unreadable model -> paths fall back to pass-through
             return
         d = d.get("result", d) if isinstance(d, dict) else d
+        if not isinstance(d, dict):
+            # `GET /api/DataTypes/{x}` answers 200 with a null body for a value it does not know
+            # (an unresolved model NAME lands on that route), so treat it as unreadable too.
+            return
         entries = {}
         for a in (d.get("attributes") or []):
             nm = (a.get("name") or a.get("Name") or "").strip()

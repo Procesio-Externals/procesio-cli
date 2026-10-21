@@ -12,7 +12,7 @@ documentation; neither is an API host.
 
 > If you want to *do* something to PROCESIO, there is almost certainly already an
 > action for it. **List them first — never reimplement a capability the notes
-> describe as a recipe:** `python scripts/run-tool.py procesio` prints all ~330.
+> describe as a recipe:** `python scripts/run-tool.py procesio` prints all 442.
 > Curated (ergonomic) actions win; a raw `<method>-<path>` wrapper or `request`
 > is the fallback only when no curated action fits.
 
@@ -86,7 +86,7 @@ python scripts/run-tool.py procesio login --profile account   # caches the Beare
 
 ## Endpoints — full 1:1 coverage
 
-**Every** Web-API endpoint (247 of them) is a dispatchable action, generated from
+**Every** Web-API endpoint (295 of them) is a dispatchable action, generated from
 the bundled Swagger index. There are three ways in, from most to least
 ergonomic:
 

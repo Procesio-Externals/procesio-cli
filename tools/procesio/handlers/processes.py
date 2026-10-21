@@ -241,8 +241,14 @@ def run_process_with_files(client, args) -> dict:
     deadline = time.monotonic() + args.timeout
     status_val = None
     while True:
+        # The poll reads `status` only. Every flag below defaults to true server-side, and
+        # `addExtras` alone costs several backend look-ups per call (starter, webhook,
+        # schedule, form names, resource usage), so each poll asks for none of it. The
+        # final read below is /output, which is unaffected.
         st = client.get(f"/api/Projects/instances/{instance_id}/status",
-                        {"flowTemplateId": args.id})
+                        {"flowTemplateId": args.id, "getActions": "false",
+                         "getVariables": "false", "getInternalVariables": "false",
+                         "addExtras": "false"})
         inst = st.get("instance") if isinstance(st, dict) else None
         status_val = (inst or st or {}).get("status")
         if status_val in _TERMINAL_STATUSES:

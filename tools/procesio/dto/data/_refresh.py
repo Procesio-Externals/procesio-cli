@@ -133,8 +133,10 @@ def main() -> int:
               "in_bundle_but_not_live": missing_live,
               "written": False}
     if a.write and (added or replaced):
+        # LF on purpose: the tree is LF (.gitattributes), and a bare write_text on Windows
+        # would turn every line into CRLF and bury the real change in EOL churn.
         BUNDLE.write_text(json.dumps(bundle, indent=1, ensure_ascii=False),
-                          encoding="utf-8")
+                          encoding="utf-8", newline="\n")
         report["written"] = True
         report["bundled_after"] = len(bundle["actions"])
     print(json.dumps(report, indent=2))

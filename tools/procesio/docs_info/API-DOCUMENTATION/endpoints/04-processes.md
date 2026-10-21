@@ -650,7 +650,7 @@ A process variable (input/process/output).
 | `Id` | `string (uuid)` | required(value type) | Variable id. |
 | `ContextId` | `string (uuid)` | optional | Context id. |
 | `DataType` | `string (uuid)` | required(value type) | References a data-type definition (Guid). |
-| `Type` | `VariableOrientation` (string|number enum) | required(value type) | INPUT / PROCESS / OUTPUT. |
+| `Type` | `VariableOrientation` (string|number enum) | required(value type) | INPUT / PROCESS / OUTPUT (AUTO = 50 is engine-written, read-only). |
 | `Name` | `string` | optional | Variable name (the JSON key clients use in the payload). |
 | `DefaultValue` | `object` | optional | Default value (any JSON). |
 | `IsList` | `boolean` | required(value type) | Whether the variable is a collection. |
@@ -890,6 +890,7 @@ One input-variable value for a scheduled run.
 | `INPUT` | 10 | Input variable. |
 | `PROCESS` | 20 | Internal/process variable. |
 | `OUTPUT` | 30 | Output variable. |
+| `AUTO` | 50 | Engine-written, read-only instance variable (added in v3.0.0, 2026-10); clients cannot create it. |
 
 ### `FlowDataRetentionType` (number-valued)
 

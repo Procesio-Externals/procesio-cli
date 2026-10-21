@@ -30,16 +30,70 @@ blob — it is the designer's initial state, so every form that never opened "Sw
 to code" carries it. Normalize `null → ""` before doing anything involving a length
 or a concatenation.
 
-## 2. The CSS — injected as a `<style>`, styles the whole document
+## 2. The CSS - injected as a `<style>`, SCOPED to the form (changed in v3.0.0, 2026-10)
 
-The renderer prepends a `<style>` element inside the form root. Because a style
-element is document-scoped regardless of where it sits, **page-level selectors
-work**: `body`, `@keyframes`, `@media`, custom properties all pass through
-untouched.
+The renderer prepends a `<style>` element inside the form root, and since prod
+user-playground v1.115.0 (ui-builder 0.185.0) it **scopes** the CSS first: every
+selector is rewritten to `sel:where([data-form-css-scope=<id>], ...)`, so a rule
+matches only the form root and what is inside it. The earlier rule here (a style
+element is document-scoped, so page-level selectors work) is no longer true.
 
-The **only** thing filtered is the branding class — `js/form-builder/css.ts`
-replaces that literal class string with a random number so it cannot be hidden.
-Everything else is yours.
+What no longer matches:
+
+- rules for `body`, `html`, `:root`, the host page's chrome and the builder;
+- `:root` custom properties, which therefore no longer reach the form. Declare them
+  on a selector for an element inside the form instead;
+- tooltips and date-picker popups, which no longer get the form CSS.
+
+What changes on the way in:
+
+- comments and CSS the scoper cannot parse are dropped, with no error, so when a
+  rule seems to do nothing, check that it survived;
+- `@keyframes` and `@font-face` are moved into a layer.
+
+What is still global:
+
+- a `<style>` inside a paragraph's or heading's HTML;
+- `@import`;
+- JS that injects a `<style>` into `window.parent.document` (the runtime pattern in
+  §4 can do this when a rule genuinely has to reach the page).
+
+How the rewrite works (verified live): the **last compound** of every selector gets
+`:where([data-form-css-scope="<formId>"], [data-form-css-scope="<formId>"] *)` appended.
+So `.card {}` becomes `.card:where(...)`, `#app *` becomes `#app :where(...)`, `:root {}`
+becomes `:root:where(...)` and `html, body {}` becomes `html:where(...), body:where(...)`.
+`@keyframes`, `@import` and `@media` wrappers survive, and the rules inside `@media` are
+rewritten the same way. The attribute sits on the form-builder elements
+(`.form-builder-view--content` and `.form-builder--form`).
+
+**What breaks: UI the JS renders OUTSIDE the form container.** A full-page app, a modal
+or an overlay appended to `document.body` gets no styles at all, and `:root` variables and
+`html` / `body` rules stop applying, because `<html>` and `<body>` are not inside the
+scope. A form whose UI stays inside the form container is not affected.
+
+**The fix (verified live on full-page forms):** before mounting, copy the scope id from
+the form container onto `<html>`. Then `:root:where([attr])` matches and every element on
+the page matches `[attr] *`:
+
+```js
+var host = document.querySelector('[data-form-css-scope]');
+if (host && !document.documentElement.hasAttribute('data-form-css-scope'))
+  document.documentElement.setAttribute('data-form-css-scope',
+                                        host.getAttribute('data-form-css-scope'));
+```
+
+Run it inside the same "wait until the form's elements exist" loop the code already
+uses: the attribute only appears once the form has rendered. Setting the attribute only
+on your own mounted root is NOT enough when the CSS uses `:root` variables or `html` /
+`body` rules. `form-set-code` warns when the JS mounts on `document.body`, or the CSS
+styles `:root` / `html` / `body`, without propagating the attribute.
+
+The scoping broke forms that mount UI outside the container when it shipped, and a revert
+was under discussion at the time of writing (2026-10-21). The fix above is harmless if the
+scoping is reverted, so apply it regardless; drop the lint only once a revert is in prod.
+
+The branding class is also filtered: `js/form-builder/css.ts` replaces that
+literal class string with a random number so it cannot be hidden.
 
 ## 3. The JavaScript — the part that surprises everyone
 
@@ -59,6 +113,13 @@ Three consequences, and every one of them has bitten:
    own. The real form is in `window.parent.document` — the platform confirms this
    itself: the JS slot's shipped boilerplate reads
    `console.log(window.parent.document); -> to access the DOM`.
+
+**Sandbox lifetime (v3.0.0, 2026-10).** At most **5** form-fill sandboxes are live at
+once; one is destroyed after **60 s** with no messages; and a run counts as finished
+after a **100 ms** quiet period. So work a run starts and leaves pending (a
+`setTimeout`, a slow `await`) may outlive the run's own lifetime and be lost with
+its sandbox. Finish the run's work promptly, and put anything long-lived in the
+parent-page runtime of §4.
 
 ## 4. The pattern that works: installer + runtime
 

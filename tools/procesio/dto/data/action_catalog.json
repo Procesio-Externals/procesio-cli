@@ -1786,15 +1786,6 @@
    "events": []
   },
   {
-   "actionId": "c37e56fe-d924-4604-a86f-7c93f863fcdf",
-   "name": "Call Subprocess",
-   "icon": "icon-workflow",
-   "shape": "square",
-   "inputPorts": 1,
-   "outputPorts": 1,
-   "isProcesioAction": true,
-   "isTestable": false,
-   "isDisableable": true,
    "configuration": [
     {
      "id": "9a1321d7-5526-4a2a-a400-46b7157beb6d",
@@ -1818,6 +1809,48 @@
        "columnId": 0,
        "columnSize": 0,
        "tooltip": "Id of the started flow",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "d2831844-54a5-42e7-a101-119e21a03fe3",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121222",
+       "label": "Call subprocess child instance id",
+       "type": "ignore",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "00000000-0000-0000-0000-000000000000",
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 2,
+       "rowId": 0,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Call subprocess child instance id",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "d2831844-54a5-42e7-a101-119e21a03fe4",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121222",
+       "label": "Call subprocess child instance id list",
+       "type": "ignore",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": true,
+       "direction": 2,
+       "rowId": 0,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Call subprocess child instance id list",
        "limits": null,
        "dependencies": [],
        "events": []
@@ -1910,7 +1943,16 @@
      ]
     }
    ],
-   "events": []
+   "events": [],
+   "actionId": "c37e56fe-d924-4604-a86f-7c93f863fcdf",
+   "name": "Call Subprocess",
+   "icon": "icon-workflow",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": false,
+   "isDisableable": true
   },
   {
    "actionId": "321e291b-cc48-dc42-b1a1-2b647cc9f9bd",
@@ -29813,7 +29855,7 @@
          "rowId": 0,
          "columnId": 0,
          "columnSize": 0,
-         "tooltip": "The SQL statement to run against the Data Store. One statement per execution.",
+         "tooltip": "The MySQL statements to run against the Data Store, separated by ;. At most one may return rows.",
          "limits": null,
          "dependencies": [],
          "events": []
@@ -29879,7 +29921,7 @@
          "rowId": 3,
          "columnId": 0,
          "columnSize": 0,
-         "tooltip": "The rows returned by the statement. Empty for statements that do not return rows.",
+         "tooltip": "The rows returned by the statement that returns rows. Empty when no statement does.",
          "limits": null,
          "dependencies": [],
          "events": []
@@ -29900,7 +29942,7 @@
          "rowId": 4,
          "columnId": 0,
          "columnSize": 0,
-         "tooltip": "For SELECT: the number of rows returned. For INSERT, REPLACE, UPDATE and DELETE: the number of affected rows.",
+         "tooltip": "For a SELECT: the number of rows returned. For INSERT, REPLACE, UPDATE and DELETE: the number of affected rows of the whole script.",
          "limits": null,
          "dependencies": [],
          "events": []
@@ -29926,6 +29968,852 @@
    "actionId": "02577ada-0000-0200-0000-00000000b001",
    "name": "Query Store",
    "icon": "database",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": true
+  },
+  {
+   "configuration": [
+    {
+     "id": "83838383-0002-0000-0000-aaaaaaaaaaaa",
+     "label": "Azure Storage",
+     "orderId": 0,
+     "settings": [
+      {
+       "id": "83838383-0001-0001-0000-bbbbbbbbbbbb",
+       "dataTypeId": null,
+       "label": "Azure Storage Credential",
+       "type": "credentials",
+       "language": null,
+       "credentialsTemplateId": "82828282-0001-0000-0000-aaaaaaaaaaaa",
+       "value": null,
+       "options": null,
+       "isRequired": true,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": null,
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "83838383-0001-0002-0000-bbbbbbbbbbbb",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Resource",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": [
+        {
+         "name": "Blob",
+         "value": "Blob"
+        },
+        {
+         "name": "Container",
+         "value": "Container"
+        }
+       ],
+       "isRequired": true,
+       "expects": "string",
+       "isList": false,
+       "direction": 2,
+       "rowId": 2,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Choose whether the operation targets a blob or a container. This filters the operation list below.",
+       "limits": null,
+       "dependencies": [],
+       "events": [
+        {
+         "type": 2,
+         "inputs": [
+          "83838383-0001-0002-0000-bbbbbbbbbbbb"
+         ],
+         "outputs": [
+          "83838383-0001-0003-0000-bbbbbbbbbbbb"
+         ],
+         "outputTarget": 2
+        }
+       ]
+      },
+      {
+       "id": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Operation",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": [],
+       "isRequired": true,
+       "expects": "string",
+       "isList": false,
+       "direction": 2,
+       "rowId": 3,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "Choose the operation to run. Only the inputs required by this operation are shown below.",
+       "limits": null,
+       "dependencies": [
+        {
+         "target": "83838383-0001-0002-0000-bbbbbbbbbbbb",
+         "operator": 2,
+         "logicalOperator": 1,
+         "value": null
+        }
+       ],
+       "events": []
+      },
+      {
+       "id": "83838383-0001-0004-0000-bbbbbbbbbbbb",
+       "dataTypeId": null,
+       "label": "Configuration",
+       "type": "side-pannel",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": [
+        {
+         "id": "83838383-0001-0005-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Container",
+         "type": "text",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": false,
+         "direction": 2,
+         "rowId": 10,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Name of the container the operation targets.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 2,
+           "logicalOperator": 1,
+           "value": null
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 2,
+           "logicalOperator": 1,
+           "value": "ListContainers"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-0006-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Blob name",
+         "type": "text",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": false,
+         "direction": 2,
+         "rowId": 11,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Full name of the blob inside the container, including any folder-like prefix.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "DownloadBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "BlobExists"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "GetBlobProperties"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "DeleteBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "CopyBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "MoveBlob"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-0007-0000-bbbbbbbbbbbb",
+         "dataTypeId": "10c6ac59-3929-49e6-99dc-121212121219",
+         "label": "Input file",
+         "type": "file",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": false,
+         "direction": 2,
+         "rowId": 12,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Variable of type file, containing the file to be uploaded.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "UploadBlob"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-0008-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Prefix",
+         "type": "text",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": false,
+         "direction": 2,
+         "rowId": 13,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Prefixes split by '/' create a folder-like structure. On upload it is added before the file name; on list and delete it narrows the blobs or containers matched. Leave empty for the root.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "UploadBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "ListBlobs"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "DeleteBlobsByPrefix"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "ListContainers"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-0009-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Blob names",
+         "type": "text",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": true,
+         "direction": 2,
+         "rowId": 14,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Blobs to delete, as a list of strings. Example: [\"reports/2024.csv\", \"reports/2025.csv\"]",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "DeleteBlobsByNames"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-000a-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Destination container",
+         "type": "text",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": false,
+         "direction": 2,
+         "rowId": 15,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Container the blob is copied or moved to. It may be the source container.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "CopyBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "MoveBlob"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-000b-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Destination blob name",
+         "type": "text",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": false,
+         "direction": 2,
+         "rowId": 16,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Full name the blob gets in the destination container.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "CopyBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "MoveBlob"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-000d-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121210",
+         "label": "Result",
+         "type": "datatype",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "boolean",
+         "isList": false,
+         "direction": 3,
+         "rowId": 20,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "True when the operation applied, or when the targeted blob or container exists.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "UploadBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "BlobExists"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "DeleteBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "DeleteBlobsByNames"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "DeleteBlobsByPrefix"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "CopyBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "MoveBlob"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "CreateContainer"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "DeleteContainer"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-000e-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Uploaded blob name",
+         "type": "datatype",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": false,
+         "direction": 3,
+         "rowId": 21,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Full name of the blob written by the upload, including the prefix.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "UploadBlob"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-000f-0000-bbbbbbbbbbbb",
+         "dataTypeId": "10c6ac59-3929-49e6-99dc-121212121219",
+         "label": "Output file",
+         "type": "file",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": false,
+         "direction": 3,
+         "rowId": 22,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Content of the downloaded blob.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "DownloadBlob"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-0010-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+         "label": "Names",
+         "type": "datatype",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": "string",
+         "isList": true,
+         "direction": 3,
+         "rowId": 23,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Blob or container names returned by the list operations.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "ListBlobs"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "ListContainers"
+          }
+         ],
+         "events": []
+        },
+        {
+         "id": "83838383-0001-0011-0000-bbbbbbbbbbbb",
+         "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121221",
+         "label": "Details",
+         "type": "datatype",
+         "language": null,
+         "credentialsTemplateId": null,
+         "value": null,
+         "options": null,
+         "isRequired": false,
+         "expects": null,
+         "isList": false,
+         "direction": 3,
+         "rowId": 24,
+         "columnId": 0,
+         "columnSize": 0,
+         "tooltip": "Structured properties of the blob or container, or of every item returned by a list operation.",
+         "limits": null,
+         "dependencies": [
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 1,
+           "value": "GetBlobProperties"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "ListBlobs"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "GetContainer"
+          },
+          {
+           "target": "83838383-0001-0003-0000-bbbbbbbbbbbb",
+           "operator": 1,
+           "logicalOperator": 2,
+           "value": "ListContainers"
+          }
+         ],
+         "events": []
+        }
+       ],
+       "options": null,
+       "isRequired": null,
+       "expects": null,
+       "isList": false,
+       "direction": null,
+       "rowId": 4,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      }
+     ]
+    }
+   ],
+   "events": [],
+   "actionId": "83838383-0000-0000-0000-aaaaaaaaaaaa",
+   "name": "Azure Storage",
+   "icon": "icon-azure-storage",
+   "shape": "square",
+   "inputPorts": 1,
+   "outputPorts": 1,
+   "isProcesioAction": true,
+   "isTestable": true,
+   "isDisableable": false
+  },
+  {
+   "configuration": [
+    {
+     "id": "77f61c6d-0000-0200-0000-00000000b011",
+     "label": "Configuration Tab",
+     "orderId": 0,
+     "settings": [
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b101",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Input",
+       "type": "text",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": true,
+       "expects": "string",
+       "isList": false,
+       "direction": 1,
+       "rowId": 1,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The Guid to convert, as text in any supported format.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b102",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Input format",
+       "type": "select",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": "AutoDetect",
+       "options": [
+        {
+         "name": "Auto Detect",
+         "value": "AutoDetect"
+        },
+        {
+         "name": "Standard",
+         "value": "Standard"
+        },
+        {
+         "name": "Hex",
+         "value": "Hex"
+        },
+        {
+         "name": "Hex (big-endian)",
+         "value": "HexBigEndian"
+        },
+        {
+         "name": "Number",
+         "value": "Number"
+        },
+        {
+         "name": "Base64",
+         "value": "Base64"
+        },
+        {
+         "name": "Base64 (.NET order)",
+         "value": "Base64DotNet"
+        }
+       ],
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 1,
+       "rowId": 2,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The format of the input. Auto Detect resolves only a Standard Guid with dashes, braces, or parentheses, and a Number. Select the format for a hex or Base64 input, because each of those spellings exists in two byte orders.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b103",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Standard",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 3,
+       "rowId": 3,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The Guid as 8-4-4-4-12 lowercase hex with dashes.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b104",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121222",
+       "label": "Guid",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": null,
+       "isList": false,
+       "direction": 3,
+       "rowId": 4,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The same Guid as a Guid value, for Guid variables and Data Store Guid columns.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b105",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Hex",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 3,
+       "rowId": 5,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "0x plus 32 hex digits in the byte order PROCESIO stores (Guid.ToByteArray). Map it unquoted into a Query Store or Execute Query statement.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b106",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Hex (big-endian)",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 3,
+       "rowId": 6,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "0x plus 32 hex digits in the order the text form is read (RFC 4122). The digits after 0x are what Oracle takes, as HEXTORAW('<digits>'); 0x itself is MySQL and SQL Server syntax. PROCESIO Data Store and .NET use Hex instead.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b107",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Number",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 3,
+       "rowId": 7,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The 16 bytes in text order (the standard digits without dashes) as an unsigned decimal integer, up to 39 digits.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b108",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Base64",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 3,
+       "rowId": 8,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The 16 bytes in text order as Base64, 24 characters. Same bytes as Number and Hex (big-endian).",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      },
+      {
+       "id": "77f61c6d-0000-0200-0000-00000000b109",
+       "dataTypeId": "0317bfee-b2f5-4bde-bfe8-121212121214",
+       "label": "Base64 (.NET order)",
+       "type": "datatype",
+       "language": null,
+       "credentialsTemplateId": null,
+       "value": null,
+       "options": null,
+       "isRequired": false,
+       "expects": "string",
+       "isList": false,
+       "direction": 3,
+       "rowId": 9,
+       "columnId": 0,
+       "columnSize": 0,
+       "tooltip": "The 16 bytes in the byte order PROCESIO stores (Guid.ToByteArray) as Base64, 24 characters. Same bytes as Hex; the .NET Convert.ToBase64String convention.",
+       "limits": null,
+       "dependencies": [],
+       "events": []
+      }
+     ]
+    }
+   ],
+   "events": [],
+   "actionId": "77f61c6d-0000-0200-0000-00000000b001",
+   "name": "GUID Converter",
+   "icon": "swap_horiz",
    "shape": "square",
    "inputPorts": 1,
    "outputPorts": 1,

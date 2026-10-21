@@ -1,7 +1,7 @@
 # PROCESIO connectors & platform actions - what the tool resolves live vs what it bundles
 
 Scope: how PROCESIO's built-in **connectors** and **platform actions** reach this tool,
-and the specific ones added in the Aug-Sep 2026 wave. Companion to
+and the specific ones added in the Aug-Sep 2026 wave and in v3.0.0 (2026-10). Companion to
 `PROCESIO-CUSTOM-ACTION-NOTES.md` (which is about *building* NuGet custom actions) and
 `PROCESIO-SQL-ACTIONS-NOTES.md`.
 
@@ -53,6 +53,7 @@ form-element enum `ElementType`.
 
 - `Ai_Decisional_Case = 44`, `Credentials_Ai = 45`
 - `Data_Store_Mapper = 46`, `Data_Store_Decisional = 47`
+- `Auto = 102` (Action-Core 2.x, v3.0.0); also new: `FeTextFormat.DATASTORE = 8`
 - (also in play: `Map_Parameters = 43`, `Credentials_Db = 32`, `Document_Mapper = 38`,
   `Document_Select = 39`, `Form_Template = 42`)
 
@@ -71,12 +72,17 @@ form-element enum `ElementType`.
   2026-09-21 `Redis` is still absent from `GET /api/Credentials/types` (35 types, no
   Redis), so a Redis credential cannot be created there yet. Contract is documented in
   `dto/credential/description.md`; treat as shipped-not-activated until it appears live.
+  Still NOT activated at the v3.0.0 release (2026-10-21): `Redis` is absent from
+  `GET /api/Credentials/types`.
 - **Query Store** action (`DataStoreQueryAction`) - query a data store from a process.
   Input `Query` in a **code-editor whose text format is `datastore`** (the new format,
   alongside `sql`/`python`/`ruby`), plus `Parameters` (map-parameters) and `Timeout`
   (60-1800); output `ResultRows` (datatype) + `TotalCount`. This is the read path a
   process uses; the interactive rows API is the `DataStore` REST surface the tool
-  already maps.
+  already maps. Since v3.0.0 (2026-10) `Query` is a `;`-separated script: no transaction, at
+  most one row-returning statement (error 2003 otherwise, raised after the script ran), user
+  variables allowed, a misspelled `@param` reads as NULL silently. Full contract in
+  `PROCESIO-QUERY-STORE-NOTES.md`.
 - **CURL** action (`CurlAction`) - `CurlCommand` (code-editor) in → `Result` (datatype),
   `Status` (number), `Error`. "Run curl commands."
 - **Data Store** connector in the process designer - operations
@@ -87,6 +93,41 @@ form-element enum `ElementType`.
   a data store is not an element - it is an event action
   `RUN_DATA_STORE_OPERATION` (config `{dataStoreId, operation READ|ADD|UPDATE|DELETE,
   inputMap[], outputMap[]}`) attachable to any element's `field-events`.
+
+## The connectors/actions added in v3.0.0 (2026-10, prod-verified)
+
+- **GUID Converter** (Utilitary, listed after Generate GUID), actionId
+  `77f61c6d-0000-0200-0000-00000000b001`. Input `Input` (required) plus `InputFormat`, a select
+  of AutoDetect / Standard / Hex / HexBigEndian / Number / Base64 / Base64DotNet. Outputs
+  Standard, Guid, Hex, HexBigEndian, Number, Base64, Base64DotNet. It converts between the
+  standard text form, the `0x` hex literal PROCESIO stores for a Data Store Guid column
+  (`BINARY(16)`, the `Hex` output), a decimal number and Base64, in both byte orders.
+  AutoDetect refuses ambiguous input (codes 1009-1012), so name the format when it is known.
+  See the Guid sections of `PROCESIO-QUERY-STORE-NOTES.md` for why the byte order matters.
+- **Azure Storage** connector, id `83838383-0000-0000-0000-aaaaaaaaaaaa`. Inputs Credentials,
+  Resource (Blob / Container), Operation (14 operations, e.g. Upload blob, List blobs by
+  prefix, Copy blob, Create container), Container, BlobName, InputFile, Prefix, BlobNames,
+  DestinationContainer, DestinationBlobName; outputs Result, UploadedBlobName, OutputFile,
+  Names, Details.
+- **"Azure Storage Account" credential**, a new ROOT credential type `AZURE_STORAGE` (= 10),
+  live in `GET /api/Credentials/types`. Fields (`be_id`): `AuthenticationType` (radio; the
+  option values are GUIDs, their `be_value`s are `SharedKey` / `ServicePrincipal`),
+  `AccountName`, `AccountKey`, `TenantId`, `ClientId`, `ClientSecret`, `BlobEndpoint`. It is
+  NOT the older derived template "OAuth2 (REST API) / Azure Storage"
+  (`REST_API_OAUTH_PREDEFINED`). Contract in `dto/credential/description.md`.
+- **Call Subprocess** gained two engine-written OUTPUT settings: "Call subprocess child
+  instance id" (`...a03fe3`) and "Call subprocess child instance id list" (`...a03fe4`). They
+  fill `Auto` (type 50) variables on the INSTANCE, named `{ActionName}_{PropertyName}` (e.g.
+  `Call_Subprocess_ChildInstanceId`; measured live 2026-10-21, prod still types them 20, so
+  read them by name); prod serves the settings as type `ignore`, and the
+  builder treats `ignore` and `auto` alike and finds the started-flow slot (`...a03fe2`, still
+  `ignore`) by id. Auto variables are engine-owned: read-only, always returned on instance /
+  history / archive reads, and kept through data-retention cleanup. The child instance ids
+  are also kept after the parent resumes.
+- **Query Store** became multi-statement (see its entry above).
+
+The offline bundle was refreshed for this wave on 2026-10-21 (238 actions: GUID Converter and
+Azure Storage added, Call Subprocess and Query Store replaced).
 
 ## Scripting languages
 

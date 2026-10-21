@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 
+from tools.procesio import formlint
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.errors import NotPersisted, UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
@@ -196,6 +197,9 @@ def set_code(client, args) -> dict:
         "previous": {"css": previous["CSS"], "javascript": previous["JAVASCRIPT"]},
         "elements": len(form["data"].get("elements") or []),
     }
+    warnings = formlint.lint_form_code_scope(css, js)
+    if warnings:
+        result["warnings"] = warnings
     if args.dry_run:
         return {"dry_run": True, **result}
 
@@ -267,5 +271,7 @@ ACTIONS = {
                     "write and fails with not_persisted if the server kept other code (PROCESIO has been seen "
                     "answering 2xx while dropping the form's Data). --clear removes the code "
                     "entirely WITHOUT decrypting it, which is the only repair for a blob the stored "
-                    "form-code-key cannot open."),
+                    "form-code-key cannot open. Returns `warnings` when the code mounts UI on "
+                    "document.body or styles :root/html/body without propagating the form's CSS "
+                    "scope attribute (those styles do not apply)."),
 }

@@ -195,7 +195,10 @@ action-node building.
 
 ### Download a flow-instance file — `GET /api/File/download` (HAR-verified)
 The file identifiers are **HEADERS, not query params** (a query-only call returns NRE
-"Object reference not set"). Query: `?isArchived=false`. Headers (+ normal auth):
+"Object reference not set"; changed in v3.0.0, 2026-10: an unhandled 500 no longer carries the
+exception text, the body is now the generic
+`[{"statusCode":100,"value":"An unexpected error occurred.","target":null}]`, so expect that
+body as the symptom). Query: `?isArchived=false`. Headers (+ normal auth):
 `uploadFilePath` (the file DTO `path`, e.g.
 `flow/flow-<flowId>/flow-instance-<instanceId>/variable-<varId>/<fileId>`),
 `variableId`, `instanceId`, `flowTemplateId`, `workspaceId`. Returns raw bytes
@@ -302,6 +305,18 @@ next session doesn't re-derive it.
   }
 }
 ```
+**`recurrence.timeZone` on calendar recurrences (changed in v3.0.0, 2026-10).** The block
+above may also carry `timeZone` (an IANA id such as `"Europe/Bucharest"`). It now applies to
+DAILY (4), WEEKLY (5), MONTHLY (6) and YEARLY (7), not only CRON (8): weekday, weekend
+exclusion, day-of-month and time-of-day rules run on that zone's local clock, while
+`startDate`, `endDate` and the computed next run stay UTC. A missing zone means UTC, so older
+schedules behave as before. A zone id the server cannot resolve fails the recurrence (it is
+validated on every recurrence type). A time inside a DST gap moves forward; an ambiguous time
+resolves to standard time. The FE now always sends its browser zone on classic recurrences
+(it used to delete the key), so a UI-created schedule carries one. The tool's
+`create-schedule` / `update-schedule --timezone` sets the zone on daily..yearly too, and
+refuses it (usage error) on ONCE / MINUTES / HOURS, where it has no effect.
+
 The GET-by-id read DTO returns this same nested shape **plus** read-only fields
 (`id`, `status`, `firstName`/`lastName`, `workspaceId`, `createdBy`/`createdOn`,
 `updatedBy`/`updatedOn`). For **update** (`PUT`), include the schedule `id` in the
@@ -389,7 +404,11 @@ Renders the doc body to HTML with placeholders filled; feeds `Send Email` Body f
 Gotchas: (a) the output is WRAPPED in a Froala editor shell
 (`<html><head><link froala_style.min.css><body><div class='fr-box fr-document'><div class='fr-view'>…</div>`)
 — INLINE styles survive (brand colors/fonts render in email), but the external Froala CSS may
-not load in email clients, so style with INLINE css, not `fr-*` classes. (b) Bind doc vars by
+not load in email clients, so style with INLINE css, not `fr-*` classes (changed in v3.0.0,
+2026-10: the shell now links the pinned the `froala-editor` package at version 5.5.0 stylesheet instead of `@latest`,
+the document CSS is kept as written and `url(data:image/png;base64,...)` is no longer
+truncated; the PDF output embeds the Froala 5.5.0 CSS; the inline-CSS advice for email still
+holds). (b) Bind doc vars by
 NAME in docMap (builder resolves name→id). (c) A Generate Document used ONLY for the HTML string
 needs no `Document Output` / `Save document as` / `File Name`.
 
@@ -1292,7 +1311,10 @@ as an upper bound only, and take `/instances` + `/history` as the authority for
 Paging/filter probing on `/instances` is a dead end when the rows are purged:
 `pageNumber` 0 and 1 behave identically (the response always echoes
 `pageNumber: 1`), and `filterStatus` accepts only some values — 2, 3 and 4
-return **HTTP 400**, while 1 and 5 return an (empty) page.
+return **HTTP 400**, while 1 and 5 return an (empty) page. Paging past the end (changed in
+v3.0.0, 2026-10): a `pageNumber` beyond the last page now returns the LAST page again, with
+`pageNumber` echoing the page served, instead of an empty page. So "page N+1 is empty" no
+longer proves the end; stop at `ceil(totalItemCount / <requested page size>)`.
 
 **Per-process schedules:** `GET /api/Projects/{id}/restricted/schedules` does
 NOT return a `schedules` key — it answers with the flow object (id, title,
@@ -1505,12 +1527,16 @@ ARE the knowledge are kept.
    design and fix ONE timezone convention (values are stored as written, no conversion).
 3. **DS-06 confirmed by contrast.** The literal `99999.99` → an **Integer** column stores `100000`
    (silent round); the same value → a **Double** column stores `99999.99`. Money is Double.
+   (Changed in v3.0.0, 2026-10: the silent round is gone, a non-whole number into an Integer
+   column is now refused HTTP 400; see "Data Store row values are typed before any SQL runs"
+   below. Money is still Double.)
 4. **⚠ DS-01 does NOT reproduce on the unified `rows/filter` path.** Against a mixed true/false set,
    a Boolean `equals` filter returns the TRUE rows (and `equals false` the FALSE rows); `istrue`/
    `isfalse` also correct. The historic "Equals-true returns FALSE rows" defect was the OLD
    query-string `GetRows` path; the filter-tree read the tool uses evaluates booleans correctly.
    Prefer `istrue`/`isfalse` for clarity, but `equals` is not broken here. A boolean filter value
    must be a JSON boolean or `"true"`/`"false"` string — an **int `1`/`0` is rejected 400**.
+   (Changed in v3.0.0, 2026-10: `1`/`0` is now accepted on filters and on writes.)
 5. **A batch `datastore-add-rows` requires a UNIFORM column set across every row** — heterogeneous
    keys → `400` "All rows in a batch must have the same set of column aliases." Send every row
    full-column with explicit `null` for absent values (a **null DateTime is accepted**). Judge the
@@ -1528,6 +1554,30 @@ ARE the knowledge are kept.
    the datatype floor is insensitive to store create/drop; the **datastore count** is the floor that
    moves. `get-projects` lists flows by **`title`** (the `name` field is null) and returns promptly
    (it does not hang like `get-process`).
+
+### Data Store row values are typed before any SQL runs (changed in v3.0.0, 2026-10)
+
+Insert, update and filter operands are converted to the column type first, so a bad value is a
+400 instead of a silent coercion or a MySQL error:
+
+- **Integer:** whole numbers within int64 only. `2.5` or `99999.99` is refused (it used to round).
+- **Boolean:** `true`/`false` in any case, `1`/`0`, or a JSON bool, on writes AND filters (an
+  int filter used to be 400; a string `"true"` on write used to fail with MySQL 1366).
+- **Guid:** must parse; junk is refused. **Float/Double:** any number.
+- **Blank** on a typed column becomes NULL, so a blank in a required column counts as missing.
+- **DateTime** is still passed as text (the grammar in item 2 above still applies).
+  **JSON** columns must parse as JSON.
+- LIKE operands are always text. On JSON-backed columns Equals/NotEquals compare as JSON and
+  In/NotIn become an OR chain.
+
+Two error formats, depending on which service refuses the value:
+
+- Web-Api write path: `400` ApiError `INVALID_REQUEST`, target `rows` or `values`, text
+  `Data Store row value for column '<display>' (<Type>): value '<value, cut at 64 chars>' is not a valid <Type>.`
+- Data-Store service: `Value for column '<display>' must be a whole number.` (or `a valid GUID`,
+  `a number`, `true or false`, `a date`).
+
+Match on the column display name in either text; the value is truncated at 64 characters.
 
 ## API-key scoping is strict: cross-workspace reads answer 403
 
@@ -2038,7 +2088,7 @@ and the validity verdict are different things.
 
 ### Classify an action by its OPERATION, never by its name
 
-The tool exposes ~352 actions over ~247 endpoints, so most endpoints have **two** names:
+The tool exposes 442 actions over 295 endpoints (2026-10 snapshot), so most endpoints have **two** names:
 a generated one (`post-projects-by-id-run`) and an ergonomic curated one
 (`run-process`). They are the same HTTP call. Any guard, audit or policy that matches
 **action names** is therefore defeated by a synonym — measured once as **34 operations**
@@ -2227,6 +2277,13 @@ Preview endpoint: **POST /api/Schedules/validate-crontab** — body
 description + next occurrences (UTC). Tool: `procesio validate-crontab`; create/update
 -schedule take `--cron`/`--timezone` (built over the JSON `--payload`). The exact camelCase
 field names of the cron block are best-effort pending a live GET of a created cron schedule.
+
+**Time zone (clarified in v3.0.0, 2026-10).** CRON always evaluated its expression on
+`timeZone`'s local clock (UTC when omitted); "the schedule's times are UTC" is true only of
+`startDate`, `endDate` and the computed next run (and the preview's occurrences). Since v3.0.0
+the same `timeZone` also drives DAILY..YEARLY, an unresolvable zone id fails the recurrence on
+every type, and DST gaps move forward while ambiguous times resolve to standard time (full rules
+in the Scheduler section above). `--timezone` on create/update-schedule is no longer cron-only.
 
 ## Scheduler — what a create/update body must actually look like (live, 2026-08-30)
 
@@ -2824,6 +2881,13 @@ So a derived template that keeps `Type = REST_API` reuses the existing client an
 **no backend change**. Only a new enum value would, and that is a platform change across
 three repos — `CredentialsType`, the factory, and whatever builder the new type needs.
 
+**Upload regression, fixed in v3.0.0 (2026-10).** Before v3.0.0 a derived template that kept
+its parent's `Type` broke custom-action UPLOADS: every upload of a package whose action has a
+`Credentials_Rest` property failed with `TEMPLATE_ERROR`. That was a platform bug (the
+credential type was resolved from the derived template, not its root). The credential type now
+resolves to the ROOT template, so adding a derived `REST_API` template no longer blocks
+uploads, and an old `TEMPLATE_ERROR` of that shape is not a defect in the package.
+
 ### Pinning the action to it
 
 Set `CustomCredentialsTypeGuid` on the `FEDecorator`, and **leave the type as
@@ -2877,6 +2941,13 @@ own `Gid`. A space before the slash creates a second, near-identical group inste
 shipped derived template follows the shape (`OAuth2 (REST API) / Azure Storage`), which is
 why none of them hits this.
 
+Do not confuse that derived OAuth template (`REST_API_OAUTH_PREDEFINED`) with **`Azure Storage
+Account`** (type `AZURE_STORAGE` = 10, new in v3.0.0, 2026-10): a separate ROOT template with
+its own fields (`be_id`): `AuthenticationType` (radio; option values are GUIDs, `be_value`
+`SharedKey` / `ServicePrincipal`), `AccountName`, `AccountKey`, `TenantId`, `ClientId`,
+`ClientSecret`, `BlobEndpoint`. It backs the new Azure Storage connector. Being a root, it has
+no slash and the grouping rule above does not apply to it.
+
 **Verify a naming change by simulating the grouping over the live template list** rather
 than by reading the form. The list is one `GET /api/Credentials/types` call, and the
 grouping is a dozen lines, so a wrong name is provable in seconds instead of guessed at
@@ -2885,7 +2956,7 @@ through the UI.
 **Reuse the PARENT's property ids.** They are slots, not identifiers you mint: in the REST
 family `...0001...` is URL, `...0002...` the test method, `...0003...` the test endpoint,
 `...0004...` the authentication method, `...0007/0008/0009/0010...` key, value, header and
-query. Every shipped derived template — Azure Storage, GitHub, the whole Google family —
+query. Every shipped derived template — Azure Storage (the derived OAuth one, not the root `Azure Storage Account`), GitHub, the whole Google family —
 keeps the parent's ids and its option ids, and overrides only `label`, `placeholder`,
 `value` and `message`. Minting fresh ids has no precedent anywhere in the data.
 
@@ -3902,7 +3973,9 @@ master and change nothing: DELETE as **`500`-wrapping-`400`**, PUT as a wrapped
 **`500 Internal Server Error`** even with a byte-correct `UpdateWorkspaceDto` (the
 name field is **`workspace`**, NOT the create DTO's `workspaceName`; required
 `canExceedPaidTime` + `maxThreads` + `licenseType`; verified against the API-doc
-DTO). ⚠⚠ **So on such a master only CREATE and READ work; UPDATE and DELETE are
+DTO. Changed in v3.0.0, 2026-10: `canExceedPaidTime` and `maxThreads` are now nullable,
+and leaving them out keeps the stored values; the same PUT can also rename the master
+for an Owner / Co-Owner). ⚠⚠ **So on such a master only CREATE and READ work; UPDATE and DELETE are
 both dead** — you can neither delete a sub-workspace to reclaim a slot NOR rename a
 stuck throwaway into a real workspace. **Repurpose-by-rename is therefore NOT a
 cap workaround here** (measured: three PUT attempts, correct DTO, all `500`,
@@ -5671,6 +5744,11 @@ So a step can only be skipped along with everything that reads it, and if those 
 needed the work has to move rather than be switched off - a second process, triggered when the value
 is actually wanted, with its own copy of the shaping logic.
 
+**Error route (changed in v3.0.0, 2026-10).** A disabled action on the Error route used to be
+dispatched anyway. It is now skipped and the flow walks on to the next enabled action, so
+disabling a step on an error branch really takes it out, with the same consequence for its
+consumers as above.
+
 ## ⚠ `toggle-activation` takes the target state in a REQUEST HEADER, not a body
 
 `PATCH /api/Projects/{id}/toggle-activation` is a **setter**, not a toggle, and the state
@@ -6741,3 +6819,142 @@ Builder facts that make this expressible: the process builder's `refdata.primiti
 
 ### Send a WhatsApp document/image FROM a process (Meta Cloud API) + reusable media id
 To reply on WhatsApp with a file: upload it to Meta ONCE with `POST /v{ver}/{phone_number_id}/media` (multipart: `messaging_product=whatsapp`, `type=<mime>`, `file=@path`) -> returns `{id}` (an uploaded-media id, valid ~30 days, reusable across sends). Then send with a normal `Call API` POST to `/{phone_number_id}/messages`, RAW json body `{messaging_product:'whatsapp', to:<e164>, type:'document', document:{id:<media_id>, filename:'X.pdf', caption:'...'}}` (image/video/audio analogous with their own object). Bake the media id as a process-var DEFAULT so the flow just references it; refresh when it expires. A keyword branch (e.g. reply with an offer PDF when the inbound text matches `/ofert/i`) is a `Node` returning a boolean -> `Decisional IS_TRUE` -> a build-body `Node` -> the send `Call API`. Same 24h-window rule as any free-form message (the inbound that triggered it opens the window, so a reply always delivers). The RAW body param shape is `{"body":{"type":"RAW","value":{"RAW":{"format":"json","value":"<%0%>"}, "BINARY":"","FORM_DATA":[],"X_WWW_FORM_URLENCODED":[]}},"headers":[{"key":"Content-Type","value":"application/json","type":"TEXT"}],"queryParams":[]}` with `<%0%>` bound to the JSON-string variable the build Node produced.
+
+## v3.0.0 production wave (2026-10-21): what changed for API clients
+
+Every backend service now runs on .NET 10. Unchanged for clients: Newtonsoft serialization
+(casing, nulls, dates), `x-version: 1.19`, Swagger at `/swagger/v1.19/swagger.json`. Swashbuckle
+moved 6.3 -> 8.1.1 and about half the operations lost the "Permission required: X" text from
+their summary/description, so do not derive permissions from Swagger text alone.
+
+### Pagination (every list endpoint, all services, Data Store rows/filter included)
+- A `pageNumber` past the end returns the LAST page again (it used to return an empty page).
+  The envelope `{totalItemCount, pageNumber, pageItemCount, pageItems}` is unchanged and
+  `pageNumber` echoes the page actually served.
+- Stop a paging loop at `ceil(totalItemCount / <requested page size>)`. A loop that waits for an
+  empty page never ends while data exists. Use the size you sent, not the echoed
+  `pageItemCount` (it shrinks to the total on page 1).
+- An oversized `pageNumber` is clamped, never a 400: when `(pageNumber-1)*pageItemCount`
+  overflows int32 the server uses `int.MaxValue / pageItemCount + 1`, i.e. the last page.
+- `totalItemCount: 0` returns no items; with `pageNumber > 1` some services report `pageNumber: 0`.
+- Unchanged: `pageNumber <= 1` is page 1; `pageItemCount <= 0` returns every item.
+- The tool has no auto-paging loop, so nothing in it can spin; a caller adding one must apply
+  the stop rule.
+
+### Errors and timing
+- An unhandled 500 now returns `[{"statusCode":100,"value":"An unexpected error occurred.","target":null}]`
+  instead of the raw exception message (which could carry SQL text or "Object reference not
+  set..."). Any note in this file quoting exception text from a 500 describes the older body;
+  diagnose from the request shape and a read-back, not from the 500 text.
+- The synchronous random delay (50-200 ms) now runs only on error and refusal responses (auth
+  failures, URL launchers, the restricted Data Store list). Successful calls and anonymous auth
+  no longer pay it, so successes are faster and a latency gap between success and refusal is
+  expected.
+
+### Response compression
+- About 30 large GET reads are compressed, Brotli or gzip chosen from `Accept-Encoding`, no
+  minimum size: Actions, Actions/node, Actions/restricted, Credentials/types, DataTypes,
+  DocumentTemplate/{id}, the Form* / FormApplication* / FormProcess* / FormTemplate* families,
+  Notifications, Projects list and `{id}`, Projects/{id}/instances, /history, /archive,
+  Webhooks; URL launchers only when they return a form template. Headers:
+  `content-encoding: br`, `Vary: Accept-Encoding`.
+- `requests` always decodes gzip and advertises br only when the `brotli` package is installed,
+  so Python clients need no change. A raw client that advertises br must decode it.
+
+### New and changed parameters and fields
+- `GET /api/Projects/{id}?variablesOnly=true` returns `{flow}` with the variables but no
+  actions, canvas or webhooks (and skips the webhook look-up); a large flow shrinks about 10x.
+  Older servers ignore it, so it is safe to send. The tool uses it (`VARIABLES_ONLY` in
+  `client.py`) in every lookup that only reads a flow's variables.
+- `GET /api/Projects/instances/{id}/status`: `getActions`, `getVariables`,
+  `getInternalVariables`, `addExtras` all default `true`, and `addExtras` costs 2-6 backend
+  look-ups. A status poll should send all four as `false` (the tool's `run-process` poll does,
+  then reads `/output`).
+- `GET /api/Users/me` adds `otpEnabled`; sub-workspace list/detail rows add it too and a new
+  sub-workspace inherits the master's flag. The 406 for a workspace that requires 2FA is unchanged.
+- `GET /api/analytics/executionEnvironment/concurrency`: `workspaceId` moved from a header to a
+  required, repeatable query parameter.
+- `GET /api/Resources/analytics/processes/{id}/details`: a real process with no rows returns `[]`.
+- `PUT api/Workspace` can rename the master (Owner / Co-Owner); `canExceedPaidTime` and
+  `maxThreads` are nullable and omitting them keeps the stored values; workspace names are no
+  longer unique.
+- Anonymous endpoints: an expired access cookie plus a refresh cookie gets a 307 back to the same
+  URL with new cookies, so a cookie client must follow redirects and keep the jar.
+
+### Auto variables (type 50)
+- `FlowVariableType.Auto` / `VariableOrientation.AUTO` = 50, serialized as `"type": 50`.
+  Engine-written and read-only: clients cannot create one, and the tool refuses to retype or
+  re-default a SYSTEM (40) or AUTO (50) variable, with no override.
+- Created on the INSTANCE from action settings meant for it, named `{ActionName}_{PropertyName}`
+  (`_2`, `_3` on a clash, 64-char cap), value in `defaultValue`. Instance, history and archive
+  reads always return them (no `getInternalVariables`); they survive data-retention cleanup like
+  SYSTEM values, while PROCESS (20) values are still deleted.
+- **Measured live in prod on 2026-10-21:** the engine already creates these variables on the instance with the new readable names (`Call_Subprocess_InstanceId`, `Call_Subprocess_ChildInstanceId` holding the child's id, `Call_Subprocess_ChildInstanceIdList`), but types them **20 (PROCESS), not 50**, because the Call Subprocess template still declares those settings as `ignore`. So read them by NAME, not by `type == 50`, and do not rely on them surviving data-retention cleanup until prod serves the settings as `auto`.
+- Only Call Subprocess uses it today: two new OUTPUT settings, "Call subprocess child instance id"
+  (`...a03fe3`) and "Call subprocess child instance id list" (`...a03fe4`). Prod serves them as
+  setting `type: "ignore"`; the FE also knows a setting type `"auto"` it treats exactly like
+  `ignore`. The started-flow slot `...a03fe2` stays `ignore`. The child instance ids are kept
+  after the parent resumes. Detail: `PROCESIO-INSTANCE-HISTORY-NOTES.md`.
+
+### Schedules
+- `recurrence.timeZone` now applies to DAILY (4) .. YEARLY (7) as well as CRON (8); the local
+  clock drives the calendar rules, `startDate` / `endDate` / next run stay UTC, a missing zone is
+  UTC, an unresolvable id fails the recurrence. Full rules: the Scheduler sections above.
+- The FE always sends `timeZone` now and disables Save for an inactive target process (FE only:
+  the API does not refuse it).
+- Tool: `--timezone` works on daily..yearly and is a usage error on ONCE / MINUTES / HOURS.
+
+### Data Store (Data-Store v3.0.0 and the Web-Api write path shipped without an announcement)
+- Row values are typed before SQL; Integer accepts whole numbers only, Boolean accepts `1`/`0`;
+  two error formats. Full rules: "Data Store row values are typed before any SQL runs" above.
+- Each rows request loads the store's metadata: a database/table that does not match it is an
+  anonymous 400; metadata unreachable is 503. Duplicate column aliases on create are refused.
+- Personal (no-workspace) stores live in a `dsi_<b64 userId>` database; Query Store on a personal
+  workspace is no longer refused (save/validate/duplicate/test no longer return 1008).
+- Anonymous `GET /api/DataStore/restricted` returns an empty page unless the caller names a
+  public, enabled form template (`formTemplateId` / `formWorkspaceId`). Signed-in callers unchanged.
+- **Query Store action:** the query now runs as one batch of `;`-separated statements, no
+  transaction, at most one row-returning statement, a misspelled `@param` reads as NULL silently.
+  User variables (`SET @v`) are allowed by the service but FAIL through the action in prod
+  (measured 2026-10-21: generic "The query could not be executed."), so do not use them yet. Detail: `PROCESIO-QUERY-STORE-NOTES.md`.
+
+### Execution
+- A disabled action on the Error route is skipped (it used to be dispatched).
+- Data-model mapping from a null source nulls only that attribute and keeps the rest of the object.
+- Generate Document / HTML to PDF: pinned the `froala-editor` package at version 5.5.0, CSS kept as written, data-URL
+  images no longer truncated. Date Difference rewritten with the same semantics. Blob copies are
+  server-side.
+
+### New actions and credentials
+- **GUID Converter** (`77f61c6d-0000-0200-0000-00000000b001`), **Azure Storage** connector
+  (`83838383-0000-0000-0000-aaaaaaaaaaaa`) and the ROOT credential template **`Azure Storage
+  Account`** (`AZURE_STORAGE` = 10), distinct from the derived `OAuth2 (REST API) / Azure Storage`.
+  Redis is still not activated in prod. Derived templates no longer break `Credentials_Rest`
+  uploads with `TEMPLATE_ERROR`. Detail: `PROCESIO-CONNECTORS-NOTES.md`; offline catalog
+  `dto/data/action_catalog.json` refreshed to 238 actions.
+
+### Custom actions
+- Hosts are net10.0; Action-Core 2.x ships `net8.0;net10.0`; a multi-target package now passes the
+  upload validator; the AI credential types moved namespace in 2.1; `ActiveNugetStore = None`
+  answers 1013 FEATURE_DISABLED. Detail: `PROCESIO-CUSTOM-ACTION-NOTES.md`.
+
+### Document signing
+- The API is live in prod: 24 routes under `api/form/signing`, a public set under
+  `api/form/signing/public/*` authenticated by the `x-signing-token` header, envelope statuses
+  DRAFT / SENT / IN_PROGRESS / COMPLETED / DECLINED / VOIDED (+ EXPIRED effective), order modes
+  NONE / SEQUENTIAL / MIXED, errors 710-719, `FormAssigneeType.SIGNER = 3`, signing tasks in
+  `api/Form/assigned`.
+- The form element is NOT usable in prod: the prod ui-builder (0.185.0) hides `document-signing`
+  and the prod playground does not wire its host events to `api/form/signing/*`. The tool covers
+  the routes only through generic endpoint actions; no curated support and no form golden.
+
+### Shipped without an announcement
+- **Process-History v3.0.0:** a failed history insert no longer deletes the runtime row (the
+  instance used to vanish from both stores); a retry no longer overwrites archived variables with
+  an empty list; instances move from `/instances` to `/history` faster.
+- **Data-Store v3.0.0:** the typed-value, metadata and personal-store changes above.
+
+### Endpoint snapshot
+- `data/endpoints.json` is now 295 operations (was 247): +24 signing routes, the Data Store
+  family, ApiKey label PUTs, ApiKeyMaster, Schedules/validate-crontab; nothing removed. The tool
+  exposes 442 actions.

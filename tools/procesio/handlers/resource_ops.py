@@ -434,7 +434,10 @@ ACTIONS = {
         description="Live-test a credential config without saving it (POST /api/Credentials/test)."),
     "customaction-test": ActionDef(
         func=customaction_test, add_args=_ca_test_args, needs_client=True,
-        description="Test a custom action (POST /api/Actions/test)."),
+        description="Run a single action in TEST mode and return its resolved result (--action + "
+                    "--values builds the request from the catalog, incl. a workspace custom "
+                    "action; or pass --body). Polls GET /api/Actions/test/{id}; returns status, "
+                    "errorMessage and testResult."),
     "webhook-launch": ActionDef(
         func=webhook_launch, add_args=_launch_args, needs_client=True,
         description="Fire a webhook-triggered process with a payload (POST /api/Webhooks/launch/{id})."),

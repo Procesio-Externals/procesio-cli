@@ -238,6 +238,51 @@ def lint_field_names(data: Any) -> list[str]:
             f"(FORM-DEV-GUIDE/08-PITFALLS.md)."]
 
 
+# Form custom CSS is scoped to the form container: every selector's last compound gets
+# `:where([data-form-css-scope=<id>], [data-form-css-scope=<id>] *)` appended. UI the JS mounts
+# on document.body, and `:root` / `html` / `body` rules, sit outside that scope and get no style
+# unless the JS copies the attribute onto <html>. See FORM-DEV-GUIDE/02-CODE-INJECTION.md §2.
+_SCOPE_ATTR = "data-form-css-scope"
+_BODY_MOUNT = re.compile(
+    r"document\.body\s*\.\s*(?:appendChild|append|prepend|insertBefore|insertAdjacentHTML|"
+    r"insertAdjacentElement|replaceChildren)\b"
+    r"|document\.body\s*\.\s*innerHTML\s*\+?="
+    r"|\.mount\(\s*(?:document\.body\b|['\"]body['\"])")
+_CSS_COMMENT = re.compile(r"/\*.*?\*/", re.S)
+_CSS_PRELUDE = re.compile(r"([^{}]+)\{")
+_PAGE_SELECTOR = re.compile(r"(:root|html|body)(?![\w-])", re.I)
+
+
+def lint_form_code_scope(css: str | None, js: str | None) -> list[str]:
+    """One warning when the form code relies on styling outside the form's CSS scope.
+
+    Fires when the JS mounts UI on document.body, or the CSS styles :root / html / body, and the
+    JS never mentions the scope attribute (the known fix copies it onto <html>). A form whose UI
+    stays inside the form container triggers neither and gets no warning."""
+    css, js = css or "", js or ""
+    if _SCOPE_ATTR in js:
+        return []
+    reasons = []
+    if _BODY_MOUNT.search(js):
+        reasons.append("the JS renders UI onto document.body")
+    heads = set()
+    for prelude in _CSS_PRELUDE.findall(_CSS_COMMENT.sub("", css)):
+        prelude = prelude.strip()
+        if prelude.startswith("@"):
+            continue
+        for sel in prelude.split(","):
+            m = _PAGE_SELECTOR.match(sel.strip())
+            if m:
+                heads.add(m.group(1).lower())
+    if heads:
+        reasons.append("the CSS styles " + " / ".join(sorted(heads)))
+    if not reasons:
+        return []
+    return [f"form code: {' and '.join(reasons)}, but the form's custom CSS is scoped to the form "
+            f"container ([{_SCOPE_ATTR}]), so those styles will not apply. Before mounting, copy the "
+            f"container's {_SCOPE_ATTR} value onto <html> (FORM-DEV-GUIDE/02-CODE-INJECTION.md §2)."]
+
+
 def lint_form_data(data: Any) -> list[str]:
     """All structural (element-level) lints for a form's Data."""
     return (lint_phantom_parent(data)

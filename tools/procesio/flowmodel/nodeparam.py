@@ -244,11 +244,25 @@ def replace_text(node: dict, find: str, replace: str, *, property_key: str | Non
 # --- process-variable type surgery --------------------------------------------------------------
 #
 # A flow variable is `{id, name, dataType, type, isList, isRequired, defaultValue}`. `type` is the
-# DIRECTION: 10 input / 20 process / 30 output / 40 system. Inputs and outputs ARE the process's
-# public contract (the run payload and the webhook response), so retyping one silently breaks every
-# caller — that is why retyping them needs an explicit override here.
+# DIRECTION: 10 input / 20 process / 30 output / 40 system / 50 auto. Inputs and outputs ARE the
+# process's public contract (the run payload and the webhook response), so retyping one silently
+# breaks every caller — that is why retyping them needs an explicit override here.
+#
+# System (40) and Auto (50) variables are written by the ENGINE, not by the process author: an Auto
+# variable is one an action creates for its own outputs (Call Subprocess exposes the child instance
+# ids that way) and its value is filled in at run time. Retyping or re-defaulting one either does
+# nothing or breaks the action that owns it, so those edits are refused outright, with no override.
 
-VAR_DIRECTION = {10: "input", 20: "process", 30: "output", 40: "system"}
+VAR_DIRECTION = {10: "input", 20: "process", 30: "output", 40: "system", 50: "auto"}
+ENGINE_OWNED_DIRECTIONS = (40, 50)
+
+
+def _refuse_engine_owned(var: dict, what: str) -> None:
+    direction = var.get("type")
+    if direction in ENGINE_OWNED_DIRECTIONS:
+        raise ValueError(
+            f"'{var.get('name')}' is a {VAR_DIRECTION[direction]} variable - the engine writes it, "
+            f"so its {what} is not the process author's to change")
 
 
 def find_variable(flow: dict, key: str) -> dict | None:
@@ -268,8 +282,10 @@ def set_variable_type(flow: dict, var: dict, data_type: str, *,
     """Retype one flow variable in place. Returns {changed, before, after}.
 
     Refuses an input (10) or output (30) variable without `allow_contract_change`: those are the run
-    payload and the response shape a caller depends on.
+    payload and the response shape a caller depends on. Refuses a system (40) or auto (50) variable
+    always: the engine owns its type.
     """
+    _refuse_engine_owned(var, "type")
     direction = var.get("type")
     if direction in (10, 30) and not allow_contract_change:
         raise ValueError(
@@ -415,7 +431,10 @@ def set_variable_default(flow: dict, var: dict, default_value, *,
     * Changing an input's default changes what a run does when the caller says nothing. That
       is a contract change in every sense that matters, even though the signature is unchanged,
       so an input/output variable needs `allow_contract_change`.
+
+    A system (40) or auto (50) variable is refused always: the engine fills its value at run time.
     """
+    _refuse_engine_owned(var, "default value")
     direction = var.get("type")
     if direction in (10, 30) and not allow_contract_change:
         raise ValueError(

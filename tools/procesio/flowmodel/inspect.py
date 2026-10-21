@@ -10,7 +10,7 @@ import collections
 from tools.procesio.flowmodel import families, read_flow
 
 _LARGE_FLOW = 40                       # actions; above this, suggest splitting
-_DIRECTION = {10: "inputs", 20: "process", 30: "outputs"}
+_DIRECTION = {10: "inputs", 20: "process", 30: "outputs", 40: "system", 50: "auto"}
 
 
 def inspect(source, flow_id: str | None = None) -> dict:
@@ -39,7 +39,8 @@ def inspect(source, flow_id: str | None = None) -> dict:
         "foreach": sum(1 for c in fg.containers if c.kind == "foreach"),
     }
 
-    variables = {"inputs": [], "process": [], "outputs": [], "required": []}
+    variables = {"inputs": [], "process": [], "outputs": [], "system": [], "auto": [],
+                 "required": []}
     for v in fg.variables:
         bucket = _DIRECTION.get(v.type)
         if bucket:

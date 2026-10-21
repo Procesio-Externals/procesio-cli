@@ -119,11 +119,16 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `delete-customurl-masterworkspace-by-id` | `--id` | DELETE /api/CustomUrl/MasterWorkspace/{id} [CustomUrlMaster] - Permission required: MasterWorkspace.Update |
 | `delete-customurl-webhook-by-id` | `--id` | DELETE /api/CustomUrl/Webhook/{id} [CustomUrlWebhook] - Permission required: Webhook.Delete |
 | `delete-customurl-workspace-by-id` | `--id` | DELETE /api/CustomUrl/Workspace/{id} [CustomUrlWorkspace] - Permission required: Workspace.Delete |
+| `delete-datastore-by-datastoreid-rows` | `--dataStoreId` | DELETE /api/DataStore/{dataStoreId}/rows [DataStore] - Delete rows from a data store from the viewer |
+| `delete-datastore-by-id` | `--id` | DELETE /api/DataStore/{id} [DataStore] - Delete a data store by id |
 | `delete-datatypes-attribute-by-rootdatatypeid-by-attributeid` | `--rootDataTypeId`, `--attributeId` | DELETE /api/DataTypes/attribute/{rootDataTypeId}/{attributeId} [DataTypes] - Permission required: DataModels.Update |
 | `delete-datatypes-by-id` | `--id` | DELETE /api/DataTypes/{id} [DataTypes] - Permission required: DataModels.Delete |
 | `delete-documenttemplate-by-id` | `--id` | DELETE /api/DocumentTemplate/{id} [DocumentTemplate] - Permission required: DocumentDesigner.Delete |
 | `delete-form` | — | DELETE /api/Form [Form] - Permission required: FormInstance.Delete |
 | `delete-form-by-id` | `--id` | DELETE /api/Form/{id} [Form] - Permission required: FormInstance.Delete |
+| `delete-form-datastore-by-datastoreid-rows` | `--dataStoreId` | DELETE /api/Form/dataStore/{dataStoreId}/rows [FormDataStore] - Delete one or more data store rows for form instance operations. |
+| `delete-form-signing-envelope-by-id` | `--id` | DELETE /api/form/signing/envelope/{id} [FormSigning] - Discard a DRAFT: it is deleted with its document (Remove document / Cancel signing). |
+| `delete-form-signing-public-envelope-by-id` | `--id` | DELETE /api/form/signing/public/envelope/{id} [FormSigningPublic] - Discard the DRAFT: it is deleted, with its document and the signer's details. |
 | `delete-formapplication-by-id` | `--id` | DELETE /api/FormApplication/{id} [FormApplication] - Permission required: FormTemplate.Delete |
 | `delete-formtemplate-by-id` | `--id` | DELETE /api/FormTemplate/{id} [FormTemplate] - Permission required: FormTemplate.Delete |
 | `delete-projects-by-id` | `--id` | DELETE /api/Projects/{id} [ProcessTemplate] - Permission required: ProcessDesigner.Delete |
@@ -211,6 +216,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `get-analytics-executionenvironment-concurrency` | — | GET /api/analytics/executionEnvironment/concurrency [Resources] - Permission required: MasterWorkspace.Read |
 | `get-analytics-executionenvironment-topprocesses` | — | GET /api/analytics/executionEnvironment/topProcesses [Resources] - Permission required: MasterWorkspace.Read |
 | `get-apikey` | — | GET /api/ApiKey [ApiKey] - Permission required: ApiKey.Read |
+| `get-apikeymaster-by-subworkspaceid` | `--subWorkspaceId` | GET /api/ApiKeyMaster/{subWorkspaceId} [ApiKeyMaster] - Permission required: MasterWorkspace.Read |
 | `get-by-masterworkspaceurl-by-workspaceurl-by-entityurl` | `--masterWorkspaceUrl`, `--workspaceUrl`, `--entityUrl` | GET /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl} [CustomUrlLaunch] |
 | `get-by-tinyurl` | `--tinyUrl` | GET /{tinyUrl} [TinyUrlLaunch] |
 | `get-credentials` | — | GET /api/Credentials [Credentials] - Permission required: Credentials.Read |
@@ -229,6 +235,12 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `get-customurl-webhook-by-id` | `--id` | GET /api/CustomUrl/Webhook/{id} [CustomUrlWebhook] - Permission required: Webhook.Read |
 | `get-customurl-workspace` | — | GET /api/CustomUrl/Workspace [CustomUrlWorkspace] - Permission required: Workspace.Read |
 | `get-customurl-workspace-master` | — | GET /api/CustomUrl/Workspace/master [CustomUrlWorkspace] - Permission required: Workspace.Read |
+| `get-datastore` | — | GET /api/DataStore [DataStore] - Get all data stores with pagination |
+| `get-datastore-by-datastoreid-data-model` | `--dataStoreId` | GET /api/DataStore/{dataStoreId}/data-model [DataStore] - Get the internal data model associated with a data store |
+| `get-datastore-by-datastoreid-export-download-by-jobid` | `--dataStoreId`, `--jobId` | GET /api/DataStore/{dataStoreId}/export-download/{jobId} [DataStore] - Download a completed CSV export job |
+| `get-datastore-by-datastoreid-import-failures-by-jobid` | `--dataStoreId`, `--jobId` | GET /api/DataStore/{dataStoreId}/import-failures/{jobId} [DataStore] - Download failed rows for a completed CSV import job |
+| `get-datastore-by-id` | `--id` | GET /api/DataStore/{id} [DataStore] - Get a data store by id |
+| `get-datastore-restricted` | — | GET /api/DataStore/restricted [DataStore] - Get all restricted data stores with pagination. Works signed in and anonymously: an anonymous caller is scoped by… |
 | `get-datatypes` | — | GET /api/DataTypes [DataTypes] - Permission required: DataModels.Read |
 | `get-datatypes-by-id-by-type` | `--id`, `--type` | GET /api/DataTypes/{id}/{type} [DataTypes] - Permission required: DataModels.Read |
 | `get-datatypes-by-value` | `--value` | GET /api/DataTypes/{value} [DataTypes] - Permission required: DataModels.Read |
@@ -253,6 +265,14 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `get-form-chain-by-chainid` | `--chainId` | GET /api/Form/chain/{chainId} [FormChain] - Permission required: FormInstance.Read |
 | `get-form-chain-by-formtemplateid-all` | `--formTemplateId` | GET /api/Form/chain/{formTemplateId}/all [FormChain] - Permission required: FormInstance.Read |
 | `get-form-download` | — | GET /api/Form/download [FileForm] - Permission required: FormInstance.Read |
+| `get-form-signing-envelope-by-id` | `--id` | GET /api/form/signing/envelope/{id} [FormSigning] - Envelope with spots, parties, and derived effective status. |
+| `get-form-signing-envelope-by-id-document` | `--id` | GET /api/form/signing/envelope/{id}/document [FormSigning] - Stream a document rendition: current (default), signed, source, or my-step - the caller's… |
+| `get-form-signing-envelope-by-id-my-session` | `--id` | GET /api/form/signing/envelope/{id}/my-session [FormSigning] - The signer's scoped session view (marks first view). Party membership is the boundary. |
+| `get-form-signing-public-envelope-by-id` | `--id` | GET /api/form/signing/public/envelope/{id} [FormSigningPublic] - Envelope with spots, its one party, and derived effective status. |
+| `get-form-signing-public-envelope-by-id-document` | `--id` | GET /api/form/signing/public/envelope/{id}/document [FormSigningPublic] - Stream a rendition: current (default), signed, or source; my-step reads as current. |
+| `get-form-signing-public-envelope-by-id-my-session` | `--id` | GET /api/form/signing/public/envelope/{id}/my-session [FormSigningPublic] - The signer's session view (their own spots and turn). |
+| `get-form-signing-public-template-document-by-workspaceid-by-formtemplateid-by-fileid` | `--workspaceId`, `--formTemplateId`, `--fileId` | GET /api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId} [FormSigningPublic] - Stream the PDF the form's designer attached to its… |
+| `get-form-signing-template-document-by-formtemplateid-by-fileid` | `--formTemplateId`, `--fileId` | GET /api/form/signing/template-document/{formTemplateId}/{fileId} [FormSigningTemplate] - Stream a template's signing document: one the form keeps as its… |
 | `get-formapplication-all` | — | GET /api/FormApplication/all [FormApplication] - Permission required: FormTemplate.None |
 | `get-formapplication-all-by-pid` | `--pid` | GET /api/FormApplication/all/{pid} [FormApplication] - Permission required: FormTemplate.None |
 | `get-formapplication-all-filter` | — | GET /api/FormApplication/all/filter [FormApplication] - Permission required: FormTemplate.None |
@@ -393,6 +413,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `patch-actions-folders-rename` | — | PATCH /api/Actions/folders/rename [Actions] - Permission required: ProcessDesigner.Update |
 | `patch-by-masterworkspaceurl-by-workspaceurl-by-entityurl` | `--masterWorkspaceUrl`, `--workspaceUrl`, `--entityUrl` | PATCH /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl} [CustomUrlLaunch] |
 | `patch-by-tinyurl` | `--tinyUrl` | PATCH /{tinyUrl} [TinyUrlLaunch] |
+| `patch-datastore-by-datastoreid-column` | `--dataStoreId` | PATCH /api/DataStore/{dataStoreId}/column [DataStore] - Modify a column in a data store (rename, retype, or update constraints) |
 | `patch-form-chain-by-chainid-by-forminstanceid` | `--chainId`, `--formInstanceId` | PATCH /api/Form/chain/{chainId}/{formInstanceId} [FormChain] - Permission required: FormInstance.Update |
 | `patch-formapplication-by-id` | `--id` | PATCH /api/FormApplication/{id} [FormApplication] - Permission required: FormTemplate.Update |
 | `patch-formtemplate-by-id` | `--id` | PATCH /api/FormTemplate/{id} [FormTemplate] - Permission required: FormTemplate.Update |
@@ -425,6 +446,13 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `post-customurl-masterworkspace` | — | POST /api/CustomUrl/MasterWorkspace [CustomUrlMaster] - Permission required: MasterWorkspace.Write |
 | `post-customurl-webhook` | — | POST /api/CustomUrl/Webhook [CustomUrlWebhook] - Permission required: Webhook.Write |
 | `post-customurl-workspace` | — | POST /api/CustomUrl/Workspace [CustomUrlWorkspace] - Permission required: Workspace.Write |
+| `post-datastore` | — | POST /api/DataStore [DataStore] - Create a new data store |
+| `post-datastore-by-datastoreid-export-start` | `--dataStoreId` | POST /api/DataStore/{dataStoreId}/export-start [DataStore] - Start a CSV export job for a data store |
+| `post-datastore-by-datastoreid-import-start` | `--dataStoreId` | POST /api/DataStore/{dataStoreId}/import-start [DataStore] - Import CSV data into a data store |
+| `post-datastore-by-datastoreid-rows` | `--dataStoreId` | POST /api/DataStore/{dataStoreId}/rows [DataStore] - Add one or more rows to a data store from the viewer |
+| `post-datastore-by-datastoreid-rows-filter` | `--dataStoreId` | POST /api/DataStore/{dataStoreId}/rows/filter [DataStore] - Get paginated rows from a data store for the data viewer. The optional body carries a recursive… |
+| `post-datastore-from-data-model` | — | POST /api/DataStore/from-data-model [DataStore] - Create a new data store from an existing data model. First-level primitive attributes become typed columns;… |
+| `post-datastore-from-json` | — | POST /api/DataStore/from-json [DataStore] - Create a new data store by inferring its column schema from a JSON payload or URL. Top-level properties become… |
 | `post-datatypes` | — | POST /api/DataTypes [DataTypes] - Permission required: DataModels.Write |
 | `post-datatypes-attribute-by-rootdatatypeid` | `--rootDataTypeId` | POST /api/DataTypes/attribute/{rootDataTypeId} [DataTypes] - Permission required: DataModels.Update |
 | `post-datatypes-changetopublic` | — | POST /api/DataTypes/changeToPublic [DataTypes] - Permission required: DataModels.Write |
@@ -439,6 +467,18 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `post-file-upload-schedule` | — | POST /api/File/upload/schedule [File] - Permission required: Schedule.Write |
 | `post-file-upload-testaction` | — | POST /api/File/upload/testAction [File] - Permission required: ProcessDesigner.Update |
 | `post-form` | — | POST /api/Form [Form] - Permission required: None |
+| `post-form-datastore-by-datastoreid-rows` | `--dataStoreId` | POST /api/Form/dataStore/{dataStoreId}/rows [FormDataStore] - Add one or more rows to a data store for form instance operations. |
+| `post-form-datastore-by-datastoreid-rows-filter` | `--dataStoreId` | POST /api/Form/dataStore/{dataStoreId}/rows/filter [FormDataStore] - Get paginated rows from a data store for form instance operations. The optional body… |
+| `post-form-signing-envelope` | — | POST /api/form/signing/envelope [FormSigning] - Create a signing envelope from a PDF dropped into a form's signing element. |
+| `post-form-signing-envelope-by-id-my-session-decline` | `--id` | POST /api/form/signing/envelope/{id}/my-session/decline [FormSigning] - Decline signing; the envelope stops circulating and the sender is notified. |
+| `post-form-signing-envelope-by-id-my-session-sign` | `--id` | POST /api/form/signing/envelope/{id}/my-session/sign [FormSigning] - Sign: applies the adopted signature to every spot assigned to the caller. |
+| `post-form-signing-envelope-by-id-send` | `--id` | POST /api/form/signing/envelope/{id}/send [FormSigning] - Send for signing: freezes spots/parties, activates the first order group, dispatches emails. |
+| `post-form-signing-envelope-from-template` | — | POST /api/form/signing/envelope/from-template [FormSigning] - Create the signing envelope of the designer's document of a form's signing element, seeded with… |
+| `post-form-signing-public-envelope` | — | POST /api/form/signing/public/envelope [FormSigningPublic] - Create the envelope from the PDF the form's signing element holds; returns the access token once. |
+| `post-form-signing-public-envelope-by-id-my-session-sign` | `--id` | POST /api/form/signing/public/envelope/{id}/my-session/sign [FormSigningPublic] - Sign: applies the drawn signature to every spot of the signer; a replay… |
+| `post-form-signing-public-envelope-by-id-send` | `--id` | POST /api/form/signing/public/envelope/{id}/send [FormSigningPublic] - Send after the public submit, bound to the instance it created (of this envelope's form… |
+| `post-form-signing-public-envelope-from-template` | — | POST /api/form/signing/public/envelope/from-template [FormSigningPublic] - Create the envelope of the designer's document of the form's signing element, with… |
+| `post-form-signing-template-document` | — | POST /api/form/signing/template-document [FormSigningTemplate] - Store the designer's PDF for a signing element of the form template. |
 | `post-form-upload` | — | POST /api/Form/upload [FileForm] - Permission required: None |
 | `post-formapplication` | — | POST /api/FormApplication [FormApplication] - Permission required: FormTemplate.Write |
 | `post-formprocess-by-formtemplateid-by-flowinstanceid-upload` | `--formTemplateId`, `--flowInstanceId` | POST /api/FormProcess/{formTemplateId}/{flowInstanceId}/upload [FileFormProcess] - Permission required: None |
@@ -456,6 +496,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `post-projects-validate` | — | POST /api/Projects/validate [ProcessTemplate] - Permission required: ProcessDesigner.Update |
 | `post-schedules` | — | POST /api/Schedules [Schedules] - Permission required: Schedule.Write |
 | `post-schedules-notifications` | — | POST /api/Schedules/notifications [Schedules] - Permission required: Schedule.Update |
+| `post-schedules-validate-crontab` | — | POST /api/Schedules/validate-crontab [Schedules] - Validate a crontab expression and preview its next occurrences |
 | `post-subscriptions-refund-by-id` | `--id` | POST /api/Subscriptions/refund/{id} [Subscriptions] - Permission required: MasterWorkspace.Admin |
 | `post-subscriptions-renew-by-id-by-state` | `--id`, `--state` | POST /api/Subscriptions/renew/{id}/{state} [Subscriptions] - Permission required: MasterWorkspace.Admin |
 | `post-transport-export-entities` | — | POST /api/Transport/export-entities [Transport] - Permission required: Workspace.Admin |
@@ -492,6 +533,8 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `put-apikey-by-id-label` | `--id` | PUT /api/ApiKey/{id}/label [ApiKey] - Permission required: ApiKey.Update |
+| `put-apikeymaster-by-subworkspaceid-by-id-label` | `--subWorkspaceId`, `--id` | PUT /api/ApiKeyMaster/{subWorkspaceId}/{id}/label [ApiKeyMaster] - Permission required: MasterWorkspace.Update |
 | `put-by-masterworkspaceurl-by-workspaceurl-by-entityurl` | `--masterWorkspaceUrl`, `--workspaceUrl`, `--entityUrl` | PUT /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl} [CustomUrlLaunch] |
 | `put-by-tinyurl` | `--tinyUrl` | PUT /{tinyUrl} [TinyUrlLaunch] |
 | `put-credentials` | — | PUT /api/Credentials [Credentials] - Permission required: Credentials.Update |
@@ -499,11 +542,16 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `put-customurl-masterworkspace` | — | PUT /api/CustomUrl/MasterWorkspace [CustomUrlMaster] - Permission required: MasterWorkspace.Update |
 | `put-customurl-webhook` | — | PUT /api/CustomUrl/Webhook [CustomUrlWebhook] - Permission required: Webhook.Update |
 | `put-customurl-workspace` | — | PUT /api/CustomUrl/Workspace [CustomUrlWorkspace] - Permission required: Workspace.Update |
+| `put-datastore` | — | PUT /api/DataStore [DataStore] - Update an existing data store |
+| `put-datastore-by-datastoreid-rows` | `--dataStoreId` | PUT /api/DataStore/{dataStoreId}/rows [DataStore] - Update rows in a data store from the viewer |
 | `put-datatypes` | — | PUT /api/DataTypes [DataTypes] - Permission required: DataModels.Update |
 | `put-datatypes-attribute-by-rootdatatypeid` | `--rootDataTypeId` | PUT /api/DataTypes/attribute/{rootDataTypeId} [DataTypes] - Permission required: DataModels.Update |
 | `put-debugger-instances-by-id-variables` | `--id` | PUT /api/Debugger/instances/{id}/variables [Debugger] - Permission required: ProcessInstance.Write |
 | `put-documenttemplate` | — | PUT /api/DocumentTemplate [DocumentTemplate] - Permission required: DocumentDesigner.Update |
 | `put-form` | — | PUT /api/Form [Form] - Permission required: None |
+| `put-form-datastore-by-datastoreid-rows` | `--dataStoreId` | PUT /api/Form/dataStore/{dataStoreId}/rows [FormDataStore] - Update a single data store row for form instance operations. |
+| `put-form-signing-envelope-by-id` | `--id` | PUT /api/form/signing/envelope/{id} [FormSigning] - DRAFT-only update of spots, signers, and order (echo RowVersion from the last read). |
+| `put-form-signing-public-envelope-by-id` | `--id` | PUT /api/form/signing/public/envelope/{id} [FormSigningPublic] - DRAFT-only update of the signer's own spots (parties and order mode in the payload are… |
 | `put-formapplication` | — | PUT /api/FormApplication [FormApplication] - Permission required: FormTemplate.Update |
 | `put-formtemplate` | — | PUT /api/FormTemplate [FormTemplate] - Permission required: FormTemplate.Update |
 | `put-projects` | — | Update a process (PUT /api/Projects). Reports HTTP status/elapsed and WARNS on an empty-body success (which can silently not persist). |

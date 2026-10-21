@@ -2,7 +2,7 @@
 "source": "webapi.procesio.app/swagger/v1.19",
 "openapi": "3.0.1",
 "version": "v1.19",
-"count": 247,
+"count": 295,
 "endpoints": [
 {
 "method": "GET",
@@ -205,6 +205,37 @@
 "tag": "ApiKey",
 "summary": "Permission required: ApiKey.Delete",
 "params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/ApiKey/{id}/label",
+"tag": "ApiKey",
+"summary": "Permission required: ApiKey.Update",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/ApiKeyMaster/{subWorkspaceId}",
+"tag": "ApiKeyMaster",
+"summary": "Permission required: MasterWorkspace.Read",
+"params": [
+"subWorkspaceId"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/ApiKeyMaster/{subWorkspaceId}/{id}/label",
+"tag": "ApiKeyMaster",
+"summary": "Permission required: MasterWorkspace.Update",
+"params": [
+"subWorkspaceId",
 "id"
 ],
 "body": false
@@ -628,6 +659,187 @@
 "path": "/api/CustomUrl/Workspace/{id}",
 "tag": "CustomUrlWorkspace",
 "summary": "Permission required: Workspace.Delete",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataStore",
+"tag": "DataStore",
+"summary": "Get all data stores with pagination",
+"params": [
+"pageNumber",
+"pageItemCount",
+"searchName"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataStore",
+"tag": "DataStore",
+"summary": "Create a new data store",
+"params": [],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/DataStore",
+"tag": "DataStore",
+"summary": "Update an existing data store",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataStore/from-data-model",
+"tag": "DataStore",
+"summary": "Create a new data store from an existing data model.\nFirst-level primitive attributes become typed columns; complex attributes become JSON columns.",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataStore/from-json",
+"tag": "DataStore",
+"summary": "Create a new data store by inferring its column schema from a JSON payload or URL.\nTop-level properties become typed columns. At least one must be designated as a primary key by name.",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DataStore/restricted",
+"tag": "DataStore",
+"summary": "Get all restricted data stores with pagination.\nWorks signed in and anonymously: an anonymous caller is scoped by the owner of the public, enabled\nform it passes in formTemplateId, looked up in formWorkspaceId (or the workspace header when absent);\nwithout a form template it receives an empty page.",
+"params": [
+"pageNumber",
+"pageItemCount",
+"formTemplateId",
+"formWorkspaceId"
+],
+"body": false
+},
+{
+"method": "PATCH",
+"path": "/api/DataStore/{dataStoreId}/column",
+"tag": "DataStore",
+"summary": "Modify a column in a data store (rename, retype, or update constraints)",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/DataStore/{dataStoreId}/data-model",
+"tag": "DataStore",
+"summary": "Get the internal data model associated with a data store",
+"params": [
+"dataStoreId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataStore/{dataStoreId}/export-download/{jobId}",
+"tag": "DataStore",
+"summary": "Download a completed CSV export job",
+"params": [
+"dataStoreId",
+"jobId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataStore/{dataStoreId}/export-start",
+"tag": "DataStore",
+"summary": "Start a CSV export job for a data store",
+"params": [
+"dataStoreId"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataStore/{dataStoreId}/import-failures/{jobId}",
+"tag": "DataStore",
+"summary": "Download failed rows for a completed CSV import job",
+"params": [
+"dataStoreId",
+"jobId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/DataStore/{dataStoreId}/import-start",
+"tag": "DataStore",
+"summary": "Import CSV data into a data store",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/DataStore/{dataStoreId}/rows",
+"tag": "DataStore",
+"summary": "Delete rows from a data store from the viewer",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataStore/{dataStoreId}/rows",
+"tag": "DataStore",
+"summary": "Add one or more rows to a data store from the viewer",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/DataStore/{dataStoreId}/rows",
+"tag": "DataStore",
+"summary": "Update rows in a data store from the viewer",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/DataStore/{dataStoreId}/rows/filter",
+"tag": "DataStore",
+"summary": "Get paginated rows from a data store for the data viewer.\nThe optional body carries a recursive filter tree with AND/OR grouping and arbitrary nesting,\nplus multi-column sorting, with columns given as display names.",
+"params": [
+"dataStoreId",
+"pageNumber",
+"pageItemCount"
+],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/DataStore/{id}",
+"tag": "DataStore",
+"summary": "Delete a data store by id",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/DataStore/{id}",
+"tag": "DataStore",
+"summary": "Get a data store by id",
 "params": [
 "id"
 ],
@@ -1208,6 +1420,48 @@
 "body": false
 },
 {
+"method": "DELETE",
+"path": "/api/Form/dataStore/{dataStoreId}/rows",
+"tag": "FormDataStore",
+"summary": "Delete one or more data store rows for form instance operations.",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Form/dataStore/{dataStoreId}/rows",
+"tag": "FormDataStore",
+"summary": "Add one or more rows to a data store for form instance operations.",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "PUT",
+"path": "/api/Form/dataStore/{dataStoreId}/rows",
+"tag": "FormDataStore",
+"summary": "Update a single data store row for form instance operations.",
+"params": [
+"dataStoreId"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/Form/dataStore/{dataStoreId}/rows/filter",
+"tag": "FormDataStore",
+"summary": "Get paginated rows from a data store for form instance operations.\nThe optional body carries a recursive filter tree with AND/OR grouping and arbitrary nesting,\nplus multi-column sorting, with columns given as display names — the same read capability the\nviewer and the Data Store connector have.",
+"params": [
+"dataStoreId",
+"pageNumber",
+"pageItemCount"
+],
+"body": true
+},
+{
 "method": "GET",
 "path": "/api/FormProcess/{formTemplateId}/{processTemplateId}",
 "tag": "FormProcess",
@@ -1251,6 +1505,226 @@
 "formTemplateId",
 "processTemplateId",
 "processInstanceId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/form/signing/envelope",
+"tag": "FormSigning",
+"summary": "Create a signing envelope from a PDF dropped into a form's signing element.",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/form/signing/envelope/from-template",
+"tag": "FormSigning",
+"summary": "Create the signing envelope of the designer's document of a form's signing element, seeded\nwith the designer's signers and blocks. Such an element takes no upload.",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/form/signing/envelope/{id}",
+"tag": "FormSigning",
+"summary": "Discard a DRAFT: it is deleted with its document (Remove document / Cancel signing).",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/form/signing/envelope/{id}",
+"tag": "FormSigning",
+"summary": "Envelope with spots, parties, and derived effective status.",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/form/signing/envelope/{id}",
+"tag": "FormSigning",
+"summary": "DRAFT-only update of spots, signers, and order (echo RowVersion from the last read).",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/form/signing/envelope/{id}/document",
+"tag": "FormSigning",
+"summary": "Stream a document rendition: current (default), signed, source, or my-step -\nthe caller's step-scoped view (their order group and earlier; parties only, 404 otherwise).",
+"params": [
+"id",
+"version"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/form/signing/envelope/{id}/my-session",
+"tag": "FormSigning",
+"summary": "The signer's scoped session view (marks first view). Party membership is the boundary.",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/form/signing/envelope/{id}/my-session/decline",
+"tag": "FormSigning",
+"summary": "Decline signing; the envelope stops circulating and the sender is notified.",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/form/signing/envelope/{id}/my-session/sign",
+"tag": "FormSigning",
+"summary": "Sign: applies the adopted signature to every spot assigned to the caller.",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/form/signing/envelope/{id}/send",
+"tag": "FormSigning",
+"summary": "Send for signing: freezes spots/parties, activates the first order group, dispatches emails.",
+"params": [
+"id",
+"formId",
+"rowVersion"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/form/signing/public/envelope",
+"tag": "FormSigningPublic",
+"summary": "Create the envelope from the PDF the form's signing element holds; returns the access token once.",
+"params": [],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/form/signing/public/envelope/from-template",
+"tag": "FormSigningPublic",
+"summary": "Create the envelope of the designer's document of the form's signing element, with the\nblocks of the signer's slots; returns the access token once.",
+"params": [],
+"body": true
+},
+{
+"method": "DELETE",
+"path": "/api/form/signing/public/envelope/{id}",
+"tag": "FormSigningPublic",
+"summary": "Discard the DRAFT: it is deleted, with its document and the signer's details.",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/form/signing/public/envelope/{id}",
+"tag": "FormSigningPublic",
+"summary": "Envelope with spots, its one party, and derived effective status.",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "PUT",
+"path": "/api/form/signing/public/envelope/{id}",
+"tag": "FormSigningPublic",
+"summary": "DRAFT-only update of the signer's own spots (parties and order mode in the payload are ignored).",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/form/signing/public/envelope/{id}/document",
+"tag": "FormSigningPublic",
+"summary": "Stream a rendition: current (default), signed, or source; my-step reads as current.",
+"params": [
+"id",
+"version"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/form/signing/public/envelope/{id}/my-session",
+"tag": "FormSigningPublic",
+"summary": "The signer's session view (their own spots and turn).",
+"params": [
+"id"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/form/signing/public/envelope/{id}/my-session/sign",
+"tag": "FormSigningPublic",
+"summary": "Sign: applies the drawn signature to every spot of the signer; a replay returns 200 with current state.",
+"params": [
+"id"
+],
+"body": true
+},
+{
+"method": "POST",
+"path": "/api/form/signing/public/envelope/{id}/send",
+"tag": "FormSigningPublic",
+"summary": "Send after the public submit, bound to the instance it created (of this envelope's form only).",
+"params": [
+"id",
+"formId",
+"rowVersion"
+],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}",
+"tag": "FormSigningPublic",
+"summary": "Stream the PDF the form's designer attached to its signing element: the document the\nperson filling it starts from. The form must be enabled, published and public.",
+"params": [
+"workspaceId",
+"formTemplateId",
+"fileId"
+],
+"body": false
+},
+{
+"method": "POST",
+"path": "/api/form/signing/template-document",
+"tag": "FormSigningTemplate",
+"summary": "Store the designer's PDF for a signing element of the form template.",
+"params": [],
+"body": true
+},
+{
+"method": "GET",
+"path": "/api/form/signing/template-document/{formTemplateId}/{fileId}",
+"tag": "FormSigningTemplate",
+"summary": "Stream a template's signing document: one the form keeps as its document, or - for a\nsubmission made before it was replaced - one its submission formId keeps.",
+"params": [
+"formTemplateId",
+"fileId",
+"formId"
 ],
 "body": false
 },
@@ -1608,7 +2082,8 @@
 "tag": "ProcessTemplate",
 "summary": "Permission required: ProcessDesigner.Read",
 "params": [
-"id"
+"id",
+"variablesOnly"
 ],
 "body": false
 },
@@ -1755,7 +2230,8 @@
 "params": [
 "startDate",
 "endDate",
-"statsType"
+"statsType",
+"workspaceId"
 ],
 "body": false
 },
@@ -1816,6 +2292,14 @@
 "scheduleId"
 ],
 "body": false
+},
+{
+"method": "POST",
+"path": "/api/Schedules/validate-crontab",
+"tag": "Schedules",
+"summary": "Validate a crontab expression and preview its next occurrences",
+"params": [],
+"body": true
 },
 {
 "method": "DELETE",

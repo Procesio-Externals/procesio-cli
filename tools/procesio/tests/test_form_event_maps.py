@@ -22,8 +22,9 @@ class _Client:
     def __init__(self, variables):
         self.variables = variables
 
-    def get(self, path):
+    def get(self, path, query=None):
         assert path == f"/api/Projects/{PID}"
+        assert query == {"variablesOnly": "true"}    # only the variables are read
         return {"flow": {"variables": self.variables}}
 
 

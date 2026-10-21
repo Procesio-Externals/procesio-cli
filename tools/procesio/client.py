@@ -19,6 +19,12 @@ from typing import Any
 from tools.procesio import auth, config, environments, profiles, reliability
 from tools.procesio.errors import DeadlineExceeded, ProcesioAPIError
 
+# Query for `GET /api/Projects/{id}` when only the flow's `variables` are needed: the server
+# then skips the actions, canvas and webhook look-up (a ~60 KB flow comes back as ~5 KB) and
+# returns the same `variables` list. A server that predates the parameter ignores it and
+# answers with the whole flow, so this is safe against every environment.
+VARIABLES_ONLY = {"variablesOnly": "true"}
+
 _BROWSER_UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/126.0 Safari/537.36"

@@ -27,6 +27,7 @@ import uuid
 from functools import lru_cache
 from pathlib import Path
 
+from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.dto.form import fieldpath
 from tools.procesio.dto.framework import Component
 from tools.procesio.errors import UsageError
@@ -954,7 +955,7 @@ def _prepare_ctx(client, config: dict) -> dict:
     pvars: dict = {}
     for pid in pids:
         try:
-            body = client.get(f"/api/Projects/{pid}")
+            body = client.get(f"/api/Projects/{pid}", VARIABLES_ONLY)
         except Exception as e:  # noqa: BLE001
             raise UsageError(f"RUN_PROCESS references process {pid!r} which could not be "
                              f"fetched ({e}); check the processId.")

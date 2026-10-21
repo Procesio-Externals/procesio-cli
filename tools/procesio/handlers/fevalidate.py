@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.errors import ProcesioAPIError, ValidationBlocked
 from tools.procesio.flowmodel import fevalidation as fv
 from tools.procesio.handlers.common import add_profile_arg
@@ -45,7 +46,7 @@ def _subprocess_resolver(client):
     def resolve(fid: str) -> dict:
         if fid not in cache:
             try:
-                r = client.get(f"/api/Projects/{fid}")
+                r = client.get(f"/api/Projects/{fid}", VARIABLES_ONLY)
                 f = r.get("flow", r) if isinstance(r, dict) else r
                 cache[fid] = {v["id"]: v for v in (f.get("variables") or [])}
             except Exception:  # noqa: BLE001 - unreadable target: can't assert its contract

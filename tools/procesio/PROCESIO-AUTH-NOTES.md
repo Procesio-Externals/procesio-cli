@@ -6,7 +6,7 @@ Recorded 2026-06-23 against the production Web API. No secrets in this file.
 
 | Host | Resolves to | TLS | Role | Reachable from here |
 |------|-------------|-----|------|---------------------|
-| `webapi.procesio.app` | 86.105.154.113 (Kong) | valid `*.procesio.app` | **Web API** (v1.19 Swagger, 247 ops) | ✅ yes |
+| `webapi.procesio.app` | 86.105.154.113 (Kong) | valid `*.procesio.app` | **Web API** (v1.19 Swagger, 295 ops) | ✅ yes |
 | `auth.procesio.app` | 86.105.154.113 (Kong) | **self-signed Kong default** (`CN=localhost,O=Kong`) | Proxy/Auth API (login) | ❌ Kong "no route" / cert fail |
 | `procesio.app` | nginx | valid | the Vue SPA (`VUE_APP_*` build env) | SPA only, `/api` = 405 |
 | `procesio.com` | Cloudflare | valid | Next.js marketing site | n/a |

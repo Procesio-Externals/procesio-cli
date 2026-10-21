@@ -380,7 +380,9 @@ is most of what makes a form read as designed rather than decorated:
 ## Stepper JS navigation + accessibility (PRC-5141, 2026-09)
 
 The stepper element exposes two callable **function configs** (`ElementConfigType.FUNCTION`)
-so a script can drive it: `next` and `previous`. PRC-5141 added a generic element-function
+so a script can drive it: `goToNextStep` and `goToPreviousStep`, called as
+`ProcesioForm.data.fields.<name>.goToNextStep()` (changed in the 2026-10 front-end release, ui-builder 0.179.0: they were named
+`next` / `previous`, which clashed with the button-text configs of the same names). PRC-5141 added a generic element-function
 registry (`ui-builder src/js/model/element/function/registry.ts`) plus accessibility work;
 the runtime wiring lives on `main`. Call them like any exposed element function to advance
 or rewind the stepper programmatically instead of relying on the built-in buttons.
