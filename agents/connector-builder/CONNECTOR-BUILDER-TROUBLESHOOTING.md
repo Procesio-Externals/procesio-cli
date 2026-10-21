@@ -27,6 +27,8 @@ The agent never re-implements PROCESIO testing — it hands off to the procesio 
 `next-step --build-id <ID>` attaches a `diagnosis` when a build failed at compile. The logic:
 
 - **NU1301 / "failed to retrieve information about '<pkg>'" / can't reach the source index** → **PLATFORM problem, not your code.** The compiler can't pull the PROCESIO SDK (`Ringhel.Procesio.Action.Core`) from GitHub Packages. Regenerating is useless. Check `get-config --which compilation` (nuget_sources) and `POST /admin/platform-settings/test-nuget` — but note test-nuget only validates the ORG index, and `build-selftest` passes without the SDK, so neither proves the SDK package is restorable. Fix is server-side (grant the GitHub Packages PAT read access to the SDK package, or mirror it to a reachable feed), then `retry --from-step 6`. *No code change needed — the generated code stays parked at step 6 and completes once restore works.* (This is exactly what happened on the first real build.)
+- **(NU1301 above was resolved by 2026-10: SDK restore from GitHub Packages works; Action-Core 2.1.0 restores fine.)**
+- **NU1605 "detected package downgrade: Newtonsoft.Json" → CODE problem.** Action-Core 2.1.0 depends on Newtonsoft.Json 13.0.4; a `.csproj` pinning 13.0.3 cannot restore. Pin 13.0.4.
 - **NU1102 / "unable to find package … version" → CODE problem.** The `.csproj` pinned a non-existent version. Read it (`get-file-version --filename *.csproj`), fix the version (`update-file`), then `retry --from-step 6`.
 - **Real C# errors → CODE problem.** Let the FIX loop try (`retry --from-step 6`); if it can't, `override-stage` back to generate and `regenerate-file` the offending file with the compiler error as instructions.
 
@@ -41,6 +43,9 @@ After `customaction-upload` + a `procesio verify` run, map what you see back to 
 | Wrong/missing input or output ports | `revise-plan` → re-approve → regenerate |
 | Action throws / returns wrong data at runtime | `regenerate-file --filename <impl>.cs --instructions "<the PROCESIO error>"` |
 | Won't load / bad metadata / wrong category | `regenerate-file` on the decorated class; if recurring, fix the `spec_module` knowledge |
+| Upload rejected 261 "Expects value type does not match the property type" | `regenerate-file` the action class: a nullable `int?` cannot carry `Expects`; use non-nullable `int` (or a string) |
+| Action runs but its HTTP call times out, while the API answers from your machine | Probe the host from PROCESIO (`procesio credential-create --dry-run` with a no-auth REST API credential); an unreachable host is an egress problem, not code |
+| Generation looks like it ignores a knowledge edit | `knowledge-list` for a `"source": "database"` override of that module; rewrite it with `knowledge-update --content-file` (never delete it: delete tombstones the base too) |
 | Every connector repeats the same SDK mistake | `knowledge-update --module-type spec_module|example|prompt …` then `reload-config` (improves ALL future builds) |
 
 Per-connector problems → `revise-plan` / `regenerate*`. Systemic problems → edit `knowledge`. Cite the `procesio-custom-actions` skill for what *correct* SDK usage is when writing a knowledge correction. Before re-uploading a fixed build, `procesio customaction-delete --id <old actionId>` so you don't leave stale duplicates.
