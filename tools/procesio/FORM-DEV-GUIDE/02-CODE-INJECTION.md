@@ -92,6 +92,24 @@ The scoping broke forms that mount UI outside the container when it shipped, and
 was under discussion at the time of writing (2026-10-21). The fix above is harmless if the
 scoping is reverted, so apply it regardless; drop the lint only once a revert is in prod.
 
+### Global CSS from the first frame: `@import` of a `data:` stylesheet (verified 2026-10-22)
+
+The attribute fix needs the JS, which arrives about a second after the form renders, so
+anything it styles outside the container (the topbar, `html` / `body`) shows unstyled for
+that second. An `@import` survives the scoper with its URL untouched, and the imported
+sheet is **not scoped**. So the few rules that must be right from the first frame go in a
+base64 `data:` import at the top of the form CSS:
+
+```css
+@import url("data:text/css;base64,<base64 of: .pds-c-topbar{display:none!important} html,body{background:#…!important}>");
+```
+
+Measured on a public form: the topbar node never rendered visibly, not even for one
+100 ms sample. Keep that sheet tiny and generate it in a build step from a readable file.
+Have the runtime check a custom property the import sets (`html{--x-critical:1}`) and
+inject the same rules as a `<style>` when it is missing, so the page still recovers if a
+later release starts dropping data imports.
+
 The branding class is also filtered: `js/form-builder/css.ts` replaces that
 literal class string with a random number so it cannot be hidden.
 
@@ -257,6 +275,12 @@ Points that matter:
 `window.ProcesioForm` exists at runtime and exposes `.data.fields` — a map of field
 state. It is reachable and occasionally the only way to do something (clearing a
 radio group, for instance, since a radio cannot be un-clicked).
+
+**It lives in the trigger sandbox, not on the page.** The sandbox builds it and posts every
+write to the parent (`SET_VARIABLE_VALUE`); `typeof window.ProcesioForm` on the parent page
+is `undefined` (measured 2026-10-22). So a runtime installed in the parent per §4 cannot read
+it: derive state from the DOM there (a signature pad's ink, for instance, by sampling its
+canvas pixels), or read it in element-event JS.
 
 Treat it as a **last resort, not an API**: it is internal, undocumented, and can
 change. Guard every access:

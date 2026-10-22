@@ -211,6 +211,17 @@ a click. Delete the form and its CustomUrl afterwards. This is how a login-gated
 production form can still be changed on evidence: the gate blocks the headless run
 on the real form, not on the copy of its mechanism.
 
+**A duplicated form is the quickest test bench for a restyle.** `form-duplicate` keeps every
+element id and the data model's root id (the ORIGINAL form id), so every value path and
+event mapping still resolves in the copy (verified 2026-10-22). The copy comes back as a
+draft named `… (Copy)`: publish it (`form-update --status 1 --state true --is-private false`),
+then bend it into each state you need to see. Make the hidden sections visible, put a base64
+PDF in a file viewer's `src` (a raw base64 string renders), drop a load process's
+`outputMap` so it cannot hide what you made visible, or swap a submit button's RUN_PROCESS
+for a MAP_FORM_DATA that shows the success section. A state that real data cannot reach
+(no valid token left, a success that writes to a database) gets tested there, on the real
+renderer, with the exact build you will ship.
+
 **A duplicated process**, for anything on the process side. `procesio` can duplicate
 a process; change the copy, run the copy, and promote the change only once it works.
 Editing a live process that a public form is calling means every submission in

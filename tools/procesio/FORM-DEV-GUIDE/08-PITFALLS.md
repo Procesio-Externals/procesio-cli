@@ -261,6 +261,22 @@ process side and `path: null` on the form side.
 **Cause.** `syncRun: false` — the form fired and forgot.
 **Rule.** `syncRun: true`. Verified to hold the line open across a multi-second
 external call.
+**Observed timing with `syncRun: false` (2026-10-22, FORM_LOAD and click chains):** the
+renderer still launched with `runSynchronous=false`, waited for the completion notice, then
+read `GET /api/formProcess/{form}/{process}/{instance}/variables`, and only then ran the next
+event of the same chain. So a "hide the loader" script placed after the RUN_PROCESS runs once
+the result is in, not right after the launch.
+
+### A signature-pad value mapped to a File input fails at launch
+**Symptom.** The click chain runs (publish, upload and launch all return 200), the form
+unlocks, and nothing else happens. The instance shows 0 actions consumed and
+`Error while building input model: Invalid variable value for the mandatory input file property.`
+**Seen** once, on a duplicated form whose signature pad fed a `File` process input (the
+upload itself succeeded; the stored value was `{id, elementId, name, file: {}, path, …}`).
+Not yet checked on an original, non-duplicated form.
+**Rule.** Before relying on a signature pad → File mapping, run the real chain once and check
+the instance's actions. Give the form a visible failure path: a UI that only reacts to the
+success output leaves the signer looking at a button that did nothing.
 
 ### The process launches twice per interaction
 **Cause.** Two `RUN_PROCESS` events on the same trigger.
@@ -334,6 +350,20 @@ the fold.
 ### A completed-field glow overhangs the next column
 **Cause.** An outer `box-shadow`.
 **Rule.** `inset`.
+
+### A hover lift does nothing on an element that animated in
+**Cause.** The entrance animation used `animation-fill-mode: both`. Its last keyframe
+(`transform: none`) stays applied after the animation ends, and animations beat
+ordinary declarations, `:hover` included.
+**Rule.** Entrances use `backwards`: the "from" state covers the delay, and the element
+returns to its own styles at the end.
+
+### Tiles in a grid overlap or overflow it
+**Cause.** Authored `<a>` / `<button>` tiles with `width: 100%` and padding render with
+`box-sizing: content-box` on this page, so every tile is wider than its grid track.
+**Rule.** Set `box-sizing: border-box` on the component and its descendants. Also check
+that a narrow-screen media query comes after the wider one in the file: a
+`max-width: 480px` rule placed before a `max-width: 760px` rule loses to it on phones.
 
 ### The entrance stagger makes a long step take seconds to appear
 **Cause.** An uncapped `nth-child` delay ramp.

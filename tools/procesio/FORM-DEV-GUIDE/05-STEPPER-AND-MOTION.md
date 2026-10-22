@@ -332,6 +332,37 @@ it the same `border-radius` as the card instead.
 Three identical spans with staggered delays produce a continuous ripple from one
 `@keyframes`. `transform` + `opacity` only, so it composites on the GPU.
 
+### A determinate loader: measure, do not animate (verified 2026-10-22)
+
+A looping sweep tells the reader nothing. A process-backed view can show real progress,
+because every step of a form's RUN_PROCESS is a request the page makes:
+
+| request (relative to the webapi host) | meaning |
+|---|---|
+| `POST /api/formProcess/{form}/{process}/publish` | the chain started |
+| `POST /api/formProcess/{form}/{instance}/upload` | a file field is going up (XHR upload progress has real bytes) |
+| `POST /api/formProcess/{form}/{instance}/launch?runSynchronous=…` | the process is running |
+| `GET /api/formProcess/{form}/{process}/{instance}/variables` | the result is in |
+
+How to build it:
+
+1. In the parent-page runtime, wrap `XMLHttpRequest.prototype.open/send` and `fetch` once
+   (guard on a window flag). Record start, end and bytes (`progress` / `upload.progress`
+   events; for fetch, count a `res.clone().body` reader against `content-length`). Never let
+   the wrapper throw into the platform's request.
+2. Backfill from `performance.getEntriesByType('resource')` (initiator `xmlhttprequest` /
+   `fetch`): the runtime installs about a second after render and can miss the first calls.
+3. Split the bar into stages that end on real events: publish/launch → result → document
+   bytes downloaded and pages rendered (canvases in the viewer) → DOM quiet for ~450 ms. Only
+   the server-side wait has no signal; ease it on `1 - exp(-t/τ)` capped below the stage end,
+   so it never passes the next real milestone. Keep the displayed value monotonic.
+4. Let later evidence close earlier stages (a rendered section means the chain finished,
+   whatever the network buffer caught), and keep the hard ceiling from above.
+
+The same number can drive a thin bar in a custom header and the tab itself: a percentage
+prefix in `document.title` and a canvas-drawn progress ring as the favicon
+(`link[rel~="icon"]`). Both are outside Vue and safe to write.
+
 ## 6. State-change motion on controls
 
 Every animation should be tied to a state change; nothing decorative should move on
