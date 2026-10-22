@@ -6915,8 +6915,9 @@ their summary/description, so do not derive permissions from Swagger text alone.
   public, enabled form template (`formTemplateId` / `formWorkspaceId`). Signed-in callers unchanged.
 - **Query Store action:** the query now runs as one batch of `;`-separated statements, no
   transaction, at most one row-returning statement, a misspelled `@param` reads as NULL silently.
-  User variables (`SET @v`) are allowed by the service but FAIL through the action in prod
-  (measured 2026-10-21: generic "The query could not be executed."), so do not use them yet. Detail: `PROCESIO-QUERY-STORE-NOTES.md`.
+  User variables (`SET @v`) work, except a text variable compared with a text column: a collation
+  mismatch makes it fail with the generic "The query could not be executed." (measured 2026-10-22);
+  add `COLLATE utf8mb4_0900_ai_ci` to that comparison. Detail: `PROCESIO-QUERY-STORE-NOTES.md`.
 
 ### Execution
 - A disabled action on the Error route is skipped (it used to be dispatched).

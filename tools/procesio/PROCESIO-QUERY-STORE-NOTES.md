@@ -269,7 +269,7 @@ most one may return rows."
   maximum one table but received N tables!"*, and that check runs AFTER the script: every write
   in it has already happened by the time the step fails.
 - **User variables** (`SET @v = ...`, `SELECT ... INTO @v`, `@v := ...`) are allowed by the
-  Data-Store service's own validator so a value one statement computes can feed the next. **Measured live in prod on 2026-10-21: `SET @v = ...` FAILS through the Query Store action** with the generic *"The query could not be executed."*, with a literal or a parameter on the right-hand side, while a script without user variables (INSERT + SELECT) runs fine. The action's own `@param` binding most likely claims every `@name` before MySQL sees it. Until that is fixed, do not use user variables in a Query Store script: compute the value in an earlier statement's WHERE / a subquery, or bind it as a parameter.
+  Data-Store service's own validator so a value one statement computes can feed the next. **Measured live in prod on 2026-10-22:** user variables work, except where one meets a TEXT column. `SET @q = 1; ... WHERE IntCol = @q` runs, and so do Boolean and Guid comparisons and a plain `SELECT @n`. `SET @n = 'x'; ... WHERE TextCol = @n` fails with the generic *"The query could not be executed."*: the variable and the column carry different collations (`utf8mb4_0900_ai_ci` vs `utf8mb4_general_ci`, a MySQL configuration mismatch on the platform side, with no dedicated error message). Workaround that runs: put an explicit collation on the comparison, `WHERE TextCol = @n COLLATE utf8mb4_0900_ai_ci` (either collation name works). Or avoid the text variable and bind the value as a parameter.
 - **Session statements stay refused**: session `SET`, `START`, `BEGIN`, `LOCK`, `PREPARE` and
   similar. When one statement of a script is refused, the message is prefixed `Statement N: `
   so it names the offender.
@@ -297,8 +297,8 @@ Each statement of a script is checked against these lists on its own (changed in
 - **REPLACE INTO** (delete+insert; reports 2 affected on an overwrite).
 - `@parameter` binding - constant and variable, bound as data.
 - **User variables** (v3.0.0, service side): `SET @v = ...`, `SELECT ... INTO @v`, `@v := ...`.
-  Not usable through the Query Store action in prod yet: `SET @v` fails (measured 2026-10-21,
-  see Multi-statement scripts).
+  A text variable compared with a text column fails unless the comparison carries an explicit
+  `COLLATE` (measured 2026-10-22, see Multi-statement scripts).
 - **Several of the above in one `;`-separated script** (v3.0.0), at most one returning rows.
 
 ## Write mechanics
@@ -319,8 +319,8 @@ Each statement of a script is checked against these lists on its own (changed in
 - **Privileges**: `GRANT`.
 - **Session / txn / lock / prepare**: session `SET`, `START TRANSACTION`, `BEGIN`, `COMMIT`,
   `LOCK TABLES`, `HANDLER`, `PREPARE`, `USE`. Still refused in v3.0.0; only a user-variable
-  assignment (`SET @v = ...`) became allowed by the service, and that still fails through
-  the action in prod (measured 2026-10-21).
+  assignment (`SET @v = ...`) became allowed (a text variable against a text column needs an
+  explicit `COLLATE`, see Multi-statement scripts).
 - **File / advisory lock / system schema**: `INTO OUTFILE`, `INTO DUMPFILE`, `LOAD_FILE()`,
   `GET_LOCK()`, `information_schema.*`, `mysql.user`, `performance_schema.*` - including
   UPPERCASE / backtick / spaced / comment-split spellings.
