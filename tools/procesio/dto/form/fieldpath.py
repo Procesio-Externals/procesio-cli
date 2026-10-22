@@ -84,6 +84,63 @@ class LiveForm:
             name = _name_of(el)
             if name:
                 self.by_name.setdefault(name, []).append(el)
+        # Form variables (Offer_ID, isConfirmed…) are mapped by their own id, and the form's
+        # data model also carries the platform's `instance` tree (instance.currentUser.email…),
+        # addressed as root.<attr id>.<attr id>…; both are as valid on a map row as a field.
+        self.variables: dict[str, dict] = {}
+        self.variable_ids: dict[str, dict] = {}
+        for v in data.get("variables") or []:
+            if not v.get("id") or not v.get("name") or v.get("name") == "form":
+                continue                      # `form` is the data-model handle, not a value
+            self.variables[str(v["name"])] = v
+            self.variable_ids[str(v["id"])] = v
+        self.model = data.get("dataModel") or {}
+
+    def is_variable(self, value) -> bool:
+        return isinstance(value, str) and value in self.variable_ids
+
+    def variable_for(self, value):
+        """`@Name`, or a bare name no field carries, or the variable's id -> the variable."""
+        if not isinstance(value, str):
+            return None
+        if value.startswith("@"):
+            return self.variables.get(value[1:])
+        if value in self.variable_ids:
+            return self.variable_ids[value]
+        if value not in self.by_name:
+            return self.variables.get(value)
+        return None
+
+    def model_path(self, value):
+        """A dotted NAME path into the form's data model (instance.currentUser.email) -> its
+        id path, or None when the first name is not a top-level attribute of the model."""
+        if not isinstance(value, str) or "." not in value or not self.root_id:
+            return None
+        names = value.split(".")
+        attrs, ids = self.model.get("attributes") or [], []
+        for i, nm in enumerate(names):
+            hit = next((a for a in attrs if a.get("name") == nm), None)
+            if hit is None:
+                if i == 0:
+                    return None
+                known = ", ".join(sorted(a.get("name", "") for a in attrs)) or "(none)"
+                raise UsageError(f"{value!r}: {nm!r} is not an attribute of "
+                                 f"{'.'.join(names[:i])!r}; it has: {known}")
+            ids.append(str(hit["id"]))
+            attrs = hit.get("attributes") or []
+        return ".".join([self.root_id] + ids)
+
+    def _model_ids_ok(self, path: str) -> bool:
+        parts = str(path).split(".")
+        if len(parts) < 2 or parts[0] != self.root_id or parts[1] == FIELDS_NS:
+            return False
+        attrs = self.model.get("attributes") or []
+        for pid in parts[1:]:
+            hit = next((a for a in attrs if str(a.get("id")) == pid), None)
+            if hit is None:
+                return False
+            attrs = hit.get("attributes") or []
+        return True
 
     def value_config_id(self, element: dict):
         return _config_id(element, value_key(element.get("type")))
@@ -166,7 +223,10 @@ class LiveForm:
             problems.append(f"segment 3 {element_id!r} is not an element on this form")
         else:
             expected = self.value_config_id(element)
-            if not expected:
+            own_configs = {str(c.get("id")) for c in element.get("configs") or [] if c.get("id")}
+            if value_id in own_configs and value_id != str(expected):
+                pass                          # a config of THIS element (label, visible, src…)
+            elif not expected:
                 problems.append(
                     f"segment 3 {element_id!r} is a {element.get('type')!r}, which has no "
                     f"{value_key(element.get('type'))!r} config and holds no value")
@@ -200,12 +260,25 @@ class LiveForm:
         checked and passed through; anything else is refused with the field list. The middle
         case is the one that matters — it is what every observed failure sent.
         """
-        if isinstance(value, str) and value in self.by_name:
+        if isinstance(value, str) and value in self.by_name and not value.startswith("@"):
             return self.path_for_name(value)
+        var = self.variable_for(value)
+        if var is not None:
+            return str(var["id"])
+        if isinstance(value, str) and self._model_ids_ok(value):
+            return value                      # an id path into the instance tree, already valid
+        if isinstance(value, str) and value.count(".") == 1:
+            ref, key = value.split(".")
+            if ref in self.by_id or ref in self.by_name:   # Paragraph9.label, Section3.visible
+                return self.config_path(ref, key)
+        mp = self.model_path(value)
+        if mp is not None:
+            return mp
         if looks_like_path(value):
             self.check(value, where)
             return value
         raise UsageError(
-            f"{where}: {value!r} is neither a field on this form nor a full value path. "
-            f"Fields that can carry a value: "
-            f"{', '.join(self.field_names()) or '(none)'}")
+            f"{where}: {value!r} is neither a field on this form, a form variable (@name), a "
+            f"data-model path (instance.currentUser.email) nor a full value path. "
+            f"Fields that can carry a value: {', '.join(self.field_names()) or '(none)'}; "
+            f"variables: {', '.join(sorted(self.variables)) or '(none)'}")

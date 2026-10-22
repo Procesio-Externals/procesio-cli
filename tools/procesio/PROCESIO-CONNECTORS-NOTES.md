@@ -118,12 +118,16 @@ form-element enum `ElementType`.
 - **Call Subprocess** gained two engine-written OUTPUT settings: "Call subprocess child
   instance id" (`...a03fe3`) and "Call subprocess child instance id list" (`...a03fe4`). They
   fill `Auto` (type 50) variables on the INSTANCE, named `{ActionName}_{PropertyName}` (e.g.
-  `Call_Subprocess_ChildInstanceId`; measured live 2026-10-21, prod still types them 20, so
-  read them by name); prod serves the settings as type `ignore`, and the
-  builder treats `ignore` and `auto` alike and finds the started-flow slot (`...a03fe2`, still
-  `ignore`) by id. Auto variables are engine-owned: read-only, always returned on instance /
-  history / archive reads, and kept through data-retention cleanup. The child instance ids
-  are also kept after the parent resumes.
+  `Call_Subprocess_ChildInstanceId`). **Fixed in prod 2026-10-22:** both settings now come
+  back as type `auto` and their instance variables as `Auto` (type 50). The earlier state is
+  gone (2026-10-21 the settings were still served `ignore` and the variables typed 20, which
+  is why the old advice was to read them by name — no longer needed). The started-flow slot
+  (`...a03fe2`) stays type `ignore`; the builder treats `ignore` and `auto` alike and finds it
+  by id, so the fix needs no builder change (`_HIDDEN_SETTING_TYPES` already covers both). The
+  offline bundle (`dto/data/action_catalog.json`) was corrected to type the two slots `auto` to
+  match. Auto variables are engine-owned: read-only, always returned on instance / history /
+  archive reads, and kept through data-retention cleanup. The child instance ids are also kept
+  after the parent resumes.
 - **Query Store** became multi-statement (see its entry above).
 
 The offline bundle was refreshed for this wave on 2026-10-21 (238 actions: GUID Converter and

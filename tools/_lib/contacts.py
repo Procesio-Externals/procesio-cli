@@ -16,8 +16,9 @@ from __future__ import annotations
 import html as _html
 import json
 import re
+import unicodedata
 from html.parser import HTMLParser
-from urllib.parse import parse_qsl, urljoin, urlsplit
+from urllib.parse import parse_qsl, unquote, urljoin, urlsplit
 
 # --- emails -------------------------------------------------------------------
 
@@ -37,6 +38,15 @@ _DOT_TOKEN_RE = re.compile(_DOT, re.IGNORECASE)
 
 # File extensions that look like a TLD in retina asset names (an "@2x" suffix before ".png").
 _NOT_TLDS = {"png", "jpg", "jpeg", "gif", "webp", "svg", "css", "js", "ico", "mp4", "pdf"}
+# Mailboxes nobody reads: never a contact, wherever they appear.
+_NO_REPLY = re.compile(r"^(no-?reply|do-?not-?reply|mailer-daemon|postmaster|bounces?)([+.-].*)?$")
+# Personal mailbox providers: an address here belongs to a person, not to the site
+# it was read from.
+FREE_MAIL_DOMAINS = {
+    "gmail.com", "googlemail.com", "outlook.com", "hotmail.com", "live.com", "msn.com",
+    "yahoo.com", "icloud.com", "me.com", "proton.me", "protonmail.com", "aol.com",
+    "gmx.com", "gmx.de", "gmx.net", "yandex.com", "zoho.com", "mail.com",
+}
 # Placeholder / infrastructure domains that are never a person's inbox.
 _JUNK_EMAIL_DOMAINS = {
     "example.com", "example.org", "example.net", "domain.com", "yourdomain.com",
@@ -55,7 +65,41 @@ def _clean_email(raw: str) -> str | None:
         return None
     if domain in _JUNK_EMAIL_DOMAINS or domain.endswith(".example"):
         return None
+    if _NO_REPLY.match(local):
+        return None
     return email
+
+
+def drop_shadowed(emails: list[str]) -> list[str]:
+    """Drop an address that is a cut-off copy of another one in the same list: same
+    local part, and one domain a strict prefix of the other's (a truncated top-level
+    domain such as ``.ne`` beside the full ``.net``). Creators mistype or truncate their
+    address in one place and get it right everywhere else; the complete one is the one
+    that delivers."""
+    out = []
+    for e in emails:
+        local, dom = e.split("@", 1)
+        if any(f != e and f.split("@", 1)[0] == local and f.split("@", 1)[1].startswith(dom)
+               for f in emails):
+            continue
+        out.append(e)
+    return out
+
+
+def email_fits_page(email: str, page_url: str) -> bool:
+    """Whether an address read off ``page_url`` plausibly belongs to that page's owner.
+
+    Any address on a link-in-bio page counts (the person put it there). On any other
+    page only an address on the page's own site, or a personal free-mail address, does:
+    a creator's video links to tools and vendors, and those pages carry the VENDOR's
+    support inbox, which is not a way to reach the creator.
+    """
+    if classify_url(page_url) == "link_in_bio":
+        return True
+    domain = email.rsplit("@", 1)[-1].lower()
+    if domain in FREE_MAIL_DOMAINS:
+        return True
+    return _site(domain) == _site(_host(page_url))
 
 
 def find_emails(text: str) -> list[str]:
@@ -449,9 +493,52 @@ def collect(sources: list[tuple[str, str]]) -> dict:
             if a["url"] not in seen:
                 affiliates.append({**a, "source": source})
                 seen.add(a["url"])
+    kept = drop_shadowed(list(emails))
     return {
-        "emails": [{"email": e, "sources": s} for e, s in emails.items()],
+        "emails": [{"email": e, "sources": emails[e]} for e in kept],
         "links": merged["links"],
         "affiliate_links": affiliates,
         "sources_scanned": len(sources),
     }
+
+
+# --- LinkedIn profiles found by a person's name -------------------------------
+
+def fold(text: str) -> str:
+    """Lowercase ASCII fold: accents dropped, so 'Ștefan' and 'stefan' compare equal."""
+    return "".join(c for c in unicodedata.normalize("NFKD", text or "")
+                   if not unicodedata.combining(c)).lower()
+
+
+def linkedin_slug(url: str) -> str:
+    """The profile id in a linkedin.com/in/<slug> URL ('' when it is not one)."""
+    try:
+        parts = urlsplit(url if "://" in url else "https://" + url)
+    except ValueError:
+        return ""
+    if not _host_matches(_host(url if "://" in url else "https://" + url), ("linkedin.com",)):
+        return ""
+    segs = [x for x in parts.path.split("/") if x]
+    if len(segs) >= 2 and segs[0].lower() == "in":
+        return unquote(segs[1])
+    return ""
+
+
+def normalize_linkedin_profile(url: str) -> str:
+    slug = linkedin_slug(url)
+    return f"https://www.linkedin.com/in/{slug}" if slug else ""
+
+
+def linkedin_slug_has_name(url: str, name: str) -> bool:
+    """True when the profile id contains the FULL name: every name token, in order
+    (or reversed), joined by nothing, '-', '_' or '.' (``beau-carnes``,
+    ``beaucarnes``, ``carnes-beau-12ab``). A single-word name never matches: one word
+    identifies nobody."""
+    slug = fold(linkedin_slug(url))
+    tokens = [t for t in re.split(r"[^a-z0-9]+", fold(name)) if t]
+    if not slug or len(tokens) < 2:
+        return False
+    sep = r"[-_.]?"
+    forward = sep.join(map(re.escape, tokens))
+    backward = sep.join(map(re.escape, reversed(tokens)))
+    return bool(re.search(forward, slug) or re.search(backward, slug))

@@ -225,7 +225,10 @@ def _resolve_maps(config: dict, client, form: dict | None = None) -> dict:
             if live is not None:
                 right = live.resolve(right, f"{side} row {i}")
             row["left"] = _slot(left, True, _path_of(row.get("left")), is_list)
-            row["right"] = _slot(right, False, _path_of(row.get("right")), is_list)
+            # a form VARIABLE side carries `path: {}` like the process side (as the designer saves it)
+            rpath = {} if live is not None and live.is_variable(right) and _path_of(row.get("right")) is None \
+                else _path_of(row.get("right"))
+            row["right"] = _slot(right, False, rpath, is_list)
             row["id"] = row.get("id", i)
             fixed.append(row)
         out[side] = fixed
@@ -423,7 +426,9 @@ ACTIONS = {
         description="Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / "
                     "RUN_DATA_STORE_OPERATION in place (surgical: only that element's event "
                     "config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take "
-                    "NAMES: left = a process variable name, right = a form FIELD name - each "
+                    "NAMES: left = a process variable name, right = a form FIELD name, a form "
+                    "variable (@Offer_ID), an element config (Paragraph9.label) or a data-model "
+                    "path (instance.currentUser.email) - each "
                     "is resolved to the id/value-path the runtime needs. Do NOT hand-build "
                     "the form value path; if you pass one it is CHECKED against the live form "
                     "and refused when wrong, because a wrong path is saved without any error "

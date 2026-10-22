@@ -266,3 +266,19 @@ Note reconciliation: an older line in `dto/credential/description.md` called
 `flowmodel/sqlparam.py` treat the unversioned `Execute Query` / `Execute Command`
 (GUIDs `76470756-…` / `a1625da6-…`) as current, with V2 variants adding Timeout +
 Parameters. Trust the live catalog.
+
+## The `Execute Query` output is `list<Object>`, and `sql-parameterize` saves a failing flow as invalid (measured 2026-10-22)
+
+Declare the variable bound to an `Execute Query` **Output** as `{"type": "object", "isList": true}`
+(`0317bfee-…-121212121221`). A `json` list (`…1220`) is what many older flows use and it runs, and
+`process-create` accepts it, but the designer layer flags it (`flow-lint` EXECQUERY_OUTPUT_TYPE). The
+first `sql-parameterize` on such a flow then runs the designer gate, still PUTs the converted SQL,
+and stamps the flow `isValid: false`. The platform stores that stamp as is, so every launch answers
+`HTTP 400 statusCode 373 "Process needs to be valid in order to be launched."` even though
+`POST /api/Projects/validate` reports it valid. Read `isValid` in the `sql-parameterize` result (and
+run `flow-lint`) before you call the process ready. Fix: retype the variable in the config,
+`process-edit` (desired state, variable ids are kept by name), then `sql-parameterize --all` again.
+
+When parameterizing, keep each `<%N%>` alone on the right of a `DECLARE`
+(`DECLARE @key_in nvarchar(100) = N'<%0%>';`) and do the `COALESCE`/`LEFT`/`NULLIF` work on that SQL
+variable afterwards: the converter turns `N'<%N%>'` into `@pN` wherever it sits.
