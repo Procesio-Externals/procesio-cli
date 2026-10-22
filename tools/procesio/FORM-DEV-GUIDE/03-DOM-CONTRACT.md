@@ -231,6 +231,34 @@ scrolled:
 .ux-veil__inner { position: sticky; top: 40vh; }
 ```
 
+### Platform defaults that fight a redesign (measured 2026-10-22)
+
+- **The page scrolls in `.form-builder-view--content`**, not in `body` or `main`. Fixed UI
+  you mount on `body` sits above it; give that element the top padding a fixed header needs.
+- **`.form-builder--section--container`** carries a 1px border, a light background, a 4px
+  radius and 16px padding even when the section's own `style` config sets none. Reset all
+  four, or every redesigned section sits inside a faint grey box.
+- **`.form-builder--button` has a fixed height** (the theme's button height, 40px). Make the
+  `<button>` taller and anything you append after it overlaps it; set `height: auto` on the
+  wrapper. Its `.pds-c-button--dropdown` sibling is an empty split-button part; hide it.
+- **A paragraph's HTML is rendered through DOMPurify into the live page, next to Bootstrap.**
+  Generic class names in authored markup collide with Bootstrap rules: an SVG `<circle
+  class="badge">` vanished because `.badge:empty { display: none }`. Prefix every class.
+
+### File viewer (INLINE) and signature pad: what is inside
+
+- File viewer: `.form-builder--file-viewer` > `--container` > `--container--viewer` (the
+  internal scroller, `max-height` around 640px) > `.vue-pdf-embed`, one `<canvas>` per page.
+  While a file loads the container shows `--container--loading`; a bad file shows
+  `--container--failed`; no `src` yet shows `--container--empty-message`. "Empty" also shows
+  briefly while a process-output file is still being fetched, so wait a few seconds before
+  you treat it as final. Count rendered pages by counting the canvases.
+- Signature pad: `.form-builder--signature-pad` > `--canvas-wrapper` > `canvas`, then a
+  footer with the platform's Clear button. The pad paints a white background into the canvas,
+  so ink = any pixel clearly darker than white (sample a downscaled copy after `pointerup`
+  and after Clear). A `ResizeObserver` **clears and redraws** the pad whenever the canvas
+  size changes, so never animate the canvas or its wrapper's padding; set the size once.
+
 ## 6. Responsive and reduced motion
 
 Side-by-side columns truncate every label on a phone. Cover both layout modes —

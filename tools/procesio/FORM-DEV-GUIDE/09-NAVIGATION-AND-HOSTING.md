@@ -93,6 +93,10 @@ removed it completely (computed `display: none`, nothing left on screen). Only t
 class is scrubbed from form CSS, and the topbar does not carry it, so the bottom
 "Built with PROCESIO" banner is the one piece of host chrome that stays.
 
+Since the form CSS became scoped (v3.0.0, 2026-10), a plain `.pds-c-topbar` rule no longer
+reaches the topbar. Put it in an `@import` of a `data:` stylesheet, which is not scoped and
+hides the topbar from the first frame ([02](02-CODE-INJECTION.md) §2).
+
 ### Drawing a whole web page over a form (measured 2026-10-17)
 
 A form can serve as a website: keep the native controls as an off-screen bridge and draw the

@@ -571,3 +571,30 @@ Rules that each cost a debugging round:
 - **Page-specific CSS.** When only one page of a multi-page app uses the map,
   ship its stylesheet with that page alone. Concatenate a per-page CSS file at
   build time instead of growing the shared stylesheet that every page carries.
+
+## A static location map (Google Maps embed, no key) in paragraph content
+
+For "show where we are" with one pin, an embed is enough. No library is needed.
+Verified 2026-10-22:
+
+- **Paragraph HTML cannot carry the `<iframe>`.** The renderer passes paragraph HTML
+  through DOMPurify, which drops iframes. Author a placeholder in the paragraph
+  (`<div class="x-map" data-map="<query>">` with a plain "open in Google Maps" link
+  inside as the fallback) and let the runtime insert the iframe.
+- **Keyless URL:** `https://www.google.com/maps?q=<query>&z=16&hl=<lang>&output=embed`.
+  It redirects to `/maps/embed?...`, which sends no `X-Frame-Options` and no
+  `frame-ancestors`, so it frames fine. The forms host itself sends no CSP.
+- **What the query decides.** A bare street address can come back with no pin at all.
+  "<Business name>, <street and number>, <city>" pins the business listing, labelled
+  with its name. In a frame about 260px tall Google leaves out the place card, which
+  would otherwise show the public rating; taller frames show it.
+- **Mount it lazily.** Wait until the placeholder is near the screen, and skip it while
+  a loader is measuring network progress. Content inside a closed `<details>` still
+  reports client rects in Chrome, so check `el.closest('details:not([open])')`, not
+  only `getClientRects()`. Re-check on the `toggle` event (listen in the capture phase,
+  because it does not bubble).
+- **Fade it in on the iframe's `load` event**, and add the loaded class on a timer as
+  well, so a blocked request never leaves a shimmer running forever. The pin sits at the
+  frame's centre, so an overlay pulse at `50% 50%` lands on the pin tip.
+- **Directions link:** `https://www.google.com/maps/dir/?api=1&destination=<query>`.
+
