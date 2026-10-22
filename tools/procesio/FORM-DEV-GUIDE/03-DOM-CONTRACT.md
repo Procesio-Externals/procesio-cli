@@ -259,6 +259,72 @@ scrolled:
   and after Clear). A `ResizeObserver` **clears and redraws** the pad whenever the canvas
   size changes, so never animate the canvas or its wrapper's padding; set the size once.
 
+### Table + dynamic-table-row: what is inside (measured on a live form, 2026-10-22)
+
+A table with a dynamic row renders TWO `table.pds-c-table`: the Table control's own (header
+only) and, inside its `tbody`, the dynamic row's table, whose `thead` exists but is
+`display: none` (`--no-header`). Each item of the dynamic row is nested:
+`div.form-builder--table-dynamic-row--container--item[data-row-index]` > `td.form-builder--table-static-row`
+> `tr.form-builder--table-static-row--container` > **`tr.pds-c-table--row`** > `td.pds-c-table--cell`.
+Both of those `tr` are **`display: flex`**, so the cells are flex items, not table cells: widths
+set on `td` act as flex-basis and the header table (a real table) does not line up with them on
+its own. Make the header row flex too (`thead.pds-c-table--header > tr { display: flex }`), give
+`th:nth-child(n)` and the row's `td:nth-child(n)` the same `flex: 0 0 <w>`, let one column take
+the rest (`flex: 1 1 auto; min-width: 0`) in both, and give both rows the same 1px border (the
+header's transparent): the label then sits exactly over its column (measured: every left edge
+and width equal to the pixel). Style the ROW as the card (border, radius, background), not the
+cells.
+
+- Helper rows `tr.pds-c-table--row.pds-c-table--row--before/--after` also carry
+  `pds-c-table--row`: select data rows with
+  `tr.pds-c-table--row:not(.pds-c-table--row--before):not(.pds-c-table--row--after)`, as a
+  DESCENDANT (they are not children of `tbody`).
+- Every header cell has the id `th<columnKey>` (`thstatus`, `thid`); map a column by that id in
+  the ROW's own table (`tr.closest('table')`). Counting `thead th` under the control counts both
+  tables. The first column is the index column when `hasIndexColumn` is on.
+- A cell's text sits in `.form-builder--table-cell > … > .form-builder--table-cell--container--text`;
+  `.form-builder--table-cell` is a ~54px block. To relabel a cell the renderer owns (translate a
+  status, shorten an id), never rewrite the text node (Vue patches it back): put the label in a
+  data attribute on the `td`, hide `.form-builder--table-cell` in that `td`, and paint
+  `td[data-x]::after { content: attr(data-x) }`.
+- A control placed in a column (the row's button) renders once per row with the SAME
+  `data-element-id`; find "this row's button" from the row.
+
+### File-upload used as a download (process output)
+
+`.form-builder--file-upload` > `.pds-c-modal--upload` > `.pds-c-modal--dialog--content` > … >
+`.pds-c-modal--dialog--content--action` (`--first` holds the file name, `--actions--icon` is the
+download icon). With no file the same control shows the upload drop zone instead, which invites
+an upload on a read-only screen: hide it with
+`.form-builder--file-upload:not(:has(.pds-c-modal--dialog--content--action))`.
+
+**Driving it from your own download menu (measured 2026-10-22).** The download icon is
+`i.pds-c-modal--dialog--content--action--actions--icon[role=button][aria-label="Download file"]`
+(text `download`; an editable control also has a delete icon next to it, so select by the label,
+never by position). Clicking it makes no request: the platform already holds the file it fetched
+after the run ([06](06-PROCESS-INTEGRATION.md) §3c), wraps it in a `Blob` of the real type
+(`application/pdf`, `…wordprocessingml.document`), calls `URL.createObjectURL` and clicks an
+`<a download="<file name>">` on that `blob:` URL. `element.click()` on the icon works while the
+control's host is `display: none`, so the visible UI can be one custom menu per document while
+the file-upload controls stay rendered (`visible: true`, see [01](01-ANATOMY.md)) and unseen. The
+file name for the menu is the text of `.pds-c-modal--dialog--content--action--first`.
+
+**Print from the same file.** There is no print action. Arm a short window, click the PDF
+control's icon, keep the `Blob` your `URL.createObjectURL` wrapper sees with a `pdf` type, and in a
+wrapper of `HTMLAnchorElement.prototype.click` cancel that one `blob:` click (the platform may
+revoke its own URL right after, so make a fresh one from the kept Blob). Load it into a hidden
+same-origin `<iframe>` and call `contentWindow.print()` on load. Measured: in Chrome the frame
+loads as `application/pdf` and `print()` opens the dialog with nothing saved. Where
+`navigator.pdfViewerEnabled === false` (PDF viewing turned off, and Playwright's default
+headless shell) the frame does not render the PDF, it DOWNLOADS it under the blob's GUID, so
+skip the frame there and let the normal download run. Safari and Firefox print such a frame
+blank or refuse it: open the PDF in a new tab instead (inside the click, or the pop-up blocker
+stops it).
+
+**A menu inside the kit's document card is clipped** by the card's `overflow: hidden` (it is there
+only for the rounded corners). Put the radius on the bar (top) and on the viewer scroller (bottom)
+and let the card overflow, or the open menu is cut at the card's edge on a phone.
+
 ## 6. Responsive and reduced motion
 
 Side-by-side columns truncate every label on a phone. Cover both layout modes —

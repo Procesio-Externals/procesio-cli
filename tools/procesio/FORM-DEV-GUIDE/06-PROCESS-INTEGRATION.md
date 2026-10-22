@@ -114,6 +114,51 @@ per column). For a live
 "N results" count while the visitor is still choosing, filter a cached copy in the browser
 and keep the process for the authoritative search and the logging.
 
+## 3c. The wire, request by request (measured on the forms host, 2026-10-22)
+
+What a RUN_PROCESS sends, for a runtime that has to follow one run among several:
+
+| request | carries |
+|---|---|
+| `POST /api/formProcess/{formId}/{processId}/publish`, body = the input values | answers the process VARIABLE list (inputs echoed as `defaultValue`), **no instance id** |
+| `POST /api/formProcess/{formId}/{instanceId}/launch?runSynchronous=true\|false&secondsTimeOut=300`, body `{"flowTemplateId": processId, "connectionId": …}` | the instance id is minted by the CLIENT and sits in the URL; the answer is `{"instanceId"}`, plus `status` + `variable` (outputs) when synchronous |
+| `GET /api/formProcess/{formId}/{processId}/{instanceId}/variables` (async only, polled) | `{"id", "status", "variables": [{name, defaultValue = the value, …}]}`, final at status 50 (finished) or 40 (finished with errors) |
+
+So tie a run to its process by the launch request BODY (`flowTemplateId`) and read the instance
+id from the launch URL; `/variables` carries both ids. A required process input whose form side
+is empty is refused at publish: `HTTP 400 statusCode 373 "Missing required input for variables:
+<name>"`, nothing launches.
+
+A File output mapped to a control is fetched ONCE, right after the run, by
+`GET /api/formProcess/download` with no query string: the file is named by request HEADERS
+(`flowtemplateid`, `formtemplateid`, `instanceid`, `variableid`, `workspaceid`, `uploadfilepath` =
+`flow/flow-<processId>/flow-instance-<instanceId>/variable-<variableId>/<fileId>`), cookie auth,
+answer = the bytes with `content-disposition: attachment; filename=…`. A File output that is empty
+still triggers the call with `uploadfilepath: undefined` and gets a 400; harmless, but it shows in
+the console.
+
+**A synchronous step keeps the form locked for its whole run.** While a chain runs every button is
+`disabled` ([08](08-PITFALLS.md)); with `syncRun: true` that lasts until the process ends (measured:
+a hidden RUN_PROCESS button stayed `disabled` for the 33 s a document-generating process took, and
+came back the moment it answered). With `syncRun: false` the chain ends at launch, so a hidden poll
+button can run while the async process is still going. A runtime that clicks a hidden button after
+a sync step must wait for `button.disabled === false`, not for a timer.
+
+**A list loaded at FORM_LOAD goes stale while the page stays open** (a signer signs, a status
+moves on). To refresh it without a page reload, put the same RUN_PROCESS on a hidden button whose
+output map writes the dynamic row again; the table re-renders from the new value and the selected
+detail stays where it is. Controls set by the chain that OPENED a record (MAPs on its status) do
+not follow the new row by themselves: reopen the record, or tell the user it moved on.
+
+**Testing a form runtime without running anything (measured 2026-10-22).** Route
+`**/formProcess/**/launch*` in Playwright, pick the run by the request body's `flowTemplateId`, and
+fulfill it with `{"instanceId": "<any guid>", "status": 50, "variable": {<output name>: <value>},
+"error": []}`. The form maps that answer exactly like a real synchronous one: outputs land in
+their fields and variables, `visible` outputs show their controls, and the chain's MAP conditions
+then run on the faked values. Nothing launches on the server (the publish before it only
+registers the inputs). This is how to rehearse states the test data no longer has; File outputs
+left out simply leave their viewers empty.
+
 ## 4. Design rule: **one output variable per field, all primitives**
 
 The tempting design is one structured output variable (a data model, or a JSON blob)
