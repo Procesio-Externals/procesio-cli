@@ -124,6 +124,48 @@ def test_run_query_truncates_to_max_rows():
     assert out["truncated"] is True
 
 
+class MultiResultCursor:
+    """A batch's results in order, each (description, rows), or an Exception that the
+    driver raises only when nextset() reaches it, as pyodbc does for a later statement."""
+
+    def __init__(self, results):
+        self._results = list(results)
+        self.executed = []
+        self.description, self._rows = self._results.pop(0)
+
+    def execute(self, sql, params=None):
+        self.executed.append((sql, params))
+
+    def fetchall(self):
+        return list(self._rows)
+
+    def nextset(self):
+        if not self._results:
+            return False
+        nxt = self._results.pop(0)
+        if isinstance(nxt, Exception):
+            raise nxt
+        self.description, self._rows = nxt
+        return True
+
+    def close(self):
+        pass
+
+
+def test_run_query_skips_row_count_results_to_the_first_rows():
+    # two INSERTs without SET NOCOUNT ON answer "1 row affected" first; the SELECT comes third
+    cur = MultiResultCursor([(None, []), (None, []), ([("k", None)], [("a",)])])
+    out = connection.run_query(FakeConn([cur]), "INSERT ...; INSERT ...; SELECT k FROM t", None, None)
+    assert out["columns"] == ["k"]
+    assert out["rows"] == [{"k": "a"}]
+
+
+def test_run_query_raises_an_error_that_follows_the_returned_rows():
+    cur = MultiResultCursor([([("k", None)], [("a",)]), RuntimeError("String or binary data would be truncated")])
+    with pytest.raises(RuntimeError, match="truncated"):
+        connection.run_query(FakeConn([cur]), "SELECT k FROM t; INSERT ...", None, None)
+
+
 # --- dispatch: query --------------------------------------------------------
 
 def test_dispatch_query_read_only_ok(one_profile):

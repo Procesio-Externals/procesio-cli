@@ -6,9 +6,9 @@ packaging==26.3
     # via hatchling
 pathspec==1.1.1
     # via hatchling
-pluggy==1.6.0
+pluggy==1.7.0
     # via hatchling
-tomlkit==0.15.1
+tomlkit==0.15.2
     # via hatchling
 trove-classifiers==2026.9.21.13
     # via hatchling

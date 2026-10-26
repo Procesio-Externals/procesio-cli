@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from tools._lib import dbschema
+from tools._lib import dbquery, dbschema
 
 # ---------------------------------------------------------------------------
 # Type-letter -> readable directory label. The mirror groups objects by this
@@ -581,6 +581,10 @@ def apply_migration_sql(conn, sql: str, *, dry_run: bool = False) -> int:
             if not batch.strip():
                 continue
             cur.execute(batch)
+            # A statement that fails after one that returned "N rows affected" raises only
+            # when the cursor reaches it. Undrained, XACT_ABORT rolls the file back on the
+            # server while this side commits nothing and reports the migration as applied.
+            dbquery.drain_results(cur)
             executed += 1
     except Exception:
         try:

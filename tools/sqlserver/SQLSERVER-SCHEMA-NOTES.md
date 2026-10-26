@@ -91,3 +91,75 @@ Code: `tools/sqlserver/schema.py` (engine SQL + migrate engine), the actions in
 - `migrate` ignores subdirectories and non-`NNNN_*.sql` files inside `--dir`
   (an `evidence/` subfolder and a `W1-REPORT.md` coexist fine; not even listed in
   `skipped_files`).
+
+## Field learnings (multi-database sync, 2026-10)
+
+- **`migrate --mode list` and `--dry-run` are not fully read-only:** both create
+  `dbo.__schema_migrations` on first contact (via `fetch_applied`). Expect that table
+  to appear in every database you only inspected.
+- **`--dry-run` doubles as a behaviour test harness.** Append assertion batches after
+  the migration (old-style calls, new parameters, expected rows; `;THROW` on any
+  mismatch) and dry-run the combined file: the change plus the proof run in one
+  transaction and are rolled back. `query` returns only the first result that has
+  columns, so capture procedure output with `INSERT @t EXEC ...` instead of letting
+  it print. Prove the assertions are live with a negative control (see below).
+- **An `ALTER COLUMN ... WITH (ONLINE = ON)` must be the first operation of its
+  transaction** when the table's clustered index carries a LOB column (`nvarchar(max)`
+  etc.); otherwise SQL Server raises error 10635. Since `migrate` wraps a file in one
+  transaction, put the online ALTER alone in its own `NNNN_*.sql`, and put any
+  `DROP STATISTICS` it needs (a type change fails while column statistics exist) in an
+  EARLIER file. The failure is conditional: it only appears where statistics exist on
+  the column, so the same file can pass on one database and fail on the next.
+- **Online vs offline size-of-data changes:** widening a column on a ~350k-row table
+  took ~220 s ONLINE (table usable throughout) versus ~30-40 s offline under a
+  schema-modification lock that blocks every reader, `READ UNCOMMITTED` included.
+  On a live table prefer ONLINE, as its own file.
+- **Comparing databases:** compare tables from the catalog (name-independent), not
+  from generated DDL, or auto-named constraints (`DF__Tbl__col__1A2B3C`) show up as
+  differences. Respect the database collation (a `_CI_` collation makes `Id` and
+  `id` the same column), and leave out automatic-tuning indexes (`nci_msft_*`,
+  `nci_wi_*`), which are per-database workload artefacts.
+
+## Field learnings (errors after a row count, wide changes on busy tables, 2026-10)
+
+- **Every `execute` is drained (`dbquery.drain_results`).** SQL Server sends a batch's
+  results in order and pyodbc raises a statement's error only when the cursor reaches it
+  with `nextset()`. Before the drain, a statement that failed after one that returned
+  "N rows affected" was silently lost: in `migrate`, `XACT_ABORT` rolled the file back on
+  the server while the tool committed nothing, reported the file as applied and recorded
+  it in `dbo.__schema_migrations`; in a `--dry-run` test, every `;THROW` that followed an
+  INSERT never fired, so the test passed whatever the data said. The error surfaces as
+  `... (SQLMoreResults)`. A test fake without `nextset()` cannot show this, so the tests
+  use a multi-result fake that raises from `nextset()`.
+- **Run a negative control for every assertion file.** Dry-run the assertions without
+  the change and require them to fail. That is how the swallowed errors were found: an
+  assertion file that passed with and without the change it was meant to prove.
+- **`query --write` returns the first result that has columns**, stepping past
+  row-count-only results, so a multi-statement batch without `SET NOCOUNT ON` still
+  returns its final SELECT (before, it returned nothing).
+- **`max_length` in `sys.columns` and `sys.parameters` is in bytes**: `nvarchar(100)`
+  reports 200. Read it as characters and a too-narrow parameter looks wide enough.
+- **A parameter and an `OPENJSON ... WITH` column cut a longer string without an error**;
+  only an INSERT or UPDATE into a narrower column raises (2628, "String or binary data
+  would be truncated"). Widen a column together with every parameter, variable and
+  OPENJSON column that carries its value, or the value is still cut, silently. Find them
+  in `sys.parameters` and by scanning `OBJECT_DEFINITION` for the column's names next to
+  a declared length.
+- **Growing a varchar/nvarchar within the same type is a metadata change**, also when
+  the column is in nonclustered indexes: a few milliseconds per column on a table with
+  about a million rows. A type change (varchar to nvarchar) rewrites every row.
+- **Order a migration so the table lock comes last.** `ALTER TABLE` holds a schema
+  lock that blocks every reader, `READ UNCOMMITTED` included, until COMMIT. Put the
+  `ALTER PROCEDURE` batches first and the column changes just before the final check:
+  the tables are then held for milliseconds, and only callers of the altered procedures
+  wait while they recompile.
+- **A dry-run test holds every lock it takes until the rollback.** Calling procedures
+  inside it on large tables with a cold cache once held four busy tables for about
+  50 seconds. On large production databases, keep the dry-run to schema assertions and
+  run the procedure calls in the post-apply check, which alters nothing and so locks
+  only its own test rows. `SET LOCK_TIMEOUT` makes a busy object fail the file fast
+  instead of queueing the application behind it; rerun later.
+- **Guard each `ALTER PROCEDURE` with the procedure's `modify_date`** as read when the
+  migration was built (`CONVERT(varchar(23), modify_date, 121)`), and `;THROW` if it
+  moved: a procedure changed by someone in between is rebuilt from the new text, never
+  overwritten.
