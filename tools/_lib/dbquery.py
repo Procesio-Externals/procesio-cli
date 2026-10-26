@@ -203,6 +203,34 @@ def column_names(cursor) -> list[str]:
     return [d[0] for d in cursor.description]
 
 
+def first_result_columns(cursor) -> list[str]:
+    """Columns of the first result that has any, stepping past row-count-only results.
+
+    A multi-statement batch run without SET NOCOUNT ON opens with "N rows affected"
+    results that carry no columns; the rows the caller wants come after them.
+    """
+    columns = column_names(cursor)
+    nextset = getattr(cursor, "nextset", None)
+    while not columns and nextset is not None and nextset():
+        columns = column_names(cursor)
+    return columns
+
+
+def drain_results(cursor) -> None:
+    """Step through every remaining result of the last ``execute`` so its errors surface.
+
+    The server returns a batch's results in order and the driver raises a statement's
+    error only when the cursor reaches it. A batch whose INSERT reported "1 row affected"
+    and whose next statement failed looks successful until ``nextset()`` gets there, so
+    a caller that must not lose an error drains after every execute.
+    """
+    nextset = getattr(cursor, "nextset", None)
+    if nextset is None:  # test doubles without result sets
+        return
+    while nextset():
+        pass
+
+
 def rows_to_dicts(
     columns: Sequence[str],
     raw_rows: Sequence[Any],

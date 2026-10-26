@@ -191,8 +191,9 @@ def run_query(
         cur.execute(sql, list(params))
     else:
         cur.execute(sql)
-    columns = dbquery.column_names(cur)
+    columns = dbquery.first_result_columns(cur)
     raw = cur.fetchall() if columns else []
+    dbquery.drain_results(cur)  # an error after the returned rows must not be lost
     capped, truncated = dbquery.cap_rows(list(raw), max_rows)
     rows = dbquery.rows_to_dicts(columns, capped)
     return {

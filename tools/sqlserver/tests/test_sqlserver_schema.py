@@ -432,3 +432,48 @@ def test_migrate_apply_dry_run_does_not_record(one_profile, tmp_path):
                    for sql, _ in conn.executed)
     # but a ROLLBACK was issued for the file's transaction
     assert any("ROLLBACK" in sql for sql, _ in conn.executed)
+
+
+class BatchCursor:
+    """Fake connection + cursor for apply_migration_sql. execute() opens a batch; the
+    results that follow its first one are listed per marker found in the SQL, and an
+    Exception among them is raised when nextset() reaches it, as pyodbc does."""
+
+    def __init__(self, later_results_by_marker):
+        self._by_marker = later_results_by_marker
+        self._pending = []
+        self.executed = []
+
+    def cursor(self):
+        return self
+
+    def execute(self, sql, *params):
+        self.executed.append(sql)
+        self._pending = list(next((r for m, r in self._by_marker.items() if m in sql), []))
+
+    def nextset(self):
+        if not self._pending:
+            return False
+        nxt = self._pending.pop(0)
+        if isinstance(nxt, Exception):
+            raise nxt
+        return True
+
+    def close(self):
+        pass
+
+
+def test_apply_migration_sql_surfaces_an_error_after_a_row_count():
+    # The INSERT answers "1 row affected" first, the THROW after it. Undrained, XACT_ABORT
+    # rolled the file back on the server while the tool reported it applied.
+    conn = BatchCursor({"INSERT dbo.T": [RuntimeError("check failed (51120)")]})
+    with pytest.raises(RuntimeError, match="51120"):
+        schema.apply_migration_sql(conn, "INSERT dbo.T VALUES (1);\n;THROW 51120, 'check failed', 1;\n")
+    assert any("ROLLBACK" in sql for sql in conn.executed)
+    assert not any("COMMIT" in sql for sql in conn.executed)
+
+
+def test_apply_migration_sql_commits_after_draining_a_clean_batch():
+    conn = BatchCursor({"INSERT dbo.T": ["1 row affected"]})
+    assert schema.apply_migration_sql(conn, "INSERT dbo.T VALUES (1);\nINSERT dbo.T VALUES (2);\n") == 1
+    assert conn.executed[-1] == "IF @@TRANCOUNT > 0 COMMIT TRANSACTION;"
