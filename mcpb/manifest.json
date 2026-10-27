@@ -2,7 +2,7 @@
   "manifest_version": "0.4",
   "name": "procesio",
   "display_name": "PROCESIO",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Lets your own AI assistant build, run, validate and audit PROCESIO processes, forms and documents.",
   "long_description": "procesio-cli is a command-line tool and MCP server for the PROCESIO automation platform. With it, your own AI assistant can build, run, validate and audit PROCESIO processes, forms and documents, from a terminal or over MCP. Open source, Apache-2.0 licence. Source: https://github.com/Procesio-Externals/procesio-cli. Docs: https://docs.procesio.com",
   "author": {
