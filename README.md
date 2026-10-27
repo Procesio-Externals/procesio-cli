@@ -138,9 +138,9 @@ itself on first run. Authenticate with `add-credential` below, run as
 
 **What gets installed is pinned.** The plugin carries a small runtime project in
 `plugin/`: `pyproject.toml` names one release of `procesio-cli` and `uv.lock` pins it and
-every dependency to exact versions with hashes. It starts the server with `uv run
---locked`, so a fresh launch installs exactly what was locked for this release, not
-whatever is newest on PyPI that day. A clone can do the same with `constraints.txt` and
+every dependency to exact versions with hashes, and the server starts as `uvx
+procesio-cli==<that release>`. An install that honours the lock gets exactly what was
+locked for this release, not whatever is newest on PyPI that day. A clone can do the same with `constraints.txt` and
 `build-constraints.txt`, which pin every package to versions with prebuilt wheels for
 Python 3.11 to 3.14 on Windows, Linux (x86-64 and ARM) and Apple Silicon. Intel Macs are
 not covered: `cryptography` no longer publishes wheels for them, so installing there
