@@ -9,6 +9,10 @@
   },
   "homepage": "https://github.com/Procesio-Externals/procesio-cli#readme",
   "repository": "https://github.com/Procesio-Externals/procesio-cli",
+  "documentationUrl": "https://github.com/Procesio-Externals/procesio-cli#readme",
+  "supportUrl": "https://github.com/Procesio-Externals/procesio-cli/issues",
+  "termsOfServiceUrl": "https://procesio.com/terms",
+  "privacyPolicyUrl": "https://procesio.com/privacy",
   "license": "Apache-2.0",
   "keywords": [
     "procesio",
