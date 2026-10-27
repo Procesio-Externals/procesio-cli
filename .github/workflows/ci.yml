@@ -53,16 +53,12 @@ jobs:
           python - <<'PY'
           import json, os, pathlib, subprocess
 
-          # The plugin pins the PyPI release ("procesio-cli==<version>"), which does not
-          # exist yet while its pull request is open, so the checkout stands in for it.
-          # Everything else in the command (pins, interpreter choice) runs as shipped.
+          # The plugin runs `uv run --locked` against plugin/uv.lock, which names a release
+          # already on PyPI, so it launches here exactly as it ships. A lock that no longer
+          # matches plugin/pyproject.toml fails right here, as it would for every user.
           cfg = json.loads(pathlib.Path("plugin/.mcp.json").read_text())["mcpServers"]["procesio"]
-          args = list(cfg["args"])
+          args = [a.replace("${CLAUDE_PLUGIN_ROOT}", "plugin") for a in cfg["args"]]
           plugin_env = {**os.environ, **cfg.get("env", {})}
-          release = args[args.index("--from") + 1]
-          if not release.startswith("procesio-cli=="):
-              raise SystemExit(f"plugin/.mcp.json must pin an exact release, got {release!r}")
-          args[args.index("--from") + 1] = "."
           plugin_argv = [cfg["command"]] + args
           request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'
 

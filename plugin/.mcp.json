@@ -1,10 +1,12 @@
 {
   "mcpServers": {
     "procesio": {
-      "command": "uvx",
+      "command": "uv",
       "args": [
-        "--from",
-        "procesio-cli==0.1.2",
+        "run",
+        "--locked",
+        "--project",
+        "${CLAUDE_PLUGIN_ROOT}",
         "procesio-mcp-chat"
       ],
       "env": {
