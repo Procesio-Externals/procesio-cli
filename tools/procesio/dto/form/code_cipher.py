@@ -55,13 +55,31 @@ def encrypt_code(javascript: str, css: str, key: str, salt: bytes | None = None)
 
 
 def decrypt_code(blob: str, key: str) -> dict:
-    """Inverse of encrypt_code: encrypted blob -> {"JAVASCRIPT": ..., "CSS": ...}."""
+    """Inverse of encrypt_code: encrypted blob -> {"JAVASCRIPT": ..., "CSS": ...}.
+
+    Raises ValueError for a wrong key or a corrupt blob. CBC with a wrong key does not
+    fail by itself: it yields random bytes, and now and then those strip as "padding",
+    decode as UTF-8 and even parse as JSON (a lone digit is valid JSON). So the padding
+    is checked in full and the result must be a JSON object, or a wrong key could pass
+    as a form with odd code.
+    """
     raw = base64.b64decode(blob)
     if raw[:8] != _MAGIC:
         raise ValueError("not a CryptoJS 'Salted__' blob")
     salt, ct = raw[8:16], raw[16:]
+    if not ct or len(ct) % 16:
+        raise ValueError("ciphertext is not a whole number of AES blocks")
     k, iv = _evp_bytes_to_key(key.encode("utf-8"), salt)
     dec = Cipher(algorithms.AES(k), modes.CBC(iv)).decryptor()
     pt = dec.update(ct) + dec.finalize()
-    pt = pt[:-pt[-1]]  # strip PKCS#7 padding
-    return json.loads(pt.decode("utf-8"))
+    pad = pt[-1]
+    if not 1 <= pad <= 16 or pt[-pad:] != bytes([pad]) * pad:
+        raise ValueError("bad PKCS#7 padding (wrong key or corrupt blob)")
+    try:
+        doc = json.loads(pt[:-pad].decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as e:
+        raise ValueError(f"decrypted bytes are not JSON (wrong key or corrupt blob): {e}") from e
+    if not isinstance(doc, dict):
+        raise ValueError(f"decrypted JSON is a {type(doc).__name__}, not an object "
+                         f"(wrong key or corrupt blob)")
+    return doc

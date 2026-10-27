@@ -28,8 +28,34 @@ def test_code_cipher_roundtrip():
 
 def test_code_cipher_wrong_key_fails():
     blob = code_cipher.encrypt_code("x", "y", KEY)
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         code_cipher.decrypt_code(blob, "WRONGKEY12345678")
+
+
+def _blob_of(plaintext: bytes, key: str) -> str:
+    """Encrypt raw bytes exactly as given (no padding added), the way a wrong key's
+    garbage would look to decrypt_code once it is decrypted."""
+    import base64
+
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    salt = b"\x01" * 8
+    k, iv = code_cipher._evp_bytes_to_key(key.encode("utf-8"), salt)
+    enc = Cipher(algorithms.AES(k), modes.CBC(iv)).encryptor()
+    return base64.b64encode(b"Salted__" + salt + enc.update(plaintext) + enc.finalize()).decode()
+
+
+@pytest.mark.parametrize("plaintext", [
+    b"7" + bytes([15]) * 15,          # valid padding, JSON number: the CI flake
+    b'"x"' + bytes([13]) * 13,        # valid padding, JSON string
+    b'{"CSS":"a"}' + bytes([0]) * 5,  # padding byte 0
+    b'{"CSS":"a"}' + b"\x01\x02\x03\x04\x05",  # last byte 5, the rest disagree
+])
+def test_code_cipher_refuses_garbage_that_a_wrong_key_can_produce(plaintext):
+    """A wrong key gives random bytes; rarely they strip as padding and parse as JSON
+    that is not an object. That reached form_code._decode as an int (`.get` on int) on
+    one CI run in many. Every such shape must be a ValueError."""
+    with pytest.raises(ValueError):
+        code_cipher.decrypt_code(_blob_of(plaintext, KEY), KEY)
 
 
 # ---- builder: form-level code --------------------------------------------
