@@ -208,16 +208,18 @@ def split_go_batches(sql: str) -> list[str]:
     """Split a SQL Server script on lines that are exactly `GO` (case-insensitive).
     Known limitation: a `GO` inside a string literal or block comment that sits
     alone on a line is still treated as a separator."""
+    # Lines keep their own endings: SQL Server stores a CREATE/ALTER of a module verbatim, so
+    # rejoining with "\n" turned every CRLF-normalized migration into an LF-only definition.
     batches, cur = [], []
-    for line in sql.splitlines():
-        if _GO_RE.match(line):
-            batch = "\n".join(cur).strip()
+    for line in sql.splitlines(keepends=True):
+        if _GO_RE.match(line.rstrip("\r\n")):
+            batch = "".join(cur).strip()
             if batch:
                 batches.append(batch)
             cur = []
         else:
             cur.append(line)
-    batch = "\n".join(cur).strip()
+    batch = "".join(cur).strip()
     if batch:
         batches.append(batch)
     return batches

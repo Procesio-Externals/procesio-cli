@@ -477,3 +477,12 @@ def test_apply_migration_sql_commits_after_draining_a_clean_batch():
     conn = BatchCursor({"INSERT dbo.T": ["1 row affected"]})
     assert schema.apply_migration_sql(conn, "INSERT dbo.T VALUES (1);\nINSERT dbo.T VALUES (2);\n") == 1
     assert conn.executed[-1] == "IF @@TRANCOUNT > 0 COMMIT TRANSACTION;"
+
+
+def test_tracking_table_is_unicode_with_a_named_primary_key():
+    # Databases that hold only nvarchar must not get a varchar column from the tool itself, and a
+    # system-named PK (PK____schema__<hash>) differs per database and breaks a parity compare.
+    import re
+    ddl = schema._ENSURE_TABLE_SQL
+    assert not re.search(r"(?<![N\w])(VAR)?CHAR\s*\(", ddl, re.I)
+    assert "CONSTRAINT PK___schema_migrations PRIMARY KEY" in ddl

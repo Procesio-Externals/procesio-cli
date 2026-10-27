@@ -180,6 +180,14 @@ different jobs. Both speak JSON-RPC over stdio.
 | what it is for | a chat client, where each tool has to say what it does | driving the whole registry |
 | launched by | the plugin, via `.mcp.json` | your own client config |
 
+**From the MCP Registry, or as a one-click bundle.** The chat server is listed in the
+official MCP Registry as `io.github.Procesio-Externals/procesio-cli`, and each release attaches
+`procesio-mcp-<version>.mcpb` to its
+[GitHub release](https://github.com/Procesio-Externals/procesio-cli/releases). Open that file in
+Claude Desktop to install it; the host fetches the Python dependencies with uv. Both are
+produced by the tag-driven `release` workflow, which fills in the bundle's hash and
+publishes `server.json`, so nothing in the registry is edited by hand.
+
 The curated surface is grouped by what you are building — processes, forms, connectors —
 and nothing in it takes a caller-supplied action, so every tool in the list is legible to
 a person reading it and to a model choosing between them. Its contents are declared in
