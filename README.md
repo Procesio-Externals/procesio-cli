@@ -136,17 +136,19 @@ icon. It launches the exact PyPI release of this package through `uvx`, so
 itself on first run. Authenticate with `add-credential` below, run as
 `uvx --from procesio-cli procesio add-credential ...` when there is no clone.
 
-**What gets installed is pinned.** The plugin names one exact release and passes
-`constraints.txt` and `build-constraints.txt` to `uvx`, so a fresh launch installs exactly the versions that
-were resolved and checked for this release, not whatever is newest on PyPI that day. The
-pins are checked to have prebuilt wheels for Python 3.11 to 3.14 on Windows, Linux
-(x86-64 and ARM) and Apple Silicon. Intel Macs are not covered: `cryptography` no longer
-publishes wheels for them, so installing there needs a Rust toolchain.
+**What gets installed is pinned.** The plugin installs one exact release of `procesio-cli`
+from PyPI, the version this repository was tagged with, and its dependencies resolve
+within the ranges `pyproject.toml` allows. For an install where every package is pinned,
+run from a clone and pass `constraints.txt` and `build-constraints.txt` to `uvx`, as the
+CI does: they hold the versions checked for this release, with prebuilt wheels for
+Python 3.11 to 3.14 on Windows, Linux (x86-64 and ARM) and Apple Silicon. Intel Macs are
+not covered: `cryptography` no longer publishes wheels for them, so installing there
+needs a Rust toolchain.
 
 **On Windows with Smart App Control.** Windows 11 can refuse to load a Python file
 whose publisher it cannot confirm, and shows "Part of this app has been blocked" for
 each one. The Python builds uv downloads for itself are not signed, so the plugin asks
-uv for a Python that is already installed first (`--python-preference system`, never
+uv for a Python that is already installed first (`UV_PYTHON_PREFERENCE=system` in its environment, never
 older than 3.11) and uses uv's own build only when there is none. If
 you see those notifications, install Python 3.11 or newer from
 [python.org](https://www.python.org/downloads/windows/) (for example

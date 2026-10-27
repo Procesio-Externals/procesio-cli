@@ -3,9 +3,8 @@
 Lets your own AI assistant build, run, validate and audit PROCESIO processes, forms and documents.
 
 This folder is the plugin: the MCP server configuration, four Agent Skills and the
-listing icon. The code is the `procesio-cli` package on PyPI. `.mcp.json` pins it to
-version 0.1.1, together with the dependency pins in `constraints.txt` and
-`build-constraints.txt`, and uv installs it the first time Claude Code starts the server.
+listing icon. The code is the `procesio-cli` package on PyPI. `.mcp.json` pins it to exactly
+version 0.1.2, and uv installs it the first time Claude Code starts the server.
 
 ## Install
 

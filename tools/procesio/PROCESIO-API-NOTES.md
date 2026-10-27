@@ -865,7 +865,16 @@ output by field: `attribute.attributeId` must be a **GUID**, and a field NAME fa
 - **Type the Node's output variable to the target store's backing data model** — builder
   `{"name":"rec","model":"<store dataTypeId>","direction":"output"}` (the `model` escape hatch;
   the store's `dataTypeId` comes from `datastore-get`). Return a plain object from the Node whose
-  KEYS match the model's attribute names; the platform populates the typed attributes by name.
+  KEYS match each attribute's **`jsonProperty`** (from `datastore-get-data-model`), which is the
+  camelCased name, e.g. `invoiceNumber`, and `pONumber` for a column `PONumber`. ⚠ Returning the
+  PascalCase attribute NAMES (`InvoiceNumber`) is silent: the run finishes with status 50 and every
+  attribute of the typed variable is null, so downstream Where/Decisional/Set Values see nulls
+  (measured 2026-10-27). The same variable injected into a later Node arrives with the
+  `jsonProperty` keys too. Builder paths (`{"var": x, "path": ["PONumber"]}`) still use the
+  attribute NAME; the builder resolves it to the attribute GUID.
+  A plain `json` variable cannot be bound by field anywhere the attribute is parsed as a GUID
+  (a rule Decisional rejects it at validate with `Error converting value "<field>" to type
+  'System.Guid'`), so route a field of a json input through a Node into a model-typed variable.
   Then each mapper row binds `attribute:{attributeId:<data-model attr GUID>, nextAttribute:null}`,
   `column:"<store column name>"`.
 - ⚠ **The store's COLUMN ids (`datastore-get` `columns[].id`) are NOT the data-model ATTRIBUTE ids

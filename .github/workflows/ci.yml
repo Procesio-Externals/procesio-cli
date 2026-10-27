@@ -51,13 +51,14 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           python - <<'PY'
-          import json, pathlib, subprocess
+          import json, os, pathlib, subprocess
 
           # The plugin pins the PyPI release ("procesio-cli==<version>"), which does not
           # exist yet while its pull request is open, so the checkout stands in for it.
           # Everything else in the command (pins, interpreter choice) runs as shipped.
           cfg = json.loads(pathlib.Path("plugin/.mcp.json").read_text())["mcpServers"]["procesio"]
-          args = [a.replace("${CLAUDE_PLUGIN_ROOT}", "plugin") for a in cfg["args"]]
+          args = list(cfg["args"])
+          plugin_env = {**os.environ, **cfg.get("env", {})}
           release = args[args.index("--from") + 1]
           if not release.startswith("procesio-cli=="):
               raise SystemExit(f"plugin/.mcp.json must pin an exact release, got {release!r}")
@@ -65,16 +66,16 @@ jobs:
           plugin_argv = [cfg["command"]] + args
           request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'
 
-          for label, argv in (
-              ("plugin, per plugin/.mcp.json", plugin_argv),
+          for label, argv, env in (
+              ("plugin, per plugin/.mcp.json", plugin_argv, plugin_env),
               ("full registry surface", ["uvx", "--python-preference", "system",
                                          "--python", ">=3.11",
                                          "--from", ".", "--constraints", "constraints.txt",
                                          "--build-constraints", "build-constraints.txt",
-                                         "procesio-mcp"]),
+                                         "procesio-mcp"], None),
           ):
               proc = subprocess.run(argv, input=request, capture_output=True,
-                                    text=True, timeout=600)
+                                    text=True, timeout=600, env=env)
               if proc.returncode != 0:
                   raise SystemExit(f"{label}: exited {proc.returncode}\n{proc.stderr[-2000:]}")
               tools = json.loads(proc.stdout.splitlines()[0])["result"]["tools"]

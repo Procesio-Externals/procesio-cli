@@ -3,18 +3,14 @@
     "procesio": {
       "command": "uvx",
       "args": [
-        "--python-preference",
-        "system",
-        "--python",
-        ">=3.11",
         "--from",
-        "procesio-cli==0.1.1",
-        "--constraints",
-        "${CLAUDE_PLUGIN_ROOT}/constraints.txt",
-        "--build-constraints",
-        "${CLAUDE_PLUGIN_ROOT}/build-constraints.txt",
+        "procesio-cli==0.1.2",
         "procesio-mcp-chat"
-      ]
+      ],
+      "env": {
+        "UV_PYTHON_PREFERENCE": "system",
+        "UV_PYTHON": ">=3.11"
+      }
     }
   }
 }
