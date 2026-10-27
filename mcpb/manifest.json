@@ -20,7 +20,18 @@
   "keywords": ["procesio", "automation", "workflow", "low-code", "mcp"],
   "server": {
     "type": "uv",
-    "entry_point": "webplatform/aat_mcp/chat_server.py"
+    "entry_point": "webplatform/aat_mcp/chat_server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--python-preference",
+        "system",
+        "--directory",
+        "${__dirname}",
+        "webplatform/aat_mcp/chat_server.py"
+      ]
+    }
   },
   "tools_generated": true,
   "compatibility": {
