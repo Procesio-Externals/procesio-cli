@@ -39,6 +39,10 @@ jobs:
         # 35 of them shipped with invalid YAML frontmatter. The validator is the
         # thing that would have caught it.
         run: uv run python scripts/validate-skills.py
+      - name: the plugin lock matches its pyproject
+        # A locked install refuses a lock that no longer matches plugin/pyproject.toml.
+        if: runner.os == 'Linux'
+        run: uv lock --check --project plugin
       - name: both MCP surfaces start, and the plugin launches the one plugin/.mcp.json names
         # The launch command is read OUT of .mcp.json rather than repeated here. A gate
         # that names its own command stops testing the plugin the moment the config
@@ -53,11 +57,10 @@ jobs:
           python - <<'PY'
           import json, os, pathlib, subprocess
 
-          # The plugin runs `uv run --locked` against plugin/uv.lock, which names a release
-          # already on PyPI, so it launches here exactly as it ships. A lock that no longer
-          # matches plugin/pyproject.toml fails right here, as it would for every user.
+          # The plugin runs `uvx procesio-cli==<runtime>`, a release already on PyPI (the
+          # same one plugin/uv.lock pins), so it launches here exactly as it ships.
           cfg = json.loads(pathlib.Path("plugin/.mcp.json").read_text())["mcpServers"]["procesio"]
-          args = [a.replace("${CLAUDE_PLUGIN_ROOT}", "plugin") for a in cfg["args"]]
+          args = list(cfg["args"])
           plugin_env = {**os.environ, **cfg.get("env", {})}
           plugin_argv = [cfg["command"]] + args
           request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'

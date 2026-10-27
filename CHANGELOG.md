@@ -17,14 +17,14 @@ there, not here.
   PyPI uses that form.
 
 ### Changed
-- The plugin starts its server with `uv run --locked` against `plugin/uv.lock`, which
-  pins the runtime release and every dependency with hashes, instead of `uvx` with only
-  the top-level version pinned.
+- The plugin ships `plugin/uv.lock`, which pins its runtime release and every dependency
+  with hashes, and starts the server as `uvx procesio-cli==<runtime>`, the bare form a
+  plugin directory's locked install accepts.
 
 ## [0.1.2] - 2026-10-27
 
 ### Changed
-- The plugin's launcher is now just `uvx --from procesio-cli==0.1.3 procesio-mcp-chat`.
+- The plugin's launcher is now just `uvx --from procesio-cli==0.1.2 procesio-mcp-chat`.
   The interpreter preference moved to `UV_PYTHON_PREFERENCE` and `UV_PYTHON` in its
   environment, and the pin files are no longer passed from the plugin folder: a plugin
   directory could not verify the version pin through them.
@@ -33,7 +33,7 @@ there, not here.
 
 ### Changed
 - The Claude Code plugin moved to `plugin/`. It now installs the exact PyPI release
-  (`uvx --from procesio-cli==0.1.3`) instead of building the repository, ships four
+  (`uvx --from procesio-cli==0.1.1`) instead of building the repository, ships four
   skills and a listing icon, and no longer picks up the repository's agent docs as
   subagents. The marketplace entry points at `./plugin`.
 - First release published to PyPI, so `pip install procesio-cli` and `uvx` work without a
