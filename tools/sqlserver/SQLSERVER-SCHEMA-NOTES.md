@@ -163,3 +163,122 @@ Code: `tools/sqlserver/schema.py` (engine SQL + migrate engine), the actions in
   migration was built (`CONVERT(varchar(23), modify_date, 121)`), and `;THROW` if it
   moved: a procedure changed by someone in between is rebuilt from the new text, never
   overwritten.
+
+## Field learnings (deadlocks and catch-all predicates, 2026-10)
+
+- **Azure SQL keeps every deadlock graph for about a month**, readable from `master`:
+  `SELECT event_data FROM sys.fn_xe_telemetry_blob_target_read_file('dl', NULL, NULL, NULL)`
+  (one `xml_deadlock_report` per row, with `database_name`), and per-database counts in
+  `master.sys.event_log WHERE event_type = 'deadlock'`. Both lag by tens of minutes. Group the
+  graphs by database, then by the statements in `executionStack/frame` (for ad-hoc batches the
+  frame is `unknown`: read `inputbuf` and the frame's line number).
+- **`exchangeEvent` + `pagelock` among the resources = an intra-query parallelism deadlock**: the
+  threads of ONE parallel scan blocking each other, not two clients. The cure is to stop the
+  scan (seekable predicate, index), not to retry or serialize callers.
+- **A catch-all predicate on a variable defeats the index**: `WHERE id = @id AND (@flag = 1 OR
+  CUI = @CUI)` cannot seek on `(CUI, id)`, because one cached plan must serve both values of
+  `@flag`. Split it into `IF @flag = 1 <statement A> ELSE <statement B>`: each branch gets its
+  own seekable plan and the behaviour is identical. Seen as ~20k reads and 0.8 s per call
+  dropping to 3-50 reads and 0 ms. The same applies to `(@p IS NULL OR col = @p)` filters.
+- **An nvarchar column compared with a numeric literal is converted, row by row**
+  (`CONVERT_IMPLICIT(bigint, col)`), so its index is unusable and the statement scans. Fix it
+  at the caller (`= N'123'` or a typed nvarchar parameter). An index on a computed
+  `CONVERT(bigint, col)` would match it but makes every non-numeric value fail on insert.
+- **Query Store hints need a stable `query_id`.** An ad-hoc statement with literals gets a new
+  `query_id` per value (check `sys.query_store_query_text`), so no hint can target it.
+- **`READ UNCOMMITTED` switches off lock-after-qualification** even when optimized locking and
+  RCSI are on: an UPDATE then holds U locks while it qualifies rows, which is what point
+  updates of the same pages deadlock against.
+- **Ranking a shared elastic pool:** `master.sys.resource_stats` (5-minute samples, 14 days) per
+  database shows who consumes the pool; then Query Store per database
+  (`sys.query_store_runtime_stats` x `count_executions`) for the top statements, including
+  `count_compiles` and `avg_compile_duration`, which expose procedures that recompile on every
+  statistics update.
+- **A range on ISNULL bounds is NOT a reliable fix for a catch-all filter.**
+  `id BETWEEN ISNULL(@id, MIN) AND ISNULL(@id, MAX)` returns the right rows, but the cached plan
+  is compiled for whichever call came first: compiled for the NULL (batch) case it scans, and every
+  single-row call then scans too (seen: ~5k reads became ~25k). Two statements under
+  `IF @id IS NOT NULL ... ELSE ...` are the plan-stable form. Measure the deployed plan, not the idea.
+- **Prove an equivalence before shipping a performance change:** run the current object and a
+  temporary copy (`CREATE PROCEDURE #name_new ...`, built from the live definition) with the same
+  parameters on real data and compare the rows, inside a transaction you roll back when the object
+  writes. Rows that differ only because production wrote between the two runs show up as
+  "old == old2 == new" on an old/new/old rerun.
+- **`OPTION (RECOMPILE)` on a list query with many optional filters** lets the optimizer drop the
+  unused ones (seen: 3.25M -> 84k reads for one page). It costs a compile per call, which on a
+  near-empty database can exceed the query itself; worth it only where the data is large.
+
+## Field learnings (index parity across databases that share one code base, 2026-10)
+
+- **Azure automatic tuning creates and drops indexes per database** (`CREATE_INDEX` / `DROP_INDEX`
+  in `sys.database_automatic_tuning_options`; names `nci_msft_*`, `nci_wi_*`). Databases that run the
+  same procedures therefore drift: the same query seeks in one and scans in another. Make every
+  index the code relies on an explicit, named index in the reference database and propagate it like
+  any other schema change; keep automatic tuning as a source of suggestions.
+- **Adopt instead of rebuilding:** where an automatic-tuning index already has exactly the wanted
+  keys and included columns, `EXEC sp_rename 'dbo.T.nci_msft_...', 'IX_...', 'INDEX'` is instant;
+  build only where it is missing. Copy the canonical definition from the most-used existing one, so
+  the big databases mostly rename.
+- **ONLINE index builds through `migrate`:** one index per file (each file is one transaction, and the
+  build's final schema lock is held until COMMIT), `WITH (ONLINE = ON (WAIT_AT_LOW_PRIORITY
+  (MAX_DURATION = 1 MINUTES, ABORT_AFTER_WAIT = SELF)))` works inside that transaction, and a
+  multi-gigabyte build outlasts the profile's 300 s statement timeout: run `main.dispatch("migrate",
+  ..., conn_factory=...)` in-process with `statement_timeout: 0` instead of copying the credential
+  into a second profile.
+- **A self-check inside a migration must not match its own comments:** a `LIKE '%pattern%'` or an
+  occurrence count over `OBJECT_DEFINITION` also sees the header comment the migration added.
+  Match the exact old predicate or keep the phrase out of the comment.
+
+## Field learnings (byte-identical modules and type changes across databases, 2026-10)
+
+- **`migrate` stores modules with the file's line endings.** It CRLF-normalizes each file, and
+  `split_go_batches` now keeps each line's own ending. Before that fix it rejoined lines with "\n",
+  so every module deployed through `migrate` was stored LF-only next to CRLF originals, and SSMS
+  reported "Inconsistent Line Endings" on script-out. Normalizing an existing module to CRLF is safe
+  only when no string literal in it spans lines (check before re-deploying).
+- **Prove text alignment by hash:** `CONVERT(varchar(64), HASHBYTES('SHA2_256', OBJECT_DEFINITION(OBJECT_ID('dbo.X'))), 2)`
+  equals the SHA-256 of the canonical text encoded UTF-16LE. SQL Server stores an `ALTER PROCEDURE/FUNCTION`
+  back as `CREATE ...`, so the hash of the CREATE text matches after an ALTER. A one-space change fails it.
+- **A function called by a DEFAULT constraint cannot be altered** (error 3729, "Cannot ALTER ... because it
+  is being referenced by object 'DF_...'"): drop the default, ALTER the function, re-create the default
+  with the same name and definition, all in one transaction.
+- **A type change on a column (varchar -> nvarchar, bigint -> int, nvarchar(max) -> datetime) is blocked
+  by the indexes and the DEFAULT on it.** Capture their exact definitions from the catalog, drop them,
+  ALTER COLUMN, re-create them; a length-only change of the same type is not blocked by a default.
+  Without dependents on a big table, do it ONLINE: one file that drops the column's statistics, a
+  second file with the ONLINE ALTER COLUMN alone (first operation of its transaction).
+- **ALTER COLUMN never truncates on a type change:** a value that does not fit the new type (non-numeric
+  text to int, bigint above the int range, an unparsable date) stops the statement with an error. Check
+  the data first with TRY_CONVERT and fill NULLs from their source column before making it NOT NULL.
+- **Stopping a parallel-scan deadlock from a caller you cannot change.** An ad-hoc statement sent with
+  literals (`WHERE message_id = 8641686710` on an nvarchar column) is neither seekable (the column gets
+  converted) nor parameterized (`query_parameterization_type_desc = None`, one Query Store query per
+  value, same `query_hash`), so a Query Store hint has no stable query_id to attach to. Two plan guides on
+  the statement's template do it: `sp_get_query_template` on one sample, then a `TEMPLATE` guide with
+  `OPTION (PARAMETERIZATION FORCED)` and a `SQL` guide on the same parameterized text and `@params` with
+  `OPTION (MAXDOP 1)`. Serial scans of one plan lock pages in the same order, so concurrent copies block
+  briefly instead of deadlocking (`exchangeEvent` + `pagelock` in the graph). Forced parameterization
+  types an integer literal in a comparison above the int range as `numeric(38,0)` and a string literal as
+  `varchar(8000)`, so the template is stable across values. Verify on the cached `Prepared` plan:
+  `PlanGuideName="<sql guide>"` and `NonParallelPlanReason="MaxDOPSetToOne"`; the ad-hoc entry shows
+  `TemplatePlanGuideName`. It is a mitigation: the statement still scans until the caller sends a typed
+  value, and once it does the guides simply stop matching.
+- **The tracking table follows the same rule.** `dbo.__schema_migrations` is now created with
+  `migration_id nvarchar(200)` under `PK___schema_migrations` and `sha256 nchar(64)`. Older copies
+  have `varchar(200)` / `char(64)` and a system-named PK (`PK____schema__<hash>`, different in every
+  database). Convert them with a migration: drop the PK found in `sys.key_constraints`, ALTER both
+  columns, re-add the named PK. `EXEC (...)` only concatenates literals and variables, so build the
+  DROP into a variable first (`EXEC (N'...' + QUOTENAME(@pk))` is a syntax error, 102).
+- **Error 689 after an ONLINE ALTER COLUMN:** the online rebuild leaves cleanup work on the table, and an
+  OFFLINE change to another column of the same table right after it fails with 689 until the cleanup
+  finishes. Order each table's changes offline first, online last, and let the runner wait ~30 s and
+  resume (the migration that failed was rolled back and is still pending) if it happens anyway.
+- **A column with a DEFAULT on a busy, large table** (a queue that takes inserts all day): the offline path
+  (drop default, ALTER, re-add) holds a schema lock for the whole rewrite, long enough to time out the
+  application's 30 s commands. Three files instead: (1) drop the default, guarded by a THROW if the column
+  holds NULLs; (2) the ONLINE ALTER COLUMN alone; (3) re-add the default under its canonical name and set
+  `col = <default>` WHERE col IS NULL, which catches any row inserted between (1) and (3) without it.
+  Only for a NULLable column (a NOT NULL one rejects those inserts while the default is gone); a reader
+  that polls for the default value sees those rows only after step (3), a delay of the ALTER's duration.
+  The steps depend on each other, so this path cannot be dry-run as a whole: prove it with a real apply on
+  a test database that has the same shape before running it on production.

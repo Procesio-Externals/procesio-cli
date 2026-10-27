@@ -474,9 +474,10 @@ IF NOT EXISTS (
 )
 BEGIN
     CREATE TABLE {MIG_FQN} (
-        migration_id   VARCHAR(200)  NOT NULL PRIMARY KEY,
+        migration_id   NVARCHAR(200) NOT NULL
+            CONSTRAINT PK___schema_migrations PRIMARY KEY,
         filename       NVARCHAR(260) NOT NULL,
-        sha256         CHAR(64)      NOT NULL,
+        sha256         NCHAR(64)     NOT NULL,
         applied_at     DATETIME2(0)  NOT NULL
             CONSTRAINT DF___schema_migrations_applied_at DEFAULT SYSUTCDATETIME(),
         applied_by     NVARCHAR(128) NOT NULL

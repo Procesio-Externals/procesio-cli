@@ -4011,6 +4011,21 @@ API 500 is a genuine refusal — tell it apart from the omit-`defaultWorkspaceCo
 500-that-still-lands **by read-back**: count unchanged = did-not-land; count +1 =
 landed. Never retry the API create (that is how the removed-row residue accrued).
 
+**Same split on a master that is NOT over any limit (measured 2026-10, v3).** A
+userpass owner with `hasAccess: true` on a master with one active sub-workspace sent one
+byte-correct `POST /api/Workspace` (`workspaceName`, `canExceedPaidTime: false`, a real
+`defaultWorkspaceConfiguration` from that master's Basic user type). The API answered
+**`500` `[{"statusCode": 100, "value": "An unexpected error occurred."}]`**, a different
+body from the "Unable to create sub-workspace!" cases, and read-back showed nothing
+landed. The web UI create on the same master a minute later landed at once. So treat
+the web UI as the working path for creating sub-workspaces, whatever the 500 body
+says. The UI path, for automation: master admin dashboard (switch to the master; the
+dashboard then shows **Create workspace**) → side panel **Create Workspace** → input
+`placeholder="Insert workspace name"` → the submit button's visible label is
+`span.pds-c-button--text` "Create" (the button also carries a hidden duplicate label,
+so `text-is("Create")` and `normalize-space(.)="Create"` match nothing). The default
+execution setting ("suspend at soft limit") adds no cost.
+
 ⚠⚠ **CORRECTION — the count-block is a platform BUG (confirmed by the PROCESIO
 team), and the subscription `softLimit`/`hardLimit` are NOT a sub-workspace count
 cap.** Two facts dissolve the earlier "cap of 10 / 14" framing: **(1)** the

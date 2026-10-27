@@ -1,9 +1,14 @@
 name: release
 
 # Publishing is driven by a tag, so the thing released is always a commit someone
-# deliberately marked. Nothing here holds a PyPI token: the publish job proves its
-# identity to PyPI over OIDC (trusted publishing), which has to be configured once
-# on pypi.org against this repository, this workflow file and the `pypi` environment.
+# deliberately marked. One tag produces three things:
+#   1. a GitHub release carrying procesio-mcp-<version>.mcpb, the one-click MCP bundle;
+#   2. the PyPI package, only once the repository variable PYPI_PUBLISH is "true";
+#   3. the entry in the official MCP Registry, io.github.Procesio-Externals/procesio-cli.
+# Nothing here holds a token. PyPI and the MCP Registry both take the job's identity over
+# OIDC: PyPI once trusted publishing is configured on pypi.org against this repository,
+# this workflow file and the `pypi` environment; the registry needs nothing configured,
+# because a GitHub OIDC token from this repository is what owns the io.github namespace.
 on:
   push:
     tags:
@@ -52,6 +57,9 @@ jobs:
   publish:
     name: publish to PyPI
     needs: build
+    # Off until trusted publishing exists on pypi.org: without it this job can only fail,
+    # and the registry entry below must not list a package PyPI does not have.
+    if: vars.PYPI_PUBLISH == 'true'
     runs-on: ubuntu-latest
     # The environment is the approval gate: require a reviewer on it in the repository
     # settings and a release cannot go out on a tag push alone.
@@ -66,3 +74,91 @@ jobs:
           name: dist
           path: dist/
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # release/v1
+
+  mcpb:
+    name: build the MCP bundle and attach it to the release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write      # creates the GitHub release that hosts the bundle
+    outputs:
+      sha256: ${{ steps.pack.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "lts/*"
+      - name: pack
+        id: pack
+        # The bundle is the tracked tree plus mcpb/manifest.json at its root. It is a
+        # "uv" bundle: the host installs the dependencies from pyproject.toml, so the
+        # file stays small and carries no compiled code.
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          mkdir -p build/bundle dist
+          git archive HEAD | tar -x -C build/bundle
+          cp mcpb/manifest.json build/bundle/manifest.json
+          test "$(jq -r .version build/bundle/manifest.json)" = "$version"
+          npx -y @anthropic-ai/mcpb@2.1.2 validate build/bundle/manifest.json
+          npx -y @anthropic-ai/mcpb@2.1.2 pack build/bundle "dist/procesio-mcp-$version.mcpb"
+          sha=$(sha256sum "dist/procesio-mcp-$version.mcpb" | cut -d' ' -f1)
+          echo "sha256=$sha" >> "$GITHUB_OUTPUT"
+          echo "procesio-mcp-$version.mcpb sha256 $sha"
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.mcpb --verify-tag --title "$GITHUB_REF_NAME" --notes-file CHANGELOG.md
+
+  mcp-registry:
+    name: publish to the MCP Registry
+    needs: [mcpb, publish]
+    # Runs whether or not the PyPI job ran; it only refuses when something it needs failed.
+    if: >-
+      always() && needs.mcpb.result == 'success' &&
+      (needs.publish.result == 'success' || needs.publish.result == 'skipped')
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write      # the GitHub OIDC token is the registry login
+      contents: read
+    env:
+      # Pinned and checksummed rather than releases/latest: this binary runs with an
+      # OIDC token in reach. Bump both values together, from the release's checksums file.
+      MCP_PUBLISHER_VERSION: v1.8.1
+      MCP_PUBLISHER_SHA256: a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: fill in server.json for this release
+        # server.json is immutable once a version is in the registry, so everything in it
+        # is checked here: the version must be the tag, the bundle hash is the one just
+        # built, and the PyPI package is listed only when PyPI really has it.
+        env:
+          MCPB_SHA256: ${{ needs.mcpb.outputs.sha256 }}
+          PYPI_PUBLISH: ${{ vars.PYPI_PUBLISH }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          version = os.environ["GITHUB_REF_NAME"].removeprefix("v")
+          doc = json.load(open("server.json", encoding="utf-8"))
+          assert doc["version"] == version, (doc["version"], version)
+          packages = []
+          for pkg in doc["packages"]:
+              if pkg["registryType"] == "mcpb":
+                  assert version in pkg["identifier"], pkg["identifier"]
+                  pkg["fileSha256"] = os.environ["MCPB_SHA256"]
+              elif pkg["registryType"] == "pypi" and os.environ.get("PYPI_PUBLISH") != "true":
+                  continue
+              packages.append(pkg)
+          doc["packages"] = packages
+          json.dump(doc, open("server.json", "w", encoding="utf-8"), indent=2)
+          print(json.dumps(doc, indent=2))
+          PY
+      - name: install mcp-publisher
+        run: |
+          curl -fsSL -o mcp-publisher.tar.gz "https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}/mcp-publisher_linux_amd64.tar.gz"
+          echo "${MCP_PUBLISHER_SHA256}  mcp-publisher.tar.gz" | sha256sum -c -
+          tar -xzf mcp-publisher.tar.gz mcp-publisher
+      - name: publish
+        run: |
+          ./mcp-publisher login github-oidc
+          ./mcp-publisher publish
