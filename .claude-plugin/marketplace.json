@@ -8,8 +8,8 @@
   "plugins": [
     {
       "name": "procesio",
-      "source": "./",
-      "description": "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant."
+      "source": "./plugin",
+      "description": "Lets your own AI assistant build, run, validate and audit PROCESIO processes, forms and documents."
     }
   ]
 }

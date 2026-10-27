@@ -1,7 +1,7 @@
 """PROCESIO environments - named URL sets an installation is reached through.
 
 A PROCESIO *environment* is one installation of the platform: a `<Client>-<ENV>`
-label (e.g. `Internal-PROD`, `Internal-QA`, `Delgaz-DEVQA`) that carries the four
+label (e.g. `Internal-PROD`, `Internal-QA`, `Acme-DEVQA`) that carries the four
 host URLs that installation lives on:
 
     web_base   the Web API host (every REST call)                webapi-*.procesio.app
@@ -22,7 +22,7 @@ Two layers, merged at read time:
   * BUILT-IN presets in code (Internal-PROD/QA/DEV) - PROCESIO's own infra, shared
     with every teammate, available with zero setup.
   * a USER registry at ``config/procesio/environments.json`` (per-user, wipeable)
-    holding client-specific environments (Delgaz-*, ...) and the default pointer.
+    holding client-specific environments (Acme-*, ...) and the default pointer.
     A user entry with the same name OVERRIDES a built-in (so a moved Internal host
     can be corrected without a code change).
 
@@ -206,7 +206,7 @@ def add(name: str, *, web_base: str, app_base: str, forms_base: str,
     if not _NAME_RE.match(name):
         raise UsageError(
             "environment name must look like '<Client>-<ENV>' "
-            "(letters/digits/.-_ , e.g. 'Delgaz-PROD')"
+            "(letters/digits/.-_ , e.g. 'Acme-PROD')"
         )
     if not (web_base and app_base and forms_base):
         raise UsageError("add-environment needs --web-base, --app-base and --forms-base")

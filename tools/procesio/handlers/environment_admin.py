@@ -57,13 +57,13 @@ def list_environments(_args) -> dict:
 
 def _add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--name", required=True,
-                   help="environment name, '<Client>-<ENV>' e.g. Delgaz-PROD")
+                   help="environment name, '<Client>-<ENV>' e.g. Acme-PROD")
     p.add_argument("--web-base", dest="web_base", required=True,
-                   help="Web API host, e.g. https://webapi.delgaz.example")
+                   help="Web API host, e.g. https://webapi.acme.example")
     p.add_argument("--app-base", dest="app_base", required=True,
-                   help="designer / front-end host, e.g. https://delgaz.example")
+                   help="designer / front-end host, e.g. https://acme.example")
     p.add_argument("--forms-base", dest="forms_base", required=True,
-                   help="public forms host, e.g. https://forms.delgaz.example")
+                   help="public forms host, e.g. https://forms.acme.example")
     p.add_argument("--auth-base", dest="auth_base",
                    help="legacy auth host (optional; login uses the web host)")
     p.add_argument("--client", help="client label (default: derived from the name)")

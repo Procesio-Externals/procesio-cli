@@ -80,14 +80,14 @@ def test_unknown_environment_raises():
 # -- add / set / remove -----------------------------------------------------
 
 def test_add_client_environment_and_switch():
-    entry = E.add("Delgaz-PROD", web_base="https://webapi.delgaz.example",
-                  app_base="https://delgaz.example",
-                  forms_base="https://forms.delgaz.example")
-    assert entry["client"] == "Delgaz" and entry["env"] == "PROD"
+    entry = E.add("Acme-PROD", web_base="https://webapi.acme.example",
+                  app_base="https://acme.example",
+                  forms_base="https://forms.acme.example")
+    assert entry["client"] == "Acme" and entry["env"] == "PROD"
     assert entry["builtin"] is False
-    E.set_default("Delgaz-PROD")
-    assert E.get_default() == "Delgaz-PROD"
-    assert E.resolve(None, None)["web_base"] == "https://webapi.delgaz.example"
+    E.set_default("Acme-PROD")
+    assert E.get_default() == "Acme-PROD"
+    assert E.resolve(None, None)["web_base"] == "https://webapi.acme.example"
 
 
 def test_add_trailing_slash_stripped():

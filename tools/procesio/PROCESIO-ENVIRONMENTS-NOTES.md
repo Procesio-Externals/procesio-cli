@@ -23,7 +23,7 @@ The `-qa` / `-dev` installations follow a host family: `webapi-qa.` / `qa.` /
   own infra, framework-shared, available with zero setup. These are *framework* data
   (public app hostnames), like the historical hard-coded defaults were.
 - **User registry** at `context-state-knowledge/config/procesio/environments.json`
-  (per-user, wipeable) — client-specific environments (`Delgaz-*`, …) and the
+  (per-user, wipeable) — client-specific environments (`Acme-*`, …) and the
   `default` pointer. A user entry with a built-in's name **overrides** it (correct a
   moved Internal host without a code change). Client installation URLs are
   customer-specific, so they are **user data** and live here, never in shared code.
@@ -56,8 +56,8 @@ resolve to `Internal-PROD` automatically.
 
 ```
 list-environments                       # what exists, which is default, bound creds
-add-environment --name Delgaz-PROD \     # register a client installation
-    --web-base https://webapi.delgaz… --app-base https://delgaz… --forms-base https://forms.delgaz…
+add-environment --name Acme-PROD \     # register a client installation
+    --web-base https://webapi.acme… --app-base https://acme… --forms-base https://forms.acme…
 set-environment --name Internal-QA       # move the default pointer (persists)
 add-credential --name qa-me --type userpass --username … --environment Internal-QA
 <any action> --environment Internal-DEV  # one call against another env, default unchanged

@@ -130,12 +130,14 @@ together. No clone, no path to write into a config file.
 /plugin install procesio@procesio-cli
 ```
 
-The plugin launches the MCP server through `uvx`, so [uv](https://docs.astral.sh/uv/)
-has to be on the machine; everything else it needs it resolves itself on first run.
-Authenticate exactly as a clone does, with `add-credential` below.
+The plugin is the `plugin/` folder: the MCP server configuration, four skills and an
+icon. It launches the exact PyPI release of this package through `uvx`, so
+[uv](https://docs.astral.sh/uv/) has to be on the machine; everything else it resolves
+itself on first run. Authenticate with `add-credential` below, run as
+`uvx --from procesio-cli procesio add-credential ...` when there is no clone.
 
-**What gets installed is pinned.** The plugin passes `constraints.txt` and
-`build-constraints.txt` to `uvx`, so a fresh launch installs exactly the versions that
+**What gets installed is pinned.** The plugin names one exact release and passes
+`constraints.txt` and `build-constraints.txt` to `uvx`, so a fresh launch installs exactly the versions that
 were resolved and checked for this release, not whatever is newest on PyPI that day. The
 pins are checked to have prebuilt wheels for Python 3.11 to 3.14 on Windows, Linux
 (x86-64 and ARM) and Apple Silicon. Intel Macs are not covered: `cryptography` no longer
