@@ -145,19 +145,19 @@ actions:
   - name: name
     type: string
     required: true
-    description: environment name, '<Client>-<ENV>' e.g. Delgaz-PROD
+    description: environment name, '<Client>-<ENV>' e.g. Acme-PROD
   - name: web-base
     type: string
     required: true
-    description: Web API host, e.g. https://webapi.delgaz.example
+    description: Web API host, e.g. https://webapi.acme.example
   - name: app-base
     type: string
     required: true
-    description: designer / front-end host, e.g. https://delgaz.example
+    description: designer / front-end host, e.g. https://acme.example
   - name: forms-base
     type: string
     required: true
-    description: public forms host, e.g. https://forms.delgaz.example
+    description: public forms host, e.g. https://forms.acme.example
   - name: auth-base
     type: string
     required: false

@@ -67,14 +67,16 @@ Same rule: `--password` is omitted, so it is prompted without echoing.
 
 ### Installed from the plugin rather than cloned
 
-The console scripts replace `python scripts/run-tool.py`:
+The plugin runs the `procesio-cli` package from PyPI through uv, so there is no checkout
+and no `procesio` command on the PATH. The same commands run through `uvx`:
 
 ```bash
-procesio add-credential --name personal --type apikey --make-default
+uvx --from procesio-cli procesio add-credential --name personal --type apikey --make-default
 ```
 
-Everything else on this page works the same way, with `procesio` in place of
-`python scripts/run-tool.py procesio`.
+Everything else on this page works the same way, with `uvx --from procesio-cli procesio`
+in place of `python scripts/run-tool.py procesio`. Someone who ran
+`pip install procesio-cli` has the `procesio` command itself and can drop the prefix.
 
 ## Verify before declaring it done
 

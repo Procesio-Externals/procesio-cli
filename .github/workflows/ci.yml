@@ -39,7 +39,7 @@ jobs:
         # 35 of them shipped with invalid YAML frontmatter. The validator is the
         # thing that would have caught it.
         run: uv run python scripts/validate-skills.py
-      - name: both MCP surfaces start, and the plugin launches the one .mcp.json names
+      - name: both MCP surfaces start, and the plugin launches the one plugin/.mcp.json names
         # The launch command is read OUT of .mcp.json rather than repeated here. A gate
         # that names its own command stops testing the plugin the moment the config
         # points somewhere else, and stays green the whole time it is not testing it.
@@ -53,14 +53,20 @@ jobs:
           python - <<'PY'
           import json, pathlib, subprocess
 
-          cfg = json.loads(pathlib.Path(".mcp.json").read_text())["mcpServers"]["procesio"]
-          plugin_argv = [cfg["command"]] + [
-              a.replace("${CLAUDE_PLUGIN_ROOT}", ".") for a in cfg["args"]
-          ]
+          # The plugin pins the PyPI release ("procesio-cli==<version>"), which does not
+          # exist yet while its pull request is open, so the checkout stands in for it.
+          # Everything else in the command (pins, interpreter choice) runs as shipped.
+          cfg = json.loads(pathlib.Path("plugin/.mcp.json").read_text())["mcpServers"]["procesio"]
+          args = [a.replace("${CLAUDE_PLUGIN_ROOT}", "plugin") for a in cfg["args"]]
+          release = args[args.index("--from") + 1]
+          if not release.startswith("procesio-cli=="):
+              raise SystemExit(f"plugin/.mcp.json must pin an exact release, got {release!r}")
+          args[args.index("--from") + 1] = "."
+          plugin_argv = [cfg["command"]] + args
           request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'
 
           for label, argv in (
-              ("plugin, per .mcp.json", plugin_argv),
+              ("plugin, per plugin/.mcp.json", plugin_argv),
               ("full registry surface", ["uvx", "--python-preference", "system",
                                          "--python", ">=3.11",
                                          "--from", ".", "--constraints", "constraints.txt",

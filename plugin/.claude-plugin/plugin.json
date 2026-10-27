@@ -1,12 +1,13 @@
 {
   "name": "procesio",
-  "description": "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant.",
-  "version": "0.1.0",
+  "displayName": "PROCESIO",
+  "description": "Lets your own AI assistant build, run, validate and audit PROCESIO processes, forms and documents.",
+  "version": "0.1.1",
   "author": {
     "name": "Ringhel TEAM SRL (PROCESIO)",
     "url": "https://procesio.com"
   },
-  "homepage": "https://procesio.com",
+  "homepage": "https://github.com/Procesio-Externals/procesio-cli#readme",
   "repository": "https://github.com/Procesio-Externals/procesio-cli",
   "license": "Apache-2.0",
   "keywords": [
