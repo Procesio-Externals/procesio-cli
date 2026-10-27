@@ -136,11 +136,12 @@ icon. It launches the exact PyPI release of this package through `uvx`, so
 itself on first run. Authenticate with `add-credential` below, run as
 `uvx --from procesio-cli procesio add-credential ...` when there is no clone.
 
-**What gets installed is pinned.** The plugin installs one exact release of `procesio-cli`
-from PyPI, the version this repository was tagged with, and its dependencies resolve
-within the ranges `pyproject.toml` allows. For an install where every package is pinned,
-run from a clone and pass `constraints.txt` and `build-constraints.txt` to `uvx`, as the
-CI does: they hold the versions checked for this release, with prebuilt wheels for
+**What gets installed is pinned.** The plugin carries a small runtime project in
+`plugin/`: `pyproject.toml` names one release of `procesio-cli` and `uv.lock` pins it and
+every dependency to exact versions with hashes. It starts the server with `uv run
+--locked`, so a fresh launch installs exactly what was locked for this release, not
+whatever is newest on PyPI that day. A clone can do the same with `constraints.txt` and
+`build-constraints.txt`, which pin every package to versions with prebuilt wheels for
 Python 3.11 to 3.14 on Windows, Linux (x86-64 and ARM) and Apple Silicon. Intel Macs are
 not covered: `cryptography` no longer publishes wheels for them, so installing there
 needs a Rust toolchain.

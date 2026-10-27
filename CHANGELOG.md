@@ -9,6 +9,11 @@ there, not here.
 
 ## [Unreleased]
 
+### Changed
+- The plugin starts its server with `uv run --locked` against `plugin/uv.lock`, which
+  pins the runtime release and every dependency with hashes, instead of `uvx` with only
+  the top-level version pinned.
+
 ## [0.1.2] - 2026-10-27
 
 ### Changed
