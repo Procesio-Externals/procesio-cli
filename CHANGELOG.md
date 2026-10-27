@@ -9,11 +9,19 @@ there, not here.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-27
+
+### Changed
+- The plugin's launcher is now just `uvx --from procesio-cli==0.1.2 procesio-mcp-chat`.
+  The interpreter preference moved to `UV_PYTHON_PREFERENCE` and `UV_PYTHON` in its
+  environment, and the pin files are no longer passed from the plugin folder: a plugin
+  directory could not verify the version pin through them.
+
 ## [0.1.1] - 2026-10-27
 
 ### Changed
 - The Claude Code plugin moved to `plugin/`. It now installs the exact PyPI release
-  (`uvx --from procesio-cli==0.1.1`) instead of building the repository, ships four
+  (`uvx --from procesio-cli==0.1.2`) instead of building the repository, ships four
   skills and a listing icon, and no longer picks up the repository's agent docs as
   subagents. The marketplace entry points at `./plugin`.
 - First release published to PyPI, so `pip install procesio-cli` and `uvx` work without a
