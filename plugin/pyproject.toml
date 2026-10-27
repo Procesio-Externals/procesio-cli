@@ -1,7 +1,8 @@
 # The Claude plugin's runtime: one dependency, the procesio-cli release the plugin runs,
-# locked with exact versions and hashes in uv.lock beside this file. .mcp.json starts the
-# server with `uv run --locked`, so what installs is exactly what was locked and reviewed.
-# Regenerate both with `procesio-oss lock-plugin` in the upstream repo, never by hand.
+# locked with exact versions and hashes in uv.lock beside this file, which a locked
+# install uses to fetch exactly what was locked and reviewed. Keep [tool.uv] to standard
+# settings: a plugin directory's frozen install refuses others. Regenerate the lock with
+# `procesio-oss lock-plugin` in the upstream repo, never by hand.
 [project]
 name = "procesio-plugin-runtime"
 version = "0.1.3"
@@ -11,7 +12,3 @@ dependencies = ["procesio-cli==0.1.3"]
 
 [tool.uv]
 package = false
-# Written by lock-plugin: third-party releases newer than the cutoff are never locked,
-# and the runtime release itself is exempt. Change them only by re-running lock-plugin.
-exclude-newer = "2026-10-20T16:30:59Z"
-exclude-newer-package = { procesio-cli = "2026-10-27T16:30:59Z" }
