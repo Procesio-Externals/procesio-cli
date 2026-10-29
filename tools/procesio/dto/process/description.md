@@ -66,7 +66,7 @@ per-action code.
   (an array/object injects as a JSON literal, so `const h = <%0%>;` is valid). **A STRING
   injects as a BARE token, not a quoted literal — wrap it yourself: `const s='<%0%>';`.
   Without quotes you get `const s=SDSDX0GM6L;` → ReferenceError → the Node returns null
-  silently (verified 2026-07-22, Uranus 100 P1).**
+  silently (verified 2026-07-22 on a client process).**
   **For arbitrary text (quotes, apostrophes, newlines, JSON, HTML) read it as a raw template
   literal: `` const s = String.raw`<%0%>`; ``.** Single quotes break on the first apostrophe and
   on any newline; `String.raw` keeps everything verbatim and only breaks on a backtick or `${`
