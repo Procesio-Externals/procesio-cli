@@ -9,6 +9,24 @@ there, not here.
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-10-29
+
+### Added
+- `procesio node-repair-designer` repairs a process with nodes the designer cannot draw,
+  such as a node without `configuration` or one with a shape the canvas does not know.
+- `web render-image` renders a local HTML file to a PNG, JPG or WebP of an exact size.
+  Pillow is now part of the `browser` extra, because WebP needs it.
+
+### Changed
+- A save of a process the designer cannot draw is refused with `designer_unrenderable`.
+  That process would still run. Its canvas and every instance view would stay blank,
+  though, and nothing else catches it.
+- Example environment names in the agent guide, the dashboard and its tests are now
+  `Acme-*`.
+- The plugin's `plugin.json` sets documentation, support, terms and privacy links. Its
+  `pyproject.toml` keeps only `package = false` under `[tool.uv]`.
+- New notes cover running and debugging a process, and Process Designer shortcuts.
+
 ## [0.1.3] - 2026-10-27
 
 ### Added
