@@ -1739,6 +1739,27 @@ def prepare_ctx(client, config: dict) -> dict:
     # model's attributes (recursively, so a nested path can descend) and index them by name.
     model_attrs: dict[str, dict] = {}
 
+    def index_attrs(model_id: str, attrs: list, seen: set) -> None:
+        entries = {}
+        for a in attrs:
+            nm = (a.get("name") or a.get("Name") or "").strip()
+            if not nm:
+                continue
+            child = a.get("dataTypeId") or a.get("DataTypeId")
+            entries[nm.lower()] = {"id": a.get("id") or a.get("Id"), "name": nm,
+                                   "dataTypeId": child}
+            if a.get("isDataModel") or a.get("IsDataModel"):
+                inline = a.get("attributes") or a.get("Attributes")
+                if inline and child and child not in model_attrs and child not in seen:
+                    # A PRIVATE inner model (from "Create from JSON") cannot be read on its own:
+                    # `GET /api/DataTypes/{id}` answers 400 "Requested data type not found!".
+                    # Its parent carries the attributes inline, so index those instead.
+                    seen.add(child)
+                    index_attrs(child, inline, seen)
+                else:
+                    index_model(child, seen)
+        model_attrs[model_id] = entries
+
     def index_model(model_id: str, seen: set) -> None:
         if not model_id or model_id in model_attrs or model_id in seen:
             return
@@ -1752,17 +1773,7 @@ def prepare_ctx(client, config: dict) -> dict:
             # `GET /api/DataTypes/{x}` answers 200 with a null body for a value it does not know
             # (an unresolved model NAME lands on that route), so treat it as unreadable too.
             return
-        entries = {}
-        for a in (d.get("attributes") or []):
-            nm = (a.get("name") or a.get("Name") or "").strip()
-            if not nm:
-                continue
-            child = a.get("dataTypeId") or a.get("DataTypeId")
-            entries[nm.lower()] = {"id": a.get("id") or a.get("Id"), "name": nm,
-                                   "dataTypeId": child}
-            if a.get("isDataModel") or a.get("IsDataModel"):
-                index_model(child, seen)
-        model_attrs[model_id] = entries
+        index_attrs(model_id, d.get("attributes") or [], seen)
 
     var_models: dict[str, str] = {}
     for v in config.get("variables", []):

@@ -9,8 +9,19 @@ there, not here.
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-10-29
+
+### Fixed
+- A `{var, path}` binding into a nested model made by "Create from JSON" now resolves.
+  Such inner models are private: `GET /api/DataTypes/{id}` answers 400 when asked for
+  one directly. The builder now reads their attributes from the parent model.
+
 ### Changed
 - The plugin runs procesio-cli 0.1.4 (`plugin/pyproject.toml` and `plugin/uv.lock`).
+- Notes that named the project a lesson came from now describe it in general terms.
+- New notes cover what takes the error path, Throw and the process timeout, how
+  Decisional, Join and Delay behave in the designer and at runtime, and private versus
+  public data models.
 
 ## [0.1.4] - 2026-10-29
 

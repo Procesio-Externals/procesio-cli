@@ -78,6 +78,26 @@ first returned 0 actions on a live process because it only looked for `Actions`.
 - **Data models** = `DataTypes`. `GET /api/DataTypes` with
   `includeProcesioEntries=false&includeExternalEntries=true` → the workspace's
   custom data models only (`{name, id, ...}`).
+- **Private inner models cannot be read on their own** (measured 2026-10-29). "Create from
+  JSON" turns each nested object or list of objects in the sample into a PRIVATE model inside
+  the parent. `GET /api/DataTypes/{innerId}` answers 400 `"Requested data type not found!"`
+  (statusCode 350); the parent's GET carries the inner attributes inline under the attribute,
+  so read them from there (the process builder does, for `{var, path}` bindings).
+- **Private vs public, as the UI behaves now** (2026-10-29): a private model shows a globe icon
+  "Make public" on its row in the parent; an attribute typed with a public model shows a
+  `public` badge. A private model is NOT offered as an attribute type in other models (only
+  public ones are), but the process variable Type list DOES offer it, under its own "Private
+  Data models" tab (the v2.0.0 release notes say it would not). Adding an attribute to a public
+  model shows up at once inside every model that uses it.
+- **Type mapping, as the designer checks it** (2026-10-29): an Integer variable in a Float
+  field is flagged "Error: data type mismatch" (red field, listed by Validate), although the
+  "Working with Data Types" docs page says Integer to Float is allowed. Any primitive into a
+  String field runs (a Float attribute concatenated into text). The variable picker greys out
+  the attributes inside a list when the field holds one value.
+- **Deleting a model a process still uses is NOT refused** (measured 2026-10-29): `DELETE
+  /api/DataTypes/{id}` returned success while a process input variable was typed with that
+  model. Reset scripts must restore the process first, then delete the model. A second DELETE
+  of a model already gone answers HTTP 500 "An unexpected error occurred." (statusCode 100).
 - **Documents (document designer)** = `DocumentTemplate`. List
   `GET /api/DocumentTemplate` (scoped by `workspaceid`).
 - **Forms** = `FormTemplate`. `GET /api/FormTemplate` (scoped by `workspaceid`);
@@ -605,7 +625,9 @@ believing it.
 
 ⚠ A first diagnosis of this blamed loop-carried variable scope ("a For Each body cannot
 accumulate across iterations"). That was WRONG: the loop had never run twice, so
-accumulation was never exercised. Whether it works is **NOT ESTABLISHED**.
+accumulation was never exercised. **It works (live, 2026-10):** a process variable updated inside the
+body (an Add whose Result is the same variable it reads) keeps its value from one pass to the next;
+a loop over three amounts counted one big and two small orders. The loop-scope theory is dead.
 
 **On using a `Decisional` as a hand-rolled loop instead:** it costs about **+2 actions per
 item** (the Decisional plus an increment node) where a For Each costs none, and
@@ -4594,8 +4616,8 @@ element for a 4-node body. **The `For Each` itself consumes none.**
 37 child-first, and a working built process is child-first). What matters is that
 both edges exist and the last body node returns to the For Each.
 
-⚠ **NOT ESTABLISHED:** N=0, N much greater than 100, and loop-carried
-accumulation across iterations.
+⚠ **NOT ESTABLISHED:** N=0 and N much greater than 100. Loop-carried accumulation across
+iterations is established (see the For Each section above).
 
 ## The anonymous form/dataStore path is scoped to the WORKSPACE, not the form
 
@@ -6926,6 +6948,9 @@ their summary/description, so do not derive permissions from Swagger text alone.
 - `FlowVariableType.Auto` / `VariableOrientation.AUTO` = 50, serialized as `"type": 50`.
   Engine-written and read-only: clients cannot create one, and the tool refuses to retype or
   re-default a SYSTEM (40) or AUTO (50) variable, with no override.
+- **Not shown in the web app** (checked 2026-10-29): the run view's Variables tab lists only
+  Input / Internal / Output variables, so auto variables (and the `{Action}_InstanceId` type-20
+  one) are visible over the API only (`get-instance-status --variables`).
 - Created on the INSTANCE from action settings meant for it, named `{ActionName}_{PropertyName}`
   (`_2`, `_3` on a clash, 64-char cap), value in `defaultValue`. Instance, history and archive
   reads always return them (no `getInternalVariables`); they survive data-retention cleanup like
@@ -7069,3 +7094,84 @@ so faking the platform in a running page proves nothing.
   the copy starts deactivated. "Copy input variables (JSON)" is in both the row menu and the
   designer's title menu (the title menu opens from the chevron, not the title).
 - **Undocumented shortcut**: Shift+Alt+F, "Beautify content in editor".
+
+## Decisional, Join and Delay: designer and runtime behaviour (live, 2026-10)
+
+Checked on procesio.app with throwaway processes while scripting a tutorial; every runtime line
+below comes from a real run.
+
+- **Connecting a Decisional on the canvas**: hover the diamond, rest on its RIGHT tip (the
+  bounding square of the rotated 48 px node, so about +31 px from the centre), then drag to the
+  target. Each connection adds a case ("Case 1", "Case 2"), pre-targeted, "(not configured)" until
+  it gets a condition. The connection opens the target's properties panel.
+- **The dot under the diamond is the ERROR port, not the default port.** Dragging from it draws a red
+  dashed "Error" connector and saves `Ports[].Type = 1, Data.isDefault = "error"` plus a
+  `VariableErrorId`, yet the properties panel lists that target as **Default**. At runtime it is
+  broken: on the first item where no case was true the run ended with status 50 after 2 actions and
+  nothing counted, silently. The docs (how-to/decisional) still show a "Drag to an action to set the
+  default path" handle there. A real default (`Type 0, isDefault: "default"`, drawn as a blue
+  "Default" label) can be built over the API (`branches: [..., {to, default: true}]`); no working
+  designer gesture for it was found. Reported as a product gap; do not teach the lower dot.
+- **Case Configuration** (click a case card): Name, Advanced Filtering Builder (Add condition / Add
+  group; left operand only from the variable picker, operator list equals ... is not empty, right
+  operand typed or picked), Target "Go to". The Default card cannot be clicked there. Case cards
+  reorder by dragging their number. The properties-panel cards sit behind the window in the DOM,
+  so scope selectors to `.pup-c-case-selector` while it is open.
+- **Only the first true case runs**: with cases "> 1000" then "> 10", an input of 5000 took only the
+  first branch.
+- **No Default**: tooltip "Stop the process if none of the conditions will be fulfilled. In a
+  Foreach it will go to the next iteration." Both verified: inside a For Each the loop moved on to
+  the next item; outside a loop the run ended with status 50 (finished, not failed) and ran nothing
+  after the Decisional.
+- **Join** goes on when any one branch arrives (a loop body whose Decisional fires one branch per
+  item ran every iteration through it), and has a single way out. A Decisional case may target a
+  Join placed earlier in the flow: Join + Decisional is the Do While pattern.
+- **A Stop cannot be dropped inside a For Each frame** (the drop does nothing; any other action
+  lands).
+- **Delay**: "Wait for a specific period of time" (amount + unit) or "Wait until" (a DateTime in
+  UTC); Runtime Amount / Runtime Interval set the wait from variables. A run with three 5-second
+  waits showed 15 s between Start time and Last update and a Processing time of 00:00:00.01: time
+  spent waiting in a Delay is not processing time.
+- **Run with no inputs** starts at once and shows a "Process completed" toast within about 2 s,
+  while the run is still waiting (it finished 15 s later). Treat that toast as "started".
+
+## Error path, Throw and process timeout: designer and runtime behaviour (live, 2026-10)
+
+- **What takes the error port.** Only an action that cannot finish: a host that does not resolve
+  (`Name or service not known (<host>:443)`, error code 400 in the error variable) or a connection
+  that hangs until Call API's own `Time Out` (`The request was canceled due to the configured
+  HttpClient.Timeout of 60 seconds elapsing.`). **An HTTP error answer is a success:** a Call API
+  that got `503` finished with status 50, `Response Status` = 503, and the error path never ran.
+  To retry on a bad status, branch on `Response Status` yourself.
+- **Call API takes ONE incoming connection.** A retry that loops back into the same action fails
+  BE validation with 383 `Action has too many input ports.`; meet the start and the retry in a Join
+  placed before the call. (The docs picture of a "retry path to the same action" skips this.)
+- **Drawing the error path in the designer:** the error port is a grey bullet about 63 px under the
+  node centre, and it is draggable only while the action is SELECTED (click it first; tooltip
+  "Drag to an action to set the error Path"). Hovering shows the bullet but it vanishes as the
+  pointer moves onto it, and a drag that starts there pans the canvas instead.
+- **The error variable** is created with the path, named `on<ActionNameInPascalCase>Error`
+  (e.g. `onGetTheRatesError`), type Error (`10c6ac59-…-121212121220`), internal, listed on its
+  own **Error** tab in Process variables. Edit Variable can rename it and set it as Input/Output.
+  Its value at runtime: `{"message", "code", "actionName"}`; after a retry loop it holds the LAST
+  failure.
+- **Throw** (`eec71c30-…`) has an output port, so it must still be wired to a Stop. Its `Custom
+  Message` defaults to the literal "An exception occured." (sic); picking a variable with the
+  field's plus APPENDS a chip after the existing text, it does not replace it, so clear the text
+  first. Text and chips mix: `"Gave up after 3 tries: <%0%>"` with the error's `message` attribute.
+  At runtime the run ends status 40 ("failed") and the instance's Action errors list both the
+  failed action's error and the Throw's message.
+- **Process timeout** (Edit process properties > `Timeout (sec)`, flow field `timeout`): tooltip
+  range 10 s to 2,678,400 s (31 days), 0 = none; below 10 the field says "Timeout value is not
+  valid." It saves with the process (designer Save and PUT both persist it). **It was never seen
+  to stop a run:** with `timeout` 10, a 64 s run of Delay waits, a 4-minute run of hanging calls,
+  a 20 s Node busy loop (designer Run and API run, sync and async) and a 107-action runaway loop
+  all ran on; the instance record shows `timeout: 0`. `timeConsumed` on an instance is
+  MILLISECONDS of processing (235 = "Processing time 00:00:00.24"), and Delay waits, hanging HTTP
+  and Node execution add almost nothing to it, so if the timeout is measured against processing
+  time it is practically unreachable. Open question for Engineering; do not promise in docs or
+  videos that it stops a run.
+- **A runaway loop cannot be stopped over the API:** `POST /api/Projects/instances/{id}/stop`
+  answered 400 "Stopping process failed." for a RUNNING instance too (not only starting/debug
+  ones). The instance view's **Stop instance** button stopped it (status 6, "stopped"). Keep a
+  retry counter in every loop.

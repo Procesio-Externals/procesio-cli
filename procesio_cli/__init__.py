@@ -11,7 +11,7 @@ Running from a clone is unchanged and still documented:
 """
 from pathlib import Path
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 #: The bundled repository root. In a wheel this directory holds tools/, agents/,
 #: scripts/, skills/ and registry.py; in a clone it is the package beside them.
