@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "procesio-cli"
-version = "0.1.3"
+version = "0.1.4"
 description = "Command-line tooling and an AI agent for the PROCESIO automation platform: drive processes, forms, documents and custom actions from a terminal or from an AI coding assistant."
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }

@@ -3,7 +3,7 @@
   "name": "io.github.Procesio-Externals/procesio-cli",
   "title": "PROCESIO",
   "description": "Lets your own AI assistant build, run, validate and audit PROCESIO processes, forms and documents.",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "repository": {
     "url": "https://github.com/Procesio-Externals/procesio-cli",
     "source": "github"
@@ -19,8 +19,8 @@
   "packages": [
     {
       "registryType": "mcpb",
-      "identifier": "https://github.com/Procesio-Externals/procesio-cli/releases/download/v0.1.3/procesio-mcp-0.1.3.mcpb",
-      "version": "0.1.3",
+      "identifier": "https://github.com/Procesio-Externals/procesio-cli/releases/download/v0.1.4/procesio-mcp-0.1.4.mcpb",
+      "version": "0.1.4",
       "fileSha256": "FILLED-IN-BY-THE-RELEASE-WORKFLOW",
       "transport": {
         "type": "stdio"
@@ -30,7 +30,7 @@
       "registryType": "pypi",
       "registryBaseUrl": "https://pypi.org",
       "identifier": "procesio-cli",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
