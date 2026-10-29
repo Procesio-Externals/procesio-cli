@@ -25,7 +25,8 @@ import json
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.dto.process.builder import fetch_datastore_meta, render_query_tokens
-from tools.procesio.dto.process.normalize import normalize_designer_layer
+from tools.procesio.dto.process.normalize import (align_node_shapes, normalize_designer_layer,
+                                                   rebuild_missing_designer_config)
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import nodeparam
 from tools.procesio.handlers.common import add_profile_arg
@@ -456,6 +457,33 @@ def node_insert(client, args) -> dict:
     return result
 
 
+def node_repair_designer(client, args) -> dict:
+    """Rebuild the designer layer of every node that has none (what a raw PUT leaves behind, and
+    what stops the designer and the instance view from drawing the process), then resync string
+    designer settings that drifted from their runtime parameter. The runtime layer is not touched."""
+    from tools.procesio.dto.process import builder as _b
+
+    flow = _fetch_flow(client, args.id)
+    catalog = _b.catalog_index()
+    try:                                # a connector node needs the workspace's custom templates
+        rc = _b._fetch_custom_actions(client)
+        custom = (rc.get("actions") if isinstance(rc, dict) else rc) or []
+        if custom:
+            catalog = _b.catalog_index(extra=list(custom))
+    except Exception:  # noqa: BLE001 - built-in templates still resolve from the bundled catalog
+        pass
+    rebuilt = rebuild_missing_designer_config(flow, catalog, set(args.node or []) or None)
+    shapes = align_node_shapes(flow, catalog)
+    resynced = normalize_designer_layer(flow)
+    result = {"id": args.id, "title": flow.get("title"), "repaired": rebuilt["repaired"],
+              "skipped": rebuilt["skipped"], "aligned": shapes["aligned"], "resynced": resynced["actions"]}
+    if not rebuilt["changed"] and not shapes["changed"] and not resynced["changed"]:
+        result["put"] = False
+        result["message"] = "every node already carries its designer layer; nothing to repair"
+        return result
+    return _gate_and_put(client, flow, args, result)
+
+
 def process_rename(client, args) -> dict:
     flow = _fetch_flow(client, args.id)
     change = nodeparam.set_process_title(flow, args.title)
@@ -532,6 +560,16 @@ def _delete_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--node", required=True, help="node actionName (canvas label) or id to delete")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="delete + heal + validate but do not PUT")
+
+
+def _repair_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--node", action="append",
+                   help="limit the rebuild to this node (actionName or id); repeatable. Default: every "
+                        "node without a designer layer")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="rebuild + resync + validate but do not PUT")
 
 
 def _replace_args(p: argparse.ArgumentParser) -> None:
@@ -927,6 +965,16 @@ ACTIONS = {
                     "timeout, SQL or script body) -> regenerate the designer layer from the runtime "
                     "layer -> validate + flow-lint -> PUT. --dry-run to preview; an invalid flow is "
                     "never PUT. Structured (list/dict) parameters stay process-edit territory."),
+    "node-repair-designer": ActionDef(
+        func=node_repair_designer, add_args=_repair_args, needs_client=True,
+        description="Repair a live process the designer cannot open (blank canvas, instance view "
+                    "will not draw): rebuild customData.configuration for every node that has none "
+                    "from its template and its runtime parameters, set each node's canvas shape and "
+                    "port counts back to its template's (an unknown shape such as 'rhombus' hangs the "
+                    "canvas with no error), then resync string designer settings that drifted from "
+                    "the runtime. A raw PUT leaves such nodes behind; the runtime never reads this "
+                    "layer, so what executes is unchanged. Validates + flow-lints before PUT; "
+                    "--dry-run previews."),
     "node-delete": ActionDef(
         func=node_delete, add_args=_delete_args, needs_client=True,
         description="Delete ONE action from a live process and heal the graph: every port that pointed "

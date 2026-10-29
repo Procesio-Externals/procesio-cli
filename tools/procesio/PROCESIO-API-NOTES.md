@@ -940,6 +940,23 @@ measured, and they compound:
 | a partial `parameters` set | a `For Each` fails instantly with a misleading `Foreach timeout exceeded!` |
 | both together | the EXPORT re-spells the Data Store mapper, so the pack ships a process that cannot run |
 
+⚠ **What exactly stops the designer (traced live, 2026-10-28).** The canvas engine builds every
+node inside a promise that only settles when all of them are built. One node that throws leaves
+it pending forever: empty canvas, endless loading, clean console, and every instance view of the
+process just as blank. The runtime never notices, so the process keeps running and the damage
+hides until someone opens it. Two node defects do it, both typical of a hand-written save:
+- a node with **no `customData.configuration` key** (a Join's template has nothing to show, but
+  the designer writes `configuration: []`; without the key the constructor throws);
+- a **`customData.type` the engine does not draw**: it knows `square`, `circle`, `diamond`, `area`
+  (a Decisional saved as `rhombus` was the case met).
+
+**Guard:** `ProcesioClient.request` refuses any `POST`/`PUT /api/Projects` whose flow has such a
+node (`designer_unrenderable`, naming the nodes), so no save path can land one. **Repair** of a
+process that already has them: `procesio node-repair-designer --id <proc>`, which rebuilds missing
+configurations from the template + runtime parameters, sets shape and port counts back to the
+template's, and leaves `parameters[]` untouched. Runs made before the repair keep the broken
+snapshot: their instance view stays blank, and "Restore process" from one of them brings it back.
+
 A process built through `dto/process/builder.py` carries a full
 `customData.configuration` and exported with the mapper INTACT in the accepted
 `column`/`source` spelling; a hand-built one exported re-spelled. So the export
@@ -6983,3 +7000,72 @@ their summary/description, so do not derive permissions from Swagger text alone.
 - `data/endpoints.json` is now 295 operations (was 247): +24 signing routes, the Data Store
   family, ApiKey label PUTs, ApiKeyMaster, Schedules/validate-crontab; nothing removed. The tool
   exposes 442 actions.
+
+## Running and debugging a process: what the UI does and what the API refuses (live, 2026-10)
+
+Measured on procesio.app while scripting a tutorial that runs, watches and debugs a small flow.
+Reported to engineering as product and docs findings; until they change, plan around them.
+
+- **Breakpoints are stored on the action** as `action.breakPoint.enabled`. In the designer the
+  toggle is the "Toggle debug breakpoint" icon at the top of an action's properties (a red dot on
+  the node). Toggling it is an unsaved change, and Run stays disabled until Save.
+- **A breakpoint pauses AFTER the marked action has run**, not before: its output already exists
+  and its input can no longer be changed. To change what goes INTO an action, put the breakpoint
+  on the action before it. Undocumented.
+- **"Run in debug mode"** is in the Run button's dropdown. The debugger lives in the INSTANCE view
+  (`/admin/process/<processId>/details/<instanceId>`), not the designer: status "debugger paused",
+  a DEBUG MODE bar with step and continue, and a pencil per variable in the Variables tab (file
+  variables get "Update file"). The bar's buttons carry wrong aria-labels (step = "Add nested
+  item", continue = "Run"): select them by position or icon, not by label.
+- **Debugger API** exists: `POST /api/Debugger/instances/{id}/operation` and
+  `PUT /api/Debugger/instances/{id}/variables`. Their body shapes are not mapped yet.
+- **`POST /api/Projects/instances/{id}/stop` answers 400 "Stopping process failed."** for a run
+  paused in the debugger (as it does for an instance left in "starting"). The UI's Stop instance
+  button stops the same run. Which request the UI sends was not captured: capture it (HAR) before
+  concluding the endpoint is broken, see the `toggle-activation` lesson above.
+- **Test Action results arrive over the push channel** (`notifications.procesio.app`), as do live
+  status updates in the instance view. With that host blocked (a browser `block_urls` rule, or a
+  corporate proxy) Test Action shows "We are sending the request" forever, with no time-out.
+- **Testable actions**: the catalog's testable flag is the truth, not the 2023 docs. Not testable
+  today: Decisional, AI Decisional, For Each, Join, Delay, Start, Stop and the subprocess calls.
+  Generate Document and Map Process Data are testable.
+- **"Execution time breakdown"** (2023 docs wording) is not per action: the instance view shows
+  processing time and action runs for the whole run. A Delay waits without using processing time.
+- **Data retention** is set per process (canvas sidebar: on success / on error / on stopped by
+  user, each Never, At end of runtime or At move to history) and per run (instance tab "Delete
+  data of the instance"). There is no fixed platform-wide purge period to quote; do not state one.
+- **Process notifications**: `post-projects-notifications` takes the FLAT object
+  `{id, emailList, isEnabled, onSuccess, onFail}`. The wrapped shape that the GET returns is
+  refused with 400. The email address survives switching notifications off.
+- **The instance view does not refresh by itself, by design** (not a bug, do not report it): it
+  shows the run as it was when the view was opened, so a finished run keeps showing "running"
+  until Refresh instance is clicked. Refresh instance disappears once a run has ended, so a
+  script should click it and then wait for the status text, not for that button.
+
+## Process Designer shortcuts and canvas behaviour (live and app code, 2026-10)
+
+Checked on procesio.app and in the designer's JavaScript (its hotkey map and canvas key
+handlers) while scripting a tutorial. The hotkey map is picked from the OS when the app loads,
+so faking the platform in a running page proves nothing.
+
+- **Save**: Ctrl+S, Cmd+S on a Mac. Shows "Successfully saved", the same as the Save button.
+  Leaving with unsaved changes asks first. The v2.0.5 release notes mention a save shortcut
+  without naming it.
+- **Copy and paste actions**: Ctrl or Cmd + C / V, only while the canvas has focus (click the
+  node itself right before). The copy lands where you last clicked and gets "(1)" in its name a
+  moment after the paste.
+- **Add to a selection**: Ctrl+click on Windows; on a Mac it is **Option+click** (confirmed by a
+  Mac user). Cmd+click does nothing. Dragging one selected node moves the whole selection.
+- **Double-click** a toolbar action's name (search results too) to drop it in the middle of the
+  visible canvas. Aim at the name: a double-click on the empty part of the row may add nothing.
+- **Hover an action** to see its Description as a tooltip, only when the description is not
+  empty (actions from the toolbar bring a default one).
+- **Variables**: clicking a variable pill opens Edit Variable; the field picker's "+" then
+  "Create variable" opens the dialog with the field's type already chosen.
+- **Shapes** (toolbar Shapes tab): Rectangle, Ellipse, Diamond; fill colour, opacity, title and
+  its alignment, Bring to front / Send to back. Double-click a shape to write in it, Enter saves.
+  No docs page covers shapes. The toolbar remembers Actions vs Shapes per user.
+- **Duplicate** (process list row menu) gives no message, collapses the group in the list, and
+  the copy starts deactivated. "Copy input variables (JSON)" is in both the row menu and the
+  designer's title menu (the title menu opens from the chevron, not the title).
+- **Undocumented shortcut**: Shift+Alt+F, "Beautify content in editor".

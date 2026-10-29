@@ -192,6 +192,32 @@ python scripts/run-tool.py web screenshot --session linkedin --url https://examp
 `--viewport-only` captures just the viewport (default is full page); `--wait`
 awaits a selector first.
 
+## Render HTML to an image (`render-image`)
+
+Artwork built in HTML (a blog cover, a social card, a banner) becomes an image of an exact
+pixel size, with no session:
+
+```powershell
+python scripts/run-tool.py web render-image --html-file cover.html --out cover.webp --width 1600 --height 900
+```
+
+- The page is opened from its `file://` URL, so a logo or font file next to the HTML resolves
+  by relative path. Web fonts (e.g. Google Fonts) are awaited before the capture.
+- Only the viewport is captured: size the page's `html, body` to the same width and height and
+  hide overflow, or anything past the edge is cut.
+- `.png` and `.jpg` come straight from Chromium; `.webp` is converted with Pillow
+  (`--quality`, default 90), because Chromium screenshots have no WebP.
+- A cover is usually shown at more than one aspect ratio. A site may show it at 16:9 on the
+  article page and crop the same file to a narrower card (4:3 with `object-fit: cover`) in the
+  listing grid. Measure the ratios the site really uses, keep the logo and title inside the
+  centre area of the narrowest one (at 1600x900 with 4:3 cards that is x 200-1400), and let
+  only the background reach the sides. Crop the render to that ratio and look at it before
+  uploading.
+- Replacing an image that is already published: hosts often serve media with a cache lifetime
+  of days, and an image optimizer in front of the site keeps its own copy, so overwriting the
+  same file name can keep the old picture on screen for days. Upload the new version under a
+  new name and point the content at it.
+
 ## Render HTML to a print PDF (`render-pdf`)
 
 `render-pdf` lays an HTML file out with Chromium's print engine. By default it prints on a

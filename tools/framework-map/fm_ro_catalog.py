@@ -77,6 +77,7 @@ TRIG = {
     "read a table from SQL Server": "citește un tabel din SQL Server",
     "refresh the agents and tools diagram / presentation page": "împrospătează diagrama de agenți și tool-uri / pagina de prezentare",
     "regenerate / rebuild the framework map or the agents-and-tools visualization": "regenerează / reconstruiește harta framework-ului sau vizualizarea agents-and-tools",
+    "render an HTML page to an image / make a blog cover, social card or banner image from HTML; render HTML to a PDF": "randează o pagină HTML ca imagine / fă din HTML o copertă de blog, un card social sau un banner; randează HTML în PDF",
     "run a MySQL query": "rulează o interogare MySQL",
     "run a SQL Server query": "rulează o interogare SQL Server",
     "run a procesio process": "rulează un proces procesio",

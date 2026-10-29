@@ -51,6 +51,18 @@ class RemovalBlocked(Exception):
         self.removed = removed or {}
 
 
+class DesignerUnrenderable(Exception):
+    """A process save was refused because the designer could not draw the result: a node
+    without a `customData.configuration` key, or with a canvas shape the engine does not know.
+    The runtime would still run it, so nothing else catches this; the designer and every
+    instance view would load forever with no error. Maps to 'designer_unrenderable', exit 2.
+    Fix the nodes (`procesio node-repair-designer`) instead of saving them."""
+
+    def __init__(self, message: str, nodes: list | None = None):
+        super().__init__(message)
+        self.nodes = nodes or []
+
+
 class ValidationBlocked(Exception):
     """A save was blocked because front-end (designer) and/or back-end validation found
     errors. Carries the full report so the caller can see exactly what to fix. Maps to
@@ -150,6 +162,9 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
         return "not_persisted", str(exc), exc.details, 1
     if isinstance(exc, RemovalBlocked):
         return "removal_blocked", str(exc), exc.removed, 2
+    if isinstance(exc, DesignerUnrenderable):
+        return "designer_unrenderable", str(exc), {
+            "nodes": exc.nodes, "fix": "procesio node-repair-designer --id <process id>"}, 2
     if isinstance(exc, DeadlineExceeded):
         return "deadline_exceeded", str(exc), {
             "kind": "deadline",

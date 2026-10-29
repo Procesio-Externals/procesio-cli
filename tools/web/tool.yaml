@@ -24,6 +24,7 @@ secrets: []
 routing:
   triggers:
     - "drive/scrape a website that has no API, using a saved login session; deeper web research"
+    - "render an HTML page to an image / make a blog cover, social card or banner image from HTML; render HTML to a PDF"
   primary_action: run
   example: "web run --session <name> ...   (read text: web get-text; one-time login: web save-session)"
 
@@ -160,6 +161,16 @@ actions:
       - {name: height, type: string, description: "Custom page height as a CSS length, e.g. 2000mm (needs --width)"}
       - {name: margin, type: string, description: "One CSS length for all four margins; 0 for full-bleed artwork. Default keeps the document margins (12/14/12/12 mm)"}
     output_schema: '{ "out": "...", "bytes": 12345 }'
+
+  - name: render-image
+    description: "Render a local HTML file to an image of exactly --width x --height pixels (session-less, headless Chromium) - artwork built in HTML such as a blog cover or a social card. Opened from its file:// URL so relative assets resolve; web fonts are awaited; only the viewport is captured. .webp is converted with Pillow."
+    args:
+      - {name: html-file, type: string, required: true, description: "HTML file to render; relative assets (logo, fonts) resolve beside it"}
+      - {name: out, type: string, required: true, description: "Output image path: .png, .jpg or .webp"}
+      - {name: width, type: integer, required: true, description: "Image width in pixels"}
+      - {name: height, type: integer, required: true, description: "Image height in pixels"}
+      - {name: quality, type: integer, default: 90, description: "WebP quality 1-100"}
+    output_schema: '{ "out": "...", "bytes": 12345, "width": 1600, "height": 900 }'
 
 examples:
   - cmd: python scripts/run-tool.py web save-session --name linkedin --url https://www.linkedin.com/login

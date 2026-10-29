@@ -401,6 +401,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `node-delete` | `--id`, `--node` | Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) ->… |
 | `node-insert` | `--id`, `--after`, `--action` | Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor's successor and the anchor is repointed at… |
 | `node-params` | `--id` | List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only). |
+| `node-repair-designer` | `--id` | Repair a live process the designer cannot open (blank canvas, the instance view will not draw): rebuild customData.configuration for every node that has none… |
 | `node-replace-text` | `--id`, `--node`, `--find`, `--replace` | Replace an EXACT literal in every string leaf of a node's runtime parameters AND designer settings on a live process - the safe way to reach a value nested… |
 | `node-set-error-port` | `--id`, `--node` | Wire ONE node's error port to a handler action on a live process, so a fault routes instead of killing the run. Writes all THREE parts the engine needs (the… |
 | `node-set-param` | `--id`, `--node`, `--property` | Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime… |

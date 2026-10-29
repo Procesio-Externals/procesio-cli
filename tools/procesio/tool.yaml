@@ -7434,6 +7434,34 @@ actions:
     type: string
     required: false
     description: one node's actionName (canvas label) or id; omit for every node
+- name: node-repair-designer
+  description: 'Repair a live process the designer cannot open (blank canvas, the instance view will not draw): rebuild customData.configuration for every node that has none from its template and its runtime parameters, set each node''s canvas shape and port counts back to its template''s (an unknown shape such as rhombus hangs the canvas with no error), then resync string designer settings that drifted from the runtime. A raw PUT leaves such nodes behind; the runtime never reads this layer, so what executes is unchanged. Validates + flow-lints before PUT; --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: node
+    type: string
+    required: false
+    description: 'limit the rebuild to this node (actionName or id) (repeatable). Default: every node without a designer layer'
+  - name: dry-run
+    type: boolean
+    required: false
+    description: rebuild + resync + validate but do not PUT
+  output_schema: '{ "id": "...", "title": "...", "repaired": [{"id": "...", "name": "...", "template": "...", "settings": 0}], "skipped": [{"id": "...", "name": "...", "why": "template_not_in_catalog"}], "aligned": [{"id": "...", "name": "...", "fields": {"type": ["rhombus", "diamond"]}}], "resynced": [{"id": "...", "name": "...", "settings": []}], "lint_problems": [], "fe": {}, "isValid": true, "put": true }'
 - name: node-replace-text
   description: Replace an EXACT literal in every string leaf of a node's runtime parameters AND designer settings on a live process - the safe way to reach a value nested inside a structured parameter (a Map Data expression, a decisional literal). --expect N asserts the hit count; --dry-run previews. Validates + flow-lints before PUT.
   args:

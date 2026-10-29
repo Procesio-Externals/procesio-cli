@@ -140,7 +140,7 @@ def _html_to_text(soup) -> str:
 
 def _pdf_to_text(path: Path) -> str:
     try:
-        import fitz
+        import pymupdf as fitz
         with fitz.open(path) as doc:
             return "\n\n".join(
                 f"--- page {i + 1} ---\n{page.get_text()}"

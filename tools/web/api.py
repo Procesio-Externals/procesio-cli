@@ -220,6 +220,51 @@ def render_pdf(html: str, out: str, *, fmt: str = "A4",
     return {"out": out, "bytes": size}
 
 
+IMAGE_FORMATS = (".png", ".jpg", ".jpeg", ".webp")
+
+
+def render_image(html_file: str, out: str, *, width: int, height: int,
+                 quality: int = 90,
+                 driver_factory: Callable = _default_factory) -> dict:
+    """Render a local HTML file to an image of exactly ``width`` x ``height`` pixels.
+
+    For artwork built in HTML (a blog cover, a social card): no session, the page
+    is opened from its file:// URL so relative assets (a logo, a font file) resolve,
+    web fonts are awaited, and only the viewport is captured. ``.png`` / ``.jpg``
+    come straight from Chromium; ``.webp`` is converted with Pillow, since Chromium
+    screenshots have no webp. Returns ``{"out", "bytes", "width", "height"}``.
+    """
+    import os
+    from pathlib import Path
+
+    ext = Path(out).suffix.lower()
+    if ext not in IMAGE_FORMATS:
+        raise UsageError(f"--out must end in one of {', '.join(IMAGE_FORMATS)}")
+    if width <= 0 or height <= 0:
+        raise UsageError("--width and --height must be positive pixel counts")
+    src = Path(html_file).resolve()
+    if not src.is_file():
+        raise UsageError(f"--html-file not found: {html_file}")
+    shot = out if ext != ".webp" else str(Path(out).with_suffix(".render.png"))
+
+    driver = driver_factory(storage_state=None, headless=True)
+    driver.start()
+    try:
+        driver.set_viewport(width, height)
+        driver.goto(src.as_uri())
+        driver.eval_js("document.fonts.ready.then(() => true)")
+        driver.screenshot(shot, full_page=False)
+    finally:
+        _safe_close(driver)
+    if ext == ".webp":
+        from PIL import Image
+
+        with Image.open(shot) as im:
+            im.save(out, "WEBP", quality=quality, method=6)
+        os.remove(shot)
+    return {"out": out, "bytes": os.path.getsize(out), "width": width, "height": height}
+
+
 def save_session(name: str, url: str, *,
                  wait_for_signal: Callable[[], Any] | None = None,
                  channel: str | None = None, persistent: bool = False,

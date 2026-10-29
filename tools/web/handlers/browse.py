@@ -162,6 +162,20 @@ def _render_pdf_args(p: argparse.ArgumentParser) -> None:
                         "default keeps the document margins 12/14/12/12 mm")
 
 
+def render_image(driver_factory, args) -> dict:
+    return api.render_image(args.html_file, args.out, width=args.width, height=args.height,
+                            quality=args.quality, driver_factory=driver_factory)
+
+
+def _render_image_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--html-file", dest="html_file", required=True,
+                   help="HTML file to render; relative assets (logo, fonts) resolve beside it")
+    p.add_argument("--out", required=True, help="Output image: .png, .jpg or .webp")
+    p.add_argument("--width", type=int, required=True, help="Image width in pixels")
+    p.add_argument("--height", type=int, required=True, help="Image height in pixels")
+    p.add_argument("--quality", type=int, default=90, help="WebP quality 1-100 (default 90)")
+
+
 ACTIONS = {
     "run": ActionDef(
         run, _run_args,
@@ -170,6 +184,10 @@ ACTIONS = {
     "render-pdf": ActionDef(
         render_pdf, _render_pdf_args,
         description="Render an HTML string/file to a PDF (session-less, headless Chromium).",
+    ),
+    "render-image": ActionDef(
+        render_image, _render_image_args,
+        description="Render a local HTML file to an exact-size PNG / JPG / WebP image (session-less).",
     ),
     "get-text": ActionDef(
         get_text, _get_text_args,

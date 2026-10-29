@@ -17,7 +17,20 @@ import time
 from typing import Any
 
 from tools.procesio import auth, config, environments, profiles, reliability
-from tools.procesio.errors import DeadlineExceeded, ProcesioAPIError
+from tools.procesio.errors import DeadlineExceeded, DesignerUnrenderable, ProcesioAPIError
+
+
+def _refuse_unrenderable(body) -> None:
+    """Every process save goes through here (builder, surgical edits, a raw put-projects), so this
+    is the one place a flow the designer cannot draw is stopped before it lands. Such a flow still
+    runs, which is why nothing downstream would ever notice."""
+    from tools.procesio.dto.process.normalize import designer_render_problems
+    problems = designer_render_problems(body)
+    if problems:
+        names = ", ".join(sorted({str(p.get("name")) for p in problems}))
+        raise DesignerUnrenderable(
+            f"refused to save: the designer cannot draw {len(problems)} node(s) ({names}). "
+            "Run `procesio node-repair-designer` or build the nodes through the builder.", problems)
 
 # Query for `GET /api/Projects/{id}` when only the flow's `variables` are needed: the server
 # then skips the actions, canvas and webhook look-up (a ~60 KB flow comes back as ~5 KB) and
@@ -192,6 +205,8 @@ class ProcesioClient:
         cls = reliability.endpoint_class(method_u)
         if not path.startswith("/"):
             path = "/" + path
+        if method_u in ("POST", "PUT") and path.split("?")[0].rstrip("/").lower() == "/api/projects":
+            _refuse_unrenderable(body)
         url = f"{config.web_base(self.profile)}{path}"
         clean = {k: v for k, v in (query or {}).items() if v is not None}
 
