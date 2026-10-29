@@ -119,7 +119,7 @@ slugs with `get-customurl-workspace-master` and `get-customurl-workspace`.
 > version. Forms already saved as `"0"` keep their re-keyed names, so the case-insensitive
 > lookup below is still the safe way to read fields in a script that may run on such a form.
 
-**`ProcesioForm.data.fields` keys are the field name LOWERCASED** (and a UI save re-derives them). JS is case-sensitive, so a camelCase reference like `ProcesioForm.data.fields.locuiesteDetalii` (or `.zonaFormular`, `.actProprietate`) is `undefined` — the event fires but silently does NOTHING (this cost days on Uranus 100: a UI save lowercased the keys and every camelCase visibility/hide/file-wrap toggle broke, while the config still looked perfect). **ALWAYS reference form fields case-insensitively** in any control/FORM_LOAD RUN_JAVASCRIPT. Prelude, then use `fld(name)`:
+**`ProcesioForm.data.fields` keys are the field name LOWERCASED** (and a UI save re-derives them). JS is case-sensitive, so a camelCase reference like `ProcesioForm.data.fields.locuiesteDetalii` (or `.zonaFormular`, `.actProprietate`) is `undefined` — the event fires but silently does NOTHING (this cost days on a client form: a UI save lowercased the keys and every camelCase visibility/hide/file-wrap toggle broke, while the config still looked perfect). **ALWAYS reference form fields case-insensitively** in any control/FORM_LOAD RUN_JAVASCRIPT. Prelude, then use `fld(name)`:
 
 **Corrected 2026-10-01, measured: a designer save re-keys the fields.** A form built through
 the API (`form-create`) keeps its names exactly as written. One save and Publish in the

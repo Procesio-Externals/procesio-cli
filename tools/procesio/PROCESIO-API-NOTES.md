@@ -1205,7 +1205,7 @@ Data Store mapper in the target. That is a workaround, not the design.
 is partitioned for isolation: that pulls other partitions' rows into process
 variables, which is the leak the partition exists to prevent.
 
-## Call API + publish semantics (learned live 2026-07-30, Livespace PoC)
+## Call API + publish semantics (learned live 2026-07-30, CRM integration PoC)
 
 ### `publish` WITHOUT `launch` leaves a zombie instance in "starting"
 `POST /api/Projects/{id}/instances/publish` (`post-projects-by-id-instances-publish`)

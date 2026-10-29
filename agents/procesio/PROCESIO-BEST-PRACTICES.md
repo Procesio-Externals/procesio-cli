@@ -166,7 +166,7 @@ at `?cod=TEST123&apartament=27` → both pre-filled).
 Use it to **seed a form from a per-record link**: give each record a stable, URL-safe token,
 name a control after the query key, distribute `…?token=<value>`. Then a form event (e.g.
 `on: open → do: process`) can read that seed control and fetch the rest. This is the mechanism
-behind the Uranus 100 „colectare acte" access model (unique link per apartment, `?cod=`).
+behind a document-collection form that gives each apartment its own link (`?cod=`).
 To make a form public + get the link: `isPrivate:false` + publish, then
 `POST /api/CustomUrl/FormTemplate {Type:3,EntityType:1,EntityId:<formTemplateId>,Url:<slug>}`
 → `tinyUrl` → `forms.procesio.app/{tinyUrl}`.

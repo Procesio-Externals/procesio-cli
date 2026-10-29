@@ -1,4 +1,4 @@
-"""Guards for three footguns found live on 2026-07-30 (Livespace PoC):
+"""Guards for three footguns found live on 2026-07-30 (CRM integration PoC):
 
 1. a credential option property given a raw string (e.g. Method="POST") used to save
    fine and then break EVERY Call API run at runtime with "Unrecognized Guid format";
