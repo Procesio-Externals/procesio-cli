@@ -9,6 +9,9 @@ there, not here.
 
 ## [Unreleased]
 
+### Changed
+- The plugin runs procesio-cli 0.1.4 (`plugin/pyproject.toml` and `plugin/uv.lock`).
+
 ## [0.1.4] - 2026-10-29
 
 ### Added
