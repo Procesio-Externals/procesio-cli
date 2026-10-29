@@ -3,7 +3,7 @@
 How to lay out a process so a human can read it, and the build patterns that recur in
 production. Agent-scoped: these are standards a build should meet, not tool mechanics.
 The DTO shapes behind every claim are in `tools/procesio/PROCESIO-RESOURCE-MODEL-NOTES.md`;
-the deterministic re-layout tool is specced in `todo/procesio-canvas-layout-tool.md`.
+the deterministic re-layout engine is `tools/procesio/layout/` (README there).
 Additive to [PROCESIO-BEST-PRACTICES.md](PROCESIO-BEST-PRACTICES.md) (§2 modularize,
 §10 speed) — it does not replace anything there.
 
@@ -118,7 +118,7 @@ The actions that carry most real systems, and the shapes they form:
 
 ## 6. Shapes in the Process Designer (decorative, execution-irrelevant)
 
-Cuore's **Shapes** (rectangle / ellipse / diamond, PRC-4391) are annotation objects on
+The designer's **Shapes** (rectangle / ellipse / diamond) are annotation objects on
 the canvas — they group and label a region and never affect execution. They persist
 under the flow's opaque `canvasData.shapes` blob (not a top-level field) and sit in a
 z-order band **below** the connectors. Two rules for the agent: **never reason about a
@@ -127,7 +127,7 @@ or a re-layout drop `canvasData`** — the tool's `process-edit` carries the liv
 through, and the layout engine leaves `canvasData` byte-identical; preserve that when
 touching a flow by hand.
 
-## 6. When you build or re-organize a process
+## 7. When you build or re-organize a process
 
 - After building programmatically, the node positions the builder emits are functional
   but not tidy. Run the layout tool to make the diagram readable before handover —

@@ -92,11 +92,11 @@ def test_failed_mutation_does_not_invalidate(monkeypatch):
 def test_add_environment_full_argv(monkeypatch):
     calls, invalidated = _patch(monkeypatch, _OK)
     PE.add_environment(_Req({
-        "name": "Delgaz-PROD", "web_base": "https://w", "app_base": "https://a",
+        "name": "Acme-PROD", "web_base": "https://w", "app_base": "https://a",
         "forms_base": "https://f", "auth_base": "https://au", "make_default": True,
     }))
     assert calls[0]["argv"] == [
-        "add-environment", "--name", "Delgaz-PROD",
+        "add-environment", "--name", "Acme-PROD",
         "--web-base", "https://w", "--app-base", "https://a", "--forms-base", "https://f",
         "--auth-base", "https://au", "--make-default"]
     assert invalidated == [True]
@@ -122,8 +122,8 @@ def test_add_environment_requires_all_urls(monkeypatch):
 
 def test_remove_environment_argv(monkeypatch):
     calls, invalidated = _patch(monkeypatch, _OK)
-    PE.remove_environment(_Req({"name": "Delgaz-PROD"}))
-    assert calls[0]["argv"] == ["remove-environment", "--name", "Delgaz-PROD"]
+    PE.remove_environment(_Req({"name": "Acme-PROD"}))
+    assert calls[0]["argv"] == ["remove-environment", "--name", "Acme-PROD"]
     assert invalidated == [True]
 
 

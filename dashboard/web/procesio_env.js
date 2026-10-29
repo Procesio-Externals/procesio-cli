@@ -81,7 +81,7 @@
   }
 
   function addEnvForm(body) {
-    const name = el("input", { placeholder: "Client-ENV, e.g. Delgaz-PROD" });
+    const name = el("input", { placeholder: "Client-ENV, e.g. Acme-PROD" });
     const web = el("input", { placeholder: "web API host, https://webapi.<host>" });
     const app = el("input", { placeholder: "front-end host, https://<host>" });
     const forms = el("input", { placeholder: "forms host, https://forms.<host>" });
