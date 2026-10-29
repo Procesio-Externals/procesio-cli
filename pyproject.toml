@@ -70,8 +70,9 @@ procesio-cli = "procesio_cli._cli:mcp_chat_server"
 # than at import time.
 # The web tool: real-browser form testing. Needs the browser binary too:
 #   uv run playwright install chromium
-# The archive-document / render-pdf actions add HTML parsing and PDF handling.
-browser = ["playwright>=1.60.0", "beautifulsoup4>=4.12", "lxml>=5.0", "pymupdf>=1.24", "pypdf>=6.15.0"]
+# The archive-document / render-pdf actions add HTML parsing and PDF handling;
+# render-image needs Pillow to write .webp.
+browser = ["playwright>=1.60.0", "beautifulsoup4>=4.12", "lxml>=5.0", "pymupdf>=1.24", "pypdf>=6.15.0", "pillow>=10.0"]
 # Reading .xlsx workbooks.
 excel = ["openpyxl>=3.1"]
 # Querying the databases a SQL action talks to. pyodbc also needs an ODBC driver

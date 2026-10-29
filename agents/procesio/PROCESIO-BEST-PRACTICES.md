@@ -84,7 +84,7 @@ Global try/catch via Error Port + Decisional action. Classify and handle:
 
 The DB credential (catalog type **`SQL`**) is now multi-engine: it carries a **server
 type** (`DbClientType` — `MSSQL=1`, `MYSQL=2`), so the same `Execute Query` / `Execute
-Command` actions run against **MySQL** by binding a MySQL-typed DB credential (PRC-3696).
+Command` actions run against **MySQL** by binding a MySQL-typed DB credential.
 **Redis** shipped as its own credential type + connector. No new action families — pick
 the engine on the credential. Outbound DB hosts are SSRF-guarded by a host blacklist, so
 a private/blacklisted host is rejected at connect time. Bind values as **parameters**,

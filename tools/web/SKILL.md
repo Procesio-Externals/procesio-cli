@@ -27,6 +27,7 @@ One JSON object on stdout for success; `{"error": {"code", "message", "details"}
 | `get-text` | `--session`, `--url` | Convenience: load a session, open --url, return visible text (whole page or --selector). For lead/topic research. |
 | `list-sessions` | — | List saved sessions (names + metadata only, never contents). |
 | `page-contacts` | `--url` | The contact details a PUBLIC page publishes, read with one plain HTTP GET (no browser, no session, nothing clicked): emails from mailto links and visible text… |
+| `render-image` | `--html-file`, `--out`, `--width`, `--height` | Render a local HTML file to an image of exactly --width x --height pixels (session-less, headless Chromium) - artwork built in HTML such as a blog cover or a… |
 | `render-pdf` | `--out` | Render an HTML string/file to a PDF (session-less, headless Chromium page.pdf). |
 | `run` | `--session` | Load a saved session, optionally navigate to --url, then execute a declarative step list (--actions JSON array or --actions-file). Returns collected outputs.… |
 | `save-session` | `--name`, `--url` | Interactively capture a login session. Launches a HEADED browser at --url, lets the human log in, then captures storageState to tools/web/sessions/<name>.json.… |

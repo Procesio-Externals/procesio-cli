@@ -2,7 +2,7 @@
 
 PROCESIO runs as separate installations — production, QA, dev, and each client's own
 PROD/QA/STAGING. This tool calls each one an **environment**, named `<Client>-<ENV>`
-(e.g. `Internal-PROD`, `Internal-QA`, `Internal-DEV`, `Delgaz-PROD`, `Delgaz-DEVQA`).
+(e.g. `Internal-PROD`, `Internal-QA`, `Internal-DEV`, `Acme-PROD`, `Acme-DEVQA`).
 Each environment has its own host URLs and its own credentials — there is no data path
 between them.
 
@@ -31,7 +31,7 @@ the default until someone switches. Client environments are added at runtime.
 ## Adding a client environment
 
 ```
-run-tool procesio add-environment --name Delgaz-PROD \
+run-tool procesio add-environment --name Acme-PROD \
     --web-base https://webapi.<host> --app-base https://<host> --forms-base https://forms.<host>
 ```
 
@@ -39,8 +39,8 @@ run-tool procesio add-environment --name Delgaz-PROD \
 account to it:
 
 ```
-run-tool procesio add-credential --name delgaz-me --type userpass \
-    --username <…> --environment Delgaz-PROD
+run-tool procesio add-credential --name acme-me --type userpass \
+    --username <…> --environment Acme-PROD
 ```
 
 (Entering the secret itself is the user's action — never take a password on the command

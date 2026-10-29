@@ -328,3 +328,62 @@ def test_run_without_hold_has_no_hold_block(isolated_sessions, driver_factory):
     _seed()
     out = api.run_steps("linkedin", _steps(), driver_factory=driver_factory)
     assert "hold" not in out
+
+
+
+# -- render-image ------------------------------------------------------------------------
+
+def _png_writing_screenshot(self, path, *, full_page=True):
+    from PIL import Image
+
+    self.calls.append(("screenshot", {"path": path, "full_page": full_page}))
+    Image.new("RGB", (16, 9), (8, 11, 22)).save(path, "PNG")
+    return path
+
+
+@pytest.fixture
+def cover_html(tmp_path):
+    page = tmp_path / "cover.html"
+    page.write_text("<html><body>cover</body></html>", encoding="utf-8")
+    return page
+
+
+def test_render_image_opens_the_file_at_exact_viewport(tmp_path, driver_factory, cover_html, monkeypatch):
+    from tools.web.tests.conftest import FakeDriver
+
+    monkeypatch.setattr(FakeDriver, "screenshot", _png_writing_screenshot)
+    out = tmp_path / "cover.png"
+    res = api.render_image(str(cover_html), str(out), width=1600, height=900,
+                           driver_factory=driver_factory)
+    d = driver_factory.built[0]
+    assert d.init["storage_state"] is None and d.init["headless"] is True
+    methods = [m for m, _ in d.calls]
+    # viewport before navigation, navigation before the capture
+    assert methods.index("set_viewport") < methods.index("goto") < methods.index("screenshot")
+    assert [kw for m, kw in d.calls if m == "goto"][0]["url"] == cover_html.resolve().as_uri()
+    assert [kw for m, kw in d.calls if m == "screenshot"][0]["full_page"] is False
+    assert d.closed is True
+    assert res == {"out": str(out), "bytes": out.stat().st_size, "width": 1600, "height": 900}
+
+
+def test_render_image_webp_is_converted_and_the_png_removed(tmp_path, driver_factory, cover_html, monkeypatch):
+    from PIL import Image
+    from tools.web.tests.conftest import FakeDriver
+
+    monkeypatch.setattr(FakeDriver, "screenshot", _png_writing_screenshot)
+    out = tmp_path / "cover.webp"
+    api.render_image(str(cover_html), str(out), width=16, height=9, driver_factory=driver_factory)
+    with Image.open(out) as im:
+        assert im.format == "WEBP"
+    assert sorted(f.name for f in tmp_path.iterdir()) == ["cover.html", "cover.webp"]
+
+
+@pytest.mark.parametrize("out, w, h, match", [
+    ("cover.gif", 10, 10, "must end in"),
+    ("cover.png", 0, 10, "positive"),
+])
+def test_render_image_rejects_bad_args_before_launching(tmp_path, driver_factory, cover_html, out, w, h, match):
+    with pytest.raises(UsageError, match=match):
+        api.render_image(str(cover_html), str(tmp_path / out), width=w, height=h,
+                         driver_factory=driver_factory)
+    assert driver_factory.built == []
