@@ -4,8 +4,8 @@ Lets your own AI assistant build, run, validate and audit PROCESIO processes, fo
 
 This folder is the plugin: the MCP server configuration, four Agent Skills and the
 listing icon. The code is the `procesio-cli` package on PyPI. `pyproject.toml` names
-release 0.1.4, and `uv.lock` pins it and every dependency to exact
-versions with their hashes. The server starts as `uvx procesio-cli==0.1.4`,
+release 0.1.5, and `uv.lock` pins it and every dependency to exact
+versions with their hashes. The server starts as `uvx procesio-cli==0.1.5`,
 and an install that honours the lock installs exactly those files and nothing newer.
 
 ## Install

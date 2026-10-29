@@ -3,7 +3,7 @@
     "procesio": {
       "command": "uvx",
       "args": [
-        "procesio-cli==0.1.4"
+        "procesio-cli==0.1.5"
       ],
       "env": {
         "UV_PYTHON_PREFERENCE": "system",

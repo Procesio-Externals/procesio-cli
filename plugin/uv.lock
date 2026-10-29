@@ -474,7 +474,7 @@ wheels = [
 
 [[package]]
 name = "procesio-cli"
-version = "0.1.4"
+version = "0.1.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -484,29 +484,29 @@ dependencies = [
     { name = "pyyaml" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cb/80/aab30c6127a49bd8b1fc3a18f785575c62725d88365ba2f874089cd6baec/procesio_cli-0.1.4.tar.gz", hash = "sha256:5d9a245870ad461b3aa80b1ff0efe4b9732dd8224fcb6b13773a0c0d5d2c2323", size = 2281693, upload-time = "2026-10-29T12:26:18.262Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/96/c5/74c8d9e8f02bc28c7ea85f0f17e960c7f332395b8e09bdb5b0a4053f17dd/procesio_cli-0.1.5.tar.gz", hash = "sha256:c6603c0622220232ae4d7fbf95ad36055889e0ad2c2207d16ce94c0bd891f64e", size = 2286340, upload-time = "2026-10-29T18:51:20.345Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/03/dc/336ff3e3f1ba7398ad63520f526145e278a69c81910e7ea0dacfaf73af42/procesio_cli-0.1.4-py3-none-any.whl", hash = "sha256:da4869fe2706a2838a8c3d6cfea2903cb8f6751ac94936dc195d69e2f887cfab", size = 2428662, upload-time = "2026-10-29T12:26:16.28Z" },
+    { url = "https://files.pythonhosted.org/packages/67/08/bd0aa11a3a506dc071d82b3f9a929d12432f10eb42dbf9c281201d08942d/procesio_cli-0.1.5-py3-none-any.whl", hash = "sha256:0ee682f10980f4c968ac02a130326edd6f80f3fb8f198be2f745160d3904394b", size = 2433615, upload-time = "2026-10-29T18:51:18.612Z" },
 ]
 
 [[package]]
 name = "procesio-plugin-runtime"
-version = "0.1.4"
+version = "0.1.5"
 source = { virtual = "." }
 dependencies = [
     { name = "procesio-cli" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "procesio-cli", specifier = "==0.1.4" }]
+requires-dist = [{ name = "procesio-cli", specifier = "==0.1.5" }]
 
 [[package]]
 name = "pycparser"
-version = "3.11"
+version = "3.12"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/da/a8/c5fdbeee588bb8ada9458774f43adf1bdd30bd59157055142183e769a024/pycparser-3.11.tar.gz", hash = "sha256:d875f09c3507d00e1aba0eecc6dcadc1352f30fff09dc6bff2f1c2935e97c2bc", size = 113796, upload-time = "2026-10-09T12:56:59.539Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cb/27/eeb9f307bf07060f3d9f9aa0fb8c15b01bdfded0a941e4b2719c7f94cacd/pycparser-3.12.tar.gz", hash = "sha256:f03387877eab82ce01bbdfd0ba7252ee55a90b1c708d5129e2ce915475cf1db6", size = 158785, upload-time = "2026-10-22T13:40:03.56Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/90/11/0e6f11117525ff0eec40ebac3d313376f102df93ca44ad9e893ee85e4f89/pycparser-3.11-py3-none-any.whl", hash = "sha256:51d5a8ba2be0bbe440b99d2112604c95bbbc3c2748a64260186c541e1729cd80", size = 51178, upload-time = "2026-10-09T12:56:58.131Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/ae/315bbeee126a769cbde43cf4908acb4b40408d8bf8bbf334dd7368d8dadf/pycparser-3.12-py3-none-any.whl", hash = "sha256:a076f3f489b39b43ed13563a1dafe42447445bec2e294154ec5c57fcdda4c85e", size = 62600, upload-time = "2026-10-22T13:40:02.021Z" },
 ]
 
 [[package]]
