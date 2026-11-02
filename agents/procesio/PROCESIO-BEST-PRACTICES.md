@@ -83,13 +83,13 @@ Global try/catch via Error Port + Decisional action. Classify and handle:
 ## 8. DB actions (SQL Server / MySQL) + Data Store
 
 The DB credential (catalog type **`SQL`**) is now multi-engine: it carries a **server
-type** (`DbClientType` — `MSSQL=1`, `MYSQL=2`), so the same `Execute Query` / `Execute
+type** (`DbClientType` - `MSSQL=1`, `MYSQL=2`), so the same `Execute Query` / `Execute
 Command` actions run against **MySQL** by binding a MySQL-typed DB credential.
-**Redis** shipped as its own credential type + connector. No new action families — pick
+**Redis** shipped as its own credential type + connector. No new action families - pick
 the engine on the credential. Outbound DB hosts are SSRF-guarded by a host blacklist, so
 a private/blacklisted host is rejected at connect time. Bind values as **parameters**,
-never inline — the injection-safe `@param` map is engine-agnostic. **Data Store** (the
-tenant table feature) is separate — see the `datastore` guidance topic; scheduling a
+never inline - the injection-safe `@param` map is engine-agnostic. **Data Store** (the
+tenant table feature) is separate - see the `datastore` guidance topic; scheduling a
 process on a cron is the `scheduling` topic.
 
 Use the `sql-server-optimizer` skill for any SQL in a SQL action. Core rules:
@@ -147,11 +147,11 @@ Use the `sql-server-optimizer` skill for any SQL in a SQL action. Core rules:
 
 When a flow contains a `Call Subprocess` / `Trigger Subprocess`, set the node's **`name`**
 (the builder accepts `name` on any action) to describe **what that call does in this flow**,
-or the **called process's name** — whichever reads clearer for the context. Never ship the
+or the **called process's name** - whichever reads clearer for the context. Never ship the
 generic "Call Subprocess" label: on a canvas with several subprocess calls they become
 indistinguishable and the flow is unreadable. Examples: `"Citește Contacte proprietari
 (read-range)"`, `"Adaugă rândul în Colectare acte (append-row)"`, `"Creează folder Ap.<nr>
-(create-folder)"`. The right name varies by context — pick the one that makes the canvas
+(create-folder)"`. The right name varies by context - pick the one that makes the canvas
 self-explanatory.
 
 ## Form: pre-fill controls from URL query params (validated live 2026-07-22)
@@ -171,23 +171,23 @@ To make a form public + get the link: `isPrivate:false` + publish, then
 `POST /api/CustomUrl/FormTemplate {Type:3,EntityType:1,EntityId:<formTemplateId>,Url:<slug>}`
 → `tinyUrl` → `forms.procesio.app/{tinyUrl}`.
 
-## Recipe: a dynamic, TYPED PROCESIO document (AAT_ Company Brief — live)
+## Recipe: a dynamic, TYPED PROCESIO document (AAT_ Company Brief - live)
 A branded PDF whose repeating table + scalars are filled from a live API call:
 1. **Table rows <- `Call API` -> a typed `list<item>` model.** Point the Call API Response
    Body at e.g. `AAT_GoogleResponse {items: list<AAT_SearchHit>}`; PROCESIO deserializes by
    `jsonProperty`. docMap the doc's `hits` list `<- {var: googleResponse, path:[items_attr]}`.
-   (The Javascript action canNOT build a typed list — see tool PROCESIO-API-NOTES.)
-2. **Scalars** — use the **Node** scripting action (raw output) and map straight onto the doc
+   (The Javascript action canNOT build a typed list - see tool PROCESIO-API-NOTES.)
+2. **Scalars** - use the **Node** scripting action (raw output) and map straight onto the doc
    vars; OR with the **Javascript** action route through an envelope model
    `{result:{searchTerm, generatedOn, resultCount, heroImageUrl}}` + docMap `path:[result,
    field]`. Build the envelope model via the attribute-endpoint create flow so it COMPILES.
-3. **Never** feed a Javascript-action output downstream as a query/filename — the `{result}`
+3. **Never** feed a Javascript-action output downstream as a query/filename - the `{result}`
    wrapper leaks. Drive the Call API query + file name from the ORIGINAL form inputs.
 4. Build every data model via the attribute-endpoint create flow (empty model -> POST each
-   attribute) so it's COMPILED — else the document renders "Unknown".
+   attribute) so it's COMPILED - else the document renders "Unknown".
 
 ## Email a generated file (Send Email)
-- **Map attachment is `list<File>`** — declare the file input `isList:true`; a single File
+- **Map attachment is `list<File>`** - declare the file input `isList:true`; a single File
   -> designer "data type mismatch" + NO attachment (run still status 50, so green != attached).
   Pass `[fileDTO]`. Form file-upload controls already hold a list.
 - **To** can be a variable for a dynamic recipient (`<%0%>` + Variable[recipientEmail]).
@@ -209,14 +209,14 @@ Resolve via FIELD VALIDITY, not JS `.disabled` toggling:
 **Variable TYPES must match EXACTLY for anything that passes between Process / Document /
 Form.** An input's type, an output's type, and a binding's type must be identical, or the
 consumer rejects it. Real failure (AAT_ v2): Send Email "Map attachment" is `List<File>`, so
-Process 3's input was made `List<File>` — but the FORM sends a single `File`, so the form
+Process 3's input was made `List<File>` - but the FORM sends a single `File`, so the form
 **could not START the process** (a silent type mismatch between the form output and the
 process input). Always check the chain: Form control type → process INPUT type → action
 PARAMETER type → next resource. One mismatch anywhere breaks the hand-off.
 
 **Bridge a single `T` → `List<T>` INSIDE the process** (do NOT change the upstream resource):
 1. Keep the process INPUT as the single `T` (so it matches what the form/webhook sends).
-2. Add a **Node** action: `return [<%0%>];` (Node returns RAW — no wrapper) bound to its
+2. Add a **Node** action: `return [<%0%>];` (Node returns RAW - no wrapper) bound to its
    **List Result** output → a `List<T>` process var. **Node REQUIRES `Timeout` > 0** (it
    defaults to `00:00:00`, which errors `value must be greater than 00:00:00`); set `Timeout: 60`.
 3. Feed that `List<T>` var to the action (e.g. Send Email Map attachment ← briefFileList).
@@ -224,7 +224,7 @@ PARAMETER type → next resource. One mismatch anywhere breaks the hand-off.
 
 **Required inputs block the start.** A process input marked `Required` that the trigger does
 NOT supply prevents the process from starting at all. Ensure every Required input is provided
-by the caller — the form button's inputMap, the webhook payload, or the run payload — or do
+by the caller - the form button's inputMap, the webhook payload, or the run payload - or do
 not mark it Required. Audit the form↔process input map against the process's Required vars.
 
 
@@ -258,16 +258,16 @@ fetched (lowercase-keyed) flow. Worked example: added Build VCF (Node) + Base64 
 Export to produce a `.vcf` bulk export (scratchpad build_vcf_flow3.py pattern).
 
 
-## Field learnings 2026-07-05 (designer review + real-corpus E2E) — AUTHORITATIVE
+## Field learnings 2026-07-05 (designer review + real-corpus E2E) - AUTHORITATIVE
 
 1. **Decisional icon**: when creating a Decisional via API set `customData.icon = "call_split"` (the
    designer standard). `icon-decisional` or anything else renders NO icon in the run view. Same rule
-   class: give decisional CASES meaningful `name`s — the designer shows them as chips on the canvas.
+   class: give decisional CASES meaningful `name`s - the designer shows them as chips on the canvas.
 2. **Scripting (Node) actions FAIL SILENTLY**: a JS code error does NOT raise / does NOT take the
    type-1 error port. The action reports SUCCESS and writes the error text to its **Error output**
    setting (9e0110c9). ALWAYS: (a) bind Error output to a string var on every Node; (b) on hot paths,
    follow the Node with a Decisional `errVar IS_NOT_EMPTY -> error join`; (c) compose the user-facing
-   error message from the error vars in one downstream Node (values from the FAILED action are unset —
+   error message from the error vars in one downstream Node (values from the FAILED action are unset - 
    never map them into the notice directly). Proven: 6 silently-dying turns became 6 successes.
 3. **Huge values (base64 media) are NOT an engine limit** (corrected 2026-09-21). A controlled probe through
    `/run` carried a 4 MB string intact through a Node `<%N%>` injection, a Decisional `IS_NOT_EMPTY`, the native
@@ -285,21 +285,21 @@ Export to produce a `.vcf` bulk export (scratchpad build_vcf_flow3.py pattern).
 6. **WhatsApp bulk contact export**: document sends get the MIME's extension APPENDED by WhatsApp
    (filename `Contacts.vcf` + text/plain ⇒ phone receives `Contacts.vcf.txt`, unimportable). No allowed
    /media MIME maps to .vcf. Correct approach: native `type:"contacts"` messages (array, chunk ~15 per
-   message, For Each over chunks) — renders as a tappable contact stack ("X and N other contacts").
+   message, For Each over chunks) - renders as a tappable contact stack ("X and N other contacts").
 
 
 ### Validation: trust the designer's Process Errors (2026-07-06, corrected)
 **A 2026-07-05 note wrongly dismissed the designer's Process Errors as stale phantoms. They are REAL
 and block SAVE. Trust them.** There are two layers:
-- **Runtime** — `POST /api/Projects/validate` (the only server validate endpoint): checks
-  `parameters[]`, returns EMPTY when valid. Does NOT catch designer-layer problems — a flow can pass
+- **Runtime** - `POST /api/Projects/validate` (the only server validate endpoint): checks
+  `parameters[]`, returns EMPTY when valid. Does NOT catch designer-layer problems - a flow can pass
   it yet be unsavable.
-- **Designer** — the client-side "Process Errors" panel blocks SAVE; it validates `customData`
+- **Designer** - the client-side "Process Errors" panel blocks SAVE; it validates `customData`
   (designer maps + code chips). No server endpoint exists for it.
 - **Replicate the designer check offline with `procesio flow-lint --id <flow> --workspace-id <ws>`**
   (a Node binding an error-scope/undeclared variable in code; a required subprocess input left
   unmapped or with a dead source in the `customData` process-inputs map). Never call a flow "done"
-  on `/validate` alone — always run flow-lint too, and if you can, confirm SAVE in the designer.
+  on `/validate` alone - always run flow-lint too, and if you can, confirm SAVE in the designer.
 - **The recurring cause:** cloning a subprocess-call node copies its `customData` process-inputs, so
   the clone keeps the SOURCE's subprocess-input ids and the real required input reads as "missing"
   (the panel shows the stale ids as raw GUIDs). Fix: regenerate `customData` process-inputs from the
@@ -312,5 +312,5 @@ a HEALTHY node of the SAME actionTemplateName that the designer accepts, and the
 `GET /api/Actions?getFullAction=true`. The one field that differs between flagged and healthy is the
 cause. That method found it in one shot: flagged subprocess nodes had a stale side-pannel setting id
 (`1da555da`) vs the template's `5456caf0`; the designer couldn't find the mapping. Then encode the rule
-into `procesio flow-lint` so it's caught mechanically next time — never call a flow done on
+into `procesio flow-lint` so it's caught mechanically next time - never call a flow done on
 `/Projects/validate` alone.

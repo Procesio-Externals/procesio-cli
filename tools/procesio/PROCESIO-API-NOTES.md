@@ -1,17 +1,17 @@
-# PROCESIO API — behaviors learned (not in Swagger)
+# PROCESIO API - behaviors learned (not in Swagger)
 
 Live-validated facts that the Swagger doesn't make obvious. Auth itself is in
 [PROCESIO-AUTH-NOTES.md](PROCESIO-AUTH-NOTES.md); this file is everything else.
 Append here as we learn more (CLAUDE.md Hard rule 6).
 
-## DTO casing — live API is camelCase, exports are PascalCase (⚠ bites parsers)
+## DTO casing - live API is camelCase, exports are PascalCase (⚠ bites parsers)
 
 The **live Web-API returns camelCase** (`flow.actions[].actionTemplateName`,
 `parameters[].value`, `customData.configuration`, `title`, `isValid`), while the
 offline **`.procesio` export bundles use PascalCase** (`Actions`, `Parameters`,
 `Value`, `CustomData`, `Title`). Same DTOs, different case. Code that consumes
 BOTH (e.g. the agent reads live processes; goldens/tests read exports) must access
-keys **case-insensitively** — verified live 2026-06-25, after the agent's `audit`
+keys **case-insensitively** - verified live 2026-06-25, after the agent's `audit`
 first returned 0 actions on a live process because it only looked for `Actions`.
 (`agents/procesio/audit.py:ci()` is the shared case-insensitive getter.)
 
@@ -21,20 +21,20 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   workspace GUID). API keys: required for workspace-scoped keys. Userpass cookie
   session: optional, sets the *active* workspace (defaults otherwise). Same header
   for both. *(The tool's userpass mode does not yet expose `--workspace-id`.)*
-- **Prefer userpass for owner/admin and cross-workspace reads** — wider access.
+- **Prefer userpass for owner/admin and cross-workspace reads** - wider access.
 
 ## Workspaces
 
-- `GET /api/Workspaces` (plural) — all workspaces the caller can see, **active
+- `GET /api/Workspaces` (plural) - all workspaces the caller can see, **active
   only**. Items: `{type, licenseType, hasAccess, workspace (=name), id, parentId}`.
   Derive a master's children by filtering `parentId == <masterId>`.
-- `GET /api/Workspace/{parentId}/subworkspaces` — **all** children of a master,
+- `GET /api/Workspace/{parentId}/subworkspaces` - **all** children of a master,
   **including soft-deleted ones**. Items: `{userCount, workspaceState, createdOn,
   canExceedPaidTime, workspace (=name), id, parentId}`. Requires owner/admin
-  context — **API keys get 401, use userpass**. To match the UI, filter
+  context - **API keys get 401, use userpass**. To match the UI, filter
   `workspaceState == "active"` (deleted ones carry `workspaceState: "removed"`,
   `userCount: 0`). Detail: `GET /api/Workspace/{parentId}/subworkspaces/{id}`.
-- `GET /api/Workspace` (singular) has **no GET** — don't use it for listing.
+- `GET /api/Workspace` (singular) has **no GET** - don't use it for listing.
 - ⚠ **`hasAccess: false` on a `Master` row = you can see its sub-workspaces but cannot act AT
   master scope.** Measured (2026-10, userpass session): with the `workspaceid` header set to such a
   master, `GET /api/Workspace/{parentId}/subworkspaces`, `GET /api/UserPermissions/usertypes` and
@@ -48,29 +48,29 @@ first returned 0 actions on a live process because it only looked for `Actions`.
 
 - List: `GET /api/Projects` → envelope `{totalItemCount, pageNumber,
   pageItemCount, pageItems}` (params `pageNumber`, `pageItemCount`, `searchName`).
-- **The display name is in `title`, NOT `name`** — `name` is null in the list.
+- **The display name is in `title`, NOT `name`** - `name` is null in the list.
   Item keys: `id, parentId, status, title, description, isValid, active, timeout,
   currentActionId, debugMode, isNotification, workspaceId, created*/updated*`.
-- **A process/form/pack carries NO structured classification field** — no category,
+- **A process/form/pack carries NO structured classification field** - no category,
   tag, folder, or jurisdiction. A process has only free-text `title` + `description`;
   a form has `name` + `browserTitle`; a `.procesio` pack's top keys are
   `DataTypes/Credentials/Webhooks/DocumentTemplates/Flows/Forms/TimeStamp`. The
   `category` that exists is an action-node CANVAS attribute (`"category":"cat1"` inside
-  `actions[]`), and a form element's `category`/`group` are DESIGNER-PALETTE groupings —
+  `actions[]`), and a form element's `category`/`group` are DESIGNER-PALETTE groupings - 
   neither classifies the process. So any business/jurisdiction classification (e.g. a
   Process-Library card's country) must ride in the `title` or `description`, not a field;
   a naming convention is the only filter available.
 - Run: `POST /api/Projects/{id}/run` body `{"payload":{}, "connectionid":null}`.
 - **An action's canvas label lives in TWO fields and both must be written together:**
   the DTO's `ActionName` and `CustomData.name`. The designer renders
-  `CustomData.name`; list/inspect surfaces read `ActionName` — write only one and the
+  `CustomData.name`; list/inspect surfaces read `ActionName` - write only one and the
   two views disagree about what a node is called. `rename-actions` sets both.
-- **Action labels are cosmetic — every reference is by id**, so renaming can never
+- **Action labels are cosmetic - every reference is by id**, so renaming can never
   break wiring: ports use `SourceId`/`DestinationId`, a Decisional case points at
   `actionid`, and a parameter binds `variableId`. Nothing resolves an action by name.
 - A newly built flow arrives with every node carrying its template's default label
   (`Node`, `Call API`, `Decisional`). A canvas of a dozen identical `Node` boxes is
-  unreadable — each one has to be opened to find out what it does. Rename in bulk
+  unreadable - each one has to be opened to find out what it does. Rename in bulk
   (`rename-actions --map`) as the last step of building a process, not as polish.
 
 ## Data models, documents, forms
@@ -100,12 +100,31 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   of a model already gone answers HTTP 500 "An unexpected error occurred." (statusCode 100).
 - **Documents (document designer)** = `DocumentTemplate`. List
   `GET /api/DocumentTemplate` (scoped by `workspaceid`).
+- **Document actions, as they behave at v3.0.0** (measured 2026-10-29, real runs):
+  - `Generate Document`: `Save document as` offers PDF or HTML only (no Word); `File Name` gets the
+    extension added (`Quote` -> `Quote.pdf`). `Map Document Data` opens with one row per template
+    variable; a list variable maps from an attribute path (`{var: quote, path: [lines]}`) as one
+    binding, and the table repeats per item. The UI shows a data-model template variable as ONE row
+    (the docs page says it expands into attribute rows).
+  - The Dynamic Table with Data Model orders its columns ALPHABETICALLY by attribute name, not in
+    model order. Name attributes so that order reads well (description, quantity, unitPrice).
+  - `Word Mail Merge`: `Word File` (file in, a .docx with MERGEFIELD fields; `w:fldSimple` fields
+    work), `Word Mail Parameters` (map-parameters: merge field NAME -> value or variable; the
+    process builder takes `{"map": {name: binding}}`), `Make Document PDF` (checkbox: on returns
+    `<input name>.pdf`, off returns the filled `.docx` under the input's name), `Completed Word File`.
+  - `DOCX To HTML` returns a full HTML page (PowerTools for Open XML, class-based `<style>`);
+    `HTML To PDF` renders it and adds `.pdf` to its `File Name`. There is no DOCX To PDF action:
+    use Make Document PDF or DOCX To HTML + HTML To PDF.
+- **A data-model variable's default must be stored as a JSON STRING.** Written as a JSON object
+  (what `process-create` does with a dict `default`), API runs accept it, but the designer's Run
+  dialog shows `[object Object]` and refuses it with "Not a valid JSON". Store
+  `json.dumps(sample)` as `defaultValue` when the process will be run from the UI.
 - **Forms** = `FormTemplate`. `GET /api/FormTemplate` (scoped by `workspaceid`);
   `status`: `1` = active/published, `0` = draft. Also `GET /api/FormTemplate/all/basic`.
 
-## Export / Import — the `.procesio` bundle (Transport)
+## Export / Import - the `.procesio` bundle (Transport)
 
-- `POST /api/Transport/export-entities` — **requires `Workspace.Admin`** (use
+- `POST /api/Transport/export-entities` - **requires `Workspace.Admin`** (use
   userpass). Scope to the source WS via `workspaceid`. Body:
   ```json
   { "dataModelIds": [], "flowIds": [], "credentialIds": [], "webhookIds": [],
@@ -114,7 +133,7 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   `flowIds` = process IDs. `exportSensitiveData=false` excludes credential secrets.
 - Response: `200`, `Content-Type: application/octet-stream`,
   `Content-Disposition: attachment; filename="ExportedEntities-<MM/DD/YYYY HH:MM:SS>.procesio"`.
-  The body **is** the `.procesio` file — a JSON bundle with top keys:
+  The body **is** the `.procesio` file - a JSON bundle with top keys:
   `DataTypes, Credentials, Webhooks, DocumentTemplates, Flows, Forms, TimeStamp`.
   Each entity carries a **stringified** `Data` field (escaped JSON).
 - `GET /api/Transport/export` and `POST /api/Transport/import` also require
@@ -123,7 +142,7 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   from WS "MD test 4 support" (`4159b568-…`) → 92,868-byte bundle, sections matched.
 - ⚠⚠ **SUPERSEDED (withdrawn 2026-08-24, re-measured working 2026-08-29 and
   2026-09-16): the API import WORKS across workspaces** once the request carries the
-  `importedData` part and the seven boolean headers — see "Data Stores in an export
+  `importedData` part and the seven boolean headers - see "Data Stores in an export
   pack" and "Multi-tenancy on one master" below. The paragraph that follows is kept
   as history only; do not route imports through the UI on its strength.
 - ~~⚠ **`POST /api/Transport/import` is REFUSED with `HTTP 403 "workspace
@@ -131,55 +150,55 @@ first returned 0 actions on a live process because it only looked for `Actions`.
   2026-08-12, reproduced into scratch; and again in a later card audit
   2026-08-28).~~ It reportedly succeeds in the **designer UI**, not over the API.
   **So the only API route that relocates a component is `process-create`
-  (`POST /api/Projects`), and it carries the PROCESS ALONE** — no form, store,
+  (`POST /api/Projects`), and it carries the PROCESS ALONE** - no form, store,
   webhook or credential. Consequence for shipping a Process-Library card/pack:
   the pack is **not API-installable**; a form-bearing card must be imported
   through the designer. **Ids are preserved on import** (a process/form id does
   not identify a single artefact across workspaces). Whether import honours a
   form's `IsPrivate` flag is **unestablished** (no successful API import exists to
-  read back), and forms are **born public** — so a shipped form must be verified
+  read back), and forms are **born public** - so a shipped form must be verified
   private before first use.
 
 ## Validation oracles (use before committing a create/edit)
 
 `POST /api/Projects/validate`, `POST /api/Credentials/test`,
-`POST /api/Actions/test` — PROCESIO's own validators; cheapest place to catch a
-bad DTO. (Used by the DTO sub-tools and by the **procesio agent** `verify` gate —
+`POST /api/Actions/test` - PROCESIO's own validators; cheapest place to catch a
+bad DTO. (Used by the DTO sub-tools and by the **procesio agent** `verify` gate - 
 see DTO-SUBTOOLS-NOTE.md and `agents/procesio/`.)
 
 - **`/api/Projects/validate` body = the BARE flow object** (exactly the object you
   get back under `result.flow` from `GET /api/Projects/{id}`). Verified live
   2026-06-25. Wrapping it (`{"flow": …}` or `{"project": …}`) returns **HTTP 500
-  "Value cannot be null. (Parameter 'source')"** — don't wrap.
+  "Value cannot be null. (Parameter 'source')"** - don't wrap.
 - **A valid process returns 2xx; an INVALID one returns HTTP 400** whose body is
-  `{"body": [ {statusCode, value, target}, … ]}` — the validation messages, NOT a
+  `{"body": [ {statusCode, value, target}, … ]}` - the validation messages, NOT a
   request error. Seen: `390 "Action has too few input ports."`, `391 "Action has
-  too few output ports."`. So a 400 here is a *result*, not a transport failure —
+  too few output ports."`. So a 400 here is a *result*, not a transport failure - 
   parse `details.body.body` for the messages (the agent's verify does this).
-- ⚠ **`statusCode 147 "A variable with the same id already exists."` — variable ids are
+- ⚠ **`statusCode 147 "A variable with the same id already exists."` - variable ids are
   CASE-INSENSITIVE.** Two variables whose names differ only by case (e.g. a File input
   `SourceFile` beside a json var `sourceFile`) derive the **same** id and the build is
   rejected at BE validation with 147 (twice, once per colliding name). The compact-config
   builder does not catch it (the names are distinct strings); the platform does, on validate.
-  Give every variable a name that is distinct **ignoring case** — not just distinct as a
+  Give every variable a name that is distinct **ignoring case** - not just distinct as a
   string. (Seen CARDS B-027, building a File-intake front end.)
 
 ## Authoritative DTO source
 
 `tools/procesio/docs_info/` is the **source-of-truth** for every DTO (extracted
-from the BE microservice repos, API v1.19 — 297 endpoints with full field lists +
+from the BE microservice repos, API v1.19 - 297 endpoints with full field lists +
 enums). Prefer it over `data/endpoints.json` (Swagger index, no bodies). The 12
-`.procesio` bundles in `docs_info/Exports/` are **live production resources** —
+`.procesio` bundles in `docs_info/Exports/` are **live production resources** - 
 the golden saved-DTO shapes the builders merge onto (Flows/DataTypes/Credentials/
 Forms each carry an internal stringified `Data`/`CanvasData`). Webhooks live
 embedded in Flows (`Flows[].Webhooks[]`), not as a standalone export section.
 `docs_info/Procesio Platform Actions.json` = `{"actions":[213]}`, each with
-`actionId` + `configuration[tabs].settings[properties]` — the golden source for
+`actionId` + `configuration[tabs].settings[properties]` - the golden source for
 action-node building.
 
-## Action-node building — worked examples
+## Action-node building - worked examples
 
-- **Send Email (SMTP) with attachment + dynamic recipient** —
+- **Send Email (SMTP) with attachment + dynamic recipient** - 
   [PROCESIO-SEND-EMAIL-NOTES.md](PROCESIO-SEND-EMAIL-NOTES.md): the
   `Parameters[]` variable-binding pattern (`{TabPropertyId, Variable[], Value}`
   with `<%N%>` placeholders), the full Send Email TabPropertyId map, File-typed
@@ -189,31 +208,31 @@ action-node building.
 
 ## Auth & client gotchas (verified 2026-06-24)
 
-- **`x-version: 1.19` header** — the client now sends it on every call
+- **`x-version: 1.19` header** - the client now sends it on every call
   (`config.api_version`, overridable via `PROCESIO_API_VERSION`). NOT strictly
-  required in prod (the gateway assumes the default when omitted — verified live),
+  required in prod (the gateway assumes the default when omitted - verified live),
   but the docs recommend pinning it; harmless and future-proof.
 - **Access cookie is a ~30 min JWT.** `auth.login` now records the real expiry
   from the JWT `exp` claim (the `x-session-expires-at` header is the *refresh*
   expiry ~24h, not the access one). `_is_fresh` distrusts an unknown/None expiry
   and re-logins. The userpass session works for ALL gateway routes (DataTypes/
-  Projects/Actions/…), not just `/api/Workspaces` — earlier "401 only on gateway
+  Projects/Actions/…), not just `/api/Workspaces` - earlier "401 only on gateway
   routes" was the path-mangling bug below, not an auth limitation.
-- **requests cookie-jar contamination** — the client clears the Session jar
+- **requests cookie-jar contamination** - the client clears the Session jar
   before each send (`_clear_jar`) so only the explicit `Cookie` header is sent;
   otherwise a stale jar `__Host-procesio.access` collides with the fresh one.
 - **⚠ Git Bash MSYS path mangling (TESTING artifact, not a tool bug).** Passing
   `--path /api/DataTypes` through the **Bash tool** rewrites the leading-slash arg
   to `/C:/Program Files/Git/api/DataTypes`, which 401s. Prefix Bash commands with
   `MSYS_NO_PATHCONV=1` (or call from PowerShell, or drive the client in-process
-  via Python). From PowerShell the path is fine. This wasted hours once — don't
+  via Python). From PowerShell the path is fine. This wasted hours once - don't
   re-debug it as "auth".
 
 ---
 
-## Session findings 2026-06-25 (AAT_ end-to-end v2 — live-verified)
+## Session findings 2026-06-25 (AAT_ end-to-end v2 - live-verified)
 
-### Download a flow-instance file — `GET /api/File/download` (HAR-verified)
+### Download a flow-instance file - `GET /api/File/download` (HAR-verified)
 The file identifiers are **HEADERS, not query params** (a query-only call returns NRE
 "Object reference not set"; changed in v3.0.0, 2026-10: an unhandled 500 no longer carries the
 exception text, the body is now the generic
@@ -229,27 +248,27 @@ body as the symptom). Query: `?isArchived=false`. Headers (+ normal auth):
 A `Call API` whose **Response Body** targets a variable typed as a **data model**
 DESERIALIZES the JSON into it by **`jsonProperty`**, INCLUDING `List<itemModel>`:
 Google `items[]` -> `AAT_GoogleResponse.items : list<AAT_SearchHit>` = 6 populated rows, live.
-This is the ONLY way to feed a typed repeating-table list from DYNAMIC data — the **Javascript**
+This is the ONLY way to feed a typed repeating-table list from DYNAMIC data - the **Javascript**
 scripting action canNOT output a typed list. Inlining the SAME item model into two parents
 (`AAT_SearchReport.hits` and `AAT_GoogleResponse.items`) yields the SAME child attr ids
 (shared, not copied) -> any `list<item>` binds to a document's repeating table built on it.
 
-### Scripting actions — output WRAPPING DIFFERS by action
+### Scripting actions - output WRAPPING DIFFERS by action
 The catalog has distinct scripting actions: **Javascript**, **Node**, **Python**.
-- **Javascript** (`setOutput(v)`): the output variable receives **`{ result: v }`** — a
+- **Javascript** (`setOutput(v)`): the output variable receives **`{ result: v }`** - a
   WRAPPER. Mapping a primitive to a string var stringifies the whole `{result:...}`. To get
   clean values either (a) feed a typed ENVELOPE model `{ result: { ...fields } }` and docMap
   each field `path:[resultAttrId, fieldAttrId]`, or (b) use **Node**.
-- **Node** (NodeJS): returns the script's result **RAW — no wrapper** (confirmed with the PROCESIO team).
+- **Node** (NodeJS): returns the script's result **RAW - no wrapper** (confirmed with the PROCESIO team).
   A Node script returning `{ searchTerm, generatedOn, ... }` maps straight onto a flat typed
   model, no `result` envelope needed. **Prefer Node when you need clean / typed scalar output.**
 - **NEVER feed a Javascript-action output var DOWNSTREAM as a scalar** (e.g. a Call API query
-  param): the `{result:...}` wrapper leaks — a JS-computed `searchTerm` made
+  param): the `{result:...}` wrapper leaks - a JS-computed `searchTerm` made
   `q = "{ 'result': 'Example Company' }"` -> empty search -> empty table + leaked cells.
   Drive downstream actions (the search query, the file name) from the ORIGINAL inputs.
 - **A DECISIONAL CANNOT ROUTE ON A JAVASCRIPT OUTPUT, AND IT FAILS SILENTLY.** A Decisional
   condition `jsOut == 'REFUSE'` compares the whole wrapper `{result:'REFUSE'}` to the string and
-  is always false, so the Decisional **falls through to its DEFAULT branch** — no error, the
+  is always false, so the Decisional **falls through to its DEFAULT branch** - no error, the
   wrong branch just runs (measured: a scanned-PDF guard whose Javascript verdict was `REFUSE`
   was silently routed to PROCEED). A Decisional cannot read the `.result` field either (it
   resolves attributes to a Data Model GUID). **Fix = lift-then-decide:** put a **Node** action
@@ -261,13 +280,13 @@ The catalog has distinct scripting actions: **Javascript**, **Node**, **Python**
 ### `Generate Document` has an "HTML string" OUTPUT
 Its configuration includes `"HTML string"` (`id 79c77296-37a6-43d7-b002-ba346860b6f1`,
 `type=datatype`, **direction=3 / OUTPUT**) alongside `"Document Output"` (file). So a
-document template can render to an HTML STRING variable — e.g. to feed a `Send Email` Body
+document template can render to an HTML STRING variable - e.g. to feed a `Send Email` Body
 from a document template (requirement-2.3 path), not only to a PDF/DOCX file.
 
 ### Process builder global `<%N%>` indexing is correct across an action's params
 For a multi-param action (Send Email To/Subject/Body/Map attachment) the builder assigns a
 GLOBAL `<%N%>` counter and remaps each templated Value to it (To `<%0%>`, Subject `<%1%> <%2%>`,
-Body `<%3%> <%4%>`, attachment `<%5%>`) with matching `Variable[].id`. Verified aligned —
+Body `<%3%> <%4%>`, attachment `<%5%>`) with matching `Variable[].id`. Verified aligned - 
 adding a `To` variable does NOT misalign later params (the rendered Subject was correct live).
 
 ## Scheduler (/api/Schedules)
@@ -275,25 +294,25 @@ adding a `To` variable does NOT misalign later params (the rendered Subject was 
 Curated actions live in `handlers/schedules.py` (list/get/create/update/delete a
 schedule, enable/disable, get/set notifications, list a project's schedules). All
 verified live 2026-06-29 against the `account` (userpass) profile. The
-create/update **body shape is NOT in our Swagger index** — captured here so the
+create/update **body shape is NOT in our Swagger index** - captured here so the
 next session doesn't re-derive it.
 
 ### Endpoints + methods (tag Schedules; permission in parens)
-- `GET  /api/Schedules` — list. Supports `pageNumber` / `pageItemCount` /
+- `GET  /api/Schedules` - list. Supports `pageNumber` / `pageItemCount` /
   `searchName` query params. (Schedule.Read)
-- `GET  /api/Schedules/{scheduleId}` — get one (rich read DTO). (Schedule.Read)
-- `POST /api/Schedules` — create (body). (Schedule.Write)
-- `PUT  /api/Schedules` — update (body, includes `id`). (Schedule.Update)
-- `DELETE /api/Schedules/{scheduleId}` — delete; returns a plain string
+- `GET  /api/Schedules/{scheduleId}` - get one (rich read DTO). (Schedule.Read)
+- `POST /api/Schedules` - create (body). (Schedule.Write)
+- `PUT  /api/Schedules` - update (body, includes `id`). (Schedule.Update)
+- `DELETE /api/Schedules/{scheduleId}` - delete; returns a plain string
   `"Deleted schedule with id <guid>"`. (Schedule.Delete)
-- `PATCH /api/Schedules/{scheduleId}/status?enable=true|false` — enable/disable.
+- `PATCH /api/Schedules/{scheduleId}/status?enable=true|false` - enable/disable.
   ⚠ The query flag is **`enable`** (NOT `active`); our `set-schedule-status`
   exposes `--active true|false` and maps it to `enable`. Returns an empty 2xx body
   (the client surfaces `{"raw_text": ""}`). (Schedule.Update)
-- `GET  /api/Schedules/notifications/{scheduleId}` — notification config + a copy
+- `GET  /api/Schedules/notifications/{scheduleId}` - notification config + a copy
   of `recurrence`/`scheduleName`/`scheduleStatus`. (Schedule.Read)
-- `POST /api/Schedules/notifications` — set notifications (body). (Schedule.Update)
-- `GET  /api/Projects/{id}/restricted/schedules` — returns the **flow detail**
+- `POST /api/Schedules/notifications` - set notifications (body). (Schedule.Update)
+- `GET  /api/Projects/{id}/restricted/schedules` - returns the **flow detail**
   (variables[], title, active), i.e. the target process whose `variables` feed a
   schedule's `processInputs`. (Schedule.Read)
 
@@ -350,7 +369,7 @@ body.
   `recurrence` block (monthly, `recurrence:6, onDay:5, onThe:[2,1]`) was accepted.
   When in doubt, GET an existing schedule and adapt its shape rather than build
   from scratch. The numeric `recurrence` enum values are not documented in our
-  index — `6` is the monthly/"every Nth of every month" type seen live; other
+  index - `6` is the monthly/"every Nth of every month" type seen live; other
   values (daily/weekly/etc.) need to be discovered from a real example or the live
   scheduler UI before relying on them.
 - **`status:false` is ignored on create.** POST with `status:false` returned a
@@ -359,53 +378,53 @@ body.
   true→false). So a "disabled test schedule" is a two-step: create, then patch.
 - **`notification.emailList` is a single string**, not an array (e.g.
   `"a@example.com,c@example.org"`).
-- **DELETE returns a bare string**, not JSON — the curated action wraps it as
+- **DELETE returns a bare string**, not JSON - the curated action wraps it as
   `{"result": "Deleted schedule with id <guid>"}`.
 - Round-trip proven live: create (id `9cbe…`) → get → set-status false → get
   (status=false) → delete → list confirms cleanup. No residue left.
 
-### Notification EMAIL — what it carries, and what fires OnFail (measured live)
+### Notification EMAIL - what it carries, and what fires OnFail (measured live)
 
 `NotificationDto` at `POST /api/Projects/notifications` (process) and
 `POST /api/Schedules/notifications` (schedule) is `{Id, EmailList, IsEnabled,
-OnSuccess, OnFail}`. ⚠ **`IsEnabled` defaults FALSE** — set it true or nothing sends.
+OnSuccess, OnFail}`. ⚠ **`IsEnabled` defaults FALSE** - set it true or nothing sends.
 `EmailList` is a single comma/semicolon-separated string (not an array). `Id` = the
 process-template (flow) id / schedule id. Binding is case-insensitive (camelCase and
-PascalCase both bind). Remove a process notification by **deleting the process** — the
+PascalCase both bind). Remove a process notification by **deleting the process** - the
 GET-back (`/api/Projects/notifications/{flowId}`) then returns HTTP 400; there is no
 `DELETE …/notifications` endpoint.
 
-**What the email contains — IDS ONLY (measured):** the platform sends an HTML mail
+**What the email contains - IDS ONLY (measured):** the platform sends an HTML mail
 **From a PROCESIO-owned sender address (via SendGrid, DKIM/SPF/DMARC pass)** carrying
-**ids + names + a deep-link and nothing else** — process name, submitter display name,
+**ids + names + a deep-link and nothing else** - process name, submitter display name,
 start/end/duration, **instance id**, **workspace id**, **workspace name**, the
 process-template id (inside the link), and a `procesio.app/admin/process/.../details/...`
 deep-link. ⚠ **It carries NO process variable VALUES and NO error/failure-message
 text.** Proven by baking three distinct fabricated markers into (a) an input variable
 no node reads, (b) a variable interpolated into the fault message, (c) the `Throw`
 Custom Message: all three sat in the failed instance and **all three were absent from
-the email**. The DTO has **no content-suppression field**, and none is needed — so the
+the email**. The DTO has **no content-suppression field**, and none is needed - so the
 notification is safe as a failure monitor without leaking payload content.
 
-**What FIRES OnFail — a genuine fault, status 40 (`RUNNING_WITH_ERRORS`):** ⚠⚠ **A
+**What FIRES OnFail - a genuine fault, status 40 (`RUNNING_WITH_ERRORS`):** ⚠⚠ **A
 Javascript/Node action `throw` is CAPTURED into that action's output variable and the
 instance FINISHES at status 50** (measured: runtime throw → status 50, instance
-`error[]` empty, the error object in `out.error`). So a script error — and any
-fail-closed script/Decisional path that records its verdict in a variable — does **NOT**
+`error[]` empty, the error object in `out.error`). So a script error - and any
+fail-closed script/Decisional path that records its verdict in a variable - does **NOT**
 fire OnFail. To end an instance at status 40, use the native **`Throw`** action (its
 `Custom Message` param is the error text) or a Data-Store duplicate-key insert
 (§`row_key` uniqueness). The mail fires within **~1 s** of the status-40 transition, for
 **direct API runs too** (not only scheduled; `scheduleName/webhookName/formName` were
 all null). ⚠ Which mailbox actually receives it is governed by the **recipient address**,
-not the trigger — verify a test recipient lands in the mailbox you read (a bare external
+not the trigger - verify a test recipient lands in the mailbox you read (a bare external
 address may route elsewhere than a same-domain one).
 
-### Node scripting action — list output + MANDATORY Timeout
+### Node scripting action - list output + MANDATORY Timeout
 - `return <value>` at top level returns the value **RAW** (no `{result}` wrapper, unlike the
   Javascript action's `setOutput`). An **array** return binds to the **List Result** output
   (id `60237e88-e95c-c74c-a130-036964e6fc28`); a non-list to **Single Result** (id
   `51b9fcdc-b18b-2a40-a73b-fc04657657bc`). Variables inject as `<%0%>` (same as Javascript).
-  Example — build a `list<File>` from a single `File`: Code `return [<%0%>];`, vars `[briefFile]`,
+  Example - build a `list<File>` from a single `File`: Code `return [<%0%>];`, vars `[briefFile]`,
   bind **List Result** → a `list<File>` var. (Code field id `1e6a5523-2091-6c4c-94ac-c7984074673d`.)
 - **`Timeout` is REQUIRED and must be > 0** (id `d3e52aab-b9d0-2d42-911e-b0e6de177a57`, number =
   seconds). If unset it defaults to `00:00:00` and the run ERRORS at the Node action:
@@ -418,12 +437,12 @@ transiently-unreadable sibling manifest used to throw and block EVERY tool (hit 
 even though `yaml.safe_load` passed). `get_tool` now skips an unloadable SIBLING manifest
 (stderr warning) and only re-raises if the broken manifest IS the requested tool.
 
-### Generate Document "HTML string" output — proven + froala wrapper (2026-06-25)
+### Generate Document "HTML string" output - proven + froala wrapper (2026-06-25)
 Renders the doc body to HTML with placeholders filled; feeds `Send Email` Body from a document
-(AAT_EmailBody → emailHtml → Body ← {var:emailHtml}, status 50 live — requirement 2.3 done).
+(AAT_EmailBody → emailHtml → Body ← {var:emailHtml}, status 50 live - requirement 2.3 done).
 Gotchas: (a) the output is WRAPPED in a Froala editor shell
 (`<html><head><link froala_style.min.css><body><div class='fr-box fr-document'><div class='fr-view'>…</div>`)
-— INLINE styles survive (brand colors/fonts render in email), but the external Froala CSS may
+ - INLINE styles survive (brand colors/fonts render in email), but the external Froala CSS may
 not load in email clients, so style with INLINE css, not `fr-*` classes (changed in v3.0.0,
 2026-10: the shell now links the pinned the `froala-editor` package at version 5.5.0 stylesheet instead of `@latest`,
 the document CSS is kept as written and `url(data:image/png;base64,...)` is no longer
@@ -432,7 +451,7 @@ holds). (b) Bind doc vars by
 NAME in docMap (builder resolves name→id). (c) A Generate Document used ONLY for the HTML string
 needs no `Document Output` / `Save document as` / `File Name`.
 
-### Custom actions (connectors) — lifecycle (HAR-verified 2026-06-25)
+### Custom actions (connectors) - lifecycle (HAR-verified 2026-06-25)
 Shipped as `customaction-upload` / `customaction-delete` / `customaction-list`
 (`tools/procesio/handlers/customaction_ops.py`).
 - **Upload / install:** `POST /api/actions`, `multipart/form-data`, single field **`package`** =
@@ -445,15 +464,15 @@ Shipped as `customaction-upload` / `customaction-delete` / `customaction-list`
   (custom only; each has `isProcesioAction:false`). `GET /api/actions` = the FULL catalog
   (built-in + custom). A freshly-uploaded action's `name` is empty until configured in the designer.
 - `POST /api/actions/event` calls are in-DESIGNER config (output mappings while editing the
-  action), NOT package management — intentionally out of scope for the lifecycle tool.
+  action), NOT package management - intentionally out of scope for the lifecycle tool.
 
-### AI Decisional action + AI OpenAI Compatible credential (2026-07-01 — 3 exports + live-verified)
+### AI Decisional action + AI OpenAI Compatible credential (2026-07-01 - 3 exports + live-verified)
 - **Action `AI Decisional`** (`actionId 772aac51-…-30001`). Params: Select AI Configuration
   (credential, template `27272727-…-aaaa`), Model (text), Endpoint (select `1`=Chat Completions
   / `2`=Responses), User Prompt (code-editor, `<%var%>`), Timeout, LLM Response (datatype OUTPUT,
   `dataTypeId 0317bfee-…-1221`) + an **Extra AI Configuration side-panel FLATTENED at runtime**
   into Temperature / Top P / Max Output Tokens / Presence Penalty / Frequency Penalty / Seed /
-  Store (ids `…30116–30122`). No new Swagger surface — it runs through the normal process endpoints.
+  Store (ids `…30116–30122`). No new Swagger surface - it runs through the normal process endpoints.
 - **Bespoke type `ai-decisional-case`** (Cases, `…30124`): RUNTIME Parameter Value =
   `[{id, actionid, condition:<NL string>}]`; DESIGNER config value =
   `[{id, name, target(=actionid), condition, internalId}]` (runtime drops name/internalId, renames
@@ -469,60 +488,86 @@ Shipped as `customaction-upload` / `customaction-delete` / `customaction-list`
   Context Window Tokens, Max Recommended Input Tokens, Method(GET/POST test), Test endpoint. For OpenAI:
   URL `https://api.openai.com/v1`, Key `Authorization`, Prefix `Bearer `, Max Tokens Param Name
   `max_completion_tokens`, test **Method GET + `/models`** (POST /models → 405).
+- **Creating it over the API needs `Structured Output Mode` set explicitly** (e.g. `tools_strict_forced`): the
+  template shows that option as the default in the designer, but a `credential-create` config that leaves it out
+  is refused with `113 "Required credentials fields should not be empty." target "Structured Output Mode"`.
+  **Test connection is not a reliable signal for this type (2026-10-29):** with a working OpenAI key it answered
+  `400 CONNECT_TO_API_ERROR` in the designer (Method GET, endpoint `/models`), and `POST /api/Credentials/test` gave
+  `isSuccess false, statusCode 400` for GET and POST alike, while an AI Decisional run with the same credential
+  routed correctly. So "not validated" in the list does not mean the credential is broken; prove it with a run.
 
-### The DB credential is multi-engine — SQL Server AND MySQL, chosen by a Server Type option (2026-08, PRC-3696)
+### Call API: free text in a JSON body, file uploads, and what lands in Response Body (verified 2026-10-29)
+- **A string variable inserted into a RAW JSON body is not escaped.** `{"a": <%0%>}` with a text value fails before
+  the call with `Error while building input model: The Call Api request body has invalid Json format for RAW type
+  value.`; `{"b": "<%0%>"}` is sent, but with the value's raw line breaks and quotes inside the string, so the
+  receiver gets invalid JSON. Any user text (a transcript, a form field, an email body) breaks the request this way.
+- **An object or data-model variable inserted whole IS serialized as JSON**, with quotes, line breaks and
+  backslashes escaped. So to put free text into a JSON request (an LLM chat message), give the text a home in a
+  small data model (e.g. `{role, content}`, default `role: "user"`), fill the attribute, and insert the whole
+  variable: `"messages": [{"role": "system", "content": "..."}, <%message%>]`.
+- **An action output can be bound straight to a data-model attribute** (`{"var": "message", "path": ["content"]}` in
+  the builder; the designer shows it as `message.content`), so a Call API's Response Body can fill the attribute with
+  no mapping step. A `text/plain` response lands in a string target as the plain string.
+- **File upload = `FORM_DATA` body with a `FILE` row**: `{"key": "file", "value": "<%0%>", "type": "FILE"}` bound
+  to a File variable, beside `TEXT` rows for the other fields. The request goes out as `multipart/form-data` with
+  the file part (checked against an echo service). This is how a process sends audio to a speech-to-text API.
+- **An HTTP error answer is still a finished Call API** (also in the error-path notes): with a revoked key, a
+  transcription call answered 401 and the action turned green, its error JSON landed in the output, and the run only
+  failed at the next AI step. Check `Response Status` when the answer matters.
+
+### The DB credential is multi-engine - SQL Server AND MySQL, chosen by a Server Type option (2026-08, PRC-3696)
 
 Long-standing notes and every research grounding said *SQL Server is the only native database*. **That is now
-wrong.** MySQL landed natively as a **credential property, not a new action**: the DB credential type — renamed
-**`SQL`** in the live catalog (formerly "SQL Server") — now offers a **Server Type** select whose value maps to
+wrong.** MySQL landed natively as a **credential property, not a new action**: the DB credential type - renamed
+**`SQL`** in the live catalog (formerly "SQL Server") - now offers a **Server Type** select whose value maps to
 `DbClientType`, and the enum gained `MYSQL = 2` beside `MSSQL = 1` (`CustomMySQLClient` over the `MySqlConnector`
 driver, in the Web-Api credential-test and Process-Execution runtime stacks). Consequences worth keeping:
 
 - **Same actions, same credential shape.** `Execute Query` / `Execute Command` (current: **Execute Query V3** /
-  **Execute Command V2**) run against a MySQL-typed credential **unchanged** — pick `Server Type = MySQL`
+  **Execute Command V2**) run against a MySQL-typed credential **unchanged** - pick `Server Type = MySQL`
   (option guid `40404040-0001-0001-0002-cccccccccccc`, `be_value=MYSQL`; MSSQL is `…-0001-…`). No new action, no
-  new tool code — the builder resolves the option name to its guid like any other select. Property labels on the
+  new tool code - the builder resolves the option name to its guid like any other select. Property labels on the
   `SQL` type: Server Type, Protocol Type, Server Name, Port Number, Database Name, Encrypt, Pooling, Trust Server
   Certificate, Authentication Type, Username, Password.
 - **Existing processes are unchanged.** A process built before the change still selects an MSSQL-typed credential
   and runs exactly as before; nothing needs re-saving. The server type is read off the *credential*, so switching
   a step to MySQL is a credentials change, not a flow change.
 - **The server-type list is CLOSED, and it is exactly two.** The field is a GUID-valued select bounded by
-  `DbClientType {MSSQL=1, MYSQL=2}` — the builder **raises** on an unmatched value. **MariaDB** rides the MySQL
+  `DbClientType {MSSQL=1, MYSQL=2}` - the builder **raises** on an unmatched value. **MariaDB** rides the MySQL
   option (same wire protocol; `MySqlConnector` handles it; Test Connection verified against MySQL 8 / MariaDB).
-  **PostgreSQL is NOT supported** — no `Npgsql`, no enum member, not on the near-term roadmap; do not infer it
+  **PostgreSQL is NOT supported** - no `Npgsql`, no enum member, not on the near-term roadmap; do not infer it
   from "the driver is a .NET MySQL provider." Oracle remains roadmap only.
-- **Docs lag (2026-09).** `docs.procesio.com/sql-credential` still documents only *"Server type — MSSQL"* and
-  `how-to/execute-query` still says *"Microsoft SQL"* only — the renamed type and the Server Type field are
+- **Docs lag (2026-09).** `docs.procesio.com/sql-credential` still documents only *"Server type - MSSQL"* and
+  `how-to/execute-query` still says *"Microsoft SQL"* only - the renamed type and the Server Type field are
   documented, the MySQL option is not. Treat the docs as behind on this; the credential template is authoritative.
 - The credential *type* is DB-seeded (no create-type API); instances are fully API-creatable via the `procesio`
   tool. Full field/option contract lives beside the tool in `dto/credential/description.md`.
 
-### Running a process with a File INPUT variable — verified live (2026-07-03)
+### Running a process with a File INPUT variable - verified live (2026-07-03)
 The one-call `run` endpoint can't carry file bytes; use the three-step sequence
 (shipped as the **transcribe** tool's pipeline, `tools/transcribe/pipeline.py`):
-1. `POST /api/Projects/{templateId}/instances/publish` — body = payload where the
+1. `POST /api/Projects/{templateId}/instances/publish` - body = payload where the
    file var carries METADATA only: `{"audioFile": {"path":"","size":N,"mimeType":
    "audio/ogg","name":"f.ogg","id":"<client-generated GUID>","hash":""}}`.
-   Response is a flat object — read **`id`** at the top level (NOT nested under
+   Response is a flat object - read **`id`** at the top level (NOT nested under
    `flows`); it also echoes all `variables` incl. process-var defaults.
-2. `POST /api/File/upload/flow` — multipart part **`package`** = the bytes; ids go
+2. `POST /api/File/upload/flow` - multipart part **`package`** = the bytes; ids go
    in HEADERS: `flowInstanceId`, `flowTemplateId`, `variableName` (var NAME, not id),
    `fileId` (= the GUID you put in the publish payload). Returns the bare fileId
    string as the whole JSON body.
-3. `POST /api/Projects/instances/{instanceId}/launch` — body
+3. `POST /api/Projects/instances/{instanceId}/launch` - body
    `{"flowTemplateId": <templateId>, "connectionId": null}` → `{"instanceId": ...}`.
-Then poll `GET /api/Projects/instances/{id}/status?flowTemplateId=...` —
+Then poll `GET /api/Projects/instances/{id}/status?flowTemplateId=...` - 
 `instance.status`: 30 running, 50 finished, 40 finished-with-errors, 6 stopped.
 `GET /api/Projects/instances/{id}/output?flowTemplateId=...` returns
 `{"instance": {"instanceId", "status", "variable": {<outputVarName>: <value>, ...},
-"error": []}}` — output vars are keyed BY NAME under `instance.variable`.
-Verified against a Speech2Text process with a workspace-scoped api-key profile — an API key CAN publish/upload/launch/read.
+"error": []}}` - output vars are keyed BY NAME under `instance.variable`.
+Verified against a Speech2Text process with a workspace-scoped api-key profile - an API key CAN publish/upload/launch/read.
 Note: `GET /api/Projects/{id}` wraps the template as `{"flow": {...}}`.
 
 ---
 
-## `Data Store` — what builds today, and the two properties that do not (2026-08-31)
+## `Data Store` - what builds today, and the two properties that do not (2026-08-31)
 
 The `Data Store` action performs row-level operations on a Data Store table. Its
 REST surface is **not in the tool's endpoint index** but the endpoints exist:
@@ -538,13 +583,13 @@ A column: `{"columnId": null, "name": ..., "dataTypeId": ..., "isList": false,
 "isPrimaryKey": bool, "isRequired": bool, "isSystemColumn": false}`.
 
 **What builds from the process builder:** a **SELECT with no `Where`**.
-`Total Count` must bind an **integer** variable — a `number` variable fails BE
+`Total Count` must bind an **integer** variable - a `number` variable fails BE
 validation with a data-type mismatch, the same rule as `Response Status` on Call
 API. `Result Rows` binds a json variable with `isList: true`.
 
 **⚠ What does NOT build: `Set Values` (INSERT/UPDATE) and `Where` (filtered
 SELECT/UPDATE/DELETE).** Both properties carry a serialisation the API does not
-describe — `"options": null` and no sub-structure, in the bundled catalog AND in
+describe - `"options": null` and no sub-structure, in the bundled catalog AND in
 the live `GET /api/Actions?getFullAction=true`. Every shape tried returns one
 generic back-end error:
 
@@ -563,7 +608,7 @@ error count drops to zero) **while the back end still refuses**, so FE and BE
 disagree about the format and the FE gate cannot be used to search for it.
 `flowmodel/fevalidation.py` maps `data-store-mapper` onto the document-mapper
 validator and `data-store-decisional` onto a list whose first element carries a
-`condition` list — that is the FE's view and evidently not the BE's.
+`condition` list - that is the FE's view and evidently not the BE's.
 
 **To recover the format:** build one INSERT and one filtered SELECT in the
 designer UI, save, then `GET /api/Projects/{id}` and read the two `Parameters`
@@ -650,7 +695,7 @@ Topology, learned by elimination against the back-end validator:
 | body entry only | `too few output ports` on the For Each |
 | continuation only | `too few input ports` on the first body node |
 | **both** | accepted |
-| both arriving at `Stop` | `too many input ports` — **merge them with a `Join`** |
+| both arriving at `Stop` | `too many input ports` - **merge them with a `Join`** |
 
 Also confirmed: **`Total Count` must bind an INTEGER variable**; a `number` fails BE
 validation with `Data type mismatch ... TotalCount`.
@@ -732,12 +777,12 @@ but a constant column does not need a process variable. Measured on both `Insert
 `UpdateRows`. Useful when a column must be a fixed value the caller must NOT be able to set
 (e.g. a `status` an anonymous submitter should not control).
 
-### ⚠ `UpdateRows` updates IN PLACE, matched by a keyed `Where` — only the matched row moves (F-1382)
+### ⚠ `UpdateRows` updates IN PLACE, matched by a keyed `Where` - only the matched row moves (F-1382)
 
 A `Data Store` `UpdateRows` node with a a106 `Where` of `<column> EQUALS <input>` and a a103
 `Set Values` of the columns to change updates exactly the matching row and leaves every other
 row untouched (measured: a second row with a different key did not move). `Set Values` (a103)
-and `Where` (a106) carry **INDEPENDENT `<%i%>` namespaces** — each `<%0%>` indexes its own
+and `Where` (a106) carry **INDEPENDENT `<%i%>` namespaces** - each `<%0%>` indexes its own
 parameter's inline `variable` array, so both may start at `<%0%>`. This is the primitive for a
 two-process HOLD-AND-RESUME (no native event-wait exists): process 1 `InsertRows` a HELD row and
 terminates ("end the instance at the hold"; `Form Trigger` does not block and there is no
@@ -758,7 +803,7 @@ add an authenticated reviewer or a forge-proof capability, not rely on the corre
 
 > **Establish a permissions fact from `GET /api/UserPermissions/entities` (the
 > assignable role model), NEVER from a Swagger `Permission required:`
-> annotation — and NAME THE SOURCE LAYER in the finding.**
+> annotation - and NAME THE SOURCE LAYER in the finding.**
 
 The two layers disagree in wording and both are accurate about themselves:
 
@@ -770,7 +815,7 @@ The two layers disagree in wording and both are accurate about themselves:
 ⚠ **This has now flipped the record twice.** A note asserting the split was
 withdrawn on the strength of endpoint annotations, then re-instated on the
 strength of the role model. Neither reading was wrong about the layer it looked
-at; the error each time was **inferring across layers** — reading a name or an
+at; the error each time was **inferring across layers** - reading a name or an
 annotation as evidence about a thing it does not describe.
 
 ⚠ **Why this is not housekeeping.** The assignable model is what a customer's
@@ -788,7 +833,7 @@ Establishing this BEFORE minting a key changed what provisioning means.
 | can it be limited to one PERMISSION? | ✅ **YES, but only via the OWNER.** `DataStoreRows: Write` with everything else `None` is expressible |
 | does the KEY itself carry a scope? | ⚠ **NO.** On use the gateway "loads the owning user's profile and authorization" |
 
-⚠ **So a key minted by an Owner is an OWNER key** — Admin on all 15 entities,
+⚠ **So a key minted by an Owner is an OWNER key** - Admin on all 15 entities,
 including `Credentials`, `ApiKey`, `ProcessDesigner` and `Workspace`. A narrow
 key requires a **dedicated service user** holding only the roles it needs.
 
@@ -832,12 +877,12 @@ instance ends **finished-with-errors (status 40)**, the row is not written, and 
 key (a business id, or `id::date`) is **idempotent by construction**: re-recording an identical row
 loudly fails rather than silently duplicating, which is the wanted behaviour for an append-only
 evidence/audit ledger (record one entry per key; re-run on a new key to append). Design the readout
-accordingly — a run that "failed" at 40 on a duplicate is a correct refusal, not a defect, and should be
+accordingly - a run that "failed" at 40 on a duplicate is a correct refusal, not a defect, and should be
 judged on whether the intended NEW rows landed, not on the terminal status alone.
 
 **Measured ceiling:** no break to **5,000 rows / 1.06 MB** in one call (8.1 s).
 E-26 had measured no size break to 100 KB EMBEDDED, but an array is a different
-shape — many small objects rather than one long string — and it scales further.
+shape - many small objects rather than one long string - and it scales further.
 
 | rows | 100 | 500 | 1000 | 2500 | 5000 |
 |---|---|---|---|---|---|
@@ -884,7 +929,7 @@ To bind a value a **Node computed** (a deadline, a state) you cannot bind the No
 output by field: `attribute.attributeId` must be a **GUID**, and a field NAME fails at build with
 `Error converting value "<field>" to type 'System.Nullable`1[System.Guid]'`. Two facts make it work:
 
-- **Type the Node's output variable to the target store's backing data model** — builder
+- **Type the Node's output variable to the target store's backing data model** - builder
   `{"name":"rec","model":"<store dataTypeId>","direction":"output"}` (the `model` escape hatch;
   the store's `dataTypeId` comes from `datastore-get`). Return a plain object from the Node whose
   KEYS match each attribute's **`jsonProperty`** (from `datastore-get-data-model`), which is the
@@ -908,12 +953,12 @@ output by field: `attribute.attributeId` must be a **GUID**, and a field NAME fa
 operand as **empty string**, and the column rejects it at build: `Error while building input model:
 String '' was not recognized as a valid DateTime`. Both a JS `null` field AND an OMITTED object key
 fail identically (the typed model coerces the unset attribute to `''`). The **only** way to leave a
-nullable DateTime null through a native write is to **omit that column from the mapper entirely** —
+nullable DateTime null through a native write is to **omit that column from the mapper entirely** - 
 the inserted row then defaults it to null (measured: a 3-column store, `d2` bound=fail, `d2` absent
 from the mapper=row lands with `d2: null`). So a static native writer maps **only the columns
 guaranteed non-null in its contract**; a column that is null at that point is omitted on
 `InsertRows` (defaults null) and left out of `Set Values` on `UpdateRows` (unchanged). External
-`datastore-add-rows` tolerates a null DateTime; the native in-flow step does NOT — this is the
+`datastore-add-rows` tolerates a null DateTime; the native in-flow step does NOT - this is the
 mechanical reason a store-binding card's create/update paths are split by which columns are set,
 not one write of the whole row. (Non-DateTime nulls are milder: a null String stores as `''`
 without erroring.)
@@ -993,10 +1038,10 @@ A real multi-action flow read back from `GET /api/Projects/{id}` and PUT back fo
 **60-80 KB**, so `run-tool.py procesio put-projects --body '<flow>'` dies with
 `FileNotFoundError: [WinError 206] The filename or extension is too long` *before the tool even runs*
 (a probe flow of a couple of variables, like the first store-write proof, stays under the ceiling and
-hides this). It is not a tool bug and not compressible away. Call the client **in process** instead —
-`ProcesioClient(profile).put("/api/Projects", flow)` (set `.workspace_id` first) — the same endpoint
+hides this). It is not a tool bug and not compressible away. Call the client **in process** instead - 
+`ProcesioClient(profile).put("/api/Projects", flow)` (set `.workspace_id` first) - the same endpoint
 the curated `put-projects` action uses, with no argv layer. Judge the result behaviourally (the PUT
-echoes an empty 200 body, which can lie — O4); run the process and read the effect.
+echoes an empty 200 body, which can lie - O4); run the process and read the effect.
 
 > **Build through the builder. Use a raw PUT to inspect or to control an id that
 > the builder cannot express, and treat anything it produces as unshippable
@@ -1067,7 +1112,7 @@ it, because the answer is a different shape rather than a different name.
   `column reference cannot be null or empty`; `column` holding a GUID gives
   `does not match any Data Store column`; `column` holding the name resolves.
 - **`source` is an OPERAND OBJECT carrying its own inline `variable` array**, and
-  the `<%i%>` placeholder index matches the `id` INSIDE that array — not an index
+  the `<%i%>` placeholder index matches the `id` INSIDE that array - not an index
   into a variable list on the parameter.
 - **The operation is the option's VALUE, not its label.** `INSERT` saves happily
   and dies at runtime with `Unsupported operation`; the runtime wants `InsertRows`.
@@ -1265,7 +1310,7 @@ Property labels: `Select REST API credentials` (`{"credential": <gid>}`), `Verb`
 `Response Body`, `Response Headers`, `Response File`.
 - **`Verb` is an OPTION GUID, not a word.** All five recovered live 2026-08-30 from
   **`GET /api/Credentials/verbs/{templateId}`** (pass the REST-API credential template id, e.g.
-  `10101010-0001-0000-0000-aaaaaaaaaaaa`) — the catalog serves the `verb` property with
+  `10101010-0001-0000-0000-aaaaaaaaaaaa`) - the catalog serves the `verb` property with
   `options: null`, so this endpoint is the only place the mapping exists:
 
   | verb | option guid |
@@ -1281,7 +1326,7 @@ Property labels: `Select REST API credentials` (`{"credential": <gid>}`), `Verb`
   `GET /api/Actions?getFullAction=true`, which is why this looked undiscoverable until the
   CREDENTIALS route was tried. Name-to-guid resolution has nothing to resolve against there. Sending the word `"GET"`
   passes FE validation, passes BE validation, saves, and then dies at RUNTIME with
-  `Http verb is invalid.` on the action — a save-time-clean / run-time-fatal class, so it
+  `Http verb is invalid.` on the action - a save-time-clean / run-time-fatal class, so it
   survives every pre-flight check. Since 2026-09-21 the process builder maps the five words above to
   their guids itself (`_ensure_call_api_properties`), so a config may say `"Verb": "GET"`.
 - **`Response Status` must bind an `integer` variable** (`...121212121211`). A
@@ -1329,7 +1374,7 @@ cannot recur silently (`tools/procesio/tests/test_guards.py` locks all three):
 
 1. **`dto/credential/builder.py::_resolve_option`** now RAISES `UsageError` when a
    credential property whose options are guid-valued is given a value that is
-   neither an option `name`, its `be_value`, nor the guid — instead of storing the
+   neither an option `name`, its `be_value`, nor the guid - instead of storing the
    raw string. The message names the valid options AND the runtime symptom
    ("Unrecognized Guid format"), because the runtime error blames the Call API
    action, not the credential. Checkbox-style (non-guid) option sets still pass
@@ -1342,30 +1387,30 @@ cannot recur silently (`tools/procesio/tests/test_guards.py` locks all three):
    `TYPE_MISMATCH` warning naming the expected vs actual type ("binds number; this
    property expects integer"). The `text` is unchanged for FE parity.
 
-## Instance history is retention-bound — count and list disagree (verified 2026-08-06)
+## Instance history is retention-bound - count and list disagree (verified 2026-08-06)
 
 Three endpoints report on a process's runs and they are NOT consistent:
 
-- `GET /api/Projects/{id}/instances/count` — can return a non-zero count
-- `GET /api/Projects/{id}/instances` — returned an empty page for the SAME process
-- `GET /api/Projects/{id}/history` — also empty for that process
+- `GET /api/Projects/{id}/instances/count` - can return a non-zero count
+- `GET /api/Projects/{id}/instances` - returned an empty page for the SAME process
+- `GET /api/Projects/{id}/history` - also empty for that process
 
 So a non-zero count is not proof that any instance rows are retrievable: the
 count survives the data-retention purge that removes the rows. Treat the count
 as an upper bound only, and take `/instances` + `/history` as the authority for
 "what can I actually inspect". If both come back empty, the run history is gone
-(or the process never ran) — do not keep probing paging.
+(or the process never ran) - do not keep probing paging.
 
 Paging/filter probing on `/instances` is a dead end when the rows are purged:
 `pageNumber` 0 and 1 behave identically (the response always echoes
-`pageNumber: 1`), and `filterStatus` accepts only some values — 2, 3 and 4
+`pageNumber: 1`), and `filterStatus` accepts only some values - 2, 3 and 4
 return **HTTP 400**, while 1 and 5 return an (empty) page. Paging past the end (changed in
 v3.0.0, 2026-10): a `pageNumber` beyond the last page now returns the LAST page again, with
 `pageNumber` echoing the page served, instead of an empty page. So "page N+1 is empty" no
 longer proves the end; stop at `ceil(totalItemCount / <requested page size>)`.
 
 **Per-process schedules:** `GET /api/Projects/{id}/restricted/schedules` does
-NOT return a `schedules` key — it answers with the flow object (id, title,
+NOT return a `schedules` key - it answers with the flow object (id, title,
 variables) and nothing else, so it cannot be used to decide whether a process is
 scheduled. Use `GET /api/Schedules` (workspace-wide) instead and match on the
 `processName` field of each row.
@@ -1432,18 +1477,18 @@ KILL <n> <python> ... )` so the shell is REPLACED by the worker and the kill lan
 on the process that actually holds the connection. Because abandoned workers keep
 issuing requests for as long as they survive, they are a **plausible (unproven)
 contributor to later 403s and to slow/stalling heavy endpoints** on the same
-instance — treat a rate-limit or stall that follows a burst of killed calls as
+instance - treat a rate-limit or stall that follows a burst of killed calls as
 possibly self-inflicted before reporting it as a platform fault.
 
 **Concurrency: a PROCESIO instance is shared across every session and tool run.**
 Heavy writes from ONE working session (form create/delete, process-edit) coincide
-with heavy READ endpoints stalling for another — the full-object reads
+with heavy READ endpoints stalling for another - the full-object reads
 (`GET /api/Projects/{id}`, `GET /api/Projects/{id}/restricted`,
 `POST /api/Projects/validate`, Transport `export`) degrade first and hardest,
 while light endpoints (auth, project LIST, flow-lint) stay sub-second throughout.
 Before diagnosing a stall as a platform fault, enumerate the OTHER live processes
 hitting the same instance (`ps` for concurrent tool invocations, including other
-agent sessions and other workspaces/profiles) — contention from a parallel session
+agent sessions and other workspaces/profiles) - contention from a parallel session
 reproduces the exact same signature and is the cheaper explanation.
 
 ## Instance variables: `/status` needs `flowTemplateId`; a 450 means the QUERY was incomplete
@@ -1488,13 +1533,13 @@ A `.procesio` export carries a **top-level `TimeStamp` recording when the export
 ran**, so two exports of a byte-identical, untouched flow produce **different**
 sha256 digests. A hash of the whole bundle is therefore not a fingerprint: it
 cannot reproduce, and any change-detection gate built on it fires on every run.
-Verified 12/08/2026 — two exports taken 11 minutes apart, no edit between them,
+Verified 12/08/2026 - two exports taken 11 minutes apart, no edit between them,
 differed only in `TimeStamp` (`…05:02:12` vs `…05:13:26`) yet hashed
 `097d4975…` vs `a5309e50…`.
 
 **Fingerprint like this instead:** parse the bundle, drop the top-level
 `TimeStamp`, re-serialise with sorted keys, hash that. Corroborate with two
-independent signals that do NOT move on their own — the flow's `updatedOn`
+independent signals that do NOT move on their own - the flow's `updatedOn`
 (compare to the second) and the action count. In the same test the canonical
 digests matched exactly (`4a03a97c…`) while `updatedOn` and action count were
 identical, which is what proves the process was untouched.
@@ -1510,12 +1555,12 @@ having executed nothing), so execution must be verified separately. Two signals
 exist and **both are eventually consistent**, so neither is usable as an
 immediate check straight after a run:
 
-- `GET /api/Resources/analytics/instances/{id}/details` — returns an EMPTY array
+- `GET /api/Resources/analytics/instances/{id}/details` - returns an EMPTY array
   for a few seconds after a run that demonstrably executed, then fills in with
   real per-action rows. Verified 12/08/2026: two runs read as empty immediately
   and, re-read moments later, both returned `Node totalRuns 3` and
   `File To Base64 totalRuns 1`.
-- `/history` — the instance simply is not there yet for a short window after the
+- `/history` - the instance simply is not there yet for a short window after the
   run, so `actionsConsumed` reads back as **`null`**.
 
 **`actionsConsumed: null` means the instance is not yet in `/history`. That is
@@ -1557,12 +1602,12 @@ call, never assume the list carries them.
 - The bundled endpoint index predates such releases; for anything released
   after the bundle, grep the LIVE swagger.json rather than `list-endpoints`.
 
-### ⚠ Live-confirmed on a clock build (2026-09-01) — six facts a store-binding card meets
+### ⚠ Live-confirmed on a clock build (2026-09-01) - six facts a store-binding card meets
 
 Measured end to end while binding a store from scratch. Kept generalized; the specifics that
 ARE the knowledge are kept.
 
-1. **`datastore-create` persists the full typed schema on the POST — no follow-up PUT.** A
+1. **`datastore-create` persists the full typed schema on the POST - no follow-up PUT.** A
    `DataStoreMetadataDto` with typed `columns` (each `{name, dataTypeId, isPrimaryKey?,
    isRequired?}`) and even a **composite** PK (two `isPrimaryKey:true` columns) sticks on
    `POST /api/DataStore`; read it back with `datastore-get` and the columns + PK are present, with
@@ -1583,19 +1628,19 @@ ARE the knowledge are kept.
    `isfalse` also correct. The historic "Equals-true returns FALSE rows" defect was the OLD
    query-string `GetRows` path; the filter-tree read the tool uses evaluates booleans correctly.
    Prefer `istrue`/`isfalse` for clarity, but `equals` is not broken here. A boolean filter value
-   must be a JSON boolean or `"true"`/`"false"` string — an **int `1`/`0` is rejected 400**.
+   must be a JSON boolean or `"true"`/`"false"` string - an **int `1`/`0` is rejected 400**.
    (Changed in v3.0.0, 2026-10: `1`/`0` is now accepted on filters and on writes.)
-5. **A batch `datastore-add-rows` requires a UNIFORM column set across every row** — heterogeneous
+5. **A batch `datastore-add-rows` requires a UNIFORM column set across every row** - heterogeneous
    keys → `400` "All rows in a batch must have the same set of column aliases." Send every row
    full-column with explicit `null` for absent values (a **null DateTime is accepted**). Judge the
    write by the **count read back** (`datastore-get-rows` → `rows.totalItemCount`), not `affectedRows`.
    The tool's `datastore-get-rows` result shape is `{columns:[…], rows:{totalItemCount, pageNumber,
-   pageItemCount, pageItems:[…]}}` — the rows nest under `rows`, not at the top.
+   pageItemCount, pageItems:[…]}}` - the rows nest under `rows`, not at the top.
 6. **In a process (compact builder): a Data Store SELECT-all builds; a write does NOT.** A `Data
    Store` action with `Operation:"SelectRows"` binding `Result Rows` (a json list var) + `Total
-   Count` (an **integer** var — a Double is rejected) builds and runs through `process-create`. But
+   Count` (an **integer** var - a Double is rejected) builds and runs through `process-create`. But
    the builder has **no handler for `Set Values` (`data-store-mapper`) or `Where`
-   (`data-store-decisional`)**, so an INSERT/UPDATE/filtered-SELECT is not builder-expressible — the
+   (`data-store-decisional`)**, so an INSERT/UPDATE/filtered-SELECT is not builder-expressible - the
    write path needs a `Call API` step + a bound REST credential (excluded from a pack export) or raw
    mapper splicing. This is the mechanical reason a pure-compute process ships as a pack and a
    store-writing one does not. `get-datatypes-count` does **not** count store-backing data models, so
@@ -1646,20 +1691,20 @@ reads `false` until someone enables recording in workspace settings. Any plan
 that relies on instance recording must probe this flag per workspace, never
 assume it. Verified 12/08/2026.
 
-## Node action injection RAW-INSERTS the value — never inject free-form text (2026-08-08)
+## Node action injection RAW-INSERTS the value - never inject free-form text (2026-08-08)
 
 `<%N%>` in a Node's `Code` template is a **literal text splice**, not a JSON-encode. This has a sharp consequence for which variables are safe to inject:
 
-- A variable whose value is **valid JSON** (a sheet read `{"values":[...]}`, an API response) is safe bare-injected: `var x = <%0%>;` becomes `var x = {"values":[...]};` — a valid JS literal. This is why `PICK`/`PARSE` work.
+- A variable whose value is **valid JSON** (a sheet read `{"values":[...]}`, an API response) is safe bare-injected: `var x = <%0%>;` becomes `var x = {"values":[...]};` - a valid JS literal. This is why `PICK`/`PARSE` work.
 - A **plain-text / free-form** value is NOT safe. `var g = <%0%>;` with the value `hello "x"\nworld` splices in raw → `var g = hello "x"[newline]world;` → **syntax error**, and the Node silently returns null. Even an **empty** value breaks it: `var g = ;`. (Confirmed: a Google-Doc export injected bare produced an empty `textBody`, so the downstream Gemini call got no `contents` and returned 400.)
 
-**Rule:** never inject Doc/HTML exports, user prose, or any free-form string into a Node. Source arbitrary text from **inside a JSON structure** — e.g. put the text in a **sheet cell**, read the row via the Sheets API, and reference it as a field of the safely-injected object (`bp.brand_guide`). The object carries the escaping for you. (This is why the social brand *guide text* lives in a `brand_packs` sheet column, while the Drive folder holds only binary assets like reference images.)
+**Rule:** never inject Doc/HTML exports, user prose, or any free-form string into a Node. Source arbitrary text from **inside a JSON structure** - e.g. put the text in a **sheet cell**, read the row via the Sheets API, and reference it as a field of the safely-injected object (`bp.brand_guide`). The object carries the escaping for you. (This is why the social brand *guide text* lives in a `brand_packs` sheet column, while the Drive folder holds only binary assets like reference images.)
 
 If a possibly-empty value must be bare-injected anyway, wrap it so empty stays valid syntax: `var v = (function(){return <%0%>;})();` (empty → `return ;` → `undefined`).
 
 **Addendum (2026-08-08):** even a JSON-ENCODED string is not enough when the value transits process
 variables: **the platform converts the two-character `\n` escape into a REAL newline** before the Node
-splice (same family as the `join('\n')` collapse), un-terminating the injected literal — while `\"`
+splice (same family as the `join('\n')` collapse), un-terminating the injected literal - while `\"`
 survives intact (verified by bisection: `"hello"` OK, `"has \"inner\" quotes"` OK, `"two\nlines"` dies).
 Transport recipe for free-form text into a process input: strip/replace backslashes, JSON.stringify,
 then replace the `\n` sequences with a token (e.g. `%%NL%%`); the receiving Node bare-injects inside an
@@ -1670,11 +1715,11 @@ class, and a backtick is worse than a quote.**
 - **bare** `var g = <%0%>;` → a quote / newline / empty value is a SYNTAX ERROR → the Node returns null (a silent DoS).
 - **double-quoted** `var g = "<%0%>";` → a `"` in the value breaks the literal (DoS); `${}` stays inert.
 - ⚠ **backtick** `` var g = `<%0%>`; `` → a value containing `${…}` **EXECUTES** as a template expression (measured under Node v24: `${(7*7)}` → `49`), and a backtick in the value breaks out into code. **This is code execution, and Node actions have open outbound network (A-34), so it is exfiltration-capable.** Bounded only by who can set the variable (a private form → authenticated).
-- **The two SAFE patterns, both proven:** base64-encode a file's bytes before injecting (the base64 alphabet carries no break / `${` / backtick char), and inject a **structure** bare (the platform JSON-encodes it into a valid, inert literal). A `.replace(/[^A-Za-z0-9+/=]/g,"")` *inside* the code does NOT help — the backtick has already evaluated any `${}` before that line runs.
+- **The two SAFE patterns, both proven:** base64-encode a file's bytes before injecting (the base64 alphabet carries no break / `${` / backtick char), and inject a **structure** bare (the platform JSON-encodes it into a valid, inert literal). A `.replace(/[^A-Za-z0-9+/=]/g,"")` *inside* the code does NOT help - the backtick has already evaluated any `${}` before that line runs.
 
 **Audit signature in an exported pack:** a variable whose `DataType` is `String`/`DateTime` (a free scalar)
 and whose `Type` is `10` (an INPUT) appearing inside a `code-editor` setting's **resolved** `value`
-(its GUID spliced where the `<%N%>` was — `CustomData…settings[].value` keeps the resolved copy, the
+(its GUID spliced where the `<%N%>` was - `CustomData…settings[].value` keeps the resolved copy, the
 `Parameters[].Value` keeps the `<%N%>` template). A String input in a code-editor value is the sink;
 read the delimiter around the GUID (backtick / dquote / bare) for the class. Worth a reusable
 detector that resolves every site → variable → datatype → context and tallies error-port
@@ -1682,18 +1727,18 @@ consumption and provisioning bindings. Recurring real sink across the processes 
 **date/period inputs** spliced raw into a Node; file content and structured results were correctly defused.
 Live example: `social_media/Set Decision`'s `editedCopy` (multi-line captions with quotes land intact).
 
-## Call API — absolute URLs, response outputs, LinkedIn recipe (2026-08-10)
+## Call API - absolute URLs, response outputs, LinkedIn recipe (2026-08-10)
 
-- **An absolute URL in `Endpoint` does NOT bypass the credential base** — the base is prepended and
+- **An absolute URL in `Endpoint` does NOT bypass the credential base** - the base is prepended and
   the call goes to the wrong host (seen as a 405 from the base host). To call a DIFFERENT host than
   the credential's base (e.g. a pre-signed upload URL), create a SECOND credential whose base IS that
   host and pass only the PATH+QUERY as the endpoint. Endpoint-with-query is safe when the credential
   injects its key as a HEADER (the double-`?` clash only exists with query-param key injection).
-- **`Response Status` binds an INTEGER variable** (config var type `integer`) — binding a text var
+- **`Response Status` binds an INTEGER variable** (config var type `integer`) - binding a text var
   fails BE validation with "data type mismatch" (statusCode 142). `Response Headers` binds a text/json
   var and is the ONLY place some APIs return the created id (LinkedIn `/rest/posts` → `x-restli-id`
   header, empty body). `Response File` turns the body into a File var (works with Drive
-  `files/{id}?alt=media` for real binaries — do NOT use the public thumbnail endpoint from code;
+  `files/{id}?alt=media` for real binaries - do NOT use the public thumbnail endpoint from code;
   it 302s into HTML error pages for non-browser clients).
 - **`Response File` cannot capture a CHUNKED binary response.** An API that streams its audio/binary
   with `Transfer-Encoding: chunked` and no `Content-Length` (OpenAI `POST /v1/audio/speech` does, for
@@ -1703,9 +1748,9 @@ Live example: `social_media/Set Decision`'s `editedCopy` (multi-line captions wi
   endpoint outside the process (a local script or a custom action that buffers the stream), or use a
   provider endpoint that returns base64 in JSON. (Seen 2026-10-18 voicing a property video.)
 - **Path parameters containing URNs must be pre-encoded** (`encodeURIComponent` in a Node) before
-  endpoint injection — raw `urn:li:...` colons in the path 400.
+  endpoint injection - raw `urn:li:...` colons in the path 400.
 - **LinkedIn REST versioning:** `LinkedIn-Version` header is REQUIRED (YYYYMM); an inactive version
-  fails with 426 NONEXISTENT_VERSION — probe for a live one (202601 verified live 2026-08-10) and
+  fails with 426 NONEXISTENT_VERSION - probe for a live one (202601 verified live 2026-08-10) and
   expect to bump it over time. `X-Restli-Protocol-Version: 2.0.0` alongside.
 - **Delay action shape** (proven in production): `{"Delay Type": "1", "Delay value": {"value":
   {"value": "<n>", "interval": 2}}}` = n MINUTES.
@@ -1726,24 +1771,24 @@ throughout: `POST /api/Projects/{id}/run`, `GET /api/Schedules`, `GET /api/Proje
 one PROCESIO call in flight at a time** (doctrine §1).
 
 **Hypothesis verdicts.**
-- **No total client deadline — CONFIRMED (root cause).** `requests`' scalar `timeout`
+- **No total client deadline - CONFIRMED (root cause).** `requests`' scalar `timeout`
   is a per-read *inactivity* guard, not a wall-clock ceiling: a connection that is
-  accepted then dribbles/held never trips it, so a stalled call ran until SIGKILL — no
+  accepted then dribbles/held never trips it, so a stalled call ran until SIGKILL - no
   structured timeout ever surfaced. Fixed: `reliability.run_with_deadline` imposes a
   class-aware TOTAL deadline (reads ~90 s, writes ~180 s) on a daemon thread →
   `deadline_exceeded`. `run-process` is exempt (a synchronous run legitimately takes
   minutes; aborting client-side does NOT stop the server run).
-- **Queueing vs flakiness — UNTESTED hypothesis.** That definition reads/writes queue
+- **Queueing vs flakiness - UNTESTED hypothesis.** That definition reads/writes queue
   behind saturated execution capacity (finite EEs; a many-action process consuming
   them) is the leading explanation but was NOT proven with a controlled experiment.
-  Treat it as a hypothesis. The platform DOES expose the shape that would confirm it —
+  Treat it as a hypothesis. The platform DOES expose the shape that would confirm it - 
   `GET /api/analytics/executionEnvironment/concurrency` returns per-workspace
-  `instancesInRun` / `instancesInWaiting` / `maxThreads` — but with an apikey and no
+  `instancesInRun` / `instancesInWaiting` / `maxThreads` - but with an apikey and no
   date range it returns a zeroed epoch skeleton (needs a range and/or
   `MasterWorkspace.Read`). Because it is unproven, the fix is NOT a concurrency
   governor; it is the sequential-calls rule plus the deadline that makes any stall
   surface.
-- **Empty-body PUT can lie — CONFIRMED.** A `put-projects` returned success with an
+- **Empty-body PUT can lie - CONFIRMED.** A `put-projects` returned success with an
   empty body while the change did not persist. Behavioural verification (run the
   process, observe) is the only trustworthy check; a re-read/diff is second best. Never
   trust a write's own echo. `put-projects` now warns on an empty body.
@@ -1755,14 +1800,14 @@ before blaming your own call.
 
 **Guardrails shipped** (all offline-tested; opt-outs `AAT_PROCESIO_NO_DEADLINE=1` /
 `AAT_PROCESIO_NO_RETRY=1`): total class-aware deadline; GET-only retry on
-`429/502/503/504` + network errors with jittered backoff (POST/PUT NEVER retried — a
+`429/502/503/504` + network errors with jittered backoff (POST/PUT NEVER retried - a
 retried execution double-runs, a timed-out write may already have applied);
 `put-projects` empty-body warning; `form-update` DTO lints (phantom `parentId`,
 duplicate id/name, `{"Data":{…}}` wrapping mistake, multiple-select missing `isList`);
 `form-set-element-event --replace-action` (replace one action's events, keep the rest
-in order — bare `--replace` warns before discarding more than one).
+in order - bare `--replace` warns before discarding more than one).
 
-## Custom actions — upload, naming, and Min/Max fields (live-verified 2026-08-10)
+## Custom actions - upload, naming, and Min/Max fields (live-verified 2026-08-10)
 
 **A value-type input with no `DefaultValue` fails at RUN time, and the seed is where it
 bites.** The designer instantiates every property when an action is dropped, so a `bool`,
@@ -1791,7 +1836,7 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    `ClassDecorator.Name` is validated as non-empty and then **discarded**. Upload
    without the header and the action installs with an EMPTY name: it appears in
    `/api/Actions/node` but a designer cannot find it in the toolbar. `Description`,
-   `Tooltip`, `Shape`, `Classification` and `IsTestable` DO come from the decorator —
+   `Tooltip`, `Shape`, `Classification` and `IsTestable` DO come from the decorator - 
    only the name is header-driven, which is why the omission looks like a package bug.
    `customaction-upload` now always sends a name (`--action-name`, defaulting to the
    package stem) and `--icon-path`. The icon likewise comes from the `path` header, not
@@ -1818,31 +1863,31 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    the package: `--icon-path` takes a Material icon name (e.g. `assignment`,
    `description`, `insert_drive_file`, `text_snippet`) or a PROCESIO `icon-*` name
    (e.g. `icon-html`, `icon-pdf`). Omit it and the action shows no icon. Discover valid
-   names from the `icon` field of existing actions in `GET /api/Actions` — that is the
+   names from the `icon` field of existing actions in `GET /api/Actions` - that is the
    exact vocabulary the designer's icon picker accepts.
 
 2. **A failed upload still burns the version.** Package validation runs AFTER the
    package is pushed to the internal NuGet repository, so a rejected upload leaves that
    PackageId+Version registered. Retrying the same version fails with statusCode **207**
-   ("Failed to upload Action Template package to repository") — which reads like an
+   ("Failed to upload Action Template package to repository") - which reads like an
    infrastructure fault but means "duplicate version". **Increment the version after
    every failed attempt, not only after a successful one.** Use 3-segment SemVer.
 
 3. **Decorator constraints enforced at upload** (`statusCode` → meaning):
-   - `265` / `266` — `Min`/`Max` are accepted only on a **non-nullable `int`**. An
+   - `265` / `266` - `Min`/`Max` are accepted only on a **non-nullable `int`**. An
      `int?` is rejected. `261` accompanies it when `Validator.Expects` no longer
      matches the property type.
-   - `151` — a literal bound to a `Min`/`Max` property is outside the allowed range;
+   - `151` - a literal bound to a `Min`/`Max` property is outside the allowed range;
      rejected by the BACK END, so `--force` cannot bypass it.
 
 4. **A `Min`/`Max` number property is effectively LITERAL-ONLY.** Binding a process
    variable to one produces designer errors `LIMIT_NAN` + `LIMIT_RANGE` (the validator
    evaluates the `<%N%>` binding token as a number). Force-saving past the designer
-   does not rescue it: at run time the value **does not arrive** — the platform
+   does not rescue it: at run time the value **does not arrive** - the platform
    substitutes the property's `Min`, silently. Net effect: any run-time range guard
    inside the action is unreachable, and the field cannot vary per run. When authoring
    a connector, choose designer-enforced `Min`/`Max` with a fixed literal, OR omit
-   `Min`/`Max` and guard at run time to keep the field bindable — not both.
+   `Min`/`Max` and guard at run time to keep the field bindable - not both.
 
 5. **An unselected credential is NOT null in the action.** The platform injects an
    `APICredentialsManager` with a non-null `Client`; only `CredentialConfig.Host` is
@@ -1850,7 +1895,7 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    fail deep in the HTTP layer with `Invalid URL: <relative path>`. Check `Host`.
 
 6. **`POST /api/Actions/test` (the side-panel test) delivers its result ASYNCHRONOUSLY**
-   — over SignalR to the designer, OR via a polling GET for a headless caller. The
+ - over SignalR to the designer, OR via a polling GET for a headless caller. The
    POST only STARTS the test and returns `{testActionInstance: {gid}}` with a
    SERVER-assigned gid (NOT the `Gid` you send). Poll `GET /api/Actions/test/{that
    gid}` until a terminal status: **40 = finished (outputs in `testResult`), 90 =
@@ -1870,7 +1915,7 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    fails with statusCode **1008** ("Not working on workspace") unless the call is
    scoped with a `workspaceid` header, and the custom URL only resolves when the FORM
    itself lives in that same workspace. A form created in the personal workspace
-   (`workspaceId` all-zeros) cannot be published under a workspace custom URL — create
+   (`workspaceId` all-zeros) cannot be published under a workspace custom URL - create
    the whole chain (credential, process, form) inside one workspace when the flow has
    to be reachable by a human.
 
@@ -1901,16 +1946,16 @@ wires itself correctly; a rebuilt form is nonetheless a NEW form with a new id,
 so it can never be a drop-in replacement for the original.
 
 **Reading a form back: there is no `get-form`; the `form-create` RESPONSE is the
-readback.** Calling `get-form` returns `unknown action: get-form` — it is not a
+readback.** Calling `get-form` returns `unknown action: get-form` - it is not a
 registered action on this build. The `form-create` response already carries the full
 stored form under `result` (`id`, `name`, `isPrivate`, `data.code` cleaned by the
-server, elements), so **that response is the authoritative readback** — confirm
+server, elements), so **that response is the authoritative readback** - confirm
 `isPrivate:true` from it, not from a follow-up call. An agent that creates a form and
 then tries to verify its privacy with `get-form` hits the unknown-action wall and
 reads a bare error where the answer was in hand. `form-delete --id <id>` removes a
 form by id and returns `{deleted:true, id}`. ⚠ Observed once: a form created via
 `form-create` was **not** surfaced by a subsequent `form-list` scoped to the workspace,
-though the form existed and `form-delete --id` removed it — so do not treat an empty
+though the form existed and `form-delete --id` removed it - so do not treat an empty
 `form-list` as proof the create failed; trust the create response and delete by id.
 
 **`_set_config` fails silently.** It overwrites a config key only if that key
@@ -2036,8 +2081,8 @@ still assumes some add / insert / append call exists for putting ONE item in, se
 for it, finds nothing, and eventually learns the rule by tripping the removal guard.
 Measured over one 19-item build, that rediscovery was **69% of all tool calls**, repeated
 from scratch in every planner step, against 18% for the same goal done in one turn. The
-description now spells out the operational form — *there is no add/insert/append; GET,
-append to the list, send the whole config back; omission removes* — and the same
+description now spells out the operational form - *there is no add/insert/append; GET,
+append to the list, send the whole config back; omission removes* - and the same
 sentence is what makes a keyword search for "add node" land on `process-edit`.
 Generalizes: **an action description must state what the semantics OBLIGE the caller to
 do, not name the semantics.** Naming them is only searchable by someone who already
@@ -2056,7 +2101,7 @@ Nothing a workspace-scoped account can reach states a **reserved execution-envir
 
 Consequence for any planning that needs a concurrency ceiling: **it is a licensing fact
 held outside the API surface**, so get it from whoever owns the subscription rather than
-expecting an endpoint to yield it. Do not infer it from the time budget — they measure
+expecting an endpoint to yield it. Do not infer it from the time budget - they measure
 different things.
 
 ### The `Resources` / `analytics` endpoints are MasterWorkspace-scoped
@@ -2065,7 +2110,7 @@ different things.
 `GET /api/Resources/used` and `GET /api/Resources/used/subworkspaces` are documented
 `MasterWorkspace.Read`. Called with a **sub-workspace** id, the ones that answer at all
 return workspace-level data with no capacity figure; called with the **master**
-workspace id, an account without that permission gets **HTTP 403 "Unauthorized"** — the
+workspace id, an account without that permission gets **HTTP 403 "Unauthorized"** - the
 same shape as the cross-workspace rule above. So a "the platform cannot tell me X"
 conclusion must try BOTH scopes before it is written down, or it is really "my scope
 cannot tell me X".
@@ -2082,7 +2127,7 @@ things**: distinguish a malformed request from a forbidden one by whether the er
 names the query field or the workspace, otherwise a permission limit gets recorded as a
 broken call.
 
-### `PATCH /api/Projects/{id}/toggle-activation` needs a `state` header — CORRECTED
+### `PATCH /api/Projects/{id}/toggle-activation` needs a `state` header - CORRECTED
 
 This was recorded on 31/08/2026 as a one-way endpoint that deactivates and will not
 activate, measured over three calls that each answered success and each left `active`
@@ -2106,7 +2151,7 @@ route, but it is no longer the only one.
 **The lesson that generalises, and it is not the one recorded the first time.** Three
 consistent measurements of a black box are not evidence about the endpoint; they are
 evidence about the request being sent, which was identical each time. Before concluding a
-platform behaves badly, compare the request against one that is known to work — the
+platform behaves badly, compare the request against one that is known to work - the
 product's own UI is the reference implementation and its traffic is available for the
 cost of opening DevTools. The original entry drew a rule about unreachable states from
 what was really an unsent header.
@@ -2127,7 +2172,7 @@ copy lands `active: false`. A launch of an inactive flow is refused with
 `HTTP 400 "Flow … is inactive."`, and a launch of an invalid one with
 `HTTP 400 "Process needs to be valid in order to be launched."`
 
-Do not infer *why* a flow is invalid from the launch refusal — ask the platform's own
+Do not infer *why* a flow is invalid from the launch refusal - ask the platform's own
 validator, `POST /api/Projects/validate`, which names the broken rule. For a flow built
 from a Start action alone it answers `statusCode 382`,
 `"Couldn't find at least one stop action."`, `target: "flow. Stop action."`. Note that
@@ -2139,7 +2184,7 @@ and the validity verdict are different things.
 The tool exposes 442 actions over 295 endpoints (2026-10 snapshot), so most endpoints have **two** names:
 a generated one (`post-projects-by-id-run`) and an ergonomic curated one
 (`run-process`). They are the same HTTP call. Any guard, audit or policy that matches
-**action names** is therefore defeated by a synonym — measured once as **34 operations**
+**action names** is therefore defeated by a synonym - measured once as **34 operations**
 that create, delete or execute being classified as harmless reads, including every
 `*-delete`, both actions that `PUT /api/Projects` over a live process, launching a
 process and launching a webhook.
@@ -2209,7 +2254,7 @@ single-caller-only by construction, and the failure mode of breaking that is a
 wrong answer rather than a crash. Treat a constant path in a subprocess driver as
 a defect on sight.
 
-## DataStore (/api/DataStore) — new module (2026-08)
+## DataStore (/api/DataStore) - new module (2026-08)
 
 Tenant-defined dynamic tables (Data-Store service, MySQL-backed), proxied by Web-Api.
 Curated actions: `datastore-*` (handlers/datastore_ops.py).
@@ -2226,7 +2271,7 @@ split DOES exist, and the note E-48 withdrew was describing this layer.
 | **endpoint annotation** (Swagger `Permission required:`) | `DataStore.Read` / `DataStore.Write` |
 
 ⚠ Both are true and they describe DIFFERENT LAYERS. E-48 read the endpoint
-annotations and concluded about the assignable model — the same shape as
+annotations and concluded about the assignable model - the same shape as
 checking one surface and reporting about another. **The assignable model is what
 a customer's admin actually grants against**, so for any question about limiting
 a principal, that is the layer to read.
@@ -2259,7 +2304,7 @@ entities, so for processes the design and the runs are independently grantable.
   `InternalDataStoreGetRowsDto {filter:<group tree>, sort:[{column,direction}]}` (empty body
   = read all). The old `GET .../rows` query-string form is GONE. **update = `PUT .../rows`**
   body `{values:{col:val}, filter:<group>}`; **delete = `DELETE .../rows`** body
-  `{filter:<group>}` — a non-empty filter is MANDATORY on both (no key-array form). add =
+  `{filter:<group>}` - a non-empty filter is MANDATORY on both (no key-array form). add =
   `POST .../rows` `{rows:[{displayName:value}]}`. The filter <group> is a recursive tree:
   `group{id,logic(0 NONE|1 AND|2 OR),items:[node]}`, `node{id,type(1 Condition|2 Group),
   logic,condition|group}`, `condition{id,column,operator(QueryOperators 0..20),value,
@@ -2274,32 +2319,32 @@ entities, so for processes the design and the runs are independently grantable.
   EndsWith=20 (NOT the 1-8 subset in the stale doc). `datastore-get-rows` maps operator
   NAMES to these numbers; recently-changed row/CSV actions also take a raw `--body`.
 - Process node: native **"Data Store"** action (SELECT/INSERT/UPDATE/DELETE), FE mapper
-  `Data_Store_Mapper`, dispatched by IsProcesio (no code GUID — DB-seeded; resolve by
+  `Data_Store_Mapper`, dispatched by IsProcesio (no code GUID - DB-seeded; resolve by
   name from /api/Actions).
 - Form trigger: `RUN_DATA_STORE_OPERATION` event; runtime hits anonymous
   `api/Form/dataStore/{id}/rows(/filter)` with form context in headers.
 
-### Schema mutation after creation — add a column with `PUT`, NEVER via the backing model (measured 2026-08-27)
+### Schema mutation after creation - add a column with `PUT`, NEVER via the backing model (measured 2026-08-27)
 
 A data store's schema is **mutable in place**. To add a column to an
 **already-populated** store, `PUT /api/DataStore` (`datastore-update`) with the
-full `DataStoreMetadataDto` — the `id`, plus the existing columns AND the new one.
+full `DataStoreMetadataDto` - the `id`, plus the existing columns AND the new one.
 **Measured**: on a store seeded with rows, a PUT carrying the original columns + a
 new **non-required** column added the column **in place, every existing row
 preserved with its values byte-identical**, the new column reading `null` on those
 rows and **immediately writable**. No re-create, no re-seed, the store id and every
-`Data Store` node binding unchanged. Make an added column **non-required** —
+`Data Store` node binding unchanged. Make an added column **non-required** - 
 existing rows have no value for it, so a required add would reject them. (`PATCH
-.../column` MODIFIES an existing column — rename / retype / constrain — it does not
+.../column` MODIFIES an existing column - rename / retype / constrain - it does not
 add.)
 
-⚠️⚠️ **DO NOT add a column by mutating the store's BACKING data model** — i.e. do
+⚠️⚠️ **DO NOT add a column by mutating the store's BACKING data model** - i.e. do
 not call `POST /api/DataTypes/attribute/{modelId}` (`datatype-add-attribute`) on
 the model id a data store is built on. **Measured: it DESTROYS the store while
 reporting success.** Both attribute POSTs returned `ok`; the store's
 `GET /api/DataStore/{id}` columns then read **`[]`** and its rows became
-**unreadable**. ⚠️ **The trap is the handler's own docstring** — *"the only path
-that COMPILES the attribute into the runtime model"* — which is true of a
+**unreadable**. ⚠️ **The trap is the handler's own docstring** - *"the only path
+that COMPILES the attribute into the runtime model"* - which is true of a
 **standalone** data model used as a process-variable / DTO type and **wrong for a
 model that backs a data store**: the store keeps its own column projection and
 mutating the type from under it breaks the store↔model correspondence. **Add store
@@ -2309,18 +2354,18 @@ documented path silently destroys a store) and is routed to Andrei.
 **Read vs write pick up a new column differently.** A row read
 (`POST .../rows/filter`) returns whole rows keyed by **every current display
 name**, so a consumer that binds the whole rows object (a `Data Store` SELECT node
-pins no column list — its params are just the store id + `SelectRows`) gains a
+pins no column list - its params are just the store id + `SelectRows`) gains a
 newly-added column **with no query or node change**. A **write mapper that
 enumerates columns** (`{source, column:<name>}` per column, as an INSERT/UPDATE
-node does) does **not** — it must name the new column explicitly.
+node does) does **not** - it must name the new column explicitly.
 
-## Scheduler — crontab recurrence (PRC-3282, 2026-08)
+## Scheduler - crontab recurrence (PRC-3282, 2026-08)
 
 Addendum to the Scheduler section above. New recurrence type **`CRON = 8`**
 (RecurrenceTypes: NONE=0, ONCE=1, MINUTES=2, HOURS=3, DAILY=4, WEEKLY=5, MONTHLY=6,
 YEARLY=7, CRON=8). The recurrence block gains a `RecurrenceCron` shape: `cronExpression`
 (5-field standard crontab, Cronos library), `timeZone` (IANA), optional start/end window.
-Preview endpoint: **POST /api/Schedules/validate-crontab** — body
+Preview endpoint: **POST /api/Schedules/validate-crontab** - body
 `{cronExpression, timeZone?, count?(default 5, 1..20), startDate?, endDate?}` → a
 description + next occurrences (UTC). Tool: `procesio validate-crontab`; create/update
 -schedule take `--cron`/`--timezone` (built over the JSON `--payload`). The exact camelCase
@@ -2333,7 +2378,7 @@ the same `timeZone` also drives DAILY..YEARLY, an unresolvable zone id fails the
 every type, and DST gaps move forward while ambiguous times resolve to standard time (full rules
 in the Scheduler section above). `--timezone` on create/update-schedule is no longer cron-only.
 
-## Scheduler — what a create/update body must actually look like (live, 2026-08-30)
+## Scheduler - what a create/update body must actually look like (live, 2026-08-30)
 
 **A cron recurrence must carry the cron keys and NOTHING else.** This is the whole
 trap. The block is:
@@ -2349,13 +2394,13 @@ trap. The block is:
 }
 ```
 
-Leave any calendar-recurrence field in beside them — `every`, `onDay`, `onThe`,
-`isOnThe`, `isWeekendExcluded`, or an `endDate` while `isEndDate` is false — and the
+Leave any calendar-recurrence field in beside them - `every`, `onDay`, `onThe`,
+`isOnThe`, `isWeekendExcluded`, or an `endDate` while `isEndDate` is false - and the
 whole request is refused with the generic HTTP 400
 `[{"statusCode":502,"value":"Invalid request due to missing or incorrect resource
 parameters.","target":"schedules"}]`, which names no field. That reply is easy to
 misread as "this deployment does not support cron", especially since the advice
-everywhere else here is to CLONE a live schedule and edit it — and cloning is exactly
+everywhere else here is to CLONE a live schedule and edit it - and cloning is exactly
 what drags the forbidden keys in. `--cron` therefore REPLACES the recurrence block
 rather than overlaying onto the payload (`_apply_cron`), and
 `tests/test_schedule_cron_shape.py` pins the key set.
@@ -2375,7 +2420,7 @@ flags that switch them off are read. Cron is the exception because its block is 
 different shape, not a superset.
 
 **A schedule belongs to a workspace, and the create response does not show it.** The
-POST reply came back with `workspaceId: null` and `createdOn: null` — it echoes the
+POST reply came back with `workspaceId: null` and `createdOn: null` - it echoes the
 request, not the stored row. The schedule really was filed under the `workspaceid`
 header's workspace, which `GET /api/Schedules` then filters on: new schedules were
 absent from an unscoped list and present in a scoped one. Always confirm with a
@@ -2388,9 +2433,45 @@ you want it running, or disable it immediately with the status PATCH.
 
 **Proof of a working schedule is an instance, not a next-run date.**
 `GET /api/Projects/{id}/instances` stamps each run with the `scheduleName` that launched
-it, so a scheduled run is distinguishable from a manual one in the same list — that
+it, so a scheduled run is distinguishable from a manual one in the same list - that
 field is the only thing separating "the scheduler fires" from "I ran it myself two
 minutes ago".
+
+## Scheduler: notification emails, Once, disable, duplicate (live, 2026-10-29)
+
+**A schedule's notification emails need a notification record on the PROCESS.** With a
+process created over the API, schedules with `notification.isEnabled: true` (made in the UI
+and over the API alike, on success and on failure) sent nothing for eight scheduled runs.
+The moment a process-level record existed (`POST /api/Projects/notifications` with
+`{"id": <process id>, "emailList": "", "isEnabled": false, ...}`, i.e. switched OFF and
+with no address), every next scheduled run sent its schedule's email about 1 s after it
+finished ("<process> process has completed / has failed (instance id: ...)", from the
+platform sender). So the process record gates delivery even when it sends nothing itself.
+`GET /api/Projects/notifications/{flowId}` lists the process's schedules with their own
+`isEnabled` under `notification.schedules[]`. Whether a process created in the designer
+gets that record by itself was not tested; when a schedule notification stays silent,
+check this first. Reported to Engineering as a gap.
+
+**Run timing and state, as seen in the list (`GET /api/Schedules`):**
+- Scheduled runs started about 9 s after the minute; each instance carries `scheduleName`
+  and the schedule's `processInputs` as its input values.
+- A **Once** schedule switches itself off after its run: `status: false`, `nextDate: null`,
+  `previousDate` set.
+- A switched-off schedule (status PATCH or the row's switch in the UI) runs no more and shows
+  `nextDate: null` ("-" in the Next run column). Its settings stay.
+- A **cron** schedule still honours `startDate`: the first run is the first match at or after
+  it, not the next match from now.
+
+**Duplicate schedule (UI row menu)** opens the Create Schedule panel filled from the
+original, same name included (no "Copy of"), with its inputs and notification. Switching
+the copy from Basic Recurrence to Crontab asks "Change recurrence type? ... Saving will
+replace this schedule's Basic Recurrence configuration." on save; confirming creates a new
+schedule and leaves the original untouched (checked over the API).
+
+**Crontab fields in the UI** (`[id$=-minute]`, `-hour`, `-day`, `-month`, `-weekday`)
+validate as you type: an out-of-range value shows "The given cron expression has an invalid
+format. Hours: Value must be a number between 0 and 23 (all inclusive)." in place of the
+plain-English line, and the preview lists the next 5 occurrences in the browser's zone.
 
 ## Forms: FORM_LOAD runs only its FIRST process (live, 2026-08-30)
 
@@ -2398,7 +2479,7 @@ A form's `Data.events` may list several `FORM_LOAD` handlers, and the designer a
 **only the first `RUN_PROCESS` in that list actually executes.** Verified live on a published form:
 with two RUN_PROCESS handlers the network shows `POST /api/formProcess/{form}/{proc}/publish` and a
 `launch` for the FIRST one and *no request at all* for the second, while every `RUN_JAVASCRIPT`
-after them still runs — and therefore reads an empty variable. The same two processes wired to an
+after them still runs - and therefore reads an empty variable. The same two processes wired to an
 element's `onInput` both run, so this is a property of FORM_LOAD, not of the handler list.
 
 **Consequence for authoring:** everything a page needs before anyone touches it must come back from
@@ -2672,8 +2753,8 @@ a rule, only a side effect of how the list was generated.
 
 ## Forms: async RUN_PROCESS + a JS handler that reads its result is a race, not a pipeline
 
-The common designer pattern — `RUN_PROCESS` with `syncRun: false`, then `RUN_JAVASCRIPT` reading the
-variable that process fills — is a race the JS usually LOSES. It is not a hang or an error: the
+The common designer pattern - `RUN_PROCESS` with `syncRun: false`, then `RUN_JAVASCRIPT` reading the
+variable that process fills - is a race the JS usually LOSES. It is not a hang or an error: the
 handler runs, sees the variable's previous value (often empty), and quietly does nothing.
 
 Seen live as two different-looking bugs with one cause: a time picker that showed all 48 half-hours
@@ -2702,13 +2783,13 @@ and address controls as `fld('Name')`.
 ## Forms: three more control traps found while rebuilding a live page
 
 - **A control defined `visible: false` is never mounted, so JS cannot reveal it.** Setting
-  `.visible = true` on it from a handler does nothing at all — there is no DOM node to show. Define
+  `.visible = true` on it from a handler does nothing at all - there is no DOM node to show. Define
   it visible with empty content instead; a paragraph with an empty `label` paints nothing.
 - **Hiding a container beats hiding its children.** Hiding controls one by one left one paragraph
   standing whatever was tried on it (`visible`, clearing `label`); hiding the `columns` container
   they sit in removed the whole block in one operation.
 - **`.defaultValue` is not `.value`.** A row-detail panel that copies a table row into its fields via
-  `.defaultValue` looks correct on screen, but a `RUN_PROCESS` input map reads `.value` — so the
+  `.defaultValue` looks correct on screen, but a `RUN_PROCESS` input map reads `.value` - so the
   process receives an empty field. This is what made a working Delete button look dead. Write both.
 - **A handler appended to an existing one shares its scope.** A block appended after a handler that
   declares `function say(text)` had its own three-argument `say(field, text, show)` shadowed, so it
@@ -2716,7 +2797,7 @@ and address controls as `fld('Name')`.
 
 ## Forms: `form-add-element` models a spliced control FLAT, whatever it is parented into
 
-A control the designer placed inside a `dynamic-table-row` is modelled twice — under
+A control the designer placed inside a `dynamic-table-row` is modelled twice - under
 `fields > <row> > $.fields` (addressed `ns.rowId.rowSubModelId.elementId`, with no value segment) and
 flat. A control added by `form-add-element` exists ONLY in the flat namespace, so its field path is
 `ns.elementId.valueAttrId` even when it renders inside that row. Borrowing the row prefix from a
@@ -2728,14 +2809,14 @@ A SQL row mapped into a typed data model keeps only the attributes that model de
 columns are discarded without a warning. Adding a column to a stored procedure that feeds a
 `For Each` over a typed list therefore changes nothing until the DATA MODEL gains the matching
 attribute (`datatype-add-attribute`). Seen live: a template body added to a notification query
-arrived as `undefined` in the loop, and the flow correctly fell back to its built-in text — a
+arrived as `undefined` in the loop, and the flow correctly fell back to its built-in text - a
 failure that looks exactly like "the feature does not work".
 
 ## Forms: a spliced child is invisible until its CONTAINER lists it
 
 A `tabs` container draws the tab NAMES in its own `tabs` config; a `table` draws the row names in
 `rows`. Setting a child's `parentId` is not enough. A tab added with the right parent and nothing
-else **exists, saves, validates, lints clean, renders nowhere** — and every process behind it keeps
+else **exists, saves, validates, lints clean, renders nowhere** - and every process behind it keeps
 working when called directly, so the feature tests green while being unreachable on screen. Two
 whole tabs were built, wired and reported done in this state before anyone tried to click them.
 
@@ -2751,25 +2832,25 @@ calendar has a meeting in it. The rules table is not the diary.
 
 The shape that works, with the two halves that are easy to get half-right:
 
-- **On the screen** — after the rules produce candidate slots, `POST calendar/v3/freeBusy` with
+- **On the screen** - after the rules produce candidate slots, `POST calendar/v3/freeBusy` with
   `{timeMin, timeMax, items:[{id: <calendarId>}]}` over a window a day either side of the local
   date, then drop any slot that overlaps a busy interval. Compare INSTANTS, not dates, and use a
   half-open test (`slotStart < busyEnd && slotEnd > busyStart`) so a meeting ending exactly when a
   slot starts does not block it.
-- **At the boundary** — the booking procedure is SQL and cannot call the calendar, so the same
+- **At the boundary** - the booking procedure is SQL and cannot call the calendar, so the same
   free/busy question has to be asked in the FLOW, for exactly the requested window, before the
   procedure runs. Without it the screen is stricter than the write path and a direct POST books
   over a real meeting.
 
 **A calendar that cannot be read must never widen availability.** Both checks treat a non-200 as
-"unknown" and fall back to the rules rather than to "free" — the database stays the authority for
+"unknown" and fall back to the rules rather than to "free" - the database stays the authority for
 everything it can see, and an outage cannot silently open the diary.
 
 ## PROCESIO can read its own workspace through its own API
 
 A form cannot enumerate credentials, but a flow can: `POST /api/ApiKey` mints a workspace key
-(`GET /api/ApiKey` never returns the value again — it is shown once, in the create response), and a
-`REST API` credential with API-key auth holds it. PROCESIO's api-key auth is three headers —
+(`GET /api/ApiKey` never returns the value again - it is shown once, in the create response), and a
+`REST API` credential with API-key auth holds it. PROCESIO's api-key auth is three headers - 
 `key` (the key's NAME), `value` (the secret), `workspaceid`. Put the SECRET in the credential
 (`Key` = `value`), and the other two as plain node headers: neither is sensitive, and an export
 encrypts a credential's designated secret field while leaving node headers in clear.
@@ -2782,13 +2863,13 @@ name, which a user is free to change.
 
 The single most expensive mistake made against these pages. A form renders its controls
 immediately and fills them from a process a moment later, so a check that waits for a selector which
-already exists — `input`, a table, the time-picker's own default grid — photographs the page BEFORE
+already exists - `input`, a table, the time-picker's own default grid - photographs the page BEFORE
 its data arrives. Every field reads empty, every handler looks dead, and the conclusion "the trigger
 does not fire" follows naturally and is wrong.
 
 It cost two false diagnoses in one session: "handlers built through the API never register" and
 "the admin page's processes need authentication". Both were the same artifact; the pages were
-working the whole time. Real damage followed — working improvements were reverted to undo a
+working the whole time. Real damage followed - working improvements were reverted to undo a
 breakage that had never happened.
 
 **Wait on a string only the loaded state can produce.** Playwright `text=` selectors are ideal:
@@ -2807,7 +2888,7 @@ through it. Take a screenshot, or read the property in page script.
 Stepping `duration + gap` from the start of the availability window and discarding whatever
 collides makes the offer depend on when the WINDOW opens rather than on when the person is free. A
 two-hour hole opening at 14:00 yielded a 14:40 slot, because that is where the grid from 09:00
-happened to land — forty minutes lost for a reason no one can see on screen, and a different
+happened to land - forty minutes lost for a reason no one can see on screen, and a different
 window start would move it again.
 
 Build the busy set first (bookings of EVERY meeting type, blackouts, and the connected calendar),
@@ -2821,13 +2902,13 @@ authoritative as a row in the bookings table.
 
 ## One gap, not two
 
-"Free minutes before" and "free minutes after" describe the same interval from opposite sides — the
-time after one meeting IS the time before the next — so two numbers can disagree and nothing says
+"Free minutes before" and "free minutes after" describe the same interval from opposite sides - the
+time after one meeting IS the time before the next - so two numbers can disagree and nothing says
 which wins between a pair. One `MinutesBetweenMeetings`, seeded from the MAX of the two so an
 upgrade cannot loosen anything, and the arithmetic becomes explainable: a 2-hour hole fits two
 60-minute meetings at gap 0, and exactly one at any gap above zero.
 
-## Exports and secrets — what is encrypted and what is NOT (audited 2026-08-17)
+## Exports and secrets - what is encrypted and what is NOT (audited 2026-08-17)
 
 **The rule: a `.procesio` export is a secret-bearing artifact. Treat every export
 as sensitive until scanned, and never commit one unscanned.**
@@ -2836,7 +2917,7 @@ An export does NOT encrypt uniformly. Two different storages sit in the same
 file, and only one of them is protected:
 
 - **Encrypted (safe to commit).** The designated secret fields of a *Credential*
-  entity — `Credentials[].properties[].value` — are AES-encrypted at rest in the
+  entity - `Credentials[].properties[].value` - are AES-encrypted at rest in the
   export. Evidence: the base64 blobs decode to byte lengths that are exact
   multiples of 16 (32/48/64/80/96/128/192/256 …), the decoded bytes are ~37%
   printable (the ratio for uniform random bytes, i.e. ciphertext, vs ~100% for
@@ -2845,15 +2926,15 @@ file, and only one of them is protected:
   account identifier) stay plaintext, which is why an account SID can appear in
   the clear beside an encrypted token.
 - **PLAINTEXT (leaks).** Every other author-typed string. Confirmed live in:
-  - `Flows[].Actions[].Parameters[].Value.headers[].value` — a token typed
+  - `Flows[].Actions[].Parameters[].Value.headers[].value` - a token typed
     straight into a Call API `Authorization` header
-  - `Flows[].Actions[].Parameters[].Value.queryParams[].value` — an API key
+  - `Flows[].Actions[].Parameters[].Value.queryParams[].value` - an API key
     passed as a query parameter
   - `Flows[].Actions[].CustomData.configuration[].settings[].value[].value.headers[].value`
-    — headers inside a *custom action's* saved configuration
-  - `Flows[].Variables[].DefaultValue` — a token baked into a process variable's
+ - headers inside a *custom action's* saved configuration
+  - `Flows[].Variables[].DefaultValue` - a token baked into a process variable's
     default value
-  - `Credentials[].properties[].value[].Value` — the nested default-header array
+  - `Credentials[].properties[].value[].Value` - the nested default-header array
     inside a credential. Note this is INSIDE a Credential yet still plaintext:
     encryption covers the designated secret *fields*, not arbitrary nested
     structures hanging off them.
@@ -2861,18 +2942,18 @@ file, and only one of them is protected:
 **Consequence for authoring:** binding a Credential protects the secret; typing
 the same token into a header, query parameter, custom-action setting, or variable
 default does not. The platform gives no visual cue that one is encrypted and the
-other is not. So the discipline is *always bind a Credential* — and when
+other is not. So the discipline is *always bind a Credential* - and when
 reviewing someone's flow before export, look at the header/param fields, because
 that is where a hardcoded token hides.
 
 **Classify by shape before believing a hit.** In the exports audited, 40 of 57
-`Bearer <x>` occurrences were GUIDs — PROCESIO *variable references*, not
+`Bearer <x>` occurrences were GUIDs - PROCESIO *variable references*, not
 secrets. Others were placeholders. Only non-GUID, non-placeholder, high-entropy
 values were real. A scanner without a shape classifier reports ~7x noise and gets
 ignored.
 
 **Scanning them requires a windowed reader.** An export is ONE JSON line, tens of
-MB wide. Any line-oriented scanner — or one that skips long lines — reports
+MB wide. Any line-oriented scanner - or one that skips long lines - reports
 "clean" on exactly the files most likely to carry a credential. This is not
 hypothetical: the first audit pass here skipped lines over 4000 chars and missed
 every finding. Use `scripts/secret_scan.py`, which reads fixed-size chunks with
@@ -2883,20 +2964,20 @@ an overlap wider than the longest token, and is enforced by
 python scripts/secret_scan.py --path tools/procesio/docs_info/Exports
 ```
 
-**Remediation without breaking the fixtures.** These exports are load-bearing —
+**Remediation without breaking the fixtures.** These exports are load-bearing - 
 `tools/procesio/tests/test_form_parity.py` reads them as the platform's own
 ground truth for form structure. So scrub in place rather than deleting: replace
 only the confirmed-plaintext values (`scripts/scrub_secrets.py --fingerprint …`,
 which targets by sha256 prefix) and leave the encrypted credential blobs intact.
-Never bulk-replace "anything high-entropy" — that would destroy the AES
+Never bulk-replace "anything high-entropy" - that would destroy the AES
 ciphertext the fixtures legitimately contain. Verify after scrubbing: re-scan
 clean, every export still parses as JSON, and the parity tests still pass.
 
-**Never print a credential value** — not in a report, a log, a commit message, or
+**Never print a credential value** - not in a report, a log, a commit message, or
 a test failure. A sha256 prefix, length and entropy identify one well enough to
 match it against a vault entry or confirm a rotation.
 
-## Credential templates — deriving one so an action sees only its own credentials
+## Credential templates - deriving one so an action sees only its own credentials
 (live-verified 2026-08-18)
 
 By default a connector's credential dropdown lists **every** credential of that kind in
@@ -2927,7 +3008,7 @@ case CredentialsType.REST_API_OAUTH_PREDEFINED:
 
 So a derived template that keeps `Type = REST_API` reuses the existing client and needs
 **no backend change**. Only a new enum value would, and that is a platform change across
-three repos — `CredentialsType`, the factory, and whatever builder the new type needs.
+three repos - `CredentialsType`, the factory, and whatever builder the new type needs.
 
 **Upload regression, fixed in v3.0.0 (2026-10).** Before v3.0.0 a derived template that kept
 its parent's `Type` broke custom-action UPLOADS: every upload of a package whose action has a
@@ -2941,7 +3022,7 @@ uploads, and an old `TEMPLATE_ERROR` of that shape is not a defect in the packag
 Set `CustomCredentialsTypeGuid` on the `FEDecorator`, and **leave the type as
 `Credentials_Rest`**. The attribute name misleads: it does not declare a special
 credential type, it fixes which template `Gid` the selector accepts. Every shipped
-connector that narrows its dropdown does this — `GitHubConnector`,
+connector that narrows its dropdown does this - `GitHubConnector`,
 `GoogleSheetsConnector` (twice), `RedisConnector`.
 
 ```csharp
@@ -2953,13 +3034,13 @@ connector that narrows its dropdown does this — `GitHubConnector`,
 For a built-in connector the seed registers the property, so `properties.TemplateId` must
 carry the same Gid. **Set both.** The seed is generated from the decorator surface, so a
 decorator without the Gid regenerates a seed pointing back at the stock template and
-silently undoes the filter — the same decorator-versus-SQL drift that produced the
+silently undoes the filter - the same decorator-versus-SQL drift that produced the
 Min/Max defect.
 
 ### Writing the template's Properties
 
 `Properties` is a JSON array. Each entry's **`be_id` must come from the
-`CredentialApiKeys` enum** — the runtime looks properties up by that name and ignores
+`CredentialApiKeys` enum** - the runtime looks properties up by that name and ignores
 anything else: `URL`, `Method`, `AuthenticationMethod`, `UserName`, `Password`, `Key`,
 `Value`, `Header`, `Query`, `Path`, `Scopes`, `ClientId`, `ClientSecret`,
 `AuthorizationUrl`, `AccessTokenUrl`, `RefreshTokenUrl`, `CertificateFile`,
@@ -2978,7 +3059,7 @@ options.push({ ...type, name: nameParts[0], gid: type.pid, pid: null, ... })
 ```
 
 Selecting a tile sets the credential's `gtid` to that gid. So a DERIVED template named
-`Prelude` produces a tile that selects its PARENT — the form loads the parent's fields,
+`Prelude` produces a tile that selects its PARENT - the form loads the parent's fields,
 nothing from the derived template appears, and the new tile behaves as a duplicate of the
 parent's. For a root template `Gid == Pid`, so the same code is harmless, which is why the
 trap only springs on derived ones.
@@ -3004,7 +3085,7 @@ through the UI.
 **Reuse the PARENT's property ids.** They are slots, not identifiers you mint: in the REST
 family `...0001...` is URL, `...0002...` the test method, `...0003...` the test endpoint,
 `...0004...` the authentication method, `...0007/0008/0009/0010...` key, value, header and
-query. Every shipped derived template — Azure Storage (the derived OAuth one, not the root `Azure Storage Account`), GitHub, the whole Google family —
+query. Every shipped derived template - Azure Storage (the derived OAuth one, not the root `Azure Storage Account`), GitHub, the whole Google family - 
 keeps the parent's ids and its option ids, and overrides only `label`, `placeholder`,
 `value` and `message`. Minting fresh ids has no precedent anywhere in the data.
 
@@ -3021,11 +3102,11 @@ VISIBLE before it even looks the dependency up:
 if (!operator || !dependencyId || dependencyId === nullableGuid) { return true; }
 ```
 
-So a null operator and the all-zero dependency BOTH force the property on screen — the
+So a null operator and the all-zero dependency BOTH force the property on screen - the
 opposite of what they look like they do. All 15 conditional properties
 in the REST template name another property's id and the option value that reveals them.
 The reliable way to say "never" is to name a property that exists and a value it can never
-hold — for an API-key template, reveal only when `AuthenticationMethod` equals the OAuth 2
+hold - for an API-key template, reveal only when `AuthenticationMethod` equals the OAuth 2
 option, which such a template does not offer:
 
 ```json
@@ -3035,7 +3116,7 @@ option, which such a template does not offer:
 ```
 
 **The all-zero `dependencyId` is NOT a hiding idiom, despite appearances.** The stock REST
-template does carry it on "Test parameters configuration" — and that block RENDERS in the
+template does carry it on "Test parameters configuration" - and that block RENDERS in the
 REST credential form. The form has to find the property named by `dependencyId` before it
 can evaluate the condition, so a dependency that matches nothing leaves the control on
 screen. The operator is a red herring either way.
@@ -3075,7 +3156,7 @@ whose template has no `Method` property fails with
 `Invalid verb: Verb not found. Only GET and POST are allowed! (400)`. The probe has no
 verb to use. A `select` with a single `GET` option is enough.
 
-**`isTest: true` keeps a property out of the RUNTIME config — it is not a cosmetic
+**`isTest: true` keeps a property out of the RUNTIME config - it is not a cosmetic
 flag.** `CredentialsApiBuilder.SetBaseUrl` reads `CredentialApiKeys.Path` (labelled
 "Test endpoint" in the UI) and **appends it to the base URL**:
 
@@ -3097,7 +3178,7 @@ spends real quota on every press of the button.
 **An EMPTY test endpoint is not "skip the test".** The probe still fires, against the bare
 base URL. APIs that serve nothing at their root answer with whatever their gateway says,
 which is rarely about the credential: one returned `403 Invalid key=value pair (missing
-equal-sign) in Authorization header` — an AWS SigV4 parse error that reads like a rejected
+equal-sign) in Authorization header` - an AWS SigV4 parse error that reads like a rejected
 key even though the key was valid. Tell the user in the tooltip to supply a real path, and
 pick one that is cheap and read-only.
 
@@ -3106,7 +3187,7 @@ pick one that is cheap and read-only.
 There is no API. Seed `credentials_template` from `BE/DataBase-Update`, the same way the
 MySQL and OpenAI templates were seeded. Guard the insert on the parent existing, so a
 missing parent fails loudly instead of creating an orphan. **Run the template seed before
-the connector seed**, because the connector references the template's Gid — number the
+the connector seed**, because the connector references the template's Gid - number the
 files if both live in the same folder.
 
 ## Writing a flow definition: three ways the write layer misreports itself
@@ -3118,7 +3199,7 @@ Verified live against `PUT /api/Projects` while editing a real flow.
 > A definition that fails server-side validation is **written anyway**, and the
 > flow is left live in exactly the invalid shape the error names. Observed with
 > `{"statusCode": 383, "value": "Action has too many input ports.", "target":
-> "Stop: Stop"}` — the call reported a failure, and the two new actions were in
+> "Stop: Stop"}` - the call reported a failure, and the two new actions were in
 > the definition on the next read.
 >
 > **Storing it is intended, and is not a defect to report.** A process you are
@@ -3133,7 +3214,7 @@ Verified live against `PUT /api/Projects` while editing a real flow.
 > landing either. Only re-reading the definition settles what is stored.
 >
 > Practical consequence: an edit routine must **reconcile from whatever state it
-> finds** rather than assume a clean starting point — remove what a previous
+> finds** rather than assume a clean starting point - remove what a previous
 > attempt left behind, restore the original wiring, then build. A precondition
 > that refuses to edit a definition whose current form is not what was read is
 > what surfaces this at all.
@@ -3144,7 +3225,7 @@ Verified live against `PUT /api/Projects` while editing a real flow.
 > "Process needs to be valid in order to be launched."}` based on the **stored**
 > `isValid` field, not on live validation. A failed PUT stamps it `false`, and
 > because the normal edit pattern is read-modify-write, **every later PUT carries
-> that stale `false` forward** — so a flow stays unlaunchable long after the
+> that stale `false` forward** - so a flow stays unlaunchable long after the
 > problem is fixed.
 >
 > `POST /api/Projects/validate` (`process-validate`) **recomputes and does not
@@ -3162,7 +3243,7 @@ Verified live against `PUT /api/Projects` while editing a real flow.
 > | `action.parameters[<n>].value` | the **executed** copy; placeholders spelled `<%N%>` |
 > | `action.customData` → `configuration[]` → `settings[]` (`label: "Code"`) | the **designer's** copy: the same source with the **variable IDs substituted** for the placeholders |
 >
-> Changing only `parameters` changes behaviour — the run proves it — while the
+> Changing only `parameters` changes behaviour - the run proves it - while the
 > designer still renders the old source, including any comment that is now
 > false. A save from the UI writes the designer's copy back, so a one-copy fix
 > can be undone by someone opening the node and pressing save. (That overwrite
@@ -3174,16 +3255,16 @@ Verified live against `PUT /api/Projects` while editing a real flow.
 
 ### Two validators, and they answer different questions
 
-- `process-validate` (`POST /api/Projects/validate`) — the back-end oracle.
+- `process-validate` (`POST /api/Projects/validate`) - the back-end oracle.
   Blocks the save.
-- `process-fe-validate` — the designer-layer check. Reports codes such as
+- `process-fe-validate` - the designer-layer check. Reports codes such as
   `MISSING_STOP` and `TYPE_MISMATCH` that the back end does not, including
   warnings that do not block anything.
 
 Ask both when a flow misbehaves: a run refusal says only "invalid", while the BE
 validator names the action and the FE validator explains what the designer would
 show. When attributing an FE warning to your own change, compare the relevant
-sub-structure across the before/after exports — a warning about binding types is
+sub-structure across the before/after exports - a warning about binding types is
 not yours if the bindings are byte-identical and you changed only script text.
 
 ### Flow-control wiring constraints worth knowing before you design a branch
@@ -3223,8 +3304,8 @@ and select says nothing about whether a row written by one run is readable by a
 later, separate run, which is the property a token-map or audit design actually
 rests on. That needs two runs to settle and cannot be read off the catalogue.
 
-⚠ **A Data Store row is mutable by design** — the same action offers UPDATE and
-DELETE — so nothing in the mechanism makes a row tamper-evident. An audit trail
+⚠ **A Data Store row is mutable by design** - the same action offers UPDATE and
+DELETE - so nothing in the mechanism makes a row tamper-evident. An audit trail
 built on one inherits that.
 
 ## Exports: what can be named, and what a pack section proves
@@ -3238,14 +3319,14 @@ dataStoreIds`.
 was true of an earlier surface and is now WRONG.** `--data-stores` populates
 `dataStoreIds`, the pack's `DataStores[]` section fills, and the store's backing data
 model is dragged into `DataTypes` alongside it. See the dated Data Store section at the
-end of this file for the exact keys — **schema only, never rows**.
+end of this file for the exact keys - **schema only, never rows**.
 
 The resulting `.procesio` file is JSON (not a zip) whose top level is
 `DataTypes, Credentials, Webhooks, DocumentTemplates, Flows, Forms, DataStores,
 TimeStamp`. ⚠ **A section existing in the format is not evidence that anything
 populates it.** Measured live: a selection of `--data-models all --processes all`
-resolved one data-model id — the backing model of the workspace's only Data Store
-— and the resulting pack reported `DataTypes: 0` and `DataStores: 0`, with the
+resolved one data-model id - the backing model of the workspace's only Data Store
+ - and the resulting pack reported `DataTypes: 0` and `DataStores: 0`, with the
 store's id absent. The lesson survives its example: a store travels **only when the
 request NAMES it**, and a flow that references one does not drag it along.
 
@@ -3259,7 +3340,7 @@ Read from the 233-template catalogue:
 
 | action | semantics |
 |---|---|
-| `Call Subprocess` | the child runs **sequentially** and control returns to the parent when it completes — **it blocks** |
+| `Call Subprocess` | the child runs **sequentially** and control returns to the parent when it completes - **it blocks** |
 | `Trigger Subprocess` | the child runs **asynchronously**; the parent does not wait |
 | `Delay` | suspends execution for a **specified time**, not until an event |
 | `Form Trigger` | creates a form instance and returns; it does not block |
@@ -3268,7 +3349,7 @@ Read from the 233-template catalogue:
 expressible (raise a form, then loop a Delay plus a Data Store SELECT until the
 row appears) but a durable hold-for-a-human is not a primitive. Whether such a
 poll survives depends on the process timeout, on whether a loop construct exists,
-and on whether a suspended instance survives a platform restart — none of which
+and on whether a suspended instance survives a platform restart - none of which
 the catalogue answers.
 
 ⚠ **There is no logging or audit action at all.** Nothing in the catalogue matches
@@ -3404,7 +3485,7 @@ permission failure are indistinguishable from the response alone. The tool now
 echoes the headers it sent, so a 403 can be read against the request that caused
 it.
 
-## DataStore error surface — read the code and target BEFORE bisecting
+## DataStore error surface - read the code and target BEFORE bisecting
 
 ⚠ **A first version of this note claimed the create endpoint returns a generic
 500 that names no field, so "any create failure has at least two candidate
@@ -3433,7 +3514,7 @@ statuses. The endpoint is not generic at all.
 > **The generic `500 / 1001 / data_store` is the LENGTH-LIMIT signature
 > specifically.** It is not what a create failure looks like in general.
 
-**Apply:** read `statusCode` and `target` first — usually they name the field and
+**Apply:** read `statusCode` and `target` first - usually they name the field and
 no bisection is needed. Bisect **only** on `500 / 1001`, and then start with the
 free-text fields, because that code has so far only ever meant a length cap.
 A create that returns 500 leaves nothing behind (verified by re-listing), so
@@ -3448,7 +3529,7 @@ bisecting upward from a minimal payload is safe.
 into a string COLUMN via `POST /api/DataStore/{id}/rows` was accepted and stored
 in full, at the same time the store's own description was capped at 256.
 
-### Target granularity VARIES BY ENDPOINT — do not carry the create behaviour over
+### Target granularity VARIES BY ENDPOINT - do not carry the create behaviour over
 
 | endpoint | fault | HTTP | statusCode | target |
 |---|---|---|---|---|
@@ -3458,7 +3539,7 @@ in full, at the same time the store's own description was capped at 256.
 
 The rows endpoint names only the **collection** (`rows`), never the offending
 row or column, while create names `Columns[1].Name`. **So "the API names the
-field" is true of create and NOT true of the rows endpoint** — which is exactly
+field" is true of create and NOT true of the rows endpoint** - which is exactly
 the over-generalisation this note was corrected for. Measure the endpoint you
 are on.
 
@@ -3476,7 +3557,7 @@ an outage the store looks perfectly healthy: `GET /api/DataStore` (list),
 `GET /api/DataStore/{id}` (name + columns + PK) and
 `GET /api/DataStore/{id}/data-model` all answer **200**, process/schedule/the rest
 of the Web-API are unaffected, and the **web UI renders the store and says "No
-records yet" — an EMPTY store, not an error**. A store that reads as empty in the
+records yet" - an EMPTY store, not an error**. A store that reads as empty in the
 UI is therefore NOT evidence that its rows were deleted. Read that split before
 blaming a payload, a filter tree, a key or a permission.
 
@@ -3487,20 +3568,20 @@ blaming a payload, a filter tree, a key or a permission.
    alive, so a **503 means the id RESOLVED** and the failure is downstream of it.
    (Measured during an outage: resolvable store → 503, unresolvable → 404.)
 2. **Another credential / another workspace.** Scoping faults answer
-   `403 Unauthorized`, a wrong id answers 404 — never 503. A 503 that follows the
+   `403 Unauthorized`, a wrong id answers 404 - never 503. A 503 that follows the
    caller across accounts is platform-wide, not tenant-bound.
 3. **Repeat the call a few seconds apart.** An outage of this kind is flat, not
    flapping, so no retry wins. The client retries **GET only** on `429/502/503/504`
-   and this is a POST, which is correct — retrying cannot help here.
+   and this is a POST, which is correct - retrying cannot help here.
 
 **There is no client-side fix**: no header, filter shape, paging, credential or
 environment switch changes it, and bisecting the payload is wasted work. ⚠ **The
-Forms read path is not a workaround** — `POST /api/Form/dataStore/{id}/rows/filter`
+Forms read path is not a workaround** - `POST /api/Form/dataStore/{id}/rows/filter`
 refuses first with `400 / 1005 "Form template id is required."`, so it needs a
 published form template bound to that store and cannot be reached generically.
 Escalate to platform support with the first-observed UTC timestamp and a store id;
 the `value` string says so literally. (Seen once platform-wide on Internal-PROD,
-independently reported by an unrelated tenant in the same window — the duration ran
+independently reported by an unrelated tenant in the same window - the duration ran
 to hours, so treat it as an outage to report, not a wait-and-retry.)
 
 ### Two paging shapes on the same tool, and they differ
@@ -3518,7 +3599,7 @@ a write so it could not report that a probe had landed.
 
 `eq` is not an operator. The accepted set is `between, contains, endswith,
 equals, greaterthan, greaterthanorequal, in, isfalse, isnotnull, isnull, istrue,
-lessthan, lessthanorequal, like, none, not…` — use **`equals`**. The tool lists
+lessthan, lessthanorequal, like, none, not…` - use **`equals`**. The tool lists
 the full set in its refusal, so read the error rather than guessing again.
 
 ### Faults `POST /api/DataStore` does NOT reject
@@ -3528,10 +3609,10 @@ Measured accepted, so do not assume the platform is validating these:
 - an **empty `columns` list**, and a payload with **no `columns` member at all**
 - **two columns both marked `isPrimaryKey`**
 - a **column name containing a space**
-- a **duplicate store name** — two stores may share a name, so any
+- a **duplicate store name** - two stores may share a name, so any
   "find the store called X" helper is ambiguous by construction
 
-## `PATCH /api/Projects/{id}/toggle-activation` without its `state` header — CORRECTED
+## `PATCH /api/Projects/{id}/toggle-activation` without its `state` header - CORRECTED
 
 Originally recorded as an endpoint that reports success and does not activate, measured on
 a process duplicated with `POST /api/Projects/{id}/duplicate` (which is created
@@ -3544,7 +3625,7 @@ after   : active=false
 ```
 
 **The endpoint was not at fault: the request was incomplete.** The target state travels in
-a `state` request header, and without it the call means "deactivate" — so it did land, and
+a `state` request header, and without it the call means "deactivate" - so it did land, and
 did exactly what it was told. Send `state: true` to activate. See the corrected entry
 above for the full mechanics.
 
@@ -3564,7 +3645,7 @@ value as failure regardless of what the call returned.
 
 **Consequence for launching:** `POST .../run` on an inactive process refuses with
 `statusCode 373 "Process needs to be valid in order to be launched."`, whose
-`target` carries the real reason — `Flow with id ... is inactive` — while
+`target` carries the real reason - `Flow with id ... is inactive` - while
 `process-validate` independently reports `isValid: true`. **Valid and active are
 two different things and the message leads with the wrong one.**
 
@@ -3599,12 +3680,12 @@ l0_err: "probe is not defined"
 expression is a syntax or reference error, and anything that IS a valid JS
 expression executes.
 
-⚠ **A STRUCTURED value is NOT — it is JSON-encoded, and that is a security
+⚠ **A STRUCTURED value is NOT - it is JSON-encoded, and that is a security
 property, not an ergonomic one.** Measured 25-08-2026: a json-typed variable
 carrying an ARRAY of row objects, one of whose string fields contained a double
 quote, interpolated with the quote **escaped**; the body parsed and ran and the
 value round-tripped. So the `{"__t": …}` wrapper is not merely the workaround
-that makes interpolation valid — **it is what makes customer-supplied data safe
+that makes interpolation valid - **it is what makes customer-supplied data safe
 to pass**, because a structure forces JSON encoding where a bare string gets
 pasted raw.
 
@@ -3625,7 +3706,7 @@ script  :  var __w = <%0%>;
            var text = (__w && __w.__t !== undefined) ? __w.__t : __w;
 ```
 
-A `json`-typed variable is **not on its own sufficient** — measured: a json
+A `json`-typed variable is **not on its own sufficient** - measured: a json
 variable holding the bare string `probe-input` still interpolates unquoted and
 still throws. The value has to be a JSON *object* (or otherwise a self-contained
 literal).
@@ -3650,7 +3731,7 @@ action and the range: `LIMIT_RANGE  "Please make sure that the value is between
 ### Instance status codes
 
 `30` running, `40` finished-with-errors, `50` finished, `6` stopped. ⚠ **50 does
-not mean the script succeeded** — an action whose error was captured into a
+not mean the script succeeded** - an action whose error was captured into a
 variable still finishes 50 with an empty top-level `error: []`.
 
 ### The script engine's capabilities, MEASURED on Internal-PROD 25-08-2026
@@ -3662,10 +3743,10 @@ variable still finishes 50 with an empty top-level `error: []`.
 | astral code points | `"\u{1D400}"` → UTF-16 length 2, `Array.from` length 1 |
 | regex Unicode property escapes `/\p{L}/u` | supported |
 | `toLowerCase()` | ⚠ does **not** fold: eszett stays eszett, Greek final sigma stays final sigma |
-| `process` global | **absent** — not Node; a sandboxed engine |
+| `process` global | **absent** - not Node; a sandboxed engine |
 
 ⚠ **A regex property escape the engine did not support would be a PARSE-time
-SyntaxError**, which no `try`/`catch` inside the script can contain — it kills
+SyntaxError**, which no `try`/`catch` inside the script can contain - it kills
 the whole body. Capability probes must therefore put each risky construct in its
 own deployment, not in one wrapped block.
 
@@ -3673,7 +3754,7 @@ own deployment, not in one wrapped block.
 
 Measured 25-08-2026: bound to `Result Rows` and passed into a Node action via
 `<%N%>`, a SelectRows result arrives as a **bare JSON array of row objects**,
-each keyed by **column name** — not wrapped under `rows`, `pageItems`, `items`
+each keyed by **column name** - not wrapped under `rows`, `pageItems`, `items`
 or `data`, and not paged.
 
 ```js
@@ -3701,9 +3782,9 @@ export actually is.
 | what | measured |
 |---|---|
 | Data Store **schema** | travels |
-| Data Store **rows** | **do NOT travel** — 0 rows in the target |
+| Data Store **rows** | **do NOT travel** - 0 rows in the target |
 | Process **flows** | travel (`Flows: 1`) |
-| **Credentials** | **do NOT travel** — `Credentials: 0`, and `credentials in target: []` |
+| **Credentials** | **do NOT travel** - `Credentials: 0`, and `credentials in target: []` |
 
 A `Call API` action carries the credential **id**, so an imported process
 references a credential that does not exist at the far end. The import succeeds,
@@ -3718,7 +3799,7 @@ Neither raises anything a structural check can see.
 > point it at the address. Budget it as a deployment step, and verify each part
 > by **counting** at the far end rather than by the import succeeding.
 
-### ⚠ THE ONE BINDING THAT DOES TRAVEL — AND IT CARRIES A BEARER ID
+### ⚠ THE ONE BINDING THAT DOES TRAVEL - AND IT CARRIES A BEARER ID
 
 A **webhook binding** is the exception, and it is the dangerous one. Asked with
 nothing bound, the process schema answers:
@@ -3730,10 +3811,10 @@ webhooks/0: 'webhookId' is a required property
 
 So the binding lives **in the process definition**, and definitions are what a
 pack is made of. Meanwhile every verb on `/api/Webhooks/launch/{id}` documents
-**`Permission required: None`** — so **the id IS the access control**, not a name
+**`Permission required: None`** - so **the id IS the access control**, not a name
 for something a permission protects.
 
-⚠ **The other gaps fail CLOSED — something is missing and the thing does not
+⚠ **The other gaps fail CLOSED - something is missing and the thing does not
 work. This one fails OPEN:** the exported pack is *less* functional at the
 destination (the id names a webhook that does not exist there) **while carrying a
 live capability for the SOURCE installation.** Anyone holding the pack can fire
@@ -3743,7 +3824,7 @@ the origin's webhook.
 
 | `Flows[*].Webhooks` | the **binding**. Travels with the flow whether asked for or not |
 |---|---|
-| `Webhooks` (top level) | the webhook **entity**. Only present if the export named it — but then it carries the id directly |
+| `Webhooks` (top level) | the webhook **entity**. Only present if the export named it - but then it carries the id directly |
 
 **Strip both before shipping a pack**, the same way credentials are already
 excluded by default:
@@ -3756,7 +3837,7 @@ procesio strip-webhook-bindings --in pack.procesio --out clean.procesio
 
 ⚠ **`process-edit` merges a config onto the GOLDEN TEMPLATE, not onto the live
 process.** A dry run with `{"title": ..., "webhooks": [...]}` built a DTO with
-**2 actions and 0 variables** — the target's real actions and variables were
+**2 actions and 0 variables** - the target's real actions and variables were
 gone. There is **no reverse path** (nothing turns a live DTO back into a config),
 so a partial edit silently replaces a process rather than amending it.
 
@@ -3774,7 +3855,7 @@ fidelity comes from the platform's own DTO rather than from a reconstruction:
 
 | ⚠ `id` must be a **real GUID**, never `null` | the validator answers `Error converting value {null} to type 'System.Guid'`. It looks like an optional field and is required |
 |---|---|
-| ⚠ omitting `filterRules`/`webhookVariables` | `HTTP 500 — Error mapping types … Destination Member: WebhookInstances`. The flow DTO's `webhooks` maps to `WebhookInstances` internally |
+| ⚠ omitting `filterRules`/`webhookVariables` | `HTTP 500 - Error mapping types … Destination Member: WebhookInstances`. The flow DTO's `webhooks` maps to `WebhookInstances` internally |
 | ⚠ the **config** form `{webhookId, variables:[{name, source}]}` | that is the `process-edit` CONFIG schema, **not** the PUT DTO. Sent to `put-projects` it produces the same 500 |
 
 ⚠ **AND THE VARIABLE MAP IS NOT `{name, source}` AT THE DTO LAYER.** Sending
@@ -3783,7 +3864,7 @@ back as the right NUMBER of entries with **every `variableId` set to
 `00000000-0000-0000-0000-000000000000`**. The binding exists; it maps nothing.
 **A process fired through it receives null inputs, writes nothing, and looks
 exactly like a platform that cannot fire.** The DTO wants
-`{"variableId": "<the flow variable's GUID>", "variableType": <n>}` — resolve the
+`{"variableId": "<the flow variable's GUID>", "variableType": <n>}` - resolve the
 names against `flow.variables` before sending.
 
 > ⚠ **The PUT returns an empty-body 200 for all of this.** The tool's own warning
@@ -3794,13 +3875,13 @@ names against `flow.variables` before sending.
 **Three from three, and the third is in a DTO that documents EVERY field
 optional:**
 
-| `DataStoreFromJsonDto.PrimaryKeyAttributeNames` | documented optional · **required** — *"At least one column must be marked as a primary key"* |
+| `DataStoreFromJsonDto.PrimaryKeyAttributeNames` | documented optional · **required** - *"At least one column must be marked as a primary key"* |
 |---|---|
 | `formInstanceId` (anonymous store path) | documented optional · **supplied, and the path still refused** |
-| `SetFormDto.Pid` | documented optional · **required** — omitting it answers `400 "Invalid request due to missing or incorrect resource parameters"`, **target `form template`** |
+| `SetFormDto.Pid` | documented optional · **required** - omitting it answers `400 "Invalid request due to missing or incorrect resource parameters"`, **target `form template`** |
 
 ⚠ **Treat the column as ABSENT, not as a hint.** Establish requiredness from a
-refusal message — **all three named their own target** — and read a related
+refusal message - **all three named their own target** - and read a related
 endpoint to find the field rather than trying candidates: `Pid` was identified
 because `GET /api/Form/{pid}/all` lists form INSTANCES by pid, so pid is the
 template they hang from.
@@ -3815,12 +3896,12 @@ LoggingMiddleware → SecureInternalRequests → DeserializeToken → Authentica
 ```
 
 > *"If an endpoint requires auth and none is supplied, the gateway returns
-> `401 Unauthorized`"* — cookie clients may instead get a `307` auto-refresh.
+> `401 Unauthorized`"* - cookie clients may instead get a `307` auto-refresh.
 
 ⚠ **A bare `Unauthorized` string with NO content type, `Set-Cookie`, and ~1 ms
 upstream is THAT middleware**, not the controller and not a third-party WAF. The
 controller's own refusals are ASP.NET ProblemDetails at hundreds of milliseconds.
-⚠ **Kong is undocumented transport in front of it** — its `X-Kong-*` headers are
+⚠ **Kong is undocumented transport in front of it** - its `X-Kong-*` headers are
 what make the latency readable, and it appears nowhere in 15 files of reference.
 
 ⚠ **`DeserializeToken` picks Anonymous mode only when there are no auth headers
@@ -3832,16 +3913,16 @@ gets the middleware `401` means the deployed attribute and the reference disagre
 **56 flows across 29 bundles carry a populated `Webhooks` array. 104
 `WebhookVariables` entries in total:**
 
-| field names | `{VariableId, VariableType}` — **104 of 104** |
+| field names | `{VariableId, VariableType}` - **104 of 104** |
 |---|---|
-| `VariableType` values in use | **3 (×56), 2 (×24), 1 (×24)** — Body, Query, Header |
+| `VariableType` values in use | **3 (×56), 2 (×24), 1 (×24)** - Body, Query, Header |
 | ⚠ **`VariableId` == null GUID** | ⚠ **0 of 104** |
 
 ⚠ **So a real binding always carries a resolved variable GUID.** A null GUID is
 a construction error, not a platform shape. **And every one of those bundles
-ships someone's live webhook id — strip bindings before distributing a pack.**
+ships someone's live webhook id - strip bindings before distributing a pack.**
 
-## ⚠ Read UPSTREAM LATENCY on a refusal — it separates two classes no status code does
+## ⚠ Read UPSTREAM LATENCY on a refusal - it separates two classes no status code does
 
 `X-Kong-Upstream-Latency` is on every response through this gateway, and it
 distinguishes refusals that share nothing but a colour:
@@ -3855,17 +3936,17 @@ distinguishes refusals that share nothing but a colour:
 ⚠ **A few milliseconds means the application never ran.** Hundreds of
 milliseconds means it ran and either decided, or called something downstream that
 refused. **The `500`-wrapping-`403` text is .NET's `EnsureSuccessStatusCode()`,
-i.e. the Web-Api gateway's own internal call being rejected** — and the same
+i.e. the Web-Api gateway's own internal call being rejected** - and the same
 pattern appears when a REQUIRED QUERY PARAMETER is omitted, so it is not by
 itself evidence of an authorization gap.
 
 ## ⚠ A form maps fields to process variables BY NAME; a webhook cannot
 
-| the FORM path | `{on, do:"process", processId, inputs:[{to:<procVar>, from:<formField>}]}` → `RUN_PROCESS{inputMap:[{left: procVarGUID, right: formFieldPath}]}` — **field-level, resolved by name to the variable's GUID** |
+| the FORM path | `{on, do:"process", processId, inputs:[{to:<procVar>, from:<formField>}]}` → `RUN_PROCESS{inputMap:[{left: procVarGUID, right: formFieldPath}]}` - **field-level, resolved by name to the variable's GUID** |
 |---|---|
-| the WEBHOOK path | `WebhookVariableDto = {VariableId, VariableType}` with `VariableType` = Header/Query/Body — ⚠ **nowhere to name a field**, so every bound variable receives the WHOLE serialised payload |
+| the WEBHOOK path | `WebhookVariableDto = {VariableId, VariableType}` with `VariableType` = Header/Query/Body - ⚠ **nowhere to name a field**, so every bound variable receives the WHOLE serialised payload |
 
-⚠ **And `LaunchFlowPayload` is `{connectionId?, flowTemplateId}` — no payload
+⚠ **And `LaunchFlowPayload` is `{connectionId?, flowTemplateId}` - no payload
 field at all**, so the form launch never carries values in its body; they come
 from the form's own field map. **Build form-triggered flows on the element event,
 not on a payload.**
@@ -3891,7 +3972,7 @@ the controller refuses the request; the app's error pipeline is never reached.
 
 ⚠ **CONSEQUENCE FOR ANYONE PROBING THIS PATH: no application-level
 configuration opens it.** Binding the store to a form, publishing the form, and
-creating a form instance were all tried and all refused identically — **they
+creating a form instance were all tried and all refused identically - **they
 configure code the request never reaches.**
 
 ⚠ **AND READ THE BODY SHAPE, NOT ONLY THE STATUS.** Three blocks compared
@@ -3903,13 +3984,13 @@ refusals.
 Measured: `POST api/Form` (`SaveForm`) creates a form instance **anonymously**
 (`200`, no `Authorization`, empty cookie jar) when `Pid` names the template.
 Supplying that instance as the `formInstanceId` header on
-`GET api/Form/dataStore/{id}/rows` **still returns `401`** — identical to the
+`GET api/Form/dataStore/{id}/rows` **still returns `401`** - identical to the
 baseline taken in the same block without it.
 
 ⚠ **AND THE `401` IS A BARE `"Unauthorized"` STRING, not the standardized error
 shape**, on verbs that document only `200` and *"standardized error response"*.
 **A refusal that does not look like the API's other refusals may not be coming
-from the application at all** — compare it against `GetAnonymousForm` on a
+from the application at all** - compare it against `GetAnonymousForm` on a
 private form, which is a documented controller-generated anonymous `401`.
 
 ## ⚠ A form's DATA-STORE binding is an element EVENT, not an element type
@@ -3941,19 +4022,19 @@ cookie jar), genuinely bound to a store by a `do: datastore` event, still got
 GET api/Form/dataStore/{that store}/rows  ->  401  "Unauthorized"
 ```
 
-⚠ **That `401` is UNDOCUMENTED on this path** — the four verbs document only
-`200` and "standardized error response" — and the reply is a bare string, not the
+⚠ **That `401` is UNDOCUMENTED on this path** - the four verbs document only
+`200` and "standardized error response" - and the reply is a bare string, not the
 standardized error shape. It is **not** a form-privacy refusal (the template
 fetch succeeded) and **not** store-vs-form validation (the store was bound).
 
 ⚠ **HYPOTHESIS, UNTESTED:** the controller auth entity is `FormInstance`, and a
 form *instance* is "a filled-in copy of a template that lives inside a
-process/flow run". A live instance — created by `POST api/Form` (`SaveForm`) —
+process/flow run". A live instance - created by `POST api/Form` (`SaveForm`) - 
 may be required, making the documented-optional `formInstanceId` header
 effectively mandatory. **The same domain already documents
 `PrimaryKeyAttributeNames` as optional when it is required.**
 
-## ⚠ Creating a Data Store from JSON — two required things the DTO does not shout
+## ⚠ Creating a Data Store from JSON - two required things the DTO does not shout
 
 `POST /api/DataStore/from-json` takes `DataStoreFromJsonDto`
 `{Name, Description?, Content, PrimaryKeyAttributeNames?}`. Two refusals are easy
@@ -3968,33 +4049,33 @@ with the full list: `approval, assignee, button, chart, chat, checkbox, column,
 columns, datetime-input, divider, dropdown, dynamic-table-row, file-upload,
 file-viewer, heading, icon, image, input, list, number-input, paragraph,
 radiobox, section, select, side-panel, signature-pad, static-table-row, step,
-stepper, tab, table, tabs, textarea`. **`text` is not one of them** — the plain
+stepper, tab, table, tabs, textarea`. **`text` is not one of them** - the plain
 text field is **`input`**.
 
 ## ⚠⚠ The FormProcess anonymous route resolves the process WITHIN the form's workspace
 
 `POST api/FormProcess/{formTemplateId}/{processTemplateId}/publish` (and the
 launch that follows) is `[AllowAnonymous]` and scoped by the
-`formTemplateWorkspaceId` **header** — the form's workspace. The process template
+`formTemplateWorkspaceId` **header** - the form's workspace. The process template
 GUID sits in the URL with no workspace of its own on the wire, so the request
 *looks* like it could name a process in any workspace. **It cannot.** Measured
 with one form and two publishes differing only in the process's workspace:
 
 - process in the **form's** workspace → publish `200`, launch runs, the flow's
   Data Store write lands. **True whether or not the form's element is bound to
-  that process** — resolution is by `(formTemplateWorkspaceId, processTemplateId)`,
+  that process** - resolution is by `(formTemplateWorkspaceId, processTemplateId)`,
   NOT by the form's button binding.
 - process in **another** workspace → `400`, `statusCode 373`, target
-  **`"Cannot find flow with id <id>"`** — a workspace-scoped flow lookup that
+  **`"Cannot find flow with id <id>"`** - a workspace-scoped flow lookup that
   failed, with the process proven valid+active+runnable by a direct `run-process`
   in its own workspace. Not "invalid flow"; "not in this scope".
 
 ⚠ **So a public form cannot anonymously drive a process in a different workspace.**
-The workspace is a boundary for this surface — the security-relevant twin of the
+The workspace is a boundary for this surface - the security-relevant twin of the
 anonymous Data Store *read* path being workspace-scoped-not-form-scoped. `373` is
 the generic "cannot launch"; read its **target** (`"…is inactive"` vs `"Cannot
 find flow with id"`) for the reason. **Never assert on the launch response**
-(a non-2xx completes as success here) — assert on the row landing in the store.
+(a non-2xx completes as success here) - assert on the row landing in the store.
 
 ## ⚠ A process built by `process-create` + `put-projects` is created INACTIVE
 
@@ -4004,19 +4085,19 @@ and is a NO-OP here** (the "accepted ≠ applied" family). What activates it is
 **`active: true` in the flow DTO passed to `put-projects`** (desired-state). Set
 it before the PUT and read the flow back to confirm `active:true`.
 
-## ⚠⚠ Sub-workspace create/delete on a capped Business plan is lossy — reconcile from the ledger
+## ⚠⚠ Sub-workspace create/delete on a capped Business plan is lossy - reconcile from the ledger
 
 `POST /api/Workspace` (`CreateWorkspaceDto`) documents only `canExceedPaidTime`
 required, but in practice needs a **real `defaultWorkspaceConfiguration`**
 (`{UserTypeId, Roles}` taken from `get-userpermissions-usertypes`). Omit it and
-you get **HTTP 500 `"Unable to create sub-workspace!"`** — a *domain* 500, not a
+you get **HTTP 500 `"Unable to create sub-workspace!"`** - a *domain* 500, not a
 `400` validation, so it reads as a capacity cap and is not one. ⚠⚠ **AND THAT 500
 STILL CREATES THE WORKSPACE** (it appears `active` in
 `get-resources-used-subworkspaces`): a create that reports failure still landed,
 so reconcile from the ledger, never from the create's own report.
 
 `DELETE /api/Workspace/{id}` (`DeleteSubWorkspace`) and `PUT /api/Workspace`
-(`UpdateSubWorkspace` — the rename/limits update) BOTH return **`500`** on a capped
+(`UpdateSubWorkspace` - the rename/limits update) BOTH return **`500`** on a capped
 master and change nothing: DELETE as **`500`-wrapping-`400`**, PUT as a wrapped
 **`500 Internal Server Error`** even with a byte-correct `UpdateWorkspaceDto` (the
 name field is **`workspace`**, NOT the create DTO's `workspaceName`; required
@@ -4024,7 +4105,7 @@ name field is **`workspace`**, NOT the create DTO's `workspaceName`; required
 DTO. Changed in v3.0.0, 2026-10: `canExceedPaidTime` and `maxThreads` are now nullable,
 and leaving them out keeps the stored values; the same PUT can also rename the master
 for an Owner / Co-Owner). ⚠⚠ **So on such a master only CREATE and READ work; UPDATE and DELETE are
-both dead** — you can neither delete a sub-workspace to reclaim a slot NOR rename a
+both dead** - you can neither delete a sub-workspace to reclaim a slot NOR rename a
 stuck throwaway into a real workspace. **Repurpose-by-rename is therefore NOT a
 cap workaround here** (measured: three PUT attempts, correct DTO, all `500`,
 read-back name unchanged; one DELETE, `500`-wrapping-`400`, read-back still active).
@@ -4034,14 +4115,14 @@ just active.** `Business` plan, `softLimit=hardLimit`, `canBeReused:false` → a
 removed slot is NEVER reclaimed: a "successful" delete only sets
 `workspaceState:"removed"`, and that row still counts. Measured: a master at
 **13 active + 4 removed = 17 total** refused `POST` with `"Unable to create
-sub-workspace!"` — the SAME message the omit-`defaultWorkspaceConfiguration` case
+sub-workspace!"` - the SAME message the omit-`defaultWorkspaceConfiguration` case
 gives, but here nothing lands (read-back `DID-NOT-LAND`), the opposite of that
 case. So that one 500 message covers **two opposite outcomes** (landed vs refused);
 only a read-back tells them apart. A soft-delete (UI or API) does NOT free room, so
 neither the DELETE deadlock nor the create cap can be escaped from the account
-side. **Getting under the ceiling needs a hard PURGE of the removed rows — a
+side. **Getting under the ceiling needs a hard PURGE of the removed rows - a
 platform/support action (`ProcesioAdmin:Delete` via `DELETE api/Workspace/any/{id}`)
-or the billing renewal — not anything the owner can do via API or the web UI** (the
+or the billing renewal - not anything the owner can do via API or the web UI** (the
 owner's UI delete is the same soft-delete). The gateway hides the real downstream
 error behind `EnsureSuccessStatusCode`. ⚠ Prefer a QA/DEV environment or
 pre-provisioned disposable workspaces over creating throwaways in a capped master.
@@ -4050,12 +4131,12 @@ pre-provisioned disposable workspaces over creating throwaways in a capped maste
 DIFFERENTLY.** Measured on the same over-cap master, same day: a **web-UI**
 sub-workspace create **landed** while non-purged was already above the paid
 `hardLimit`, but an **API `POST /api/Workspace`** with a byte-correct body (proven
-`defaultWorkspaceConfiguration`, Basic usertype — `--dry-run`-validated) at the same
+`defaultWorkspaceConfiguration`, Basic usertype - `--dry-run`-validated) at the same
 count was **refused** with `HTTP 500 "Unable to create sub-workspace!"`, and
 read-back showed the count **unchanged** (nothing landed). So the API path enforces
 the count ceiling and the owner-driven UI path does not. ⚠ When the master is over
 its ceiling, create the workspace **in the web UI**, not via the API. This over-cap
-API 500 is a genuine refusal — tell it apart from the omit-`defaultWorkspaceConfiguration`
+API 500 is a genuine refusal - tell it apart from the omit-`defaultWorkspaceConfiguration`
 500-that-still-lands **by read-back**: count unchanged = did-not-land; count +1 =
 landed. Never retry the API create (that is how the removed-row residue accrued).
 
@@ -4074,35 +4155,35 @@ dashboard then shows **Create workspace**) → side panel **Create Workspace** �
 so `text-is("Create")` and `normalize-space(.)="Create"` match nothing). The default
 execution setting ("suspend at soft limit") adds no cost.
 
-⚠⚠ **CORRECTION — the count-block is a platform BUG (confirmed by the PROCESIO
+⚠⚠ **CORRECTION - the count-block is a platform BUG (confirmed by the PROCESIO
 team), and the subscription `softLimit`/`hardLimit` are NOT a sub-workspace count
 cap.** Two facts dissolve the earlier "cap of 10 / 14" framing: **(1)** the
-subscription's `softLimit`/`hardLimit` are a **`LicenseType` (Time/Thread) budget** —
+subscription's `softLimit`/`hardLimit` are a **`LicenseType` (Time/Thread) budget** - 
 for a `type:Time` plan they are paid-TIME units (the `/api/Resources/used` budget is
 in **milliseconds**, e.g. `soft/hard = 36000000`), **not** a workspace count. **There
 is no documented sub-workspace COUNT limit** anywhere in the API reference (the only
 `MAX_NR_*` is `MAX_NR_API_KEYS = 25`). **(2)** The docs define `DELETE
-api/Workspace/{id}` as a **plain delete (`200 OK`, empty)** — no soft-delete, no
+api/Workspace/{id}` as a **plain delete (`200 OK`, empty)** - no soft-delete, no
 "still counts" semantics. So the observed behavior (delete only soft-deletes to
 `workspaceState:"removed"`, and removed rows still block `POST` / `PUT`) is **not
-intended design — it is a confirmed platform bug that is being addressed.** Intended
+intended design - it is a confirmed platform bug that is being addressed.** Intended
 behavior: a deleted sub-workspace is an inactive record that does **not** hold an
-active slot. ⚠ **Therefore the create/rename block is TEMPORARY** — once the fix
+active slot. ⚠ **Therefore the create/rename block is TEMPORARY** - once the fix
 ships, deleting frees capacity and normal create/rename resume. Until then the
 workaround (create in the UI, or repurpose existing workspaces) stands, but frame it
 as a **bug workaround, not a plan limit**, and do not quote "10" as a workspace cap.
 
-## ⚠ A form template is fetchable ANONYMOUSLY — measured
+## ⚠ A form template is fetchable ANONYMOUSLY - measured
 
 `GET api/FormTemplate/{workspaceId}/{id}` returned **`200` with no
 `Authorization` header and an empty cookie jar** for a form created with
-`isPrivate: false`. ⚠ **So `formTemplateWorkspaceId` and `formTemplateId` — the
+`isPrivate: false`. ⚠ **So `formTemplateWorkspaceId` and `formTemplateId` - the
 two headers that scope every anonymous form-runtime endpoint, including the four
-`api/Form/dataStore/{id}/rows` verbs — are obtainable without authentication.**
+`api/Form/dataStore/{id}/rows` verbs - are obtainable without authentication.**
 They are the form's public address, not a secret, and cannot be the access
 control.
 
-## ⚠⚠ A native Data Store node is WORKSPACE-SCOPED — cross-workspace store access needs a Call API, not a node
+## ⚠⚠ A native Data Store node is WORKSPACE-SCOPED - cross-workspace store access needs a Call API, not a node
 
 Measured live: a valid, active process in workspace **A**, with a
 Data Store `InsertRows` node whose store-id parameter points at a store in workspace
@@ -4110,16 +4191,16 @@ Data Store `InsertRows` node whose store-id parameter points at a store in works
 **fails at runtime with `status 40`** and `Error while building input model: Error
 while getting data store metadata <storeId> for workspace <A>`. The engine resolves
 the bound store id **within the process's own workspace** and errors when it is not
-there. ⚠ Nothing lands, but it is a **mechanistic error, not a silent no-op** — read
+there. ⚠ Nothing lands, but it is a **mechanistic error, not a silent no-op** - read
 the error, not just an empty count.
 
 ⚠ **To reach a store in another workspace, use an authenticated Call API to the
 DataStore REST endpoint** (`api/DataStore/{id}/rows`) with a credential scoped to
-that workspace — treat the other workspace's store as an external authenticated
+that workspace - treat the other workspace's store as an external authenticated
 resource. A cross-workspace **mediated write** (the shape a per-workspace custody
 split needs) is therefore a Call API, never a Data Store node.
 
-## ⚠ THIS REPO SHIPS A FULL API REFERENCE — READ IT BEFORE PROBING
+## ⚠ THIS REPO SHIPS A FULL API REFERENCE - READ IT BEFORE PROBING
 
 `tools/procesio/docs_info/API-DOCUMENTATION/` is a checked-in, endpoint-by-endpoint
 reference for this platform, including a **Shared enums** section. It defines
@@ -4136,20 +4217,20 @@ was documented. **Grep `docs_info/API-DOCUMENTATION/` before designing a probe.*
 `STATUS_DISPATCHED_ACTIONS`=20 · `STATUS_RUNNING`=30 · `STATUS_RUNNING_WITH_ERRORS`=40 ·
 `BREAK_POINT`=45 · `STATUS_FINISH`=50 · `STATUS_TEMPORARY_WAITING`=60
 
-⚠ **`status: 1` means the instance exists and has not started** — not "running",
+⚠ **`status: 1` means the instance exists and has not started** - not "running",
 not "queued". A run that never began sits here.
 
 ⚠ **`GET /api/Projects/{id}/instances` lists CURRENT RUNTIME instances, not
 history.** A finished instance disappears from it, so it cannot answer "has an
 instance ever been in state X".
 
-## ⚠ A webhook binding cannot map FIELDS — one variable gets the WHOLE body
+## ⚠ A webhook binding cannot map FIELDS - one variable gets the WHOLE body
 
 `WebhookVariableDto` is exactly `{VariableId, VariableType}`, and
 `WebhookVariableType` is `Header`=1, `Query`=2, `Body`=3. ⚠ **There is nowhere to
 name a body field.**
 
-| `variableType` out of range (e.g. 0) | ⚠ **ACCEPTED without complaint** — the DTO validates that the GUID is a GUID and does **not** range-check the enum. The variables receive nothing, and a Data Store insert fails with *"primary key column '<col>' cannot be null for insert operation."* |
+| `variableType` out of range (e.g. 0) | ⚠ **ACCEPTED without complaint** - the DTO validates that the GUID is a GUID and does **not** range-check the enum. The variables receive nothing, and a Data Store insert fails with *"primary key column '<col>' cannot be null for insert operation."* |
 |---|---|
 | N variables all bound to `Body` = 3 | ⚠ **each receives the ENTIRE serialised payload.** A row was written whose primary key, and two other columns, were each the whole JSON object |
 | ✅ **the correct design** | **ONE variable of an object/JSON type bound to `Body`**, parsed inside the flow |
@@ -4176,15 +4257,15 @@ whose variable map was fully resolved:
 
 The webhook-attributed instance was still `status: 1` with zero actions and zero
 milliseconds **25 minutes later**. ⚠ **So a launch returning success, and even an
-instance existing, says nothing about execution — read `actionsConsumed` and
+instance existing, says nothing about execution - read `actionsConsumed` and
 `timeConsumed`, not the launch response and not the presence of an instance.**
 
-⚠ **AND `POST /api/Projects/instances/{id}/launch` NEEDS A BODY** — called
+⚠ **AND `POST /api/Projects/instances/{id}/launch` NEEDS A BODY** - called
 without one it answers `415 Unsupported Media Type`, which is a fact about the
 request and not about whether a pending instance can be launched.
 
 ⚠ **An instance record OUTLIVES the webhook that caused it**, and its
-`webhookName` becomes `"Currently Unavailable"` once the webhook is deleted — so
+`webhookName` becomes `"Currently Unavailable"` once the webhook is deleted - so
 run history can show a run with no visible cause.
 
 ## ⚠ Revoking a webhook: UNBIND FIRST
@@ -4196,7 +4277,7 @@ once nothing does.
 
 ⚠ **A second delete of an already-deleted webhook answers `400` wrapping
 `502 "Invalid request. Provided resource is not able to be created or
-modified."`** — so a failed delete does **not** mean the webhook survived.
+modified."`** - so a failed delete does **not** mean the webhook survived.
 **Confirm by listing twice**, not by the delete's status.
 
 ## PROCESIO's outbound calls identify themselves
@@ -4232,7 +4313,7 @@ Two consequences that are easy to get wrong:
 
 **So a green connection test is evidence of reachability, not of authorisation.**
 If the credential is meant to prove a token works, point `Test endpoint` at a
-route that actually requires the token — otherwise verify auth by exercising a
+route that actually requires the token - otherwise verify auth by exercising a
 protected route through the flow that uses it.
 
 ⚠ **`Method` is an option list valued by GUID.** Sending a raw string saves
@@ -4248,13 +4329,13 @@ Measured 2026-08-25, on the same workspace, minutes apart:
 | `duplicate-process` | **False** | ⚠ **refused** |
 | `process-create` | **True** | ✅ runs to status 50 |
 
-⚠ **A duplicate arrives inactive and must be activated explicitly** —
+⚠ **A duplicate arrives inactive and must be activated explicitly** - 
 `process-toggle-activation --state true`, which sets the `state` header the endpoint
 reads. (This entry previously said a duplicate could not be activated through the API at
 all. That was wrong: the calls behind it were sent without the `state` header, so each one
 meant "deactivate". See the corrected toggle-activation entries above.)
 
-**Duplication still is not a drop-in provisioning mechanism** — a copy arrives inactive
+**Duplication still is not a drop-in provisioning mechanism** - a copy arrives inactive
 while `process-create` arrives active, so any programmatic path that builds a flow by
 copying one has to activate it as a separate, verified step.
 
@@ -4269,10 +4350,10 @@ target          "Flow with id <guid> is inactive"
 
 ⚠ **The message says VALID; the cause is ACTIVE.** Measured on the same process:
 `process-validate` → `{"isValid": true, "errors": []}`. A reader who trusts the
-message goes and audits a flow graph that was never the problem — the real cause
+message goes and audits a flow graph that was never the problem - the real cause
 is only in the `target` string.
 
-## Building a process through `process-create` — the parameter names
+## Building a process through `process-create` - the parameter names
 
 The high-level config is
 `{"title", "variables":[…], "actions":[{"id", "action", "params":{…}}]}`.
@@ -4287,7 +4368,7 @@ with a deliberate bad key rather than guessing:
 
 **`Operation`** takes `SelectRows` · `InsertRows` · `UpdateRows` · `DeleteRows`.
 
-⚠ **`Operation` is NOT validated against those at build time** — a nonsense verb
+⚠ **`Operation` is NOT validated against those at build time** - a nonsense verb
 passed `--dry-run` cleanly. Same hazard as a credential's GUID-valued option
 list: it saves fine and fails later.
 
@@ -4313,14 +4394,14 @@ entries hides the thing they have in common:
 
 > ## ⚠ THE PLATFORM RETURNS A CONFIDENT ANSWER ABOUT SOMETHING OTHER THAN WHAT IT NAMES.
 
-None of them looks broken. Each returns a well-formed, plausible result — the
-kind a caller acts on — and each is measuring, naming, or reporting a different
+None of them looks broken. Each returns a well-formed, plausible result - the
+kind a caller acts on - and each is measuring, naming, or reporting a different
 subject than the one the caller asked about.
 
 | # | what it names | what it actually reports |
 |---|---|---|
 | 1 | a create failure | ⚠ **a 500 naming no field.** Any create failure then has at least two candidate causes and bisection is the only route |
-| 2 | `toggle-activation` succeeded | `{"value": null, "errors": []}` — identical whether it activated, deactivated, or changed nothing. It cannot report the outcome, and without a `state` header it always deactivates |
+| 2 | `toggle-activation` succeeded | `{"value": null, "errors": []}` - identical whether it activated, deactivated, or changed nothing. It cannot report the outcome, and without a `state` header it always deactivates |
 | 3 | the credential works | ⚠ **only that its `Test endpoint` answered.** Aimed at an open route it passes with a bearer that cannot work |
 | 4 | the process is not valid | ⚠ **the process is INACTIVE.** `process-validate` returns `isValid: true` on the same process; the real cause is only in the `target` string |
 | 5 | the flow config is valid | ⚠ **`Operation` is not checked against its verb list.** A nonsense write verb passes `--dry-run` and fails at runtime |
@@ -4330,7 +4411,7 @@ subject than the one the caller asked about.
 
 ⚠ **Never accept a platform success as evidence about the subject you care
 about. Establish what the call actually measured, then assert on the subject
-directly — by counting at the far end, or by exercising the protected path.**
+directly - by counting at the far end, or by exercising the protected path.**
 
 Concretely, and each of these is the direct consequence of a row above:
 
@@ -4346,7 +4427,7 @@ Concretely, and each of these is the direct consequence of a row above:
 > before trusting it against a healthy one.
 
 
-## The `Python` action returns what the script PRINTS — assignment is silently useless
+## The `Python` action returns what the script PRINTS - assignment is silently useless
 
 Measured 2026-08-25, five conventions against one action.
 
@@ -4358,7 +4439,7 @@ Measured 2026-08-25, five conventions against one action.
 
 ⚠ **The failure mode is silent.** An assignment-style script completes with
 status 50 and an empty `result`, which is **indistinguishable from a script that
-ran and produced nothing** — and therefore from an engine that is not answering.
+ran and produced nothing** - and therefore from an engine that is not answering.
 Any probe built on the wrong convention reports a false negative about whatever
 it was testing.
 
@@ -4366,7 +4447,7 @@ it was testing.
 different findings and must not be read as one: a module-allowlist entry read as
 a network outcome turns a sandbox rule into a false security claim.
 
-**Parameters:** `Python` exposes only `Code` and `Output` — **no `Error`
+**Parameters:** `Python` exposes only `Code` and `Output` - **no `Error`
 binding**, unlike `Node` (`Code`, `Error`, `List Result`, `Single Result`,
 `Timeout`). So a Python action's failure detail is only ever visible through the
 `error` key of its `Output`.
@@ -4377,19 +4458,19 @@ orderly refusal above and the flow continues normally.
 
 ## ⚠ There is NO crypto module in the `Node` action. Hashing must be implemented in full.
 
-`require` inside a `Node` action resolves **image contents only** — so `crypto`,
+`require` inside a `Node` action resolves **image contents only** - so `crypto`,
 and any other module not baked into the image, is unavailable. There is no
 `crypto.createHash`, and no `SubtleCrypto`: the action is not a browser context.
 
 **Consequence for design, not just for one script:** any scheme that needs a
-digest inside a flow — an idempotency key, a row key, a content fingerprint, a
-signature check — **carries its own implementation**, in the action body, at the
+digest inside a flow - an idempotency key, a row key, a content fingerprint, a
+signature check - **carries its own implementation**, in the action body, at the
 cost of the source it adds to every request.
 
 ⚠ **And if the digest must agree with one computed outside the platform, the
 ENCODING is the whole risk.** JavaScript strings are UTF-16; most references
 hash UTF-8 **bytes**. A digest fed raw `charCodeAt` values **agrees on ASCII and
-diverges on everything else** — which is the worst shape, because it passes any
+diverges on everything else** - which is the worst shape, because it passes any
 test built from English sample data.
 
 **Prove such a digest with three things, never one:**
@@ -4405,7 +4486,7 @@ a `charCodeAt` encoder disagreed with the UTF-8 reference on 22 of 22 of them.
 
 ## ⚠ `process-create`'s config CANNOT express a Data Store mapper. Create, then patch.
 
-The high-level authoring config binds each action property to a **binding** —
+The high-level authoring config binds each action property to a **binding** - 
 a literal, `{value}`, `{var}`, `{credential}` or `{template, vars}`. A
 `Data Store` action's `Set Values` is none of those: it is a **mapper row list**,
 and each row's `source` carries its own **inline** variable array:
@@ -4420,7 +4501,7 @@ and each row's `source` carries its own **inline** variable array:
 ⚠ **`variableId` is a GUID the platform mints when the process is created.** It
 does not exist while the create config is being written, so no binding form can
 supply it. `{template, vars}` fills the `<%i%>` leaf and sets the PARAM-level
-`Variable`, leaving the row's inline array empty — which fails as:
+`Variable`, leaving the row's inline array empty - which fails as:
 
 | FE | `REQUIRED` · `Data Store - Set Values (row 1)` |
 |---|---|
@@ -4429,7 +4510,7 @@ supply it. `{template, vars}` fills the `<%i%>` leaf and sets the PARAM-level
 **The route that works is two-step, and it is the same one the pack-repair tool
 uses:**
 
-1. `process-create` the flow **without** the mapper — everything else configured
+1. `process-create` the flow **without** the mapper - everything else configured
 2. read the created flow back and take the **minted variable GUIDs**
 3. `PUT /api/Projects` (`put-projects`) with the mapper rows carrying those GUIDs
 
@@ -4440,7 +4521,7 @@ array. **Only the mapper needs the second step.**
 ### The `Data Store` side panel, in full (its properties are addressed at TOP level)
 
 `Configure Operation` is a `side-pannel`, and its children are flattened into the
-same label index — so they are passed as ordinary `params` keys, **not** nested
+same label index - so they are passed as ordinary `params` keys, **not** nested
 under `Configure Operation`.
 
 | property | shown for |
@@ -4450,53 +4531,53 @@ under `Configure Operation`.
 | `Page Number`, `Page Item Count`, `Sort By`, `Desc`, `Result Rows`, `Total Count` | `SelectRows` |
 | ⚠ **`Affected Rows`** | `InsertRows`, `UpdateRows`, `DeleteRows` |
 
-⚠ **`Affected Rows` is a built-in count of what the operation touched** — the
+⚠ **`Affected Rows` is a built-in count of what the operation touched** - the
 cheapest way to tell a filter that matched nothing from one that matched. **But
 it is what the write REPORTS, not proof of what landed:** on this platform a
 write that reports success without landing is measured, so a state change still
 needs a read-back.
 
-## Surgical flow edits — one literal, not a whole rebuild
+## Surgical flow edits - one literal, not a whole rebuild
 
 `process-edit` (and the DTO builders) are DESIRED-STATE: they rebuild the entire flow from a
 config and replace it. That is right when you own the config and wrong for a flow a human
 built in the designer years ago, where reconstructing the config risks losing everything the
-config cannot express. For "one literal moved" — an endpoint whose host changed, a timeout, a
-SQL statement, a script body — use the surgical trio instead (all three GET the flow, patch it,
+config cannot express. For "one literal moved" - an endpoint whose host changed, a timeout, a
+SQL statement, a script body - use the surgical trio instead (all three GET the flow, patch it,
 regenerate the designer layer where the normalizer can, then BE-validate + designer flow-lint
 and only then PUT; `--dry-run` stops before the PUT and an invalid flow is never written):
 
-- **`node-params --id <proc> [--node <label|id>]`** — read-only. Lists each node's runtime
+- **`node-params --id <proc> [--node <label|id>]`** - read-only. Lists each node's runtime
   parameters with the DESIGNER label (`Endpoint`, `Time Out`, `Query`, `Second number`), the
   current value, whether it is editable text, and which variables it binds. This is the map you
   need before patching, and it costs a fraction of dumping the DTO.
-- **`node-set-param --node X --property "Endpoint" --value "..."`** — set one parameter's
+- **`node-set-param --node X --property "Endpoint" --value "..."`** - set one parameter's
   literal text. It refuses a non-string (structured) value, and it refuses a new text whose
   `<%N%>` set differs from the old one: the placeholder set IS the contract with `variable[]`,
   so dropping or inventing one silently unbinds a variable with no validation error.
-- **`node-replace-text --node X --find "-12-01" --replace "-01-01" --expect 4`** — exact-literal
+- **`node-replace-text --node X --find "-12-01" --replace "-01-01" --expect 4`** - exact-literal
   replace across every string leaf of the node's runtime parameters AND designer settings. This
   is how you reach a value nested inside a structured parameter (a Map Data row's source
   expression, a decisional case's literal) that the two above refuse and that the normalizer
   deliberately never regenerates. It is safe there precisely because the same literal appears
-  verbatim in both layers — the runtime row holds `<%1%>-12-01` and the designer mirror
+  verbatim in both layers - the runtime row holds `<%1%>-12-01` and the designer mirror
   `<var-guid>-12-01`, so one literal swap keeps them consistent without either shape having to
   be understood. `--expect N` asserts the hit count and writes nothing on a mismatch.
-- **`variable-set-type --variable X --data-type <id> [--is-list true]`** — retype one flow
+- **`variable-set-type --variable X --data-type <id> [--is-list true]`** - retype one flow
   variable. It REFUSES an input (type 10) or output (type 30) variable unless
   `--allow-contract-change`, because those two are the process's public contract: the run
   payload and the response a caller parses. Internal (type 20) variables are free to retype.
 
 Built-in primitive dataType ids share the prefix `0317bfee-b2f5-4bde-bfe8-1212…`; the two that
 get confused are **`…121220` = `Json`** and **`…121221` = `Object`**. An `Execute Query` Output
-must be a **list<Object>** — a `list<Json>` runs correctly but the designer paints a "data type
+must be a **list<Object>** - a `list<Json>` runs correctly but the designer paints a "data type
 mismatch" on the node (flow-lint `EXECQUERY_OUTPUT_TYPE`). Retyping that internal list variable
 to Object fixes the designer without touching the response shape.
 
 ### Pushing a whole Node script body, and proving it landed
 
 `node-set-param --property "Code"` accepts a full multi-line **Node script body**, not just a
-short literal — the same validate + flow-lint + PUT path, `--dry-run` to preview. Two facts that
+short literal - the same validate + flow-lint + PUT path, `--dry-run` to preview. Two facts that
 bite on a body push specifically:
 
 - **Push the body as LF, not CRLF.** The platform stores and returns a Node's Code as **LF**; a
@@ -4506,13 +4587,13 @@ bite on a body push specifically:
   form when comparing to what the platform returns.
 - **`put` returning success is NOT evidence the body changed; the whole-document hash MOVING is
   NOT a failed write.** Read the node back (`node-params --node X`) and hash its Code against the
-  bytes you sent — that is the only proof it landed (the platform's failure signature is a clean
+  bytes you sent - that is the only proof it landed (the platform's failure signature is a clean
   status that persisted nothing). Separately, any PUT makes the **whole-document** hash move
-  because the platform materialises `ports` fields on write that a read never triggers — so gate
+  because the platform materialises `ports` fields on write that a read never triggers - so gate
   on the single node-body hash, never on a before/after hash of the entire flow definition.
 - **Deliver the body with no shell/CRT mangling** by driving the tool in-process (`from
   tools.procesio import main; main.dispatch("node-set-param", argv)` with the value as an exact
-  string) or via a subprocess whose argv is a LIST — `--value` is a plain arg with no `@file` or
+  string) or via a subprocess whose argv is a LIST - `--value` is a plain arg with no `@file` or
   stdin form, and a newline-bearing value quoted onto a Windows command line is where bytes get
   lost.
 
@@ -4520,21 +4601,21 @@ bite on a body push specifically:
 
 Seen live on a flow that computed `year = year + (-1)`: an **`Add`** action (template
 `fea7cedc-…`, "Add operation for two objects") whose `First number` and `Result` both bind the
-SAME variable and whose `Second number` is a literal **did not write the result** — the variable
+SAME variable and whose `Second number` is a literal **did not write the result** - the variable
 kept its pre-Add value and the flow ran on happily. Nothing surfaces it: the run finishes
 `status 50`, `POST /api/Projects/validate` is clean, and the designer shows no error. Only the
 downstream effect reveals it.
 
-**Because it fails silently, never trust an arithmetic node from reading the canvas — prove it.**
+**Because it fails silently, never trust an arithmetic node from reading the canvas - prove it.**
 The cheap proof is to give the operand a value whose result would make a DOWNSTREAM step fail
 loudly (here: an operand large enough that the computed year produced a URL the server 502s),
 run it, and see whether the run still succeeds. A successful run is then proof the arithmetic
-never applied. Restore the operand to a value that keeps the OBSERVED behaviour afterwards — a
+never applied. Restore the operand to a value that keeps the OBSERVED behaviour afterwards - a
 node that is currently a no-op will start doing something the day the platform fixes it, so
 leaving `-1` in place is a latent behaviour change; `0` is not.
 
 Watch for this whole class: an action whose input and output bind the same variable. Prefer a
-separate result variable, and rename any node whose label describes arithmetic it does not do —
+separate result variable, and rename any node whose label describes arithmetic it does not do - 
 a canvas that lies costs the next reader more than the bug did.
 
 ## Data Store `InsertRows` does NOT fan out a list-bound mapper
@@ -4556,7 +4637,7 @@ declared_value = '["alpha","bêta","العرب"]'
 row_key        = '["gz-446a…","gz-dea5…","gz-3380…"]'
 ```
 
-⚠ **The lists DO arrive at the node as real arrays** — a read-only Node action
+⚠ **The lists DO arrive at the node as real arrays** - a read-only Node action
 placed immediately before the insert, binding the same variables, returned
 `isArray=true typeof=object len=3` on every one, non-ASCII intact. So the
 collapse is in the Data Store action, not in variable transport.
@@ -4569,18 +4650,18 @@ correctly and inferring its semantics are two different acts.**
 **Consequence for design:** inserting N rows where N is data-dependent cannot be
 expressed as one node. A static graph can only express a fixed node count (e.g.
 one per COLUMN, derivable from the store schema at build time). A data-dependent
-N needs a loop construct or N executions — neither is proved here.
+N needs a loop construct or N executions - neither is proved here.
 
 **Diagnosing a collapsed batch:** the landed row alone cannot distinguish "the
 lists never arrived as lists" from "the action did not fan out". Put a read-only
 probe node between the stages binding exactly what the failing node binds. It
 writes nothing, so it cannot perturb the outcome it measures.
 
-## `For Each` — containment is `ParentId`, and identity is never the name
+## `For Each` - containment is `ParentId`, and identity is never the name
 
 **Body membership is stored, not implied by wiring.** A node inside a `For Each`
 carries `ParentId` = the For Each node's id. Across the 29-bundle export corpus
-(612 flows, 7,567 actions) **all 979 parented actions resolve to a `For Each`** —
+(612 flows, 7,567 actions) **all 979 parented actions resolve to a `For Each`** - 
 no other template parents anything.
 
 ⚠ **`ActionTemplateName` IS NOT IDENTITY.** Of the **138** nodes whose
@@ -4591,20 +4672,20 @@ text (observed in production: `"concatEmails"`, `"Check Top Pagex"`).
 `TemplateId`.
 
 ⚠ **`For Each` is not the only loop.** **60 corpus flows contain a directed cycle
-in their port graph with no `For Each` node in it** — a hand-rolled loop that
+in their port graph with no `For Each` node in it** - a hand-rolled loop that
 exists only as an *edge*, invisible to any name-based search. It is priced at
 about **+2 actions per item** (a Decisional plus an increment node) where a
 `For Each` costs none.
 
 ⚠ **The loop-item variable** is `IsList: false` and its `ContextId` is the
 For Each node's own id. A body child addresses fields of the current item by
-binding **that one variable** on several different `attributeId`s — one
+binding **that one variable** on several different `attributeId`s - one
 production node binds it on 7 attributes in a single statement.
 
 ### The insert-per-element shape that works
 
 Put the Data Store node **inside** the loop (`ParentId` = the For Each) with
-`Operation: InsertRows`, and bind the mapper to **SCALARS** — per-iteration values
+`Operation: InsertRows`, and bind the mapper to **SCALARS** - per-iteration values
 picked out of the loop item by small Node actions in the body. **Binding lists
 into the mapper instead is what collapses to one serialised row.** Wire the last
 body node **back** to the `For Each`.
@@ -4623,7 +4704,7 @@ iterations is established (see the For Each section above).
 
 `POST /api/Form/dataStore/{dataStoreId}/rows/filter` with headers
 `formTemplateWorkspaceId` + `formTemplateId` (both full GUIDs; `formInstanceId`
-optional) returns rows for **any store in that workspace** — including a store the
+optional) returns rows for **any store in that workspace** - including a store the
 form does not reference at all.
 
 Measured with a form bound to store A and store B asserted absent from the form
@@ -4632,7 +4713,7 @@ id → **404**, so the path does refuse when there is nothing to return.
 
 ⚠⚠ **A form is not a key to one store. It is a read capability over every store in
 its workspace.** A workspace holding a store that must not be read anonymously
-must therefore contain **zero** forms — not merely no form bound to that store.
+must therefore contain **zero** forms - not merely no form bound to that store.
 
 ### ⚠ The 401 on `/rows` is a ROUTING failure, not an auth failure
 
@@ -4646,12 +4727,12 @@ POST /api/Form/dataStore/{id}/rows/filter   -> 200, application/json, upstream 3
 
 The bare `Unauthorized` string with no content type and ~1 ms upstream latency is
 **the gateway declining to route the verb**, not the application declining the
-caller — a real controller 401 returns ASP.NET ProblemDetails in hundreds of ms.
+caller - a real controller 401 returns ASP.NET ProblemDetails in hundreds of ms.
 **Before concluding a surface refuses you, try a second verb on the same path.**
 
 ### Reading workspace ids
 
-`list-workspaces` returns `id: null` for the **Personal** workspace — the key
+`list-workspaces` returns `id: null` for the **Personal** workspace - the key
 exists, so `.get("id")` yields `None` and `str()` turns it into the plausible
 4-character non-address `"None"`. Filter on `isinstance(id, str) and len(id) == 36`
 before using one as an address. `datastore-list` **is** workspace-scoped.
@@ -4659,7 +4740,7 @@ before using one as an address. `datastore-list` **is** workspace-scoped.
 ## A data-model-typed input variable is not delivered by `run-process --payload`
 
 A flow whose input variable's `dataType` is a **data model** (measured with the
-built-in `FileDataModel`) **validates, PUTs, activates — and then the run returns
+built-in `FileDataModel`) **validates, PUTs, activates - and then the run returns
 a response with no `status` field at all**, `error: null`, and nothing written.
 
 Discriminated with a three-arm ladder, one property changed per step:
@@ -4671,29 +4752,29 @@ FileDataModel + attribute:{id}   -> identical to the arm above
 ```
 
 ⚠ The arm carrying **no attribute binding at all** fails exactly as the bound one
-does, so **leaf addressing is not implicated** — the input's *type* is.
+does, so **leaf addressing is not implicated** - the input's *type* is.
 
 ⚠⚠ **The `status` field is ABSENT, not null.** Record `status_present` separately
 from `status_value`: a missing field and a null value both render as `None`, and
-this platform has a *different* failure — `FlowStatus.STATUS_NONE`, a returned
+this platform has a *different* failure - `FlowStatus.STATUS_NONE`, a returned
 value of **1** on an instance created but never executed. Fusing the two would
 manufacture one explanation for two unrelated faults.
 
 ⚠ **Scope, because the over-claim is tempting:** this is measured through
-`run-process --payload`. Production flows plainly *do* bind data-model values —
+`run-process --payload`. Production flows plainly *do* bind data-model values - 
 one live node binds a single variable to **17 distinct `attributeId`s**, and 145
 such params exist across the export corpus. So the finding is that a synchronous
 run payload does not deliver one, **not** that the platform cannot. Untested
 candidates: the value arriving via a form or webhook instead; a generated model
 rather than a built-in; or a typed envelope the run path does not construct.
 
-**Judge any of this on rows landed in the store, never on the run's response** —
+**Judge any of this on rows landed in the store, never on the run's response** - 
 this platform reports `status: 50, affected: 1, error: []` for writes that did
 not do what was asked.
 
 ---
 
-## `Extract Text` returns ONE page object per page — a no-text page is NOT an empty list (measured)
+## `Extract Text` returns ONE page object per page - a no-text page is NOT an empty list (measured)
 
 `Extract Text` (native PDF action, `actionId f15741e2-…`): input `Pdf File`
 (`FileDataModel`, `10c6ac59-…-121212121219`), output **`Extracted Text` typed
@@ -4705,14 +4786,14 @@ fabricated scanned vs text-layer PDFs, the output shape is:
     "Words": [ { "Id", "Text", "TextOrientation", "FontName", "Position": {…} }, … ] }, … ]
 ```
 
-⚠⚠ **The list holds ONE element per PAGE, always — its length is the page count,
+⚠⚠ **The list holds ONE element per PAGE, always - its length is the page count,
 not a presence signal.** A page with **no extractable text layer** (a scanned /
-image-only page) yields **`{ "PageNumber": n, "Text": "", "Words": [] }`** — the
+image-only page) yields **`{ "PageNumber": n, "Text": "", "Words": [] }`** - the
 action **succeeds** (instance `status: 50`), it does **not** error and does **not**
 refuse, and **the list is NOT empty.** So:
 
 - ⚠ **A Decisional `IS_EMPTY` on the `Extracted Text` variable does NOT detect a
-  scanned document** — the list is non-empty (one page object), so it routes to
+  scanned document** - the list is non-empty (one page object), so it routes to
   the non-empty branch. `IS_EMPTY` is reliable and evaluates the Object list fine;
   it is answering the wrong question. The emptiness is one level down, in
   `element.Text` / `element.Words`.
@@ -4724,54 +4805,54 @@ refuse, and **the list is NOT empty.** So:
 - ⚠ **A PARTIALLY-scanned document cannot be caught natively.** Its list is
   non-empty on the text pages, so any whole-document check passes it; the
   image-only page is lost silently. **No native action reports a PDF's page
-  count** — across the 233-action catalog the only page-aware actions are
-  `Remove Pages` and `Select Pages`, neither of which counts — so the extraction
+  count** - across the 233-action catalog the only page-aware actions are
+  `Remove Pages` and `Select Pages`, neither of which counts - so the extraction
   cannot be cross-checked against document extent without a Custom Action or an
   out-of-band page count. `Read Files Content` does not help: its failure mode on
   a bad-encoding PDF is a mis-decode that PRODUCES content (silence), not an
   `Errors` entry.
 
 The lesson under this: `isList: true` on an output does **not** mean an empty
-extraction is an empty list — verify a platform action's empty/edge behaviour by
+extraction is an empty list - verify a platform action's empty/edge behaviour by
 **executing** it, not by reading the action definition.
 
-## `list-processes` is paginated — an "absence by listing" is not proof (measured)
+## `list-processes` is paginated - an "absence by listing" is not proof (measured)
 
 `GET /api/Projects` / `list-processes` does **not** reliably enumerate every
-process: the default page — and even `--page-size 500` — can omit
+process: the default page - and even `--page-size 500` - can omit
 recently-created processes, so a scan that finds no match is **not** evidence the
 process is gone or never existed (a false absence; the same shape as the
 `datastore-list` page cap). **Verify a specific process's existence/lifecycle
 per-id with `get-process --id <id>`**, never by scanning the list: a **deleted**
 (or non-existent) process returns `HTTP 400` wrapping `statusCode 501, "User is
-not authorized for the requested resource."` — so `get-process` erroring that way
+not authorized for the requested resource."` - so `get-process` erroring that way
 is the confirmation a delete landed. (Seen at a teardown where the default
 `list-processes` reported zero of three just-created processes.)
 
-## CSV/XLSX read-actions return THREE different empty-shapes — and per-action status `90` = FAILED (measured)
+## CSV/XLSX read-actions return THREE different empty-shapes - and per-action status `90` = FAILED (measured)
 
 The native spreadsheet read-actions do **not** share one empty behaviour; each
 needs its own guard branch (measured against fabricated empty / malformed /
-content-control files — one control per action, so an empty result and a broken
+content-control files - one control per action, so an empty result and a broken
 reader are distinguishable):
 
 - **`Read Range from CSV`** (`9c9cc774-…`; input `CSV file`[file] + `Range`[text],
-  output `Values`[json]): an **empty (0-byte) file FAULTS** — instance `status 40`,
+  output `Values`[json]): an **empty (0-byte) file FAULTS** - instance `status 40`,
   `error:[{errorMessage:"Object reference not set to an instance of an object."}]`.
-  A malformed-but-parseable CSV does **not** fault (CSV parsing is permissive — NUL
+  A malformed-but-parseable CSV does **not** fault (CSV parsing is permissive - NUL
   bytes / an unterminated quote come back as a row). ⚠ **Output type shifts with row
   count:** one row → a single **object** `{A,B,C}`, many rows → a **list** of them.
 - **`Read Range`** (Excel, `c183ff97-…`; input `Excel workbook`+`Sheet name`+
   `Range`, output `Values`+`Formulas`[json]): an **empty sheet returns a NON-empty
-  list of ALL-empty rows** (length = the requested range height, every cell `""`) —
+  list of ALL-empty rows** (length = the requested range height, every cell `""`) - 
   the `Extract Text`-on-a-scan shape: `IS_EMPTY` is FALSE, emptiness one level down.
   A corrupt/non-zip workbook FAULTS (`status 40`, `"File contains corrupted
   data."`). ⚠ **Fidelity gap: STRING cells read back `""` while NUMERIC cells read**
-  (on openpyxl-generated `.xlsx`; the CSV read did not drop strings) — a string-only
+  (on openpyxl-generated `.xlsx`; the CSV read did not drop strings) - a string-only
   workbook can look empty.
 - **`Split Workbook To CSV`** (`155c2a82-…`; input `Excel workbook`+`Sheet name`+
   `Rows number`[num], output `CSV files`[file,**isList**]): an **empty workbook
-  returns `null`** (a clean `status 50` carrying nothing — NOT an empty list); a
+  returns `null`** (a clean `status 50` carrying nothing - NOT an empty list); a
   corrupt workbook FAULTS (`status 40`, `"End of Central Directory record could not
   be found."`); a real workbook returns a **list of file descriptors**.
 
@@ -4780,32 +4861,32 @@ from per-action `40` = executed, and from instance-level `40` = finished-with-
 errors), alongside instance `status 40` + the `error[]` entry naming the action.
 So the per-action register is at least `{1: never entered, 40: executed, 90:
 failed}`. A read-action that can fault needs its **error port wired**
-(`"onError": "<handler>"`) so a fault routes to a fail-closed handler — a raw
+(`"onError": "<handler>"`) so a fault routes to a fail-closed handler - a raw
 `status 40` fault is a crash, not a legible refusal.
 
-⚠ **`Get Sheet Names`** (`d5a0194d-…`; workbook → list of names) exists, so —
-unlike the PDF partial (no page count) — a partial workbook (one populated sheet +
+⚠ **`Get Sheet Names`** (`d5a0194d-…`; workbook → list of names) exists, so - 
+unlike the PDF partial (no page count) - a partial workbook (one populated sheet +
 empty sheets, which a sheet-scoped `Read Range`/`Split` proceeds on) IS catchable
 natively: `Get Sheet Names → For Each → Read Range → aggregate`.
 
-## ⚠⚠ A NULL variable injected at `<%N%>` is a captured SyntaxError that SILENTLY ADMITS — use `[<%N%>][0]` (measured)
+## ⚠⚠ A NULL variable injected at `<%N%>` is a captured SyntaxError that SILENTLY ADMITS - use `[<%N%>][0]` (measured)
 
 Script injection (`Javascript`/`Node` `Code`) is **textual**: `<%N%>` is replaced
 by the bound variable's JSON serialisation. A **null** value serialises to
-**empty**, so `var v=<%0%>;` becomes `var v=;` — a **`SyntaxError: Unexpected token
+**empty**, so `var v=<%0%>;` becomes `var v=;` - a **`SyntaxError: Unexpected token
 ';'`**. ⚠⚠ **The throw is CAPTURED, not fatal**: the instance still finishes
 `status 50`, and the script's Output is set to `{"error":{"errorMessage":
 "SyntaxError…"}}`. A lift doing `String(v.result)` on that yields `"[object
-Object]"`, and a Decisional comparing it to an expected token **defaults** — i.e. a
+Object]"`, and a Decisional comparing it to an expected token **defaults** - i.e. a
 guard reading a null-returning action **silently PROCEEDS**. Invisible to a
 two-signal check; a three-signal readout (verdict / which terminal fired by
 per-action status / output shape) exposes it.
 
-**Fix:** wrap every value-injecting placeholder as **`[<%0%>][0]`** — `undefined`
-on a null injection (valid JS), the whole value on a list/object — and make the
+**Fix:** wrap every value-injecting placeholder as **`[<%0%>][0]`** - `undefined`
+on a null injection (valid JS), the whole value on a list/object - and make the
 lift **fail-closed on an `{error:…}` verdict**. Any node whose bound input can
 legitimately be null (e.g. `Split Workbook To CSV` on an empty workbook) needs
-this; an action that never returns null (e.g. `Extract Text`) does not — which is
+this; an action that never returns null (e.g. `Extract Text`) does not - which is
 why a guard cloned from a never-null action breaks when re-pointed at a can-be-null
 one.
 
@@ -4813,11 +4894,11 @@ one.
 
 `run-process-with-file` / synchronous `run-process` / `get-instance-output` return
 the finished instance's output values under **`result.variable`, a dict keyed by
-the variable NAME with the value inline** — e.g. `{"values_out":[{…row…},…],
+the variable NAME with the value inline** - e.g. `{"values_out":[{…row…},…],
 "gateway_out":{"result":"…"}}`. It is **not** a list of `{name,value}` records, so a
 walker searching for a `name`/`value` pair finds nothing and reports `null` for
 every output. ⚠ Read `result.variable[<varName>]` directly (a `Javascript` `Output`
-wraps as `{"result":…}`; a `Node` `Single Result` is bare — unwrap the former).
+wraps as `{"result":…}`; a `Node` `Single Result` is bare - unwrap the former).
 Always send a **content control** through a probe: if the control's output also
 reads empty, the reader is broken, not the action.
 
@@ -4831,10 +4912,10 @@ validates + flow-lints before the PUT.
 
 It refuses rather than guesses: `Start` / `Stop` (a flow needs both) and any node with more than
 one outgoing port (which successor inherits the incoming edges is a design decision). Healing never
-creates a self-loop or a duplicate edge — the designer renders both and the engine follows them, so
+creates a self-loop or a duplicate edge - the designer renders both and the engine follows them, so
 a missing edge is the safer failure. Variables are left alone: another node may still read them,
 and there is no API to delete a flow variable, so an orphaned one simply stays (an output variable
-left behind still advertises itself in the process's public contract, always null — worth removing
+left behind still advertises itself in the process's public contract, always null - worth removing
 by hand in the designer).
 
 `canvasData` is only the viewport (`{x, y, zoom}`), so it needs no cleanup when a node goes.
@@ -4850,7 +4931,7 @@ A form is reachable by a stranger only when both of these are true, and each is 
 different endpoint. Getting one and not the other produces a URL that exists and refuses.
 
 **1. A CustomUrl entity** (`POST /api/CustomUrl/FormTemplate`, scoped by the `workspaceid`
-header — without it, statusCode 1008 "Not working on workspace"). Body:
+header - without it, statusCode 1008 "Not working on workspace"). Body:
 
 ```json
 {"workspaceId":"<ws>","entityId":"<formTemplateId>","entityType":1,"type":3,"url":"<slug>"}
@@ -4859,7 +4940,7 @@ header — without it, statusCode 1008 "Not working on workspace"). Body:
 The server mints a `tinyUrl` in the response and the form renders at
 `https://forms.procesio.app/{tinyUrl}`. The human-readable `url` slug is stored but the tinyUrl is
 what resolves; a bare `/forms/{id}` 404s. Read an existing one back with
-`GET /api/CustomUrl/FormTemplate/{formTemplateId}` — that is the fastest way to learn the shape
+`GET /api/CustomUrl/FormTemplate/{formTemplateId}` - that is the fastest way to learn the shape
 from a form that is already published.
 
 **2. `IsPrivate: false` on the form itself**, together with `Status: 1` (published). This is the
@@ -4872,13 +4953,13 @@ the public is a publishing decision that no unrelated save should make by accide
 public form launches under the form's own anonymous `FormProcess` route, not the caller's session:
 verified by loading a public form with no account and finding finished instances attributed to it
 (`list-instances` shows `formName`). A 401 in the page console does not by itself mean the form is
-broken — check for the instance rather than trusting the console.
+broken - check for the instance rather than trusting the console.
 
 **To prove "public" end to end, call it with no credentials at all**: publish -> launch ->
 variables against `webapi.procesio.app` with only `Content-Type` and `formTemplateWorkspaceId`
 headers. A test that runs under your own token proves nothing about a stranger.
 
-## Processes have no folders — group by name prefix
+## Processes have no folders - group by name prefix
 
 `/api/Actions/folders` is the ACTION catalog's folders. There is no equivalent for processes
 (`/api/Projects`), so a workspace's process list is flat. To keep maintenance/scratch processes out
@@ -4893,13 +4974,13 @@ assertion; the 200 is not.
 ## Adding a control to a form that already exists (`form-add-element`)
 
 `form-create` speaks an authoring config and `form-edit` rebuilds a whole form from one, so neither
-can add a control to a form built in the designer — the two shapes are different languages (an
+can add a control to a form built in the designer - the two shapes are different languages (an
 authoring config has no element ids at all). `form-add-element --id <form> --elements '<json>'
 [--parent <name|id>]` fills that gap, and the reason a splice is safe is a structural invariant:
 
 **A control's data-model sub-model id IS its element id, and its attribute ids ARE that element's
 own config ids.** So new controls only ever contribute new sub-models. The live `Data.dataModel` is
-appended to, never regenerated — which matters because a RUN_PROCESS/MAP trigger references a field
+appended to, never regenerated - which matters because a RUN_PROCESS/MAP trigger references a field
 by the path `root.fields.elementId.valueAttrId`. Rebuilding the model would mint new ids and break
 every mapping already on the form, silently.
 
@@ -4908,7 +4989,7 @@ controls sharing one make every reference to it ambiguous.
 
 ### Designer forms carry EMPTY map rows, and they are not harmless
 A hand-built form's RUN_PROCESS config routinely contains a row like
-`{"id":1,"left":{"value":""},"right":{"value":""}}` — designer litter from an added-then-abandoned
+`{"id":1,"left":{"value":""},"right":{"value":""}}` - designer litter from an added-then-abandoned
 mapping. It sits there doing nothing until a tool tries to resolve it, so strip empty rows from
 `inputMap`/`outputMap` before writing an event back. Seen on more than one form in the same
 workspace.
@@ -4916,7 +4997,7 @@ workspace.
 ### Extending a process's input contract without breaking its form
 `process-edit` reuses variable ids BY NAME, so adding inputs to a live process keeps every existing
 form mapping valid: declare the existing variables with their existing names plus the new ones, and
-only the new ones get fresh ids. Confirm it with `--dry-run` first — and note that the dry-run only
+only the new ones get fresh ids. Confirm it with `--dry-run` first - and note that the dry-run only
 became trustworthy for this once it was routed through the edit path (see DTO-SUBTOOLS-NOTE.md).
 
 ## An OAuth2 predefined credential needs a human click before it can be used
@@ -4930,14 +5011,14 @@ Creating one: `credential-create` with `template` = the exact type name (e.g.
 and omitting either fails with `statusCode 113 "Required credentials fields should not be empty"`
 naming only the first one:
 
-- **`Method`** — a select whose only option is `GET` (it is the TEST call's verb, not the verb your
+- **`Method`** - a select whose only option is `GET` (it is the TEST call's verb, not the verb your
   Call API nodes use).
-- **`URL`** — the service base, pre-filled on the template (`https://www.googleapis.com`).
+- **`URL`** - the service base, pre-filled on the template (`https://www.googleapis.com`).
 
 `Scopes` is a pills list and defaults to the full recommended set; narrow it at creation time rather
 than after, since changing scopes later means re-consenting anyway.
 
-Then `GET /api/Credentials/authorize/{id}` returns `{url, headers}` — the Google consent URL,
+Then `GET /api/Credentials/authorize/{id}` returns `{url, headers}` - the Google consent URL,
 carrying a one-shot `state`. Hand that to the person who owns the calendar, or have them press the
 Google button on the credential in the designer, which mints a fresh one. Nothing else about the
 credential works until that returns.
@@ -4960,7 +5041,7 @@ with differently named outputs (`Status Output`/`Body Output` instead of
 ## `Call API` needs `Request Parameters` even for a bodyless verb
 
 A DELETE (or GET) node authored without the `Request Parameters` property fails at RUN time with
-`Error while building input model: CallApi has NULL value on request parameters.` — it is not
+`Error while building input model: CallApi has NULL value on request parameters.` - it is not
 optional just because the verb carries no body. Give it the empty payload:
 
 ```json
@@ -4979,13 +5060,13 @@ guid: FE and BE validation both pass.
 `{"var": "responseBody", "path": ["id"]}` against a variable declared `type: "object"` fails the
 save with `Error converting value "id" to type 'System.Guid'`: there is no model to resolve the
 name against, so the name is written where an id belongs. Bind a Call API's `Response Body` (or any
-output you intend to read a field out of) to a variable typed by a MODEL — even a three-field one
+output you intend to read a field out of) to a variable typed by a MODEL - even a three-field one
 covering just the fields you need. The response's other fields are simply ignored.
 
 ## A loop-scoped variable reads back NULL after the loop
 
 The final instance output of a flow shows a `For Each` body's variables as null even when every
-iteration set them — they are the loop's scope, not the flow's. Do not read that as "the body never
+iteration set them - they are the loop's scope, not the flow's. Do not read that as "the body never
 ran": check the side effect instead (the row it wrote, the resource it created). A run that reports
 `status: 50` with a null loop variable and a correctly updated database is working exactly as it
 should.
@@ -5009,22 +5090,22 @@ rather than quietly reverting somebody else's edit.
 
 Slot availability is filtered in `sp_GetAvailableSlots`, and it would have been easy to leave a new
 exclusion there alone. But `sp_BookMeeting` re-derives the offered list from that same procedure
-INSIDE its transaction and refuses anything absent from it — so a rule added to the slot engine is
+INSIDE its transaction and refuses anything absent from it - so a rule added to the slot engine is
 automatically enforced at the booking boundary too, against a hand-crafted POST that never saw the
 form. Prove it that way round: call the booking procedure directly with a time the rule should
 forbid, and check it is refused. A filtered dropdown proves nothing.
 
-`DATETIME2` also does not accept `'2026-09-07T12:00'` from a string literal — seconds are required
+`DATETIME2` also does not accept `'2026-09-07T12:00'` from a string literal - seconds are required
 (`'2026-09-07T12:00:00'`), and the failure is a bare `Error converting data type varchar to
 datetime2` with no hint that precision is what it wants.
 
-## A table added through the API has no row context — reach its rows through the page
+## A table added through the API has no row context - reach its rows through the page
 
 A `dynamic-table-row` created by `form-add-element` renders and behaves like a designer-built one
 until something inside it needs to know **which row it is in**. It never does. Measured on a spliced
 table, in every handler that fires from inside a row:
 
-- `fld('<RowName>')['$.item']` is **undefined** — on a side-panel's `onOpen`, on a button's
+- `fld('<RowName>')['$.item']` is **undefined** - on a side-panel's `onOpen`, on a button's
   `onClick`, and on a control's `onInput` alike. On a designer-built table the same expression is
   the row and is the basis of that table's whole edit mechanism.
 - A row-scoped control read by name gives a field object whose `.value` is `undefined`, whatever is
@@ -5035,7 +5116,7 @@ table, in every handler that fires from inside a row:
 - `document.activeElement` is already back on `<body>` by the time a click handler runs, so the
   pressed button cannot be recovered that way either.
 
-The row's values are not lost, though — the table binds the row's `Actions` object into that row's
+The row's values are not lost, though - the table binds the row's `Actions` object into that row's
 controls, so **the values are on the page**, in the DOM, exactly as the person sees them. That gives
 a working pattern for per-row edit and delete on a spliced table:
 
@@ -5048,7 +5129,7 @@ a working pattern for per-row edit and delete on a spliced table:
 3. **In the handler, read that attribute through `window.parent.document`** (the form's own
    `document` is a sandboxed frame holding none of the form) and match the cells against the list
    the page already has in a variable, to recover the row's primary key.
-4. **Read the rest off the open panel** — its inputs, by their labels — and write everything into
+4. **Read the rest off the open panel** - its inputs, by their labels - and write everything into
    plain hidden fields at TAB level, which four-segment paths address normally. The process map
    reads those.
 
@@ -5062,7 +5143,7 @@ chain ends with no message anywhere.
 - **A select's options come only from a process output map.** Assigning `sourceValue` from a handler
   leaves "No data available" on screen. To feed a second select from data already fetched, clone the
   existing output-map row and repoint its right-hand side at the new element's `sourceValue` config
-  — do not write a handler.
+ - do not write a handler.
 - **`readonly: true` on a `datetime-input` closes its calendar as well as its keyboard**, which
   makes the value unchangeable rather than merely untypeable. A date control already refuses
   anything that is not a date, so leave it writable.
@@ -5071,14 +5152,14 @@ chain ends with no message anywhere.
   first.
 - **A form's global CSS/JavaScript is stored encrypted** in `Data.code`; read and write it with
   `form-get-code` / `form-set-code`, and pass `--workspace-id` (the call returns HTTP 400 without
-  it). It can be empty on a form whose behaviour appears to depend on it — a local draft that was
+  it). It can be empty on a form whose behaviour appears to depend on it - a local draft that was
   never deployed looks exactly like a deployed one until you fetch it.
 
 ### A column header's capitals may exist only in CSS
 
 Table headers on a form render upper-cased, but that is `text-transform`, not the text. `textContent`
 returns what was authored ("Status"), while `innerText` returns what is painted ("STATUS"), so a
-guard written against the screen — `head.textContent.indexOf('STATUS')` — never matches and the code
+guard written against the screen - `head.textContent.indexOf('STATUS')` - never matches and the code
 after it silently does nothing. Compare case-insensitively, or read `innerText` deliberately.
 
 The same distinction bites when checking whether an action is still on screen: `textContent` includes
@@ -5438,40 +5519,40 @@ so blocking a working add would be wrong). Fail-open on any read error; `--force
 the warning.
 
 **Related cluster-4 platform defects, and where each is handled in the tool:**
-- **4b — NOT a platform defect; our request was incomplete.** The endpoint takes its target
+- **4b - NOT a platform defect; our request was incomplete.** The endpoint takes its target
   state from a `state` REQUEST HEADER (`true` activates, `false` deactivates); sent without
   it, it deactivates every time, which is what looked like a one-way endpoint. Established by
   comparing our call against the designer's own traffic. What remains true is only that the
-  response cannot report the outcome — it is `{"value": null, "errors": []}` in every case —
+  response cannot report the outcome - it is `{"value": null, "errors": []}` in every case - 
   so `process-toggle-activation` sends `--state` and still re-reads `active` from the
   list-processes projection (`GET …/{id}.status` is a different field). See the corrected
   toggle-activation sections above.
-- **4c — NOT a defect; confirmed intended.** A `PUT /api/Projects` that fails validation
+- **4c - NOT a defect; confirmed intended.** A `PUT /api/Projects` that fails validation
   answers 400 and still persists the definition. That is deliberate: unfinished work has to
   be saveable, so an invalid process must be allowed to store. The 400 carries the verdict,
-  not the fate of the write. The discipline it leaves behind is unchanged — never read a
+  not the fate of the write. The discipline it leaves behind is unchanged - never read a
   write's echo as the outcome; re-read and reconcile. `put-projects` warns on an empty-body
   success (see the empty-body PUT note); after any process PUT, re-read and verify.
-- **4d — RE-TESTED. The accounting half reproduces; the create-anyway half does not.**
+- **4d - RE-TESTED. The accounting half reproduces; the create-anyway half does not.**
   Measured on a master workspace: the active sub-workspace list returns 22, the
-  `--include-removed` list returns 24, and `GET /api/Resources/used/subworkspaces` — the
-  usage view — also returns **24, including both `removed` rows**. So a soft delete does not
+  `--include-removed` list returns 24, and `GET /api/Resources/used/subworkspaces` - the
+  usage view - also returns **24, including both `removed` rows**. So a soft delete does not
   remove a sub-workspace from resource accounting; two deleted in 2023 were still carried
   three years later. Separately, `POST /api/Workspace` answers **HTTP 500 with the single
   body `"Unable to create sub-workspace!"` for every request shape tried** (name key
   `name` vs `workspace`, with and without `parentId`, with and without the optional fields)
-  and creates nothing — five attempts left both the master's count and the account-wide
+  and creates nothing - five attempts left both the master's count and the account-wide
   workspace list unchanged. The older observation that the 500 creates the workspace anyway
   did NOT reproduce and may be fixed. Whether the opaque 500 IS the cap being enforced is
   not decidable from outside: the most recent successful creation is the one that brought
-  the including-removed total to exactly 24. Do not quote a numeric workspace cap — the
+  the including-removed total to exactly 24. Do not quote a numeric workspace cap - the
   documented `soft/hardLimit` is a time/thread budget, not a workspace count.
 
 ### Adding an input to a SQL action: two ways it silently arrives NULL
 
 Extending an existing SQL node (a new `@pN` on the stored procedure, fed by a new process
 variable) fails quietly in two places. Both look identical from outside: the process runs,
-reports success, the statement executes — and the parameter is NULL. Nothing is logged, and
+reports success, the statement executes - and the parameter is NULL. Nothing is logged, and
 the procedure's own validation sees only a missing value.
 
 **1. `<%N%>` slots are numbered across the WHOLE action, not per parameter.** The mapping
@@ -5486,7 +5567,7 @@ take a number no one uses:
 used = {int(n) for n in re.findall(r"<%(\d+)%>", json.dumps(action["parameters"]))}
 slot = max(used) + 1          # row["id"], row["source"]["value"], and variable[0]["id"]
 ```
-The destination (`p5`, `p6`) is the SQL parameter name and is independent of the slot — they
+The destination (`p5`, `p6`) is the SQL parameter name and is independent of the slot - they
 do not have to match, and forcing them to match is what causes the collision.
 
 **2. A mapping row copied from a neighbour keeps its `attribute`.** Rows that read a field
@@ -5495,7 +5576,7 @@ a plain string/number variable, that attribute is preserved, and asking for an a
 value that has none yields nothing. Set `variable[0]["attribute"] = None` for a scalar.
 
 Symptom in both cases: the procedure's `ISNULL(@New, existing)` keeps the old value, so a save
-appears to work and changes nothing. Worth a one-off probe when a new input misbehaves — have
+appears to work and changes nothing. Worth a one-off probe when a new input misbehaves - have
 the procedure write what it received into a settings row, run the process directly with a known
 value (bypassing the form), and read it back. That separates "the form did not send it" from
 "the process did not deliver it" in one step, which guessing at either end cannot.
@@ -5503,7 +5584,7 @@ value (bypassing the form), and read it back. That separates "the form did not s
 ### A control added to a table row through the API is invisible to a save
 
 `form-add-element` can place a control inside a dynamic table row, and it renders and works on
-screen — but it is not part of the row's own field model, so a RUN_PROCESS map pointing at its
+screen - but it is not part of the row's own field model, so a RUN_PROCESS map pointing at its
 path (whether the four-segment own path or the five-segment row path) sends nothing. The fix
 is a field at tab level that carries the value: an `onInput` handler on the row control writes
 it there, and the save reads the carrier. Handlers on such a control DO fire; the row model
@@ -5512,7 +5593,7 @@ only limits what a *map* can address.
 When that handler recovers the value from the DOM rather than the field model, filter the
 candidates by rendered size (`getBoundingClientRect()`), because the create panel usually holds
 a control with the same label. Reading the first match writes the create panel's default over
-the user's choice on every save, and the symptom — the value reverting to a constant — looks
+the user's choice on every save, and the symptom - the value reverting to a constant - looks
 exactly like a save that never received anything.
 
 ### A radio list draws each option's record id as the input's `name`
@@ -5963,12 +6044,12 @@ values and render once, would remove the whole class of problem.
 
 
 
-## ⚠⚠ Processing-time BILLING is readable per-workspace and per-run — and the meter is not what you'd guess
+## ⚠⚠ Processing-time BILLING is readable per-workspace and per-run - and the meter is not what you'd guess
 
 ⚠ **Consumption is readable from any workspace (no admin):** `GET /api/Resources/used`
 (`get-resources-used`, permission `Workspace.Read`) returns `result.time.consumed` /
 `masterConsumed` (**milliseconds** of processing time spent, against a `limit.soft`/`hard`
-paid-time budget also in ms), plus `result.average.platform.{total, internal, external}` —
+paid-time budget also in ms), plus `result.average.platform.{total, internal, external}` - 
 the platform **already splits internal (action) time from external (Call-API) time**. It
 accepts `--startDate`/`--endDate`; the **no-window** call can read 0 while a same-day window
 shows the real spend, so pass an explicit window. So "billing can't be seen from a workspace"
@@ -5982,51 +6063,51 @@ is FALSE.
 per-instance `timeConsumed` equals the workspace `consumed`-delta EXACTLY** (verified against a
 0-ms ambient-drift floor), so `timeConsumed` IS the billed paid-time and is attributable per
 run. `get-projects-by-id-used` returned empty and `get-resources-analytics-processes` needs
-non-obvious params — prefer the instance path. A **failed (status 40)** instance bills
+non-obvious params - prefer the instance path. A **failed (status 40)** instance bills
 `timeConsumed ≈ 0`.
 
-⚠⚠ **What the meter actually counts is surprising — prove it with a positive control:**
+⚠⚠ **What the meter actually counts is surprising - prove it with a positive control:**
 - **In-script (`Node`) CPU is NOT metered.** A `Node` busy-looping real EE CPU billed a FLAT
   ~4 ms whether it burned 3 s, 5 s, or 20 s (wall clock confirmed the burn). Billing
   approximates a small **fixed per-action orchestration** cost (consistent with the "≈360k
   actions per paid hour" framing), **not** CPU-ms. So a "0/near-0 ms" is "not billed", not
-  "meter asleep" — but confirm with a compute positive-control first.
+  "meter asleep" - but confirm with a compute positive-control first.
 - **`Delay` is a SUSPEND → 0 billed.** `Start→Delay(period 30 s)→Stop` billed
   `timeConsumed=0`, `actionsConsumed=0`, status 50 (33.5 s wall). The catalog description is
-  literal: *"suspends the execution"* — the executor is released, so nothing accrues. Same for
+  literal: *"suspends the execution"* - the executor is released, so nothing accrues. Same for
   form/user-task human waits, idle schedules, API-rate-limit waits (the marketing "a 30-minute
   approval costs milliseconds" is TRUE for this reason).
 - **`Call API` is a synchronous HOLD → billed by ROUND-TRIP WALL-TIME.** Its per-action
   `actionExecutionTime` tracked the round-trip (181 ms for a ~200 ms round-trip; 7 ms for a
-  7 ms connect-fail) — NOT a fixed cost, unlike `Node`/`Delay`. The executor is kept on the
+  7 ms connect-fail) - NOT a fixed cost, unlike `Node`/`Delay`. The executor is kept on the
   blocking I/O, so a slow external endpoint bills its wait. (A "N-seconds billed for a slow
   call" figure elsewhere in the corpus is often the *external service's* elapsed latency
-  relabelled "billed" under this assumption — distinguish a meter read from a stopwatch read.)
+  relabelled "billed" under this assumption - distinguish a meter read from a stopwatch read.)
 
 ⚠ **Reconciliation to carry:** *suspend* (Delay / form-hold / schedule / rate-limit wait) = not
 billed; *synchronous hold* (`Call API` on a slow endpoint) = billed by wall-time. Both public
-and internal statements about "waits" are true — of different mechanisms.
+and internal statements about "waits" are true - of different mechanisms.
 
 ⚠ **Building a `Delay` or credential-less `Call API` via the friendly `process-create` spec:**
-`Delay value` is a composite and must be wrapped as a binding — `{"Delay value": {"value":
+`Delay value` is a composite and must be wrapped as a binding - `{"Delay value": {"value":
 {"value": "30", "interval": 1}}}` with `{"Delay Type": "1"}` (interval 1=Second … 7=Year).
 `Call API` credential is OPTIONAL (`Select REST API credentials` isRequired=false), but a
 **credential-less** `Call API` with a full URL in `Endpoint` FAILS AT BINDING at runtime
-(status 40, no per-action metering, ~3.5 s fixed fail-overhead — the request never fires); a
+(status 40, no per-action metering, ~3.5 s fixed fail-overhead - the request never fires); a
 real external call needs a credentialed base URL. `Endpoint` is a path relative to that base.
 
-⚠⚠ **Billed time is decided by a process's ACTION MIX, not by its input size — measured across four
+⚠⚠ **Billed time is decided by a process's ACTION MIX, not by its input size - measured across four
 processes at 3 input sizes × 5 runs each.** Two regimes:
-- **Node + Decisional + Data-Store processes bill FLAT — independent of input size.** ~15–27 ms whether the
+- **Node + Decisional + Data-Store processes bill FLAT - independent of input size.** ~15–27 ms whether the
   input carried 10 or 500 records (a ×20–50 data span → billed ×1.0–1.1). Consistent with the flat
   per-action orchestration cost: in-script (`Node`) work over N rows is not metered, so looping more rows
   inside one action adds no billed time.
 - **Processes with document-RENDERING actions (`HTML To PDF`, `Excel`/xlsx build) bill MORE as the output
-  document grows — sublinearly.** One 16-action file→Excel+PDF process billed 197 ms at 10 rows → 305 ms at
+  document grows - sublinearly.** One 16-action file→Excel+PDF process billed 197 ms at 10 rows → 305 ms at
   200 → 1,079 ms at 2,000 (size ×200 → billed ×5.5). These render actions do metered work proportional to
   the document (like `Call API` wall-time, unlike `Node`); the fixed orchestration floor dominates at small
-  sizes, the rendering at large. So predict a process's billed cost from its action mix — which actions
-  render or hold I/O — not from input size alone.
+  sizes, the rendering at large. So predict a process's billed cost from its action mix - which actions
+  render or hold I/O - not from input size alone.
 
 ⚠ **On a SHARED workspace, read the per-instance `timeConsumed`, not the workspace `consumed`-delta.** The
 measured identity (`timeConsumed == consumed`-delta for a status-50 run) holds **only when the run's own bill
@@ -6039,44 +6120,44 @@ to trust; the workspace delta is a quiet-window-only cross-check.
 ⚠ **Running a process 403s if the account lacks DataStore-execute on a store the process touches.** A
 workspace-scoped **userpass owner** that runs pure-compute processes fine gets **HTTP 403 "Unauthorized"**
 on `POST /api/Projects/{id}/run` for a process whose flow references a data store it cannot execute against
-— the same account also 403s the REST row API (`POST /api/DataStore/{id}/rows/filter`). A **workspace-bound
+ - the same account also 403s the REST row API (`POST /api/DataStore/{id}/rows/filter`). A **workspace-bound
 apikey** with the DataStore permission can run it, but such an apikey's authorization was observed to be
-**intermittent** (one success, then a run of 403s in the same session — an expired/rate-limited token).
+**intermittent** (one success, then a run of 403s in the same session - an expired/rate-limited token).
 Measure store-touching processes with a credential that holds stable DataStore-execute, and read `/run`'s
 status, not the launch response.
 
 ---
 
-## Data Store — the properties a product design rests on, re-measured end to end (2026-09-03)
+## Data Store - the properties a product design rests on, re-measured end to end (2026-09-03)
 
 Everything below was measured live against throwaway stores and deleted afterwards. Where an
 existing note is contradicted, the contradiction is stated.
 
 ### ⚠ A Data Store lives in EXACTLY ONE workspace. There is no master → sub inheritance.
 
-Measured in both directions with a principal that can cross workspaces (a userpass account — a
+Measured in both directions with a principal that can cross workspaces (a userpass account - a
 workspace-bound **apikey answers 403 for any other workspaceid, which is a refusal of the KEY and
 proves nothing about the STORE**; do not read that 403 as a scoping answer):
 
 | store created in | visible from master | visible from a SIBLING sub | visible from its own ws |
 |---|---|---|---|
-| the **master** workspace | yes | **no — 404, absent from the listing** | yes |
-| a **sub**-workspace | **no — 404, absent from the listing** | **no — 404** | yes |
+| the **master** workspace | yes | **no - 404, absent from the listing** | yes |
+| a **sub**-workspace | **no - 404, absent from the listing** | **no - 404** | yes |
 
 `GET /api/DataStore/{id}` answers `404 "Data store not found."` from every workspace but the owner,
 and the resource itself carries `workspaceId`. **Per-entity isolation via sub-workspaces is
-therefore real**, and the converse — one store serving a master and its subs — is not expressible:
+therefore real**, and the converse - one store serving a master and its subs - is not expressible:
 it has to be replicated per workspace, or fronted by a mediated writer.
 
 ⚠ **An id is NOT a global handle, and "the id exists here" is not an identity test.** A pack import
 PRESERVES the store id, so after importing a store into a second workspace the SAME id resolves in
-both — with different `workspaceId` and different contents (measured: 3 rows in the source, 0 in
+both - with different `workspaceId` and different contents (measured: 3 rows in the source, 0 in
 the import). Distinguish two stores by CONTENT, never by id.
 
 ### ✅ Read AND write are credential-free. The native action has nowhere to put a credential.
 
-The `Data Store` action (`02577ada-0000-0100-0000-00000000a001`) exposes exactly three settings —
-`Select Data Store`, `Operation`, `Configure Operation` (side-panel) — and **no credential setting
+The `Data Store` action (`02577ada-0000-0100-0000-00000000a001`) exposes exactly three settings - 
+`Select Data Store`, `Operation`, `Configure Operation` (side-panel) - and **no credential setting
 of any kind**. Discrimination control on the same catalogue: `Call API` carries `Select REST API
 credentials` and `Execute Query` carries `Select Database Server`, both `type: "credentials"`. So
 the absence is a property of this action, not of how it was read.
@@ -6087,11 +6168,11 @@ live valid flow doing both has **104 `credentialsTemplateId` fields, all null**,
 credential id in its workspace; (3) a live run of a minimal one-action writer inserted a row and
 returned status 50.
 
-⚠ **`Credentials: 0` in a pack is NOT by itself evidence** — `export` excludes credentials by
+⚠ **`Credentials: 0` in a pack is NOT by itself evidence** - `export` excludes credentials by
 default, so that section is empty even for a flow that needs one. Judge on the ACTION's setting list.
 
 ⚠ Unchanged: a **batch** write (`POST .../rows` with a `Rows` array) is the REST API, reachable from
-a flow only through `Call API` — which does need a credential. Credential-free applies to the native
+a flow only through `Call API` - which does need a credential. Credential-free applies to the native
 row-at-a-time action.
 
 ### Export carries SCHEMA ONLY. Rows never travel in a pack.
@@ -6108,18 +6189,18 @@ Id, Name, Description, Columns[{ColumnId, Name, DataTypeId, IsList, IsPrimaryKey
 There is **no rows/data key at all**, and a store export also drags its backing data model into
 `DataTypes` (so a store-only selection reports `DataTypes: 1`). The four system columns are absent
 from the exported `Columns` and are re-appended by the target on create. On import the id and full
-schema are preserved and the store **arrives empty** — measured, with the source still holding rows.
+schema are preserved and the store **arrives empty** - measured, with the source still holding rows.
 
 ⚠ **Correction to the older note: a Data Store CAN be named in an export request**
 (`--data-stores` → `dataStoreIds`), and `DataStores` at top level is NOT always empty. The still-true
-half is that a flow referencing a store does not drag it along — name it, or the pack ships a
+half is that a flow referencing a store does not drag it along - name it, or the pack ships a
 dangling reference.
 
 **Seed rows ship out of band, and the supported route is the CSV job.** Measured round trip:
 `datastore-export-start` → `export-download` yields a CSV of the USER columns only (system columns
 excluded), and `datastore-import-start` on a twin store with the same schema lands every row
 faithfully, nulls included. ⚠ `import-failures` on a clean job answers **HTTP 409 "CSV import
-completed without failed rows."** — an error status for a success, so branch on the message.
+completed without failed rows."** - an error status for a success, so branch on the message.
 `datastore-from-json` is **schema inference only**: it derives columns from a JSON **object** (an
 array is refused: "The JSON content must be an object, not an array.") and seeds **zero rows**; it
 also infers a decimal as **Float**, not Double, so retype money columns after using it.
@@ -6133,29 +6214,29 @@ also infers a decimal as **Float**, not Double, so retype money columns after us
   system columns and NO primary key. So "a store always has a PK" is false at the API.
 - Column types offered by the platform's primary set: **Boolean, Integer, Float, Double, String,
   DateTime, Json, Object, Guid**. The typed schema (including a composite PK) persists on the POST.
-- `datastore-delete` **cascades to the backing data model** — after deleting a store its
+- `datastore-delete` **cascades to the backing data model** - after deleting a store its
   `dataTypeId` answers `350 "Requested data type not found!"`. No orphan model to clean up.
-- **Duplicate primary key — confirmed at both layers.** REST: `409` +
+- **Duplicate primary key - confirmed at both layers.** REST: `409` +
   `1006 "A row with the specified key already exists."`, and the batch is **all-or-nothing** (a
   2-row batch with one new + one duplicate key wrote **neither**; count unchanged). In a flow: a
   native `InsertRows` on a colliding key ends the instance at **status 40** with
   `Duplicate key violation: "A row with the specified key already exists."` naming the action, the
   affected-rows output null and the store unchanged; the same flow on a **fresh** key ends 50 with
-  affected 1. Run the fresh-key case first — without that positive control a 40 is unreadable.
+  affected 1. Run the fresh-key case first - without that positive control a 40 is unreadable.
 
-### Limits — measured, and the ones that are NOT what the flow-value figure suggests
+### Limits - measured, and the ones that are NOT what the flow-value figure suggests
 
 - ⚠ **The 32 KB figure does NOT apply to store values.** A `String` column accepts and returns
   **65,535 bytes** exactly and refuses 65,536 with `502 "One or more values exceed the maximum
   allowed length."` (32 KB is a Windows **argv** ceiling on passing a body as a CLI argument, a
-  different layer — call the client in process for large payloads.)
+  different layer - call the client in process for large payloads.)
 - ⚠ **That ceiling is BYTES, not characters.** 32,767 two-byte characters (65,534 bytes) is
   accepted; 32,768 of them (65,536 bytes) is refused. Size a text column in UTF-8 bytes.
 - A **`Json`** column is a different, much larger store: valid JSON of **16 MB** was written and read
-  back intact. ⚠ But it **normalises** what it stores — the JSON is re-serialised, so the bytes read
+  back intact. ⚠ But it **normalises** what it stores - the JSON is re-serialised, so the bytes read
   back are not the bytes written (a separator gains a space). Never hash a Json column's
   round-tripped value. ⚠ And an **invalid-JSON string in a Json column fails with an opaque 502 "A
-  database error occurred"**, not a validation message — do not read that as a size limit.
+  database error occurred"**, not a validation message - do not read that as a size limit.
 - ⚠ **The column ceiling is a per-row storage budget, not a column count.** Measured boundary for
   **String** columns: **172 user columns succeed, 173 fails** (`1001 "A database error occurred
   during the schema operation."`); `Json` fails at 173 the same way; but **300 Integer and 300
@@ -6163,10 +6244,10 @@ also infers a decimal as **Float**, not Double, so retype money columns after us
   the column TYPES, and the error names neither the limit nor the cause.
 - **No row-count ceiling met**: a single store was taken to **110,003 rows**. Batch inserts of
   5,000 / 10,000 / 20,000 / 25,000 rows in one call all succeeded (2.7 MB, ~150 s at 25k), and a
-  3,000-row batch padded to 3.2 MB succeeded in 1.8 s — so **cost tracks ROW COUNT, not payload
+  3,000-row batch padded to 3.2 MB succeeded in 1.8 s - so **cost tracks ROW COUNT, not payload
   bytes**. ⚠ One 25,000-row call failed fast with `1001 "Could not add rows to the data store."` and
   the identical call **succeeded twice on retry**: that was a transient, not a ceiling. A single
-  failing sample does not establish a limit — re-run before recording one.
+  failing sample does not establish a limit - re-run before recording one.
 
 
 ## `Call Subprocess` cannot receive a File variable (2026-09-03)
@@ -6184,7 +6265,7 @@ Tried and failed, both ways:
 
 1. the caller's own uploaded File passed straight through;
 2. the file **re-materialised inside the calling flow** (`File To Base64` → `Base64 To File`)
-   so the object was created in that flow's own context — same failure, different parse
+   so the object was created in that flow's own context - same failure, different parse
    position, so it is not about where the file came from.
 
 The engine appears to JSON-parse the mapped value while staging a new `fileId` for the target,
@@ -6204,7 +6285,7 @@ and a `FileDataModel` value does not survive that. Non-file inputs map fine.
 
 **What to do instead** when an input must be supplied without the user providing it: change the
 consuming flow so the value is optional and defaulted in place (a Decisional that branches
-around the native encode, since a native File action rejects null — see
+around the native encode, since a native File action rejects null - see
 `PROCESIO-NODE-CODE-NOTES.md` §6), rather than composing two flows.
 
 ## Multi-tenancy on one master: measured behaviour (2026-09-16)
@@ -6223,9 +6304,9 @@ afterwards. Read these as rules about the platform, not about that pack.
 | data models, documents | land with the same ids |
 | form | lands with the same id; **`isPrivate`, draft status and disabled state survive** |
 | credential (named in the export, secrets off) | lands with the same id and its **non-secret properties** (URL, option GUIDs); each workspace then holds an **independent** copy |
-| webhook **entity** | ⚠ **NOT imported** (the manager's webhook flag is hard-coded off) — `GET` in the target answers 400 / statusCode 502 target `webhook` |
+| webhook **entity** | ⚠ **NOT imported** (the manager's webhook flag is hard-coded off) - `GET` in the target answers 400 / statusCode 502 target `webhook` |
 | webhook **binding** inside the flow | ⚠ **arrives anyway**, pointing at the SOURCE workspace's webhook id |
-| schedule | ⚠ **not in the pack at all** (no section) — recreate per workspace |
+| schedule | ⚠ **not in the pack at all** (no section) - recreate per workspace |
 
 ⚠ **The dangling binding does not cross tenants.** Firing the source webhook id through the
 anonymous `api/Webhooks/launch/{id}` ran only the source workspace's bound process; the
@@ -6243,8 +6324,8 @@ the process definition can stay identical.
 
 | import | measured result |
 |---|---|
-| `overrideData=true`, credentials included | process updated **in place** (same id, `createdOn` kept, `updatedOn` bumped, run history kept) — ⚠⚠ **and the tenant's edited credential is RESET to the pack's value** |
-| `overrideData=false` | ⚠ **200 and nothing changes** — existing entities are skipped silently, no duplicates, no warning |
+| `overrideData=true`, credentials included | process updated **in place** (same id, `createdOn` kept, `updatedOn` bumped, run history kept) - ⚠⚠ **and the tenant's edited credential is RESET to the pack's value** |
+| `overrideData=false` | ⚠ **200 and nothing changes** - existing entities are skipped silently, no duplicates, no warning |
 | `overrideData=true` + `--no-credentials` | process updated in place **and the tenant's credential is preserved** |
 
 **Rule:** ship updates to existing tenants with override on and every tenant-owned entity type
@@ -6271,11 +6352,11 @@ same-workspace control:
 | instance status of another workspace's run (same template id) | 400, statusCode 450 "Database requested information not found." |
 | credential that exists only in another workspace | 400, statusCode 450 |
 | `GET /api/File/download` of another workspace's run file (owner with the other header, or a key minted in the other workspace) | 400 wrapping "403 (Forbidden)" |
-| same file through `[AllowAnonymous]` `GET /api/FormProcess/download`, no auth | 400 (all headers) / 400 statusCode 502 (path only) — refused for a process-run file; a public-form run file was NOT tested |
+| same file through `[AllowAnonymous]` `GET /api/FormProcess/download`, no auth | 400 (all headers) / 400 statusCode 502 (path only) - refused for a process-run file; a public-form run file was NOT tested |
 | a workspace API key with another workspace's header | 403 `Unauthorized` (projects, sub-workspace list, usage, subscriptions) |
 
 ⚠ **But `GET /api/Workspaces` with a workspace-scoped key lists every workspace the key's
-OWNER can see** — names, ids and the master. A key minted by a master owner and handed to a
+OWNER can see** - names, ids and the master. A key minted by a master owner and handed to a
 tenant discloses the names of every sibling tenant, even though it can read none of them.
 
 ⚠ **Tenant-visible metadata carries the master's name.** The form template body's
@@ -6289,7 +6370,7 @@ tenant discloses the names of every sibling tenant, even though it can read none
   sub-workspaces; a sub-workspace does not get its own pool, and one tenant's burst delays the
   others. Whether the ceiling is the master's or the cluster's was not established.
 - `GET /api/Resources/used` in a sub-workspace shows that sub-workspace's `consumed`, the pool's
-  `masterConsumed`, and the **master's** limit — there is no per-sub-workspace limit field.
+  `masterConsumed`, and the **master's** limit - there is no per-sub-workspace limit field.
 - `GET /api/Resources/used/subWorkspaces` at **master** scope returns one row per sub-workspace
   (`timeConsumed` as a string of ms, removed sub-workspaces included) and the rows sum
   **exactly** to the master's `consumed`; at sub-workspace scope it returns `[]`; with a
@@ -6480,7 +6561,7 @@ approved template (no 24h window yet).
 
 - **`GET /api/Credentials/{id}` returns secrets in plaintext.** A DB / SMTP / FTP credential
   comes back as a list of `properties[]`, and the password field is an ordinary
-  `{"label": "Password", "type": "password", "value": "<plaintext>"}` — the key is `value`,
+  `{"label": "Password", "type": "password", "value": "<plaintext>"}` - the key is `value`,
   not `password`. A redaction filter keyed on field NAMES (`pass`, `secret`, `token`) walks
   right past it. Redact by the property's `type == "password"` (and its `label`), never by
   the JSON key, and never print a whole credential DTO. To reuse a DB credential for a
@@ -6497,7 +6578,7 @@ approved template (no 24h window yet).
 
 Offline audit path that works: `request GET /api/Projects/<id>` per process +
 `form-get` / `form-get-code` per form into a folder, then `flow-digest --in <dir> --out …
---names names.json` and `form-digest --in <forms> --processes <dir> --out …` — readable
+--names names.json` and `form-digest --in <forms> --processes <dir> --out …` - readable
 Markdown with variables, SQL, scripts and the form↔process maps resolved to names.
 
 ## A resource delete can outlive the client timeout and still succeed
@@ -6563,14 +6644,14 @@ That is convenient and it is a trap:
   production. Nothing errors: the id resolves, the header is valid, the rows
   come back.
 
-⚠ The header appears **twice** per action — once in `Parameters` (runtime) and
+⚠ The header appears **twice** per action - once in `Parameters` (runtime) and
 once mirrored under `CustomData.configuration[].settings[].value[]` (the designer
 layer). Rewriting only the first leaves the designer disagreeing with the
 runtime, which survives a save and reappears on the next edit.
 
 **So when moving a process between workspaces, the thing to re-point is the
 workspace header, not the resource ids.** Verify by exporting the target
-afterwards and reading the header back — the import response is an empty body and
+afterwards and reading the header back - the import response is an empty body and
 proves nothing.
 
 Related: a data-store export through Transport carries **schema only, no rows**
@@ -6606,13 +6687,13 @@ one key -> both stores co-located in ONE space   READ OK, both
 
 ⚠ **The consequence for design: if two datasets must be writable by different
 identities, they must live in different WORKSPACES.** Co-locating them and
-issuing two keys does not separate them — both keys carry the workspace-wide
+issuing two keys does not separate them - both keys carry the workspace-wide
 role. A topology that relies on "this service cannot write that store" is only
 enforced by the workspace boundary.
 
 Least privilege *within* a workspace is still available across entity types
 (a key can hold `Data Store Rows: Write` with `Data Store Schema: None`, so it
-can write rows but not alter schemas) — just not between two stores of the same
+can write rows but not alter schemas) - just not between two stores of the same
 type.
 
 ## ⚠ Importing `tools.procesio.main` as a library RE-EXECUTES the CLI (measured 2026-09-22)
@@ -6626,8 +6707,8 @@ if _VENV_PY.exists() and Path(sys.executable).resolve() != _VENV_PY.resolve():
 ```
 
 So `from tools.procesio.main import dispatch`, run under ANY interpreter that is
-not the framework `.venv` — a second venv, the system Python, a tool's own
-environment — spawns the CLI as a subprocess with **the importing script's own
+not the framework `.venv` - a second venv, the system Python, a tool's own
+environment - spawns the CLI as a subprocess with **the importing script's own
 argv forwarded**, then `sys.exit()`s the importing process.
 
 **The two failure shapes, and the second one is the dangerous one:**
@@ -6635,12 +6716,12 @@ argv forwarded**, then `sys.exit()`s the importing process.
 | the caller's argv | what happens |
 |---|---|
 | has arguments | the child reports `unknown action: <your first argument>` and exits non-zero |
-| is empty | the child prints the action list to stderr and exits **0** — so the caller looks like it SUCCEEDED and silently did nothing |
+| is empty | the child prints the action list to stderr and exits **0** - so the caller looks like it SUCCEEDED and silently did nothing |
 
 The empty-argv case is why this can sit unnoticed: a provisioning or rebinding
 script that imports the tool, takes no CLI arguments and edits a credential
 will report success and never have run. Blanking `sys.argv` before the import
-does not help — it converts the loud shape into the silent one.
+does not help - it converts the loud shape into the silent one.
 
 **The rule: a script that imports a framework tool as a library must assert its
 interpreter before the import**, because after the import there is no process
@@ -6656,7 +6737,7 @@ from tools.procesio.main import dispatch
 The general form: **a module whose import has a side effect on the process
 cannot be imported defensively.** Any preamble that may `sys.exit`, re-exec or
 mutate global state belongs behind a function the caller invokes, not at module
-scope — and where it already exists, every library consumer has to guard for it.
+scope - and where it already exists, every library consumer has to guard for it.
 
 ## A save can be refused by a limit the action's own metadata says is legal
 
@@ -6671,7 +6752,7 @@ itself**. Seen on the `Timeout` parameter of the JavaScript action:
 | the validator, at save time | `[10, 180]` |
 
 A process carrying `Timeout: 300` is therefore legal by the designer contract
-and unsaveable by the validator. Every surgical write to it is refused — **and
+and unsaveable by the validator. Every surgical write to it is refused - **and
 the process keeps running**, because it was created by a route that does not run
 this validator.
 
@@ -6685,7 +6766,7 @@ six identical lines mean six nodes rather than six problems.
 
 1. `import` (`POST /api/Transport/import`) does **not** run this validator, so
    it deploys a bundle the surgical writers would refuse. This is the route to
-   use when the out-of-range value is deliberate — a model-inference call that
+   use when the out-of-range value is deliberate - a model-inference call that
    genuinely needs longer than the validator's ceiling.
 2. Bring the value inside the validator's range, **only** when the shorter limit
    is actually acceptable at runtime. Lowering a timeout to satisfy a save is a
@@ -6706,7 +6787,7 @@ The surgical writers return both, and they answer different questions:
 `changed: true` means *the value you passed differs from the stored one*. It is
 computed before the write is attempted and stays `true` on a refused save.
 `put` is whether the PUT was actually sent. A write refused by validation
-reports exactly the above — a truthful record that reads, at a glance, like
+reports exactly the above - a truthful record that reads, at a glance, like
 success.
 
 **Check `put`, then re-read the resource.** The tool reports the refusal
@@ -6729,7 +6810,7 @@ var t = <%0%>;            // value "Contact Ion Popescu" -> var t = Contact Ion 
 ```
 
 fails with `Unexpected identifier 'Ion'`. A text variable is only safe in a
-script when its values are themselves valid JS literals — which is why
+script when its values are themselves valid JS literals - which is why
 `String(<%3%>) !== 'false'` works for a flag holding `true`/`false` and would
 break the moment that variable held a word.
 
@@ -6747,7 +6828,7 @@ already escaped:
 var t = [<%0%>][0];       // value {"v":"Contact \"Ion\"…"} -> a valid JS object
 ```
 
-The json wrapper is not a convention or a quirk — it is the only escaping
+The json wrapper is not a convention or a quirk - it is the only escaping
 mechanism available. The caller doing the serialising (an SDK, `json.dumps`,
 `JSON.stringify`) is what makes the text safe.
 
@@ -6762,7 +6843,7 @@ the whole safety of passing untrusted text rests on it.
 
 A form control produces a plain string. Mapping it to a json process variable
 passes that string raw, and every downstream script breaks. On-platform
-construction of the object is not available either — each route was tried:
+construction of the object is not available either - each route was tried:
 
 | route | why it does not work |
 |---|---|
@@ -6781,7 +6862,7 @@ account id) is CLIENT-SUPPLIED and must be treated as such.
 ⚠ **A structured `source.value` on a subprocess row also diverges the two
 layers.** The designer row is derived from the FIRST entry of the row's inline
 `variable` array, so a hand-built structure shows in the designer as a plain
-variable mapping while the runtime sends something else — and the next person
+variable mapping while the runtime sends something else - and the next person
 who opens the designer and saves silently reverts it. Runtime and designer
 layers that disagree are worse than a missing feature, because the divergence
 is invisible until a save destroys it.
@@ -6874,11 +6955,11 @@ Creating a message template on a real (owned) WABA with `POST /v22.0/{WABA}/mess
 ### Meta WhatsApp: free-form text vs template is a 24h-window rule (server-enforced)
 A non-template message (`type:'text'`, also image/audio/etc. with your own content) delivers ONLY inside the 24-hour customer-service window - the 24h since the recipient's LAST inbound message to your number. Inside it, `POST /{phone_id}/messages` returns 200 + a `messages[0].id` and the text arrives. Outside it Meta returns #131047 ("more than 24 hours since the customer last replied") and nothing is delivered; a pre-approved template is then the ONLY way to open contact. Design consequence for a CRM/agent use case: an AI REPLYING in a live conversation should send free text (custom, no template approval, cheapest) - the window is open because the client just wrote; a PROACTIVE cold nudge (e.g. a deal stage-change with no recent inbound) MUST use a template. Same endpoint and 200 shape either way. So "send a custom AI-composed message" is fully supported for the reply path - build the Node to emit `{messaging_product,to,type:'text',text:{preview_url:false,body:<composed>}}` and feed `body` from the AI's output variable.
 
-### Download WhatsApp (Meta) inbound media into a PROCESIO File variable — proven recipe
+### Download WhatsApp (Meta) inbound media into a PROCESIO File variable - proven recipe
 Meta delivers a media message with a media **id** (in `messages[0].<type>.id`, type one of image/document/audio/video/sticker), plus `mime_type`, and for image/document a `caption`, for document also `filename`. Downloading it is TWO hosts, so TWO `Call API` nodes and (because one REST credential reaches one host) TWO credentials:
-1. **Resolve URL** — `Call API` on the Meta credential (base `https://graph.facebook.com`), `Verb GET`, `Endpoint /v22.0/<%0%>` with `<%0%>` bound to the media id → `Response Body` (json) carries `{url, mime_type, file_size, ...}`. The `url` is on `lookaside.fbsbx.com`, short-lived (~5 min), and REQUIRES the same Bearer token.
-2. **Download bytes** — `Call API` on a SECOND credential whose base URL is `https://lookaside.fbsbx.com` and which carries the SAME `Authorization: Bearer <token>` API-key header, `Verb GET`, `Endpoint <%0%>` bound to the URL's **path+query** (strip the scheme+host: `url.replace(/^https?:\/\/[^/]+/,'')`, the query passes through) → bind **`Response File`** (Call API output property id suffix `...7790008`, the live unversioned Call API `cd8bd0bc-...804de`) to a variable whose datatype is the **File model `10c6ac59-3929-49e6-99dc-121212121219`**. That is the whole "HTTP binary → File var" mechanism; `file-download --instance-id/--variable-id` (or `--from-run`) pulls the exact bytes back (verified byte-identical, sha256).
-Builder facts that make this expressible: the process builder's `refdata.primitive_type_id` has NO `file` primitive, so declare the File var with `{"model": "10c6ac59-...-121212121219"}` (not `type:"file"` — that alias only exists in `flowmodel/nodeparam`); a `Call API` `Verb` may be written as the word `"GET"` (builder resolves it to the option GUID `3ab385bd-f8ae-b641-9176-e7db886aec01`) and a bodyless GET needs no Request Parameters (builder seeds the empty payload); gate the download with a `Decisional` `IS_NOT_EMPTY` on the extracted media-id string (no boolean node needed); a param value given as `{"template","vars"}` binds `<%N%>` for ANY param including `Endpoint`, not just a body. Token rotation now touches THREE stores (the graph credential, the lookaside credential, and the OS secret) — refresh all three.
+1. **Resolve URL** - `Call API` on the Meta credential (base `https://graph.facebook.com`), `Verb GET`, `Endpoint /v22.0/<%0%>` with `<%0%>` bound to the media id → `Response Body` (json) carries `{url, mime_type, file_size, ...}`. The `url` is on `lookaside.fbsbx.com`, short-lived (~5 min), and REQUIRES the same Bearer token.
+2. **Download bytes** - `Call API` on a SECOND credential whose base URL is `https://lookaside.fbsbx.com` and which carries the SAME `Authorization: Bearer <token>` API-key header, `Verb GET`, `Endpoint <%0%>` bound to the URL's **path+query** (strip the scheme+host: `url.replace(/^https?:\/\/[^/]+/,'')`, the query passes through) → bind **`Response File`** (Call API output property id suffix `...7790008`, the live unversioned Call API `cd8bd0bc-...804de`) to a variable whose datatype is the **File model `10c6ac59-3929-49e6-99dc-121212121219`**. That is the whole "HTTP binary → File var" mechanism; `file-download --instance-id/--variable-id` (or `--from-run`) pulls the exact bytes back (verified byte-identical, sha256).
+Builder facts that make this expressible: the process builder's `refdata.primitive_type_id` has NO `file` primitive, so declare the File var with `{"model": "10c6ac59-...-121212121219"}` (not `type:"file"` - that alias only exists in `flowmodel/nodeparam`); a `Call API` `Verb` may be written as the word `"GET"` (builder resolves it to the option GUID `3ab385bd-f8ae-b641-9176-e7db886aec01`) and a bodyless GET needs no Request Parameters (builder seeds the empty payload); gate the download with a `Decisional` `IS_NOT_EMPTY` on the extracted media-id string (no boolean node needed); a param value given as `{"template","vars"}` binds `<%N%>` for ANY param including `Endpoint`, not just a body. Token rotation now touches THREE stores (the graph credential, the lookaside credential, and the OS secret) - refresh all three.
 
 ### Send a WhatsApp document/image FROM a process (Meta Cloud API) + reusable media id
 To reply on WhatsApp with a file: upload it to Meta ONCE with `POST /v{ver}/{phone_number_id}/media` (multipart: `messaging_product=whatsapp`, `type=<mime>`, `file=@path`) -> returns `{id}` (an uploaded-media id, valid ~30 days, reusable across sends). Then send with a normal `Call API` POST to `/{phone_number_id}/messages`, RAW json body `{messaging_product:'whatsapp', to:<e164>, type:'document', document:{id:<media_id>, filename:'X.pdf', caption:'...'}}` (image/video/audio analogous with their own object). Bake the media id as a process-var DEFAULT so the flow just references it; refresh when it expires. A keyword branch (e.g. reply with an offer PDF when the inbound text matches `/ofert/i`) is a `Node` returning a boolean -> `Decisional IS_TRUE` -> a build-body `Node` -> the send `Call API`. Same 24h-window rule as any free-form message (the inbound that triggered it opens the window, so a reply always delivers). The RAW body param shape is `{"body":{"type":"RAW","value":{"RAW":{"format":"json","value":"<%0%>"}, "BINARY":"","FORM_DATA":[],"X_WWW_FORM_URLENCODED":[]}},"headers":[{"key":"Content-Type","value":"application/json","type":"TEXT"}],"queryParams":[]}` with `<%0%>` bound to the JSON-string variable the build Node produced.
@@ -7175,3 +7256,592 @@ below comes from a real run.
   answered 400 "Stopping process failed." for a RUNNING instance too (not only starting/debug
   ones). The instance view's **Stop instance** button stopped it (status 6, "stopped"). Keep a
   retry counter in every loop.
+
+### SaaS apps (HubSpot, Airtable, Smartsheet, Jira, Typeform...) are REST API credential + Call API (2026-10)
+- **There are no dedicated actions** for these apps in the catalog (`GET /api/Actions`, 238 actions, none
+  named after a SaaS). The docs' "Integrations" pages all use one pattern: a REST API credential holding
+  the app's base URL and token, and a Call API action per step (endpoint relative to the credential's URL).
+- **Header format that works for most of them:** API key authentication, Key `Authorization`, Value
+  `Bearer <token>`, Header ticked. Jira Cloud is the exception: Basic authentication, Name = the
+  Atlassian account email, Password = an API token.
+- **Check a base URL and header format without a real secret:** `procesio credential-test` with a fake
+  token. Each API answers 401 with its own recognisable body (HubSpot `INVALID_AUTHENTICATION`
+  "Authentication credentials not found", Airtable `AUTHENTICATION_REQUIRED`, Smartsheet errorCode
+  `1002` "Your Access Token is invalid."). Test connection saves nothing.
+- **Docs lag:** the HubSpot page still uses the `hapikey` query parameter (HubSpot retired API keys in
+  2022; it answers 401 "The API key provided is invalid"); use a private app token as Bearer. Airtable
+  replaced API keys with personal access tokens. Smartsheet's base URL is `https://api.smartsheet.com/2.0`.
+
+### Robots and OCR services (UiPath, SenseTask): run API, Call API and a webhook (2026-10)
+- **No dedicated actions** for RPA or OCR services in the catalog. Both directions use the generic pieces:
+  the robot calls the process's run endpoint; the process calls the robot's API with Call API; an OCR
+  service pushes its result into a PROCESIO webhook.
+- **An outside caller with an API key needs THREE headers:** `key` (the key's name), `value` (its secret)
+  and `workspaceid`. With `key` + `value` only, `POST /api/Projects/{id}/run` answers `403 Unauthorized`
+  (the public "integrate with UiPath robots" page lists only the two). `?runSynchronous=true&secondsTimeOut=N`
+  with body `{"payload": {...inputs}}` returns `{instanceId, status, variable, error}` (status 50 = finished).
+  A Double input prints with a decimal in a Concatenate (`980` -> `980.0`); use Integer for whole amounts.
+- **Client-credentials OAuth is a Call API step, not a credential.** The REST API credential's "OAuth 2"
+  method is the authorization-code flow only (Auth URL, Access Token URL, consent). For an API that issues
+  tokens to a confidential app (UiPath External Application with application scopes), POST to the token
+  URL with an `X_WWW_FORM_URLENCODED` body (`grant_type=client_credentials`, `client_id`, `client_secret`,
+  `scope`), Extract Objects `$.access_token`, then send `Authorization: Bearer <token>` on later calls.
+- **UiPath Automation Cloud specifics:** token URL `https://cloud.uipath.com/<org>/identity_/connect/token`
+  (scopes `OR.Execution OR.Jobs` to find a process and start a job); an unknown organisation answers
+  `302` (a redirect, not JSON), so the next Extract Objects fails with "The input is not a valid
+  JSON/JArray"; a bad client answers `400 {"error":"invalid_client"}`. Orchestrator calls go to
+  `https://cloud.uipath.com/<org>/<tenant>/orchestrator_/odata/...` with header
+  `X-UIPATH-OrganizationUnitId` = the folder id: `GET Releases?$filter=Name eq '<process>'` then
+  `POST Jobs/UiPath.Server.Configuration.OData.StartJobs` with `{"startInfo": {"ReleaseKey", "Strategy":
+  "ModernJobsCount", "JobsCount": 1}}`. Only unattended robots can be started from outside. The docs page's
+  token step (refresh token + user key from "API Access") is UiPath's older method.
+- **A webhook's data model comes from a sample.** `webhook-create` needs `sample` (or the UI's Start
+  listening on a real event). An OCR service that does not publish its payload (SenseTask) has to send one
+  real event first; do not invent the structure.
+
+### RSign (RPost e-signature): shipped processes, not actions or a credential type (2026-10)
+- **No RSign action and no RSign credential type** in the catalog. The integration is four ready-made
+  processes that a dashboard card ("RSign: Import already configured RSign processes", Open App) installs:
+  `RSign/Send Envelope From Template`, `RSign/Get Envelope Status`, `RSign/Get Envelope Download Signed
+  Documents`, `RSign/ RPost Webhook`. The card opens a PROCESIO form app ("RSign Import") with two tabs:
+  Automatic Import (asks for a username and password, then creates a NEW workspace named `RSign_<random>`)
+  and Manual Download (a bundle you import into a workspace you choose).
+- **Each process logs in on every run** with Call API `POST https://{Base_URL}/api/V1/Authentication/AuthenticateIUser`
+  (body `ReferenceKey`, `EmailId`, `Password`; `Base_URL` = `webapi.rsign.com`), Extract Objects `..AuthToken`,
+  then sends the token in an `AuthToken` header: `POST /api/V1/Envelope/SendEnvelopeFromTemplate`
+  (`TemplateCode`, `TemplateRoleRecipientMapping[{RoleID, RecipientEmail, RecipientName, DeliveryMode}]`,
+  `UpdateControls`), `GET /api/V1/Envelope/GetMasterEnvelopeStatus/{envelope}`,
+  `GET /api/V1/Manage/GetDownloadedTerminatedAndIncompleteExipredDocument/{envelope}` (then `..Base64FileData`
+  -> Base64 To File). The webhook process is an empty Start -> Stop: RPost configures the callback.
+- **The RSign login travels as plain run inputs** (email, password, reference key), so it lands in each
+  instance's input values. To keep it out of run history, move it into a REST API credential or a
+  sub-process before real use.
+- **What a real run needs, all from RPost:** an RSign account with API access (reference key + user login),
+  units on it, and an RSign template (template code, role ids, control ids). Ad hoc document upload is out of
+  the shipped processes' scope. Without an account none of it can be exercised; a run with a made-up login
+  still ends at status 50 (finished): the Call API answer is not checked, so check `statusCode` yourself.
+- **Moving the processes between workspaces:** `procesio export --processes all` from the imported
+  workspace and `procesio import` keep the process ids (the same ids exist in every imported workspace).
+
+### Read Mailbox output, and a regex match feeding a Data Store lookup (2026-10-29)
+- **Read Mailbox `Result`** is a list of the system model **`InboundEmailInformation`**: `sender`, `subject`, `body`,
+  `to`, `cc`, `bcc` (strings), `sendDate` (DateTime), `id`, `size` (Integer), `status`, `importanceLevel` (strings),
+  `fileIndexes` (list of Integer). Type a `For Each` item variable with that model and map `email.subject` /
+  `email.body` / `email.sender` by path. The docs page does not list the fields; read them with `datatype-get`.
+  Its `Filter` takes one `name: value` per row (`from:`, `subject:`, `deliveredAfter`...); a `from:` filter on a test
+  sender is a cheap guard that keeps a demo flow from ever answering a real person.
+- **RegEx Extract returns EVERY match, duplicates included.** Searching `subject + body` for an id that appears in
+  both gives a two-element list. A Data Store `Where` with `equals` bound to that list fails at run time:
+  `Data Store Decisional condition on column '<col>' (String): value '[...]' is not a valid String.` Put a
+  **Get Element** (index 0) between them and bind the scalar.
+- **Get Element on an empty list fails** with `Index exceeds the list's size.` Give it an `onError` branch (e.g.
+  forward the item to a person) when "no match" is a normal case: the run then finishes at status 50 with the error
+  recorded, instead of stopping at status 40. Inside a For Each, the error branch needs its own target action
+  (one incoming connection per action) and then joins the other branches.
+
+## SMTP credentials and Send Email: ports, encryption, sender (measured 2026-10-29)
+
+- **Outbound e-mail (SMTP) `Encryption` is None / TLS / Auto, and it is port-sensitive.** Measured with
+  `POST /api/Credentials/test` against a commercial relay: port 587 (and 25) connects with all three; port 465
+  (implicit TLS) connects ONLY with **Auto**. With None or TLS on 465 the test request never answers (the client
+  times out after 60 s), which reads like an outage. Rule: 587 -> TLS, 465 -> Auto.
+- **A wrong login answers state `125 CONNECT_TO_SMTP_ERROR`** with "Couldn't connect to SMTP. Either authentication
+  or connection data is invalid." followed by the server's own reason (e.g. `535 5.7.3 Authentication
+  unsuccessful`). In the UI that text sits in a read-only textarea (not DOM text): a script waits on the state
+  badge, not on the message.
+- **Send Email `From (Entity)` left empty falls back to the credential's `From`** (the mail arrived from the
+  credential's address, display name from `From (Display Name)`).
+- **A sender the relay does not accept fails the run (status 40) with the relay's own text as the action error**,
+  e.g. SendGrid's "The from address does not match a verified Sender Identity...". On SendGrid's relay the
+  credential is `smtp.sendgrid.net`, 587, user `apikey`, password = an API key with Mail Send.
+- **Call API `X_WWW_FORM_URLENCODED` body with `<%N%>` placeholders in the values** goes out as
+  `application/x-www-form-urlencoded` with the variables filled in (checked against a public echo service);
+  this is the shape an SMS provider's `/send` endpoint takes (e.g. SMSO: base `https://app.smso.ro/api/v1`, key in
+  the `X-Authorization` header, form fields `to`, `sender`, `body`; `GET /credit-check` is a free smoke test).
+- The docs.procesio.com integration pages still name the credential types "Rest API Configuration" and
+  "SMTP Server Configuration"; the type list now says "REST API" and "Outbound e-mail (SMTP)".
+
+## Checking an email address in a process: format, MX lookup, Decisional on a json answer (live, 2026-10)
+
+- **No-credential MX lookup.** Call API `GET https://dns.google/resolve?type=MX&name=<domain>` (Google's public
+  DNS-over-HTTPS JSON API) answers `Status` 0 with an `Answer` list of `{name, type: 15, TTL, data: "<pref> <host>."}`
+  for a domain that takes mail, and `Status` 3 (NXDOMAIN) with an `Authority` block and no `Answer` for a domain that
+  does not exist. A domain can also publish a "null MX" (`data: "0 ."`, RFC 7505: it accepts no mail), which still
+  has an `Answer`, so a check that only looks for `Answer` lets it through.
+- **The domain from an address**: RegEx Replace, expression `^.*@`, Replace with empty, gives the part after the at
+  sign as a plain string (RegEx Extract returns a list, which a URL template cannot use directly).
+- **Format**: RegEx Validate with `^[^@ ]+@[^@ ]+[.][a-z]{2,}$` and Ignore case writes a boolean into its Validation
+  result; a Decisional `IS_TRUE` on it routes. A character class `[.]` avoids backslashes, which are easy to lose when
+  the pattern travels through shell heredocs and JSON.
+- **Decisional on a json variable that has no data model**: a `{var, path: ["Answer"]}` operand is refused by the BE
+  validator (`Error converting value "Answer" to type 'System.Guid'`: a path step is an attribute id of a data model).
+  `CONTAINS` with the right operand `Answer` on the bare json variable saves and works at runtime (the value is
+  matched as text).
+- **Opening a side sub-panel marks the process changed.** Opening RegEx pattern (RegEx Validate) or Configure Request
+  (Call API) and closing it without touching anything greys out Run ("Please validate the process to ensure
+  consistency checks before running") until Save. Save first, then Run.
+- **Duplicate Stop names get a suffix on save**: three actions named `Stop` come back as `Stop`, `Stop (1)`,
+  `Stop (1) (1)`. Give each Stop its own name in an API-built process if the canvas is shown.
+- **Instance view side list** ("View all instances"): its rows have no Show details button; clicking the run's id
+  opens it in the same view (the small icon beside the id opens a new tab). Its search box is a placeholder
+  (`Search by id`), not text.
+
+## Get File Data and row-by-row criteria loops
+
+See [PROCESIO-GET-FILE-DATA-NOTES.md](PROCESIO-GET-FILE-DATA-NOTES.md): the two layers of Get File Data's Column Definition the builder does not write, and the designer-only checks (For Each body back-connection, Decisional operand types, Validate before Run).
+
+### Export / import in the UI: what travels, and what Override data really does (2026-10, measured)
+- **Where:** the `Import / Export` button at the bottom of the admin left menu (not in the Process Designer).
+  It opens "Select action" with Export and Import. API and UI both need the workspace Admin role.
+- **Export dialog:** file name (default `export`, `.procesio` appended), an `Export all` toggle, one checkbox
+  per type with `ALL | SELECT ITEMS`. Select items adds a tab per type ("Processes (n)", "Data models (n)",
+  "Credentials (n)") with a searchable table. `Export with sensitive data` appears only once Credentials is
+  ticked. After Export the footer button turns into `Close`; the file is handed over through
+  `URL.createObjectURL` (no server download URL).
+- **Import dialog:** a drop zone with `Choose file` (no `<input type=file>` exists until the button is
+  clicked), `Override data` (default off), `Import all` plus Processes, Data models, Data stores,
+  Credentials, Documents, Forms, all unticked by default (no Webhooks checkbox: webhooks ride inside flows).
+  Success is the toast `Import completed`.
+- **A process exported alone carries neither its data model nor its credential** (`DataTypes: 0`,
+  `Credentials: 0`); select them too.
+- **Without sensitive data** a credential travels with its settings (URL, key name, header flag) and its
+  secret value `null`. **With it**, the secret is in the file in an encrypted form and works after import.
+  An exported credential also carries its creator's `firstName` / `lastName`.
+- **Override data off:** a resource whose id already exists is skipped (a process renamed after the export
+  keeps its new name). **On:** it is replaced by id, whatever its name.
+- ⚠ **Override on + a credential exported without sensitive data empties the working credential's
+  secret.** Runs then send the auth header with no value (seen against an echo service). Untick
+  Credentials on import (`importCredentials=false`) to keep the existing one; re-importing a sensitive
+  export restores it.
+- **Ready-made use cases:** the docs moved them under `docs.procesio.com/docs/marketplace/...`; a page ends
+  with its `.procesio` file. The in-app PROCESIO Library (`/FlowZy/Marketplace/Usecases`) is a form app that
+  takes 30 to 40 s to load and never finishes with the push channel blocked. The docs say its `Get free`
+  imports into a NEW `MarketPlace_...` workspace (not tried: it creates a workspace).
+
+## Plan usage, limits and the Analytics pages (seen while filming, 2026-10-29)
+
+- **Where usage is shown.** A sub-workspace dashboard has a "Workspace usage" card (processing time in
+  hours, a month picker, average platform and custom action time). The MASTER dashboard has "Plan
+  details" (plan name, monthly processing time, "Buy resources", "Your SaaS Agreement"), a "Plan usage"
+  bar ("Processing time resets on <1st of next month>"; the info icon's tooltip is "Remaining processing
+  time: hh:mm:ss") and a per-workspace "Workspace usage" list. The personal workspace shows the same Plan
+  details card for its own plan.
+- **Analytics lives in the sub-workspace, not the master**: sidebar More tools > Analytics
+  (`/admin/analytics`). "Processes Analytics" has PROCESS NAME, TOTAL PROCESSING TIME, TOTAL PROCESS
+  RUNS, ACTION RUNS, LAST UPDATE and "View instances" per row, a month picker, no search, sorted by last
+  update. "View instances" (`/admin/analytics/instances/<processId>`) lists the runs: INSTANCE ID,
+  PROCESSING TIME, ACTION RUNS, STARTED ON, LAST UPDATE, SUBMITTED BY, STATUS, and "Show details" (the
+  run's own instance view). Its range picker defaults to "Last 3 days" (Last hour ... Last year, or a
+  month). Deleted processes are rolled into one "Deleted Processes" row.
+- **Both tables pick runs up minutes late** (a run was missing for 3 to 5 minutes, then appeared), and
+  the page size chosen at the bottom stays for the rest of the browser session.
+- **Action runs leave out Start, Stop and Delay**: a Call API followed by a 5 s Delay reads 1 action run
+  and a processing time that rounds to 00:00:00.00, while STARTED ON and LAST UPDATE are 5 s apart.
+- **A run can be recorded with 0 action runs and 0 processing time** although it did the same work as
+  its neighbours: two of three `run-process --synchronous` runs of one process, and later one of seven
+  asynchronous runs, while every other run read 1. Run a few more than you need when the counters
+  matter on screen.
+- **"Record time analytics" (master > Workspaces > Edit > Resource Tracking) does not gate the Analytics
+  pages**: process and instance analytics fill in with it off. It is off for a new sub-workspace, has a
+  "Time analytics end date" and a "Time analytics storage limit", and is the `isRecordingEnabled` flag of
+  `GET /api/ResourceTrackingConfig`; the per-action breakdown `GET /api/Resources/analytics/instances/{id}/details`
+  stays `[]` while it is off.
+- **Soft and hard limits, as the UI states them**: the soft limit is the plan's monthly processing time;
+  past it processes keep running and the extra time is charged; the hard limit is "30% processing time
+  on top of your current plan" (tooltip in the workspace form). `GET /api/Resources/used` returns
+  `limit.hard` as that 30% EXTRA in ms (a 100 h plan: soft 360000000, hard 108000000), not as the total.
+  At the hard limit the app's banner says "Process execution is currently suspended until usage resets."
+- **Per-workspace execution setting**: master > Workspaces > Edit > General > "Process execution
+  settings:" offers "Suspend process execution on workspace when Company workspace resources reach soft
+  limit to avoid extra cost generated." (the default seen) or "Do not suspend ... until the hard limit".
+- **"Request upgrade" is now "Buy resources"**: the dialog "Buy resources - <Plan> Plan" picks a monthly
+  amount (from "1 hour/month"), is "Paid annually", shows "Total to be paid (without VAT)", allocates the
+  hours to a new or an existing workspace and ends in "Continue to payment" (2Checkout). The bundle
+  still carries a "Request Upgrade" button text linking to the pricing page, not shown on any dashboard
+  seen. `/admin/execution-analytics` exists only for a master on a Thread licence (it redirects otherwise).
+
+## Find Duplicates and DeDuplicate: list deduplication, measured behaviour (live, 2026-10)
+
+Two Lists actions. **Find Duplicates** (template `327684ea-6ec3-4e73-a38e-de2a7c08fa4e`; the action tree
+names the same template "Duplicate Identification", so the docs' "Duplicate identification" how-to is this
+action) checks a list of objects. **DeDuplicate** (`d32f8c2f-1a0b-4da3-8bff-d6c8e8fcc72d`, "DeDuplicate list"
+in the tree) checks a list of plain values. Both take `List to process`, the code-editor string
+`Duplicate identification JSON configuration` (required on Find Duplicates, optional on DeDuplicate), and give
+`Duplicates found`, `Duplicates correlation` and the required `Deduplicate list`.
+
+- **Find Duplicates config**: `{"IdField": "id", "FieldMatches": [{"FieldName": "email", "MatchType": "Exact"}],
+  "Sort": [{"Field": "name", "OrderType": "Asc"}]}`. **`Sort` must be a JSON array.** The docs show it as an
+  object, which fails the run (status 40) with `Cannot deserialize the current JSON object ... into type
+  'System.Collections.Generic.List`1[...DeDuplicate.SortSettings]'`. Sort orders both the deduplicated list and
+  Duplicates found.
+- **DeDuplicate config** is flat: `{"MatchType": "Similar"}`. An empty config behaves like Exact.
+- Several `FieldMatches` rules are ANDed: a row is a duplicate only when every rule matches.
+- The FIRST occurrence is kept. `Duplicates correlation` is `[{"MainID": "<id as a string>", "CorrelatedIDs":
+  ["..."]}]`; for DeDuplicate the MainID is the value itself.
+- **Exact compares case-insensitively** (`Mark.Ellis@Example.org` = `mark.ellis@example.org`) but does not trim:
+  `"Sales "` is not `"Sales"`.
+- **Similar** removes spaces and punctuation, ignores case, reads ` at ` as `@`, and ALSO matches when one
+  cleaned value contains the other, for any value (the docs mention containment for phone numbers only). So
+  `Report` matches `Reporting`, `ana@example.com` matches `hana@example.com`, `Fabrikam` matches `Fabrikam GmbH`.
+  Expect false positives on short values; check the correlation before dropping rows.
+- `IgnoredTerms` is a literal, case-sensitive substring removal. With Exact, removing `GmbH` from
+  `Fabrikam GmbH` leaves a trailing space, so it still does not equal `Fabrikam`; remove `" GmbH"` instead.
+- Fuzzy (`"FuzzyAlgorithm": "Levenstein"`, `"FuzzyThreshold": 0.7`), Contains, Soundex (`"SoundexDistance": 4`)
+  and SimilarWordMatch (`"SimilarFirstNwords": 1`) all run as documented.
+- **DeDuplicate rewrites a numeric-looking string with a leading zero as an octal number**: `"0721000111"` comes
+  back as `"121897033"`, `"0040721000111"` as `"4416864329"` (seen with an Object-list input; a String-list
+  input not tested). Do not feed it phone numbers or codes with leading zeros.
+- UI: an Object-list variable's default value shows as `[object Object],[object Object],...` in the designer's
+  Run dialog and in Edit Variable's Default value field (saving that field would overwrite the list with the
+  text). The default itself is intact: an API run with `{}` uses it. A process with no input variables starts
+  at once from the designer's Run button, with no dialog.
+
+## OnPrem Agent v1.0.3 and its two actions, measured end to end (2026-10-29)
+
+Run for real: the shipped agent (`OnPremAgent_Net6_1.0.3`) in a .NET 6 runtime container, the
+two shipped NuGet packages installed in a workspace as custom actions, one process
+(CMD -> Delay -> Get Results). The behaviour below was measured, then confirmed in the
+decompiled agent and action code.
+
+- **The actions install like any custom action.** `OnPremCMD.0.0.11.nupkg` and
+  `OnPremGetResults.0.0.11.nupkg` go in with `customaction-upload`; a workspace without the
+  OnPrem subscription has neither action in its catalog until then. Inputs are addressed by
+  their LABELS in `customaction-test --values` ("On premise agent SID", "On premise agent
+  secret key", "Endpoint", "Time out (seconds)", "Working directory", "Commands to execute",
+  "Task ID"), not by the C# property names.
+- **The agent registers itself** at start with its host name and `SecretAgentKey`; nothing
+  is created in PROCESIO first. A wrong key and an unknown agent name fail the same way, with
+  the raw SQL text `Cannot insert the value NULL into column 'AgentGUID', table
+  '...AgentTasks'`: read that message as "agent name or key does not match".
+- **Task status is not a completion signal on Linux.** The agent's command runner is an
+  `async void`, so on Linux (where it awaits writing the temporary script) the task is
+  marked 2 (SuccessfullyExecuted) as soon as the command starts; Data results is still
+  null at that moment and fills in when the command ends. Wait on Data results / Error
+  results, not on status 2.
+- **A failing command still ends with status 2** (both platforms): standard error lands in
+  Error results and does not change the status. Status 3 only appears when the runner itself
+  throws. Always read Error results.
+- **The agent writes its temporary script into the working directory** (`<random>.sh` or
+  `.bat`, deleted afterwards), so a listing of that folder taken by the command itself shows
+  it. Point listings at a pattern, not at the whole folder.
+- **Time out (seconds)**: 0 or less becomes 600 s (action code). A process built over the
+  API with a NUMBER in the node's designer configuration shows the field EMPTY in the
+  designer (the runtime still gets the value); store the designer value as a string.
+- **Custom action icons must exist in the app's icon font.** An icon name the font lacks
+  (`terminal`) draws a blank node in edit mode; the node's own `customData.icon` is used only
+  in the instance view. `dns` works. The icon cannot be changed after upload: delete and
+  upload again (new template id, so processes using it must be rebuilt).
+
+## Data retention (once "HIPAA mode") behaviour (2026-10-29)
+
+- "HIPAA Mode" in the 2025 release notes is the feature now called **Data retention**, and it
+  is on every installation, cloud or self-hosted (product owner, 2026-10-29).
+- Changing a value in the designer's Data retention panel is NOT stored until the process is
+  saved (Run greys out meanwhile); `PATCH /api/Projects/{id}/dataRetention` stores it at once.
+- With delete-on-success = At end of runtime (1), a successful run's data is gone as soon as
+  it ends: `get-instance-status` on it answers 400 "Database requested information not
+  found", and `get-instance-output` 500. The synchronous run response still carried the
+  outputs.
+
+## List, text, number and date actions: measured behaviour (live, 2026-10)
+- **Palette folders:** List, Numerical, String (with sub-folders RegEx and URLs) and DateTime. Search by name
+  filters actions, not folder names, and shows each hit under its folder. A few names exist twice in different
+  folders (Add, Contains, Get Index, Length, Concatenate): in a `process-create` config pin those by template id.
+- **Select options take their option VALUE in a builder config, not the label** (a label fails the designer gate
+  with `VALUE_INTEGER`): First/Last N `Sorted:` 1 Unsorted / 2 ascending / 3 descending; Sort `Input Order (A/D)`
+  `ASC` / `DESC`; Update DateTime `Unit Of Time` 1 Year ... 3 Day ... 6 Seconds; Date Difference `Unit of Time`
+  4 Day ... 8 Year; Get Week Number rules 1-3; Language fields take a culture (`ro-RO`, `en-US`).
+- **Side-panel actions build from their inner labels.** RegEx Extract / Validate / Replace, Similarity Search, Filter,
+  Simple Filter and Sort Data Model keep their fields inside a side panel; `params` keyed by the inner labels
+  (`RegEx expression`, `String to extract from`, `Filter JSON configuration`...) build and run.
+- **Sort changes the list in place** (input and output are the same variable). **First N Elements' `Sorted:`
+  option sorts only the N items it returns**: on an unsorted list it takes the first N, then orders them.
+- **Zero-based positions:** Get Index, Get Element, Substring (`Input Position`) and Take From Middle
+  (`Index starting at`). List To String renders a number list as `[1200,1200,640,250,80]`.
+- **Contains (list)** takes the item as text and matches a number list (`"1200"` in a Double list is true).
+- **To Title Case leaves a word written in capitals unchanged** (`ȘTEFAN popesku` -> `ȘTEFAN Popesku`): run
+  To Lower first. Normalize Diacritics turns `Ș` into `S`. Trim Start / Trim End trim one side.
+- **RegEx Validate is a search, not a whole-value match** (`[0-9]+` on `order 4521` is true); anchor with `^...$`
+  for a full check. RegEx Extract and Between return LISTS. Patterns without backslashes (`[0-9]`, `[.]`) avoid
+  escaping trouble when a config passes through a shell.
+- **Similarity Search** (threshold 0-1, default 0.85, limit 100) found a one-letter typo at 0.8 and returned only
+  the close name. Simple Filter `{"MatchType":"Contains","FilterExpression":"x","KeepIfTrue":true}` and Filter
+  `{"FieldMatches":[{"FieldName":"city","MatchType":"Exact","FilterExpression":"x","KeepIfTrue":true}]}` both keep the
+  matching items.
+- **⚠ Sort Data Model compares numeric fields of a Json list as TEXT:** `amount` 1200 / 250 / 80 sorts Asc as
+  1200, 250, 80 and Desc as 80, 250, 1200. Sort numbers with Sort on a number list, or pad them.
+- **Modulo takes Integers only** (a Double variable fails the BE validator with a data type mismatch). Round,
+  Round Up and Round Down take a digit count (246.912 -> 246.91 / 247.0 at one digit up / 246.9 down).
+- **String To Number** parses `1234.56`. **String To DateTime** with `Format` `dd.MM.yyyy` reads `05.11.2026`.
+  Update DateTime accepts a negative amount (goes back). Format DateTime takes a .NET pattern
+  (`dddd, d MMMM yyyy`, `en-US` -> `Saturday, 5 December 2026`); DateTime To String takes a standard letter
+  (`D` in `ro-RO` -> `sâmbătă, 5 decembrie 2026`). Today returns midnight UTC; UTC Now carries the time.
+  Date Difference / Time Difference count whole units from the first to the second date.
+
+
+## Webhook query parameters, and a webhook as a tracking pixel (2026-10)
+
+A webhook launch answers **any verb**, a plain `GET` included, with `200` and an empty
+`application/json` body, so an `<img src="<webhook URL>?id=...">` in an HTML email fires the
+process when the mail app loads the image. Verified end to end with a real email: SendGrid-backed
+SMTP delivered the tag untouched, and loading its `src` ran the bound process within seconds.
+
+| ⚠ trap | what happens | do this |
+|---|---|---|
+| `webhook-create` with `hasQuery: true` | saved as `hasQuery: false`; `webhook-edit` does not change it either | create the webhook in the UI: Advanced configuration, tick **Query parameters**, Start listening, call the URL once (any `?k=v`), Save. Then `hasQuery` reads back `true` |
+| the Query parameters checkbox | a mouse click on it only focuses it the first time | click it, then press Space; check the box's `--checked` class |
+| a binding with ONLY a Query variable (`variableType: 2`) | every launch creates an instance that stays at status 1 (starting), 0 actions, forever | bind like the designer does: three input variables, `<name>` = Body (3), `<name>_params` = Query (2), `<name>_header` = Header (1) |
+| a Body-only binding | runs, but the variable holds only the (empty) body, never the query | as above |
+| a `/` in a webhook name | the UI refuses it ("special characters are not accepted"); REST accepts it | name webhooks with spaces |
+| the webhook's edit panel | shows the URL and "Listen for another event", not Advanced configuration | the query setting is visible only while creating |
+
+**What the process receives.** `<name>_params` is a list of name/value pairs, values always a list:
+`[{"Key": "id", "Value": ["<the id>"]}]`. `<name>_header` is an object of lists. Read one value with
+JSON Mapper (Extract Objects), Query `$[0].Value[0]`, Result bound to a string variable.
+
+**Every load is a launch.** A second load of the same URL ran the process again (an update of
+the same row moved to the newer time). A mail app that blocks images never calls it.
+
+**SendGrid SMTP adds its own open-tracking pixel** (`url<n>.<domain>/wf/open?upn=...`) to every
+HTML body it relays. It is SendGrid's, not the process's; it does not interfere with a webhook pixel.
+
+## Data Store node built over the API: the designer shows "Select Data Store" empty
+
+The builder saves the store id in the action's `customData` setting with `options: []`. The run
+works, but the designer's dropdown has no label for the id and shows blank, which looks
+unconfigured on screen. Put the store in that setting's options before a PUT:
+`{"name": "<store name>", "value": "<store id>"}`; the dropdown then shows the name. A `guid`
+variable mapped into a String column of a Data Store insert is stored as its text form.
+
+## Designer Schedules tab, saving a scheduled process, and an SMTP credential's login (live, 2026-10)
+
+- **The process designer's Schedules side tab lists every schedule in the workspace**, not only
+  the schedules that target the open process (seen with a schedule of another process in the
+  list). Each card's switch enables or disables that schedule at once (the card then shows the
+  next run). Anything that clicks in that panel by position can therefore hit another process's
+  schedule: filter with the panel's search box first, then act inside the card that carries the
+  schedule's name.
+- **Saving a process that a schedule targets asks first**: "Save changes? This process is part
+  of a schedule. Are you sure you want to save?" with Cancel / Save Changes. Nothing is saved
+  until Save Changes is clicked.
+- **Opening a Call API action's Configure Request panel can mark the flow as changed** without
+  any edit: the Run button greys out until the process is saved again (observed in the
+  designer; the saved flow still runs the same).
+- **An "Outbound e-mail (SMTP)" credential needs a Username.** Creating one with an empty
+  Username is refused `400` with statusCode 113 "Required credentials fields should not be
+  empty." target `Username`, even for a server that takes no login.
+- **A public test SMTP server is not a dependable demo target.** A free no-login SMTP sink that
+  answered nothing on ports 25, 587, 2525 and 465 made Send Email fail after about two minutes
+  with "The operation has timed out.", and the credential's /test probe timed out as well. Use
+  a real, tested SMTP credential and a mailbox you control for anything that must arrive.
+- **A Query Store date filter for "yesterday"** works on a DateTime column with
+  `WHERE DATE(<col>) = CURDATE() - INTERVAL 1 DAY`; `CURDATE()` is the server's UTC date, so a
+  run scheduled early in the morning on a Europe/* clock still sees the right day.
+
+## Form logic: events, charts, stepper and designer publish (measured 2026-10, form-logic tutorial build)
+
+- **Node action: a string variable injected as `<%N%>` lands unquoted.** `const s = <%0%>;` with a string
+  input becomes `const s = Afternoon;`, the script throws, and the run still ends **success (50)** with the
+  output `null` (an API run shows every variable `null`). Quote it: `const s = '<%0%>';`. JSON and number
+  variables inject fine unquoted. A Node returning an array must bind **List Result**; an array returned into
+  **Single Result** also comes back `null`.
+- **Chart fed by a process.** Map the process output into the chart's `seriesSourceValue` config
+  (`form-set-element-event ... --config '{"outputMap":[{"left":"<procVar>","right":"<chart>.seriesSourceValue"}]}'`
+  resolves the element-config path). The value must be **JSON text** (a string output, e.g. Node
+  `return JSON.stringify([...])`); a list output reaches the chart and draws nothing. The chart's `height` needs
+  a CSS unit (`"300px"`): a bare number draws an empty card. A stepper's `onStepChange` (Trigger process) is a
+  good place to load it: the chart element itself has no events.
+- **Stepper built over the API**: the stepper's `steps` config keeps the template default `["Step1","Step2"]`,
+  so the designer shows only two step headers even when three `step` children exist; set it to the step
+  labels. A `button` nested in a step is created with `section: "footer"` and renders after every other field
+  of that step; set `section: "body"` to keep it where it was declared.
+- **`goToNextStep()` / `goToPreviousStep()` exist only on a form published from the designer.** On a form
+  created or updated over the API the call throws `... goToNextStep is not a function`, and after that JS
+  error the published form greys out every control. Open it in the designer, Save, Publish (the docs say the
+  same for forms published before v2.0.7). An API `form-update` afterwards removes them again.
+- **Designer: Publish is disabled after any edit until you Save.** Save stores the template as a draft
+  (`status 0`); Publish sets it back to `1`. A reset script that restores a form over the API must also send
+  `--status 1 --state true`.
+- **Trigger form is only offered on form-level events** (onLoad, onBeforeSubmit, onAfterSubmit), not on element
+  events (those offer Trigger process, Trigger JavaScript, Map form variable, Data store operation). In its
+  "Map forms data" panel the target form's field shows as an `Unknown` chip, yet it works: an onAfterSubmit
+  Trigger form created a submission of the other form carrying the mapped value. Read submissions with
+  `get-form-by-pid-all --pid <formId>`; values sit in `data.valueMap`, keyed by each element's value-config id.
+- **Interval (ms)** is shown only on `onReady` triggers (the chat has one); every trigger has Debounce (ms).
+- **Query-string prefill also works for a select** (`?session=Afternoon` picks the option), not only inputs.
+- A public form opened in a browser that is signed in to PROCESIO shows `Workspace: <the user's personal
+  workspace>` in its header; signed out, no workspace line.
+- After a submit attempt with an empty required select, its "This field is required." stays visible even
+  after an option is picked (the value is taken; only the message is stale). Avoid the empty required field.
+- Designer element overlay: the copy icon (`.form-builder--element--overlay--header--left`) duplicates the
+  element right below it with the same label and settings and a new name (`input1`); the overlay's cross
+  deletes the element at once, no confirmation. Duplicating then deleting by position deletes the original if
+  the selector picks the first match: address the copy by its new id.
+
+## Forms: user task forms, assignees, approvals and the task inbox (live, 2026-10)
+
+- **Type**: `type` 0 = user task, 1 = general (list badge "user task" / "general"). Assignees live on a
+  `section`, a stepper `step`, `tabs` and a data `table` (`assignee`, `assigneeReplacement`); the `approval`
+  element has its own `approver`, `approverReplacement`, `commentRequiredOnApprove`, `commentRequiredOnReject`.
+  `form-set-element-config` sets all of them and re-derives the form's top-level Assignees.
+- **A form with assignees is private only**: the designer greys out Make form public. Preview as lists the
+  assignees plus "Unassigned member"; for an unassigned member an approval is drawn greyed out, and a section
+  with visibility "Only task assignees" is not drawn at all.
+- **A user assigned to a later step sees all their steps at once** when they open the form's base URL (the
+  approval replaces Submit), so one account can never send a task to its own inbox through the page. A form
+  whose earlier section is assigned to someone else shows that section read only.
+- **What the page sends on Submit**: `POST /api/form` with `{id, pid, chainId, chainStage, chainData[0]{startOn,
+  state, userId, elements, valueMap}, workspaceId, name, data{elements, valueMap, ...}, nextStep,
+  overrideAssignees[{stepId, orderId, users[{userId}], type}]}` (type 1 = assignee, 2 = approver). The CLIENT
+  sends `overrideAssignees`, and the server keeps them as the instance's assignees: changing the template's
+  assignee afterwards does not move a pending task. The form snapshot travels twice (`data.elements` /
+  `data.valueMap` and `chainData[0].elements` / `valueMap`); the review page draws the answers from `data`.
+  Replaying a captured body with new `id`/`chainId`, new answers and the wanted user in both snapshots and in
+  `overrideAssignees` files a real pending task (a test fixture for the inbox with a single account).
+- **Inbox**: `GET /api/Form/assigned?awaitingAction=true` is the Open tab; without the flag it also lists
+  instances the caller submitted. UI: `/admin/form-assignments` (Open / Completed, Review button), the review
+  page is `forms.procesio.app/forms/assignments/<instanceId>`. The inbox is per user, so every test run by the same
+  account in the same workspace lands in one list; its search box filters by form name after a short debounce
+  (about 3 s), and leaving the page drops the filter.
+- **Assignment email**: from `nocode@procesio.com`, subject "Form action request from <name>", body "New Form
+  Assignment ... Complete form", link `procesio.app/admin/form-assignments/<instanceId>#<workspaceId>`. Sent with
+  no configuration. "Set form notifications" (designer right rail) is separate: addresses + submitted / failed.
+- **Comment required on reject**: the comment placeholder becomes "(required on reject)" and Reject stays
+  disabled, with the tooltip "Please make sure that required comment is set", until a comment is typed.
+- **Submissions**: `/admin/forms/submissions/<formId>`; the default view shows submitter, stage, assignees,
+  approvers, step; View data shows one column per field. Export to Excel downloads
+  `export_form_<name>_<ms>.xlsx` (sheet "Data": Submission date, one column per field label, the approval as
+  "Approved (<comment>) by <user> at <date>"). Deleting the form template deletes its instances too.
+- **Dashboard app** ("Mark as an application", designer right rail): a `FormApplication` with `type` 2, needs a
+  name and an image (upload, or a URL; an `.ico` URL renders as a broken image). It saves on its own (no form
+  Save/Publish); remove with `DELETE /api/FormApplication/{id}` (`get-formapplication-all-by-pid`). Apps with
+  `isProcesio: true` (for example the RSign card) belong to another workspace and show on every workspace
+  dashboard: these are the "global forms" PROCESIO publishes; the endpoint that publishes them is internal.
+
+## Data Store in the designer, the viewer and forms: seven measured behaviours (2026-10)
+
+Measured while filming a Data Store tutorial in a clean workspace (UI and REST, same build).
+
+- **A Data Store action's store list is frozen when the action is DROPPED.** The node saves the option list the
+  `OnReady` event returned (`POST /api/actions/event`), and reopening the designer does not ask again: a store
+  created after the drop never appears in that action, reload or not. An action built over the API (process
+  builder, `put-projects`) never ran the event, so its list is EMPTY ("No data available"). Drop a fresh action
+  from the toolbox after the store exists. The form designer's "Select data store" list is live (it has a
+  reload button), so this is a process-designer trait only.
+- **The store-name rule differs between UI and REST.** Create Data Store refuses `/` ("Error: special characters
+  are not accepted") and spaces ("Error: space is not accepted"); `POST /api/DataStore` accepts both.
+- **Form events do not run in Preview.** Preview made no call to `api/Form/dataStore/.../rows`, so a table fed by an
+  `onLoad` Data store operation stays empty there; the published form URL
+  (`https://forms.procesio.app/forms/<formId>#<workspaceId>`) runs it. Save leaves a draft; Publish is needed.
+- **A form table is fed through its `value`, not the element.** In "Map data and filter rows", Rows must point at
+  `form > fields > <table> > value` (the list); picking the table node itself saves a 3-segment path that renders
+  "Row is empty". Give the heading and the table different names, or the picker shows two identical entries.
+- **The anonymous form path reads AND writes every store in the workspace.** With only the public form's
+  `formTemplateWorkspaceId` + `formTemplateId` headers (no auth), `POST /api/Form/dataStore/{id}/rows/filter`
+  returned 200 for a store the form does not reference, and `POST /api/Form/dataStore/{id}/rows` inserted a row
+  into it (`affectedRows: 1`). Extends the read-only measurement above to writes.
+- **The viewer shows DateTime values as UTC converted to the browser's zone.** A value written
+  `2026-10-01T09:00:00` displays as 12:00 PM in a UTC+3 browser, and Edit Mode's date picker shows the shifted
+  time too. Committing an edit to another column of that row left the stored value unchanged.
+- **A process with no input variables runs at once** from the designer's Run button (no Run Process dialog), and a
+  CSV import into keys that already exist updates those rows (UpdatedOn changes, the count stays the same).
+- **Where builder:** the badge between two conditions toggles AND/OR, and its tooltip reads "AND has priority over
+  OR in evaluating conditions". Measured on a Select: `City = X OR Amount > 1000 AND Paid is false` returned the
+  AND-first count. `is false` takes no value; the operator list depends on the column type.
+
+## Form Designer in the web app: behaviour seen while filming a form tutorial (2026-10)
+
+UI facts of the Form Designer (`/admin/forms/designer`), measured by driving it, not from the docs:
+
+- **A new form is private** (`isPrivate: true`) and is a draft until Publish. Publish shows only a toast ("Form was published successfully."), no dialog, and creates **no** `CustomUrl` entity: the Share form panel shows `https://forms.procesio.app/forms/{formId}#{workspaceId}`. No custom-URL or short-link field appears in the designer when the workspace and master have no custom URL configured (`GET /api/CustomUrl/MasterWorkspace` and `/Workspace` both empty).
+- **Share form** holds Form URL, Iframe embed code, and two switches, `Make form public` and `Hide branding` (the "Built with PROCESIO" bar under a published form). The switches are `input[role=switch]` of zero size inside a `label`; click the `.pds-c-input-group--selection` span next to them.
+- **The form list groups by the name part before "/"** into a folder row that starts collapsed. A search that matches one form shows it flat; two or more matches come back grouped and collapsed again, so a script must open the folder row.
+- **Duplicate** (row menu) makes "<name> (Copy)" as a disabled draft (`status 0`, `state false`). Delete asks for confirmation ("Delete "<name>" form?").
+- **Heading and Paragraph text are Monaco editors** in the element settings (a 1-px hidden textarea): click `.monaco-editor .view-lines`, then select all and type. A heading's text field is not an `<input>`.
+- **Drop slot rule:** dropping a toolbar element over an existing element inserts it BEFORE that element. To append at the end, drop just under the last top-level element (in the gap above the button row); dropping on the button row itself does nothing. Drag from the element's preview card in the toolbar, not from its label text.
+- **Columns** starts with four columns; the settings list them with a delete icon each. A field dropped on `#column1` lands inside it.
+- **Select input > Data Source**: Source type is Static list, JSON or URL; a static list is a Label/Value table that adds an empty row after each filled one (`input[placeholder='Insert label']`, `'Insert value'`).
+- **Button** default Action is Submit; a published form's submit shows the Personalize messages text "Upon submission (no approval pending)" and lands in Submissions with one column per field.
+- **Theme > Colors** has a Light and a Dark set. A viewer in dark mode (the app's appearance menu: Light, Dark, System, high contrast; the public form page has the same menu) gets the Dark set.
+- **Custom CSS classes**: every class name in the form's CSS (Switch to code > CSS) is offered under the element's Styling > Apply CSS classes, and is put on the element's wrapper div (so style the inner control, e.g. `.pill button {...}`). The theme's own border radius wins unless the rule is `!important`.
+- **Date-time input** settings: Mode, Inline view, Min/Max value, Available and Disabled intervals, Minute interval. The picker on the live form has a "Today" button.
+- **File upload** settings: Allow multiple files upload; Validation holds Required, Max file size, Allowed file types.
+
+## Webhooks in the UI: listen vs manual, answering the caller, filter rules; API keys and the run call (2026-10-29)
+
+Measured on the live web app and the Web API.
+
+**Creating a webhook (Automation > Webhooks > Create webhook)**
+- The name refuses special characters, `/` included ("Error: special characters are not accepted"). The API
+  (`POST /api/Webhooks`) accepts a name with `/`, so an API-made webhook can carry a name the UI rejects.
+- Two ways to get the payload shape: **Start listening** (default) or, in the button's arrow menu, "I want to
+  manually define webhook payload" (a JSON editor, then Generate data model). `GET /api/Webhooks/{id}` shows
+  `type: 0` for listen and `type: 1` for manual.
+- ⚠ **Only a listening webhook has Configure Response** (Handshake response body, Custom response body). A
+  manual-payload webhook shows no Configure Response at all, in create or in edit, and its
+  `customResponseConfig` stays `null`.
+- **Advanced configuration > Capture on webhook: Headers, Query parameters** (both ticked by default, listen
+  mode only; DTO `hasHeader` / `hasQuery`). With them on, assigning the webhook creates three variables: the
+  payload one plus `<name>_params` and `<name>_header` (Json).
+- Start listening is disabled while Configure Response is open ("Close Configure Response panel to Start
+  listening for events"). The listen screen runs a 5-minute timer and receives the sample event over the push
+  channel (`notifications.procesio.app`): a browser that blocks it never sees the event, although the POST to
+  the launch URL answers 200.
+
+**What the caller gets back**
+- Custom response body, Static response (JSON), defaults to `<%request.content%>`: the caller gets its own
+  request echoed (`customResponseConfig: {"configType": 1, "config": "<%request.content%>"}`). Ctrl+I in that
+  editor opens a selector with `request.content`, `request.headers`, `request.params` and `response.content`
+  (list<Object>).
+- ⚠ **`<%response.content%>` makes the launch wait for the process** and answer with the process's own
+  Custom response (designer side tab Custom response, flow field `customResponse`) as a JSON list, e.g.
+  `["Welcome, Ana"]`, in about 1.1 to 1.4 s for a one-action process.
+- A manual webhook, or one without that template, answers an empty 200 at once, even when the bound process
+  sets a Custom response.
+- ⚠ **With `<%response.content%>`, an event the filter rules reject gets no HTTP answer at all**: the call
+  was still open after 400 s. A malformed template (a stray `>`) also left the launch hanging.
+
+**Assigning (designer side tab Webhooks > Assign webhook)**
+- The local variable is an **input** variable (`type: 10`) of the webhook's data model, renameable in the
+  panel; the binding's `webhookVariables` entry is `variableType: 3` (Body).
+- Filter rules: the left operand picks an attribute of the payload, operators start with equals / does not
+  equal / contains / belongs. A non-matching event starts no instance (without `response.content` its caller
+  still gets an empty 200).
+- A webhook-started instance shows `Submitted by: Webhook: <name>` in Process instances.
+- ⚠ **Unassigning (clear Select webhook, save the panel, save the process) also removes the webhook's
+  variables from the process**; actions bound to them are left pointing at nothing.
+- Deleting a webhook still bound to a process is refused: `400`, `statusCode 501`, "User is not authorized
+  for the requested action.", target "Webhook with the id : <id> is used inside flows".
+  `GET /api/Webhooks/{id}/used` lists the processes that hold it.
+
+**API keys (Automation > API Key)**
+- Up to 25 keys at a time (page text). Create API Key asks for an optional **Name** (DTO `label`); the
+  generated **Key handle** is DTO `name`. The value is shown in the table once, with a warning that it is
+  encrypted after you leave the page; a pencil renames, the bin asks "Revoke API key?" (Revoke).
+- `POST /api/Projects/{id}/run` with headers `key` = the handle, `value`, `workspaceid` and body
+  `{"payload": {<inputs by name>}}`. A `workspace` header with the workspace NAME (as the public docs page
+  describes) answers 403. `?runSynchronous=true` answers with the process's Custom response body as it is
+  (a bare JSON string such as `"Welcome, Ana"`) when one is set; without it you get `{"instanceId": ...}` at
+  once.
+- CORS on webapi allows the origin `https://procesio.app` for both the launch URL and the run call, with the
+  headers `key, value, workspaceid`, so a page on procesio.app can send either request with `fetch`.
+
+## For Each frame layout and the loop's instance view (2026-10-29)
+
+- **The layout engine sizes a For Each frame for ONE row.** When the loop body fans out (a
+  Decisional into three branches), the created frame (`customData.areaSize`, here 416 x 200)
+  covers only the top row and the other branches are drawn outside the shaded box. Set
+  `areaSize` yourself to cover every child (children are frame-relative, see above) and PUT
+  the flow back.
+- **The frame centres its inner Start vertically**: the inner Start (and the frame's in and out
+  ports) sit at `areaSize.height / 2`. Put the loop's main row at `height / 2 - 24` and fan the
+  branches above and below it; changing the height moves the row, so recompute both together.
+  Branch labels sit on the vertical segment near the Decisional: leave about 170 px between
+  branch rows or a label overlaps the caption of the node above it.
+- **The instance view of a loop run marks the LAST item's path**: the canvas shows the checks
+  for the branch the final item took (the other branches show a plain outline, not a check).
+  Do not read it as "the other branches never ran"; check the per-item effect (here, the
+  emails each branch sent).
+- **Send Email's Subject picker (the plus) lists a data-model variable's attributes**; picking
+  one stores the Subject as `<%N%>` with `variable[N].attribute.attributeId` set, so literal
+  text plus a picked attribute is a valid, bound template.

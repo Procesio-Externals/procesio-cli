@@ -68,6 +68,22 @@ chip red ("Unknown") and fails the step. Names with spaces/special chars work be
 never enters the SQL. **System columns** `CreatedOn`, `UpdatedOn`, `CreatedById`, `UpdatedById`
 are NOT in the picker; type them by name (e.g. `WHERE CreatedOn > @since`).
 
+**Measured live (2026-10-29):** a store renamed with `PUT /api/DataStore` (name only, columns
+sent unchanged) and a column renamed with `PATCH /api/DataStore/{id}/column` both left a saved
+Query Store node returning the same rows. ⚠ **Renaming a column through the full `PUT`** (same
+`columnId`, new `name`) is NOT a rename: the column keeps its id, so chips still resolve and the
+query still runs, but **every value in that column is gone** (NULL on every row), with a success
+response. The query then quietly matches nothing, which reads as a broken chip and is not. Rename
+a column only with the PATCH (`datastore-modify-column`, `{originalColumn, updatedColumn}`).
+
+The designer's Ctrl+I picker (Configure Query side panel) lists the process variables first, then
+**Data Stores > store > columns**. Its search filters stores by name, so searching a store's
+distinctive name shows that store alone with all its columns; clicking the store row inserts the
+table chip, a column row the column chip. In the editor the chip reads
+`<%DataStores.<store>.<column>%>`, so long store names make long lines: lay a query out over
+lines. **Esc** in the editor enlarges it to the whole page (and shrinks it back); the same works
+on a Test Action output field, which is how a long error message is read in full.
+
 ## Parameters (always use them for external values)
 - Write `@name` in the SQL; map it below the editor to a fixed value or a process variable.
   A parameter value is always **data, never SQL** (injection-safe).
@@ -338,6 +354,19 @@ Query Store only ever touches the Data Stores of the workspace the process runs 
 - On failure the step routes to its **error port**; wire an error branch and capture the
   message in an `Error`-typed variable.
 - **Test Action** runs the step alone (the vertical tab on the properties panel).
+  Its test values come from the process variables' defaults. A finished test shows `Test
+  status: Finished` and every bound output (Result Rows as JSON, Total Count); a refused or
+  failing statement shows `Test status: Error`, the platform's message under `Test error
+  message` and `Test error code` 400. The result arrives over the push channel.
+- Measured 2026-10-29 (one run each): a refused statement's run ends at status 40 with the
+  refusal as the action error, e.g. `Statement type 'DROP' is not allowed. Allowed statement
+  types: SELECT, WITH, INSERT, REPLACE, UPDATE, DELETE, SET.` (prefixed `Statement 2: ` when it
+  is the second of a script), `References to system schemas are not allowed in queries.`, and
+  `Statement 1: Statement type 'START' is not allowed. Session, transaction, lock, and
+  prepared-statement control is not available in queries.` A parameter holding `x' OR '1'='1`
+  matched nothing (bound as data). An `UPDATE` touching two rows gave Total Count 2 and empty
+  Result Rows. `UPDATE ...; SELECT ...; SELECT ...` failed with "Expected maximum one table but
+  received 2 tables!" and the UPDATE stayed committed.
 
 ## Authoring a Query Store node with the tool (process-create / process-edit)
 

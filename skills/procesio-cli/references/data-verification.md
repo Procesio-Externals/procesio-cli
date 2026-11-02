@@ -9,6 +9,7 @@ Change a PROCESIO data model or data-processing workflow and prove the resulting
 - Identify workspace, data-model/process ID, target database or file, credential profile, environment, expected rows/fields, transaction/idempotency behavior, and safe test key.
 - For SQL Server tuning, load `sql-server-optimizer`; this playbook owns platform execution and end-to-end proof.
 - Confirm database/query tools are configured without exposing credentials.
+- Confirm the query tool reads the database the process writes: a local profile and the workspace credential can point at different databases. When in doubt, read through the process's own credential with `customaction-test --action "Execute Query"`, one batch per call.
 
 ## Inspect
 

@@ -1,4 +1,4 @@
-# 03 — The runtime DOM: selectors, structure, and what you may rely on
+# 03 - The runtime DOM: selectors, structure, and what you may rely on
 
 The reference you need open while writing CSS or any `querySelector`. Two selector
 families, two very different levels of trust.
@@ -7,16 +7,16 @@ families, two very different levels of trust.
 
 ## 1. The two families
 
-### `.form-builder--*` — the renderer's own classes. **Trustworthy.**
+### `.form-builder--*` - the renderer's own classes. **Trustworthy.**
 
 They live in this platform's own SCSS, they are stable, and they are the ones to
 build on.
 
 | Selector | What it is |
 |---|---|
-| `.form-builder--form` | the card — the outermost form container |
+| `.form-builder--form` | the card - the outermost form container |
 | `.form-builder--form-body` | the scrolling body inside the card |
-| `.form-builder--element[data-element-id]` | **one control** — the unit you iterate |
+| `.form-builder--element[data-element-id]` | **one control** - the unit you iterate |
 | `.form-builder--columns` / `--column` | layout containers |
 | `.form-builder--stepper` | the stepper as a whole |
 | `.form-builder--stepper--container` | the **active step's content** |
@@ -27,7 +27,7 @@ build on.
 | `.form-builder--file-upload--description` | the dropzone's helper line |
 | `.form-builder--button` | a button control |
 
-### `.pds-c-*` — the design system. **Use with care.**
+### `.pds-c-*` - the design system. **Use with care.**
 
 These come from the `@procesio/procesio-design-system` npm package, whose internals
 are **not in this repo**. Only the ones the renderer's own SCSS references are safe;
@@ -38,7 +38,7 @@ anything deeper must be verified against a live render before you rely on it.
 | `.pds-c-input-group--wrapper` | the box around an input |
 | `.pds-c-input-group--wrapper--focused` | focused state (also use `:focus-within`) |
 | `.pds-c-input-group--wrapper--is-error` | platform validation error state |
-| `.pds-c-input-group--label` | **the field's label** — your primary identification handle |
+| `.pds-c-input-group--label` | **the field's label** - your primary identification handle |
 | `.pds-c-input-group--message--is-error` | the error message node |
 | `.pds-c-input-group--square` | the checkbox square |
 | `.pds-c-radiobox` / `.pds-c-radiobox--is-checked` | radio dot and its checked state |
@@ -63,7 +63,7 @@ function fields() {
 ```
 
 **The active step's content is `.form-builder--stepper--container`.** Its direct
-element children are the controls of the current step — that is the handle for
+element children are the controls of the current step - that is the handle for
 staggered entrances and for the leave/arrive transition:
 
 ```css
@@ -71,8 +71,8 @@ staggered entrances and for the leave/arrive transition:
 ```
 
 **Controls are recreated, not hidden** (`v-if`). So:
-- entrance animations re-fire on every step change — free, and desirable;
-- **exit transitions are impossible** — by the time you would animate it out, the
+- entrance animations re-fire on every step change - free, and desirable;
+- **exit transitions are impossible** - by the time you would animate it out, the
   node is gone. Animate the *container*, not the departing control ([05](05-STEPPER-AND-MOTION.md) §4);
 - never store state on a node; recompute it ([02](02-CODE-INJECTION.md) §6).
 
@@ -106,8 +106,8 @@ function fieldKey(el) {
 ```
 
 **Order the list from most specific to least.** A substring match on a shorter
-label will swallow the longer one — `'id doc — series'` matches inside
-`'id doc representative — series'`, so the representative's field would be keyed
+label will swallow the longer one - `'id doc - series'` matches inside
+`'id doc representative - series'`, so the representative's field would be keyed
 wrongly if it came second.
 
 Normalize diacritics on **both** sides of every comparison. A form written in
@@ -140,7 +140,7 @@ function currentStep() {
 
 **Return a sentinel for "unknown" and honour it.** When the step cannot be
 identified, leave the indicator exactly as it was rather than guessing. Wrong
-information is worse than a stale frame — a progress bar that jumps to 100% because
+information is worse than a stale frame - a progress bar that jumps to 100% because
 the match failed actively misleads.
 
 ## 5. CSS traps specific to this renderer
@@ -149,11 +149,11 @@ the match failed actively misleads.
 
 Every platform-rendered element carries a `data-v-<hash>` attribute, and the rules are
 written as `.pds-c-message[data-v-<hash>] { … }`. A node built with `createElement` has no
-such attribute, so copying the platform's class list is **not** enough — the scoped rules
+such attribute, so copying the platform's class list is **not** enough - the scoped rules
 never match it. The symptom is a widget that works but looks wrong.
 
 Never hardcode the hash; it changes on every frontend rebuild. Clone an existing native
-node of the same kind instead — `cloneNode(true)` carries the scope attributes, the inner
+node of the same kind instead - `cloneNode(true)` carries the scope attributes, the inner
 markup and the theme for free.
 
 Worked example, with the inner-structure details and the "exclude your own node from the
@@ -164,7 +164,7 @@ template query" trap:
 
 The card is the scroll context. Clipping it makes the page unscrollable and the
 lower half of a long form unreachable. If you need something clipped to the card's
-rounded corners, **paint it as a background** — backgrounds are clipped to
+rounded corners, **paint it as a background** - backgrounds are clipped to
 `border-radius` automatically:
 
 ```css
@@ -181,7 +181,7 @@ rounded corners, **paint it as a background** — backgrounds are clipped to
 A `transform` on an ancestor makes that ancestor the **containing block** for
 `position: fixed` descendants. The renderer's pinned footer then anchors to the
 card instead of the viewport and lands on top of the content. **Entrance animations
-on the card must animate `opacity` only** — never `transform`, `filter`,
+on the card must animate `opacity` only** - never `transform`, `filter`,
 `perspective`, or `will-change: transform`.
 
 ### An animated background must tile
@@ -219,7 +219,7 @@ if (next !== icon.getAttribute('src')) { icon.setAttribute('src', next); }
 ```
 
 The equality check keeps the attribute write out of the MutationObserver loop when
-nothing changed — otherwise you feed your own observer.
+nothing changed - otherwise you feed your own observer.
 
 ### The card is often taller than the viewport
 
@@ -244,6 +244,32 @@ scrolled:
 - **A paragraph's HTML is rendered through DOMPurify into the live page, next to Bootstrap.**
   Generic class names in authored markup collide with Bootstrap rules: an SVG `<circle
   class="badge">` vanished because `.badge:empty { display: none }`. Prefix every class.
+
+### Theme surfaces, tabs and buttons (read from the renderer's stylesheet and bundle, 2026-10-23)
+
+- **Every container has a theme surface.** Sections (`--c-section-background`, `--bw-section`,
+  `--pv-section`…), tabs (`--c-tabs-surface-background`, `--bw-tabs-surface`, `--pv-tabs-surface`
+  on `.form-builder--tabs`, painted by `.form-builder--tabs--container`) and columns
+  (`--c-column-background`, `--pv-column`, `--min-h-column`, `--bw-columns`, `--bc-columns`) default
+  to a light grey fill, a 1px subtle frame and 16px padding. The values come from the form's
+  `Data.theme` and from each element's `style` config (only the `enabled` entries apply). To make
+  them white or frameless, set the variables on the element itself with `!important`.
+- **Tabs are bootstrap-vue-next BTabs:** `.form-builder--tabs.pds-c-tabs > .tabs.vue-tabs >
+  ul.nav.nav-tabs.vue-tablist[role=tablist] > li.nav-item > button.nav-link.vue-tab[role=tab]
+  [aria-selected]`. The theme gives each tab `flex: 1`, `padding: unset`, a 2px underline and
+  `margin-bottom: 16px !important`; a restyle has to override all four, with enough specificity
+  to beat that `!important`.
+- **A radio group's value is an attribute, not `.value`:** `[id=<radio id>] > [role=radiogroup] >
+  label.pds-c-radiobox--group > input.pds-c-radiobox--field[modelvalue="<option value>"] +
+  span.pds-c-radiobox[role=radio][aria-checked] + span.pds-c-radiobox--label`. The input has no
+  `value` attribute, so its `.value` is `"on"` for every option; read `getAttribute('modelvalue')`
+  (forms bundle, Radiobox.component, 2026-10-26). An empty option in the source list renders as a
+  radio with an empty label.
+- **A button's visible label is `.pds-c-button--text`.** The component also keeps a `v-show`-hidden
+  span with the slot content. Hide `.pds-c-button--text` to dedupe and the button goes blank.
+- **The stepper's Previous / Next can be hidden with `display: none`.** Scripts that move the
+  stepper call `querySelector('.form-builder--stepper--buttons--next button').click()`, which works on
+  a hidden element; a step-navigation UI can then replace them.
 
 ### File viewer (INLINE) and signature pad: what is inside
 
@@ -275,6 +301,12 @@ header's transparent): the label then sits exactly over its column (measured: ev
 and width equal to the pixel). Style the ROW as the card (border, radius, background), not the
 cells.
 
+- The design system's table body puts EVERY item between two helper rows, each a
+  `tr.pds-c-table--row.pds-c-table--row--before` / `--after` with one `td[colspan]` (read from the
+  forms bundle, GeneralTable, 2026-10-26). The Table's own `tbody` therefore holds, per dynamic row,
+  before-row, the row element itself (`div.form-builder--element`), after-row; the dynamic row's
+  table does the same around every `div.--item`. A column defined with no key and no label still
+  draws `th#th` and an empty cell per row.
 - Helper rows `tr.pds-c-table--row.pds-c-table--row--before/--after` also carry
   `pds-c-table--row`: select data rows with
   `tr.pds-c-table--row:not(.pds-c-table--row--before):not(.pds-c-table--row--after)`, as a
@@ -297,6 +329,8 @@ cells.
 download icon). With no file the same control shows the upload drop zone instead, which invites
 an upload on a read-only screen: hide it with
 `.form-builder--file-upload:not(:has(.pds-c-modal--dialog--content--action))`.
+The same chip holds the file's own controls (remove, open): code that treats a pointer-down anywhere
+in the upload as "a new file is coming" must skip the chip, or removing a file reads as an upload.
 
 **Driving it from your own download menu (measured 2026-10-22).** The download icon is
 `i.pds-c-modal--dialog--content--action--actions--icon[role=button][aria-label="Download file"]`
@@ -325,9 +359,38 @@ stops it).
 only for the rounded corners). Put the radius on the bar (top) and on the viewer scroller (bottom)
 and let the card overflow, or the open menu is cut at the card's edge on a phone.
 
+### Controls as they render (measured on the live renderer, 2026-10-22)
+
+Every control sits in `.form-builder--element[data-element-id=<element id>]`; the component root
+inside carries the element's `id` config as its DOM `id` and most configs as attributes.
+
+- **Select:** root `.pds-c-input-group.form-builder--select[id][value]` (the `value` attribute
+  follows the model) > `.pds-c-input-group--label--holder` + `.pds-c-input-group--selector-holder`
+  > `.multiselect[tabindex=0]` (`.multiselect__select` arrow, `.multiselect__tags` >
+  `.multiselect__single` or `.multiselect__placeholder`). Options are drawn only while open. The
+  `info-text` config renders as a `.pds-c-message.pds-c-message-info` sibling of the root.
+- **Date:** root `.pds-c-input-group--date-picker.form-builder--date-time-input[value]`; the
+  configs `minDate` / `maxDate` appear as the attributes `mindatetime` / `maxdatetime`; the visible
+  input is `readonly` and carries the shown text in `modelvalue` (e.g. "28 October 2026").
+- **File upload:** `.form-builder--file-upload[id]` > `.pds-c-modal--upload` (repeats the id) >
+  label holder + `.pds-c-modal--dialog--content` (the dropzone: `.pds-c-modal--dialog--upload-icon`
+  icon-font glyph, `.pds-c-modal--dialog--content--text` "Drag and drop your input file here or",
+  a small solid "Select file" `.pds-c-button`). An uploaded file shows as
+  `.pds-c-modal--dialog--content--action`. There is no `<input type=file>` in the markup before the
+  button is clicked.
+- **Stepper nav:** `.form-builder--stepper--nav--item[data-element-id=<step id>][active="true"]`
+  for the current step; only VISIBLE steps get an item, so the items also tell which steps are
+  unlocked. Hidden with `display: none`, the items stay in the DOM and stay readable.
+- **Stepper buttons:** `.form-builder--stepper--buttons--previous` / `--next` hosts, each with a
+  `.pds-c-button` and an empty `.pds-c-button--dropdown`; Next exists only while a later step is
+  visible.
+- **Dynamic table:** `.form-builder--table` > `.pds-c-table--container` > `table.pds-c-table`;
+  header cells `th#th<column key>`; the dynamic row's own `.pds-c-table--wrapper--empty` shows
+  "Row is empty." with no data.
+
 ## 6. Responsive and reduced motion
 
-Side-by-side columns truncate every label on a phone. Cover both layout modes —
+Side-by-side columns truncate every label on a phone. Cover both layout modes - 
 whichever the renderer uses, the other declaration is inert:
 
 ```css
@@ -367,4 +430,4 @@ new ones (a palette is usually a hard requirement on a client form):
 
 The platform's own theme variables (`--c-neutral--500`, `--c-primary`, `--h-input`,
 `--p-form`, `--gap-columns`, …) are available and should be preferred wherever one
-exists — they keep your layer consistent with a theme change made in the designer.
+exists - they keep your layer consistent with a theme change made in the designer.

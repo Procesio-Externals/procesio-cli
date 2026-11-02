@@ -21,6 +21,7 @@ from __future__ import annotations
 from tools._lib.webserialize import client as ws_client
 from tools._lib.webserialize import registry as ws_registry
 from tools._lib.webserialize.config import BrokerConfig
+from tools.web.errors import UsageError
 
 _TAG_KEYS = ("via", "service_queue_wait_ms", "service_fallback")
 
@@ -104,4 +105,10 @@ def _translate(action: str, parsed):
 
         return steps, parsed.url, reshape
 
-    raise ValueError(f"no broker translation for web action {action!r}")
+    raise UsageError(
+        f"web {action} cannot run through the {parsed.session!r} broker: an owning broker only "
+        f"serializes run, get-text and screenshot. perf-probe needs exclusive control of the browser "
+        f"(CDP CPU throttling and a fresh context per variant), which a broker's shared warm browser "
+        f"cannot give. Re-run without a broker-owned --session, or pass --direct to drive the profile "
+        f"in-process (only safe when the {parsed.session!r} broker is stopped / idle)."
+    )

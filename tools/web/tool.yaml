@@ -150,6 +150,43 @@ actions:
       - {name: timeout, type: integer, default: 20, description: "Request timeout in seconds"}
     output_schema: '{ "url": "...", "final_url": "...", "status": 200, "content_type": "...", "reachable": true, "title": "...", "emails": ["..."], "links": {"linkedin": [], "x": [], "website": [], "link_in_bio": [], "...": []}, "affiliate_links": [ {url, host, network, program, param} ] }'
 
+  - name: perf-probe
+    description: >
+      What a page costs a slower machine, measured in a real Chromium. Slows the
+      page's main thread with CDP CPU throttling (4x is roughly a budget laptop next
+      to a recent MacBook), lets it boot, then measures a window: frame rate and
+      frame-time percentiles (requestAnimationFrame), long tasks, and main-thread
+      script / layout / style ms (CDP Performance.getMetrics). The boot is measured
+      too: when each --marks selector first appeared and every layout shift (the
+      pop-in while a runtime restyles a page that has already drawn). Variants rerun
+      the same measurement on a fresh navigation with CSS/JS injected from the first
+      frame (CSS needs !important), so one call answers "what does turning X off
+      buy". Headless Chromium rasterizes in software, so paint cost (a full-screen
+      canvas, a backdrop blur) shows as lower fps and slow frames, not as main-thread
+      ms. Read-only: it navigates and watches, it clicks nothing unless --during-js does.
+    args:
+      - {name: url, type: string, required: true, description: "Page to measure (http/https)"}
+      - {name: session, type: string, description: "Saved session to load; default a fresh anonymous context"}
+      - {name: cpu-throttle, type: number, default: 4, description: "CPU slowdown factor (1 = this machine, 4 ~ budget laptop, 6 ~ low-end)"}
+      - {name: nav-timeout, type: integer, default: 0, description: "Per-load navigation timeout in ms; 0 (default) scales the driver's nav budget by the CPU-throttle rate so a throttled load is not cut off"}
+      - {name: viewport, type: string, default: "1366x768", description: "Viewport WIDTHxHEIGHT"}
+      - {name: dpr, type: number, default: 1, description: "Device pixel ratio"}
+      - {name: settle-ms, type: integer, default: 6000, description: "Wait after load before measuring; the boot is measured over this time"}
+      - {name: measure-ms, type: integer, default: 8000, description: "Length of the measured window"}
+      - {name: marks, type: string, description: "JSON {name: css selector}: when each first appears during boot"}
+      - {name: marks-file, type: string, description: "Path to the --marks JSON"}
+      - {name: variants, type: string, description: "JSON array [{name, css?, js?, cpu_throttle?, dpr?, reduced_motion?, settle_ms?, measure_ms?, during_js?, expose_js?}]; each runs on a fresh navigation after the baseline"}
+      - {name: variants-file, type: string, description: "Path to the --variants JSON"}
+      - {name: no-baseline, type: boolean, default: false, description: "Skip the page-as-served run"}
+      - {name: during-js, type: string, description: "JS run at the start of the window (e.g. a scroll loop); default idle"}
+      - {name: expose-js, type: string, description: "JS expression read at the end (e.g. the page's own perf counters)"}
+      - {name: repeat, type: integer, default: 1, description: "Runs per variant (1-10); the summary is the median"}
+      - {name: warmup, type: boolean, default: false, description: "Load the page once, unmeasured, first, so every variant boots from a warm cache (without it only the first run pays for a cold cache)"}
+      - {name: headed, type: boolean, default: false, description: "Show the browser window"}
+      - {name: channel, type: string, description: "Chromium channel: chrome or msedge"}
+      - {name: direct, type: boolean, default: false, description: "Bypass the owning tool serializing broker and drive the browser in-process (only safe when that broker is stopped; perf-probe needs exclusive control anyway)"}
+    output_schema: '{ "url": "...", "cpu_throttle": 4, "viewport": "1366x768", "variants": [ {"name": "baseline", "summary": {"fps": 0, "frame_ms_p95": 0, "slow_frames_pct": 0, "busy_pct": 0, "script_ms": 0, "layout_ms": 0, "style_ms": 0, "long_tasks_ms": 0, "boot_cls": 0, "boot_long_tasks_ms": 0}, "calibration_ms": 0, "boot": {"marks": {}, "layout_shift": {"cls": 0, "count": 0, "largest": [{"at_ms": 0, "value": 0, "moved": [{"node": "div.form-builder--form", "y": [0, 0], "height": [0, 0]}]}]}, "long_tasks": {}}, "window": {"fps": 0, "frame_ms": {"p50": 0, "p95": 0, "p99": 0, "max": 0}, "slow_frames_pct": 0, "janky_frames": 0, "long_tasks": {}, "main_thread": {"task_ms": 0, "script_ms": 0, "layout_ms": 0, "style_ms": 0, "other_ms": 0, "busy_pct": 0, "layouts": 0, "style_recalcs": 0, "dom_nodes": 0, "js_heap_mb": 0}}, "exposed": null, "vs_baseline": {}} ], "page_errors": [] }'
+
   - name: render-pdf
     description: "Render an HTML string/file to a PDF (session-less, headless Chromium page.pdf)."
     args:

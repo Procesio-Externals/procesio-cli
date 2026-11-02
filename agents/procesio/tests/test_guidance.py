@@ -12,9 +12,9 @@ def test_topics_present():
         "playbook", "best-practices", "visual-organization", "datastore",
         "scheduling", "environments", "reliability", "boundary",
         "forms", "forms-anatomy", "forms-code", "forms-dom", "forms-interaction",
-        "forms-motion", "forms-process", "forms-deploy", "forms-pitfalls",
+        "forms-motion", "forms-process", "forms-deploy", "forms-pitfalls", "forms-redesign",
         "patterns", "patterns-processes", "patterns-forms", "patterns-integrations",
-        "patterns-database"}
+        "patterns-database", "patterns-optimizing"}
 
 
 def test_each_topic_loads_real_content():
@@ -71,7 +71,7 @@ def test_implementation_patterns_carry_no_workspace_data():
     addresses and connection strings."""
     import re
     for t in ("patterns", "patterns-processes", "patterns-forms", "patterns-integrations",
-              "patterns-database"):
+              "patterns-database", "patterns-optimizing", "forms-redesign"):
         text = knowledge.load(t)["content"]
         assert not re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", text), t
         assert not re.search(r"[\w.-]+@[\w-]+\.[a-z]{2,}", text), t

@@ -1,4 +1,4 @@
-# 02 — How form-level CSS and JavaScript actually run
+# 02 - How form-level CSS and JavaScript actually run
 
 **This is the prerequisite for everything else.** The execution model is not what
 it looks like from the designer, and code written on the wrong assumption appears
@@ -14,7 +14,7 @@ to work on first load and then quietly stops.
 {"JAVASCRIPT": "…", "CSS": "…"}
 ```
 
-stored **AES-encrypted**: CryptoJS `AES.encrypt(text, passphrase)` — i.e. OpenSSL
+stored **AES-encrypted**: CryptoJS `AES.encrypt(text, passphrase)` - i.e. OpenSSL
 AES-256-CBC, key + IV derived by `EVP_BytesToKey(MD5, 1 iteration)`, serialized as
 `base64("Salted__" + salt + ciphertext)`. The passphrase is a **static key, one per
 installation**, stored in the OS credential store per environment
@@ -26,7 +26,7 @@ plaintext `{JAVASCRIPT, CSS}` object in memory; the host webapp does the AES ste
 Confirmed with the platform team: no unencrypted path exists.
 
 **`{"JAVASCRIPT": null, "CSS": null}` is a normal decrypt result**, not a corrupt
-blob — it is the designer's initial state, so every form that never opened "Switch
+blob - it is the designer's initial state, so every form that never opened "Switch
 to code" carries it. Normalize `null → ""` before doing anything involving a length
 or a concatenation.
 
@@ -113,7 +113,7 @@ later release starts dropping data imports.
 The branding class is also filtered: `js/form-builder/css.ts` replaces that
 literal class string with a random number so it cannot be hidden.
 
-## 3. The JavaScript — the part that surprises everyone
+## 3. The JavaScript - the part that surprises everyone
 
 > Form-level JS is replayed by the renderer as a **synthetic `RUN_JAVASCRIPT`
 > event**, on mount **and on every re-trigger**, inside a **throwaway sandbox
@@ -122,13 +122,13 @@ literal class string with a random number so it cannot be hidden.
 Three consequences, and every one of them has bitten:
 
 1. **Nothing survives the run.** Listeners, `MutationObserver`s, timers, module
-   state — all die with the iframe. Code that "worked once and then stopped" is
+   state - all die with the iframe. Code that "worked once and then stopped" is
    almost always this.
 2. **It runs more than once.** Every re-trigger executes the whole file again.
    Un-guarded code installs a second copy of every handler; symptoms are doubled
    toasts, doubled ripples, doubled process launches.
 3. **The sandbox is not the page.** `document` inside the sandbox is the iframe's
-   own. The real form is in `window.parent.document` — the platform confirms this
+   own. The real form is in `window.parent.document` - the platform confirms this
    itself: the JS slot's shipped boilerplate reads
    `console.log(window.parent.document); -> to access the DOM`.
 
@@ -173,19 +173,19 @@ function UX_RUNTIME() {
 Why each piece is exactly this way:
 
 - **`fn.toString()`** carries the source across the boundary with no escaping
-  problems. Do not build the payload as a string literal — you will fight quoting
+  problems. Do not build the payload as a string literal - you will fight quoting
   forever and every edit risks a syntax error you cannot see until runtime.
 - **Two guards, not one.** The DOM id guard stops a second `<script>` from being
   appended; the `window.__uxFormRuntime` flag stops a second *execution* if the
   script somehow runs again. They protect different failures.
-- **`window.parent !== window`** — the same file must also work when it is not
+- **`window.parent !== window`** - the same file must also work when it is not
   framed (a preview, a local replica). Falling back to `window` keeps one code
   path for both.
 - **The `try/catch` is deliberate.** A cross-origin parent throws on `.document`.
   There is nothing to do about it and nothing to report: the CSS layer still
   works, so the form degrades rather than breaking.
 
-### The runtime is closure-scoped — that is the point
+### The runtime is closure-scoped - that is the point
 
 Because the payload runs as one IIFE in the parent document, everything it declares
 is private to it. Expose only what other code genuinely needs, on `window`:
@@ -266,13 +266,13 @@ Points that matter:
   propagation.
 - **The retry loop in `start()`** exists because the runtime can be installed
   before the form body exists.
-- **`refresh()` is total, not incremental.** It never asks "what changed" — it
+- **`refresh()` is total, not incremental.** It never asks "what changed" - it
   recomputes the whole visible state. This is the only model that survives nodes
   being destroyed underneath you.
 
 ## 7. Reaching the platform's own model
 
-`window.ProcesioForm` exists at runtime and exposes `.data.fields` — a map of field
+`window.ProcesioForm` exists at runtime and exposes `.data.fields` - a map of field
 state. It is reachable and occasionally the only way to do something (clearing a
 radio group, for instance, since a radio cannot be un-clicked).
 

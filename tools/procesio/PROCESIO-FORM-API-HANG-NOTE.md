@@ -8,9 +8,9 @@
 > **Why this matters more than a stale row:** the note below steers the reader away from the
 > surgical read-modify-write path and toward full rebuilds, which is the riskier route on a
 > live form. Treat the table as history. Re-probe before believing any "this call hangs"
-> claim — an intermittent or since-fixed hang reads identically to a permanent one.
+> claim - an intermittent or since-fixed hang reads identically to a permanent one.
 
-# PROCESIO forms over the API — what works, and the one call that hangs
+# PROCESIO forms over the API - what works, and the one call that hangs
 
 Live-probed while shipping a form for a marketplace template. The folklore is "form
 creation hangs over the API". That is **wrong, and the imprecision costs a build**: creation
@@ -18,10 +18,10 @@ is fine. The call that hangs is the **read**.
 
 | Call | Endpoint | Result |
 |---|---|---|
-| `form-create` | `POST /api/FormTemplate` | ✅ **works** — returns the new form id; the form renders with all its controls |
+| `form-create` | `POST /api/FormTemplate` | ✅ **works** - returns the new form id; the form renders with all its controls |
 | `form-list` | `GET /api/FormTemplate/all/basic` | ✅ works (fast) |
 | `get-customurl-formtemplate-by-id` | `GET /api/CustomUrl/FormTemplate/{id}` | ✅ returns (empty until a CustomUrl is minted) |
-| **`form-get`** | **`GET /api/FormTemplate/{id}`** | ❌ **HANGS** — no response, no error; killed at 90s |
+| **`form-get`** | **`GET /api/FormTemplate/{id}`** | ❌ **HANGS** - no response, no error; killed at 90s |
 
 ## The consequence: nothing that must READ a form first can run
 
@@ -49,12 +49,12 @@ correct create, then the UI.
    the `FileDataModel` input; a file control already holds a *list*, which is what a
    file-typed process input expects).
 4. Map **outputs** the same way if results are shown back on the form. Design rule: one
-   output variable per field, all primitives — mapping one structured object
+   output variable per field, all primitives - mapping one structured object
    attribute-by-attribute is what produces `[object Object]` in every field.
 5. Publish, then mint the public URL (CustomUrl) if the form should be reachable
    without a login.
 
-## Wire the process INSIDE the create — it works, and it is the only way here
+## Wire the process INSIDE the create - it works, and it is the only way here
 
 Because `form-set-element-event` cannot run (it reads first), declare the trigger in the
 `form-create` config itself. The builder resolves names on both sides, so the config stays
@@ -91,7 +91,7 @@ field never populates.
 small splitter action per display field that returns a plain string, rather than mapping
 one structured object attribute by attribute (which writes `[object Object]` everywhere).
 
-## Building the form in one create — shape that worked
+## Building the form in one create - shape that worked
 
 `form-create --config-file` with a flat `elements` list; each control is
 `{type,label,name,required,...}` and the submit is `{"type":"button","submit":true}`.

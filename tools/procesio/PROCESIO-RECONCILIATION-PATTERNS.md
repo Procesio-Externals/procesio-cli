@@ -1,4 +1,4 @@
-# Reconciliation flows in PROCESIO — patterns that survive an auditor
+# Reconciliation flows in PROCESIO - patterns that survive an auditor
 
 Cross-cutting build patterns for any flow that compares two datasets and reports what
 disagrees (VAT/tax returns vs invoices, bank statement vs ledger, stock file vs count,
@@ -17,7 +17,7 @@ at PARSE time; do every sum, comparison and delta in integers; divide by 100 onl
 render.** The tolerance parameter converts to minor units too. This single decision removes
 an entire class of flaky-test and wrong-report bugs.
 
-## 2. Deduplicate BEFORE grouping — and prove the order
+## 2. Deduplicate BEFORE grouping - and prove the order
 
 If duplicates are collapsed *after* the per-category totals are computed, the duplicate is
 silently absorbed and the report shows a **plausible but wrong** delta. The order must be:
@@ -37,7 +37,7 @@ Classify each group, in this precedence:
 2. **All rows identical on the identity fields** → an exact duplicate. Safe to collapse; the
    amount counts **once**.
 3. **Same id, disagreeing amounts** → a data-integrity **conflict**. Quarantine the whole
-   group from the total, list **every** candidate row, and **never pick a winner** — choosing
+   group from the total, list **every** candidate row, and **never pick a winner** - choosing
    one silently invents a number the source does not support.
 
 Define the identity key explicitly and narrowly (id + amounts + category). Descriptive
@@ -47,7 +47,7 @@ differ only in a label get mis-classified as a conflict.
 ## 4. Report an unexplained residual; never name a row you were not given
 
 When one side declares more than the other, you know the *amount* that disagrees, not
-*which* documents are missing — the other side's line-item list is not an input. State it as
+*which* documents are missing - the other side's line-item list is not an input. State it as
 an **unexplained residual** and describe it as *consistent with* items present in one source
 and absent from the other. Naming a specific missing invoice is inventing information; it is
 the single fastest way to destroy trust in a reconciliation product. Keep the honesty
@@ -68,7 +68,7 @@ A hardcoded period passes every test written against a single-period fixture and
 production. Take **start and end dates as separate inputs** (a single "2026-07" string
 conflates the filter scope with the report label and hides the boundary rule), filter
 inclusively, and keep a separate optional label for the header. Prove it with a test that
-re-runs the *same* extract under a *different* period and asserts a *different* result — if
+re-runs the *same* extract under a *different* period and asserts a *different* result - if
 the output is identical, the parameter is not being read.
 
 ## 7. Neutralise formula injection at render, not at parse
@@ -82,7 +82,7 @@ value); doing it at render protects the reader without touching the arithmetic.
 ## 8. Quarantine bad rows, don't fail the run
 
 An unparseable date or amount in one row should produce a `malformed_row` finding naming the
-row index, field and raw value — and the reconciliation should complete on the remaining
+row index, field and raw value - and the reconciliation should complete on the remaining
 rows. A run that dies on row 3 of 20,000 tells the user nothing; a run that reports two
 quarantined rows and a residual that reflects them tells the user exactly what to fix.
 Pair this with an explicit **row-count guardrail** that reports a finding rather than letting

@@ -67,6 +67,18 @@ form-element enum `ElementType`.
   CallbackUrl, CorrelationId, IncludeCallerName); output `Result`/`Status`/
   `VerificationId`/`RequestId`. Confirms the old "Prelude" worked-example in
   `PROCESIO-API-NOTES.md` is now a **real shipped connector**, not just an illustration.
+  - **Email targets too** (seen in the designer, 2026-10): `Target Type` offers Phone number and
+    Email address (empty = detect: a value with `@` is an email). On Prelude's side, email codes
+    (`target.type: email_address` on `POST /v2/verification` and `/v2/verification/check`) must be
+    switched on for the account by Prelude support. The action's description still says "phone
+    verification codes" only.
+  - The panel can be set up with no credential: the Operation select lists Send verification code /
+    Check verification code / Look up phone number from the catalog, and the Input and Output tabs
+    follow the operation. Without a credential the process cannot be saved valid, so a film or demo
+    that has no Prelude key shows the setup and does not run it.
+  - The credential field's tooltip names `https://api.prelude.dev` (Prelude's real v2 API host),
+    while the derived credential template's base URL is `https://platform.prelude.so`: check which
+    one a saved credential ends up calling before trusting either.
 - **Redis** connector + Redis credential - code merged (Web-Api #1452 validation +
   test client, Process-Execution #250), but **NOT yet activated on PROD**: as of
   2026-09-21 `Redis` is still absent from `GET /api/Credentials/types` (35 types, no
@@ -121,7 +133,7 @@ form-element enum `ElementType`.
   `Call_Subprocess_ChildInstanceId`). **Fixed in prod 2026-10-22:** both settings now come
   back as type `auto` and their instance variables as `Auto` (type 50). The earlier state is
   gone (2026-10-21 the settings were still served `ignore` and the variables typed 20, which
-  is why the old advice was to read them by name — no longer needed). The started-flow slot
+  is why the old advice was to read them by name - no longer needed). The started-flow slot
   (`...a03fe2`) stays type `ignore`; the builder treats `ignore` and `auto` alike and finds it
   by id, so the fix needs no builder change (`_HIDDEN_SETTING_TYPES` already covers both). The
   offline bundle (`dto/data/action_catalog.json`) was corrected to type the two slots `auto` to
@@ -136,6 +148,8 @@ Azure Storage added, Call Subprocess and Query Store replaced).
 ## Scripting languages
 
 Python, Javascript, Node, **Ruby**, and **CURL** - no C# scripting action (C# is the
-custom-action NuGet path). Each takes a `Code` string and returns an output; Node adds a
-`Timeout` (60-300) and a `Stdout` output (console.log capture, added 2026-09). See
-`PROCESIO-NODE-MODULE-WHITELIST.md` / `PROCESIO-PYTHON-ACTION-NOTES.md` for the sandbox.
+custom-action NuGet path). Each takes a `Code` string and returns an output. Node, Python
+and Ruby share one shape: `Timeout` (10-180 s, default 60), `Single Result`, `List Result`,
+`Stdout` and `Error`; Javascript has only `Output` (no Timeout, no Error). See
+`PROCESIO-NODE-MODULE-WHITELIST.md` / `PROCESIO-PYTHON-ACTION-NOTES.md` for the sandbox, and
+the live-behaviour section of the latter for how the four compare when run.

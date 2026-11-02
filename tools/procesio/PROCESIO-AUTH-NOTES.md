@@ -1,4 +1,4 @@
-# PROCESIO API — live-validated auth & coverage notes
+# PROCESIO API - live-validated auth & coverage notes
 
 Recorded 2026-06-23 against the production Web API. No secrets in this file.
 
@@ -16,7 +16,7 @@ same Kong node; only `webapi` has a configured cert+route. So the documented
 auth host `auth.procesio.app` currently serves Kong's default cert and 404s its
 own `/api/Authentication` and `/swagger` from the public edge.
 
-## Auth mode 1 — API key  ✅ WORKING
+## Auth mode 1 - API key  ✅ WORKING
 
 Three request headers on every Web-API call:
 
@@ -31,7 +31,7 @@ developer docs add `workspaceid`. Live results for the two showcase keys:
 
 | Profile | key/value | workspaceid | `GET /api/Workspaces` |
 |---------|-----------|-------------|------------------------|
-| `personal` | valid | (none) | **200** — 146 workspaces |
+| `personal` | valid | (none) | **200** - 146 workspaces |
 | `ws-scoped` | valid | (none) | 401 Unauthorized |
 | `ws-scoped` | valid | its own workspace GUID | **200** |
 | `ws-scoped` | valid | a DIFFERENT workspace GUID | 401 |
@@ -54,14 +54,14 @@ workspace-scoped key **requires** the exact workspace GUID. Such a profile must 
 - `GET /api/Actions` → `{actions, grouping, prototypes}`
 - `GET /api/Credentials/types` → 33 connection types
 
-`GET /api/ApiKey` returns 401 even for the personal key — that endpoint needs a
+`GET /api/ApiKey` returns 401 even for the personal key - that endpoint needs a
 `workspaceid`-scoped context (use a workspace profile).
 
-## Auth mode 2 — username / password  ✅ WORKING (cookie session)
+## Auth mode 2 - username / password  ✅ WORKING (cookie session)
 
 Confirmed from a real login HAR (`procesio.app.har`) + live replay. The actual
 flow is a **cookie session on the Web API**, NOT the OAuth/Bearer flow the docs
-describe and NOT on `auth.procesio.app` (that host is obsolete — "auth moved to
+describe and NOT on `auth.procesio.app` (that host is obsolete - "auth moved to
 webapi"):
 
 ```
@@ -95,15 +95,15 @@ involved any more for login.
 
 ### Session caching (Windows Credential Manager blob limit)
 
-Windows Credential Manager rejects a blob over **2560 bytes** — `CredWrite` fails
+Windows Credential Manager rejects a blob over **2560 bytes** - `CredWrite` fails
 with `WinError 1783 "stub received bad data"`. The trap: keyring stores the value
 as **UTF-16LE**, so the real ceiling is **1280 CHARACTERS**, not 2560. Measured by
 binary search on this machine: 1280 chars writes, 1281 fails. Budget in
 characters and halve the byte figure, or you will conclude a payload fits when it
-does not — the two cookies are ~1700 chars, which "fits" 2560 bytes on paper and
+does not - the two cookies are ~1700 chars, which "fits" 2560 bytes on paper and
 is rejected in practice.
 
-### The login 401 is GENERIC — it never tells you which half is wrong
+### The login 401 is GENERIC - it never tells you which half is wrong
 
 A rejected form login answers:
 
@@ -115,7 +115,7 @@ Verified by probing the endpoint with an account that does not exist: the body i
 byte-identical to a real account with a wrong password. So the string proves only
 that the gateway accepted the REQUEST shape (path, form body, `x-requested-by`)
 and refused the CREDENTIALS. It does not distinguish, and must not be read as, a
-missing/expired token despite what it says — nothing about a cached session is
+missing/expired token despite what it says - nothing about a cached session is
 involved on a login call.
 
 Diagnose by elimination, in this order (cheapest first):
@@ -124,7 +124,7 @@ Diagnose by elimination, in this order (cheapest first):
    rejected exactly like a bad password. Match the profile's environment to the
    host the user actually logs into in the browser.
 2. **Typo at the hidden prompt.** getpass echoes nothing, and `Ctrl+V` does not
-   paste in a Windows console — a truncated paste looks like a wrong password.
+   paste in a Windows console - a truncated paste looks like a wrong password.
 3. **SSO account.** An account that reaches the platform through an external IdP
    has no platform-side password to submit; the redirect-based SSO flow is not
    implemented here, so use an api-key profile instead.
@@ -140,7 +140,7 @@ located by varying one input at a time.
 command line (flags leak into shell history and process listings). But run-tool
 routes tools through the persistent runner by default, so the tool runs in a
 daemon worker with no TTY, `sys.stdin.isatty()` is False, and the prompt is
-unreachable — even though the human IS at a console. Bypass it for that one call:
+unreachable - even though the human IS at a console. Bypass it for that one call:
 
 ```powershell
 $env:AAT_RUNNER_DIRECT = "1"
@@ -154,7 +154,7 @@ Generalizes to every framework action that prompts for a secret. See
 ### The dashboard's secret list is not where a profile is added
 
 A tool that keeps its OWN multi-profile store shows only its bookkeeping secrets
-in the dashboard's generic per-tool secret list — here `credentials` (the
+in the dashboard's generic per-tool secret list - here `credentials` (the
 non-secret JSON index of profile names) and `form-code-key` (unrelated to login).
 Neither is the credential a user is hunting for, and hand-writing the index
 desyncs it from the real `cred-<name>` entries. Profiles are added through the
@@ -163,17 +163,17 @@ set-default/remove for profiles that already exist.
 
 The two JWTs therefore cannot share one entry, and both must survive (the access
 cookie authenticates; the refresh cookie is what renews the session without the
-password). They get **one entry each** — `token-<name>` for the access cookie
+password). They get **one entry each** - `token-<name>` for the access cookie
 plus its expiry, `refresh-<name>` for the refresh cookie. At ~961 and ~733 chars
 each fits comfortably.
 
 So the tool: (1) keeps an **in-process** cookie cache (always works, avoids
 re-login within one CLI invocation), and (2) best-effort persists both entries
-independently — a failed refresh write only costs the next process a full login,
+independently - a failed refresh write only costs the next process a full login,
 it does not break the access cache. If a write fails it logs to stderr and
 re-logs-in next invocation. Never let a token cache write crash a request.
 
-### Renewing a session — refresh, don't re-login
+### Renewing a session - refresh, don't re-login
 
 The access cookie is a **~30-minute JWT**; the refresh cookie outlives it. A
 browser never notices, because for cookie/BFF clients the gateway refreshes
@@ -189,7 +189,7 @@ body: refresh_token=<value of __Host-procesio.refresh>&client_id=procesio-ui
 
 → `200 {"message":"Token refreshed successfully"}` plus a fresh **pair** of
 Set-Cookie headers. Verified live: the refreshed access cookie authenticates an
-ordinary Web-API call. This is why the refresh cookie must be cached — without
+ordinary Web-API call. This is why the refresh cookie must be cached - without
 it the only way to renew is to re-send the account password every half hour.
 
 Resolution order is therefore: in-process cache → persistent cache → **refresh**
@@ -220,7 +220,7 @@ mode: the 200 body then carries `access_token` / `refresh_token` / `expires_in`
 (1800) instead of setting cookies, and `Authorization: Bearer <access_token>`
 authenticates Web-API calls normally (verified live). PROCESIO's own API
 documentation recommends this style for integrations and reserves the cookie path
-for the official SPA. This tool still uses the cookie flow — switching is a
-migration to make deliberately, not a bug fix — but the option is real and
+for the official SPA. This tool still uses the cookie flow - switching is a
+migration to make deliberately, not a bug fix - but the option is real and
 carries no extra dependency.
 

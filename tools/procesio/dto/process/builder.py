@@ -776,8 +776,26 @@ def _action_parameters(template: dict, params: dict, ctx: dict, counter: list | 
                             for s in t.get("settings", []) if s.get("label")})
             raise UsageError(
                 f"action {template.get('name')!r} has no property {key!r}; known: {known}")
+        if prop.get("type") == "map-parameters" and isinstance(binding, dict) and "map" in binding:
+            out.append(_map_parameters(prop["id"], binding["map"], ctx, counter))
+            continue
         out.append(_make_parameter(prop["id"], binding, ctx, counter))
     return out
+
+
+def _map_parameters(prop_id: str, mapping: dict, ctx: dict, counter: list) -> dict:
+    """A map-parameters property (Word Mail Merge's `Word Mail Parameters`, a script's
+    parameters) from `{"map": {name: binding}}`: runtime rows {id, source:{value,variable},
+    destination:{value:name}}. A bare string/number binding is a LITERAL (as in dsMap);
+    `{var[, path]}` binds a variable or one of its attributes."""
+    if not isinstance(mapping, dict):
+        raise UsageError("a map-parameters binding needs {'map': {name: binding}}")
+    var_ids = ctx.get("var_ids", {})
+    rows = []
+    for i, (name, b) in enumerate(mapping.items()):
+        src = _operand(b if isinstance(b, dict) else {"value": b}, var_ids, counter, ctx)
+        rows.append({"id": i, "source": src, "destination": {"value": str(name), "variable": []}})
+    return {"TabPropertyId": prop_id, "Variable": [], "Value": rows}
 
 
 def _is_template_default_output(s: dict) -> bool:

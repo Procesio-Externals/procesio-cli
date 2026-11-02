@@ -1,4 +1,4 @@
-# WEB — automation notes
+# WEB - automation notes
 
 Durable learnings for the `web` tool and everything built on it
 (`whatsapp-personal`, `fgo-web`, `mirro` web actions). Hard rule 6.
@@ -18,7 +18,7 @@ the composer (`#main footer div[contenteditable='true']...`).
 - shadows `navigator.webdriver` via an init script;
 - if the live UA contains "Headless", rewrites it to plain "Chrome" through CDP
   `Network.setUserAgentOverride` (read from `navigator.userAgent`, so it tracks
-  the installed Chromium version — nothing hard-coded).
+  the installed Chromium version - nothing hard-coded).
 
 This is best-effort and fully guarded (a stealth failure never breaks a launch),
 and harmless when already headed (no "Headless" in the UA → UA override skipped).
@@ -40,7 +40,7 @@ Confirmed: headless `send-message` + `read-messages` against the saved
 
 `web save-session --name whatsapp --url https://web.whatsapp.com --persistent`
 opens a HEADED window for the QR scan and stores a **persistent profile** at
-`tools/web/sessions/whatsapp.profile` (IndexedDB-backed auth — a storageState
+`tools/web/sessions/whatsapp.profile` (IndexedDB-backed auth - a storageState
 snapshot is not enough). The login persists across runs; the headless stealth
 above is what lets later automated sends reuse it.
 
@@ -54,7 +54,7 @@ HALF-AUTHENTICATED profile is written to disk.
 
 Symptom (observed 2026-07-18, google session): three consecutive
 `save-session --persistent --channel chrome` runs each returned
-`cookies_saved: 54` — an identical, deterministic count, because 54 is simply
+`cookies_saved: 54` - an identical, deterministic count, because 54 is simply
 what Google sets on the pre-auth sign-in page. Every later
 `web get-text --session google` then hit "Verify it's you". The profile dir
 mtime updated each run, so the save *looked* successful.
@@ -65,7 +65,7 @@ and must not read `cookies_saved` as proof of a completed login.
 
 **Verify a Google session correctly:** use a real target surface
 (`https://drive.google.com/drive/my-drive`) and pass the SAME
-`--channel chrome` the profile was saved with — bundled Chromium against a
+`--channel chrome` the profile was saved with - bundled Chromium against a
 real-Chrome profile is a fingerprint mismatch that triggers its own challenge.
 `myaccount.google.com` always re-challenges and is a false negative.
 
@@ -82,7 +82,7 @@ Proven live restoring the `google` session after a password reset.
 **`login_detected` is ADVISORY, not proof.** The URL poller returned
 `login_detected: false` on the very run that produced a fully working session
 (it reads one page's address bar; a login that completes in another tab, or
-late, reads as a timeout). It is safe in the useful direction — a false negative
+late, reads as a timeout). It is safe in the useful direction - a false negative
 only costs waiting the full timeout. **The authoritative check is always a
 post-save probe of the real target surface**, with the same `--channel` the
 profile was saved with:
@@ -275,3 +275,21 @@ Then write the strings to files and record a sha256 for each. Two traps:
   raising. Set `PYTHONIOENCODING=utf-8`, or read the bytes and decode them yourself.
 - **A login check by page text is unreliable.** Many account pages do not print the user's
   name. Check for an element only a logged-in user gets, or look at the screenshot.
+
+## Measuring what a page costs a slow machine (`perf-probe`)
+
+- `Emulation.setCPUThrottlingRate` slows only the renderer's main thread. Prove it took with a
+  fixed in-page loop timed before the window (`calibration_ms` scales with the rate).
+- A navigation to the SAME address with a `#fragment` is a same-document navigation: no reload, no
+  init scripts, and the previous run's boot comes back. Go through `about:blank` between runs.
+- The first run of a batch pays for a cold cache (a large platform stylesheet can dominate the boot
+  timeline). Load once unmeasured (`--warmup`) before comparing boot marks across variants.
+- In headless Chromium painting and canvas raster happen in software on the main thread, so they
+  appear in CDP `TaskDuration` but not in `ScriptDuration` / `LayoutDuration` / `RecalcStyleDuration`
+  (the probe reports the rest as `other_ms`). A canvas whose script costs under 1 ms a frame can
+  still hold the main thread at 100%. Compositor-only costs (backdrop-filter) do not show at all.
+- `layout-shift` entries carry `sources[].node` with previous and current rects: recording them
+  from an init script names the element that jumped, which is usually enough to find the cause.
+- Headless `requestAnimationFrame` is not tied to a 60 Hz display: an idle page reaches about
+  120 fps. Compare fps between the variants of one run, never with a physical screen.
+

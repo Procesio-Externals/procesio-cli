@@ -51,6 +51,45 @@ def test_build_request_binds_supplied_inputs_and_every_output():
         {"VariableId": body["variables"][0]["Id"], "Value": "hello", "Attribute": None}]
 
 
+CRED_ACTION = {
+    "actionId": "22222222-2222-2222-2222-222222222222",
+    "name": "Cred Action",
+    "isProcesioAction": False,
+    "configuration": [
+        {"label": "Config", "settings": [
+            {"id": "c3c3c3c3-0000-0000-0000-000000000003", "label": "Server",
+             "direction": 1, "dataTypeId": None, "type": "credentials"},
+            {"id": "a1a1a1a1-0000-0000-0000-000000000001", "label": "Query",
+             "direction": 1, "dataTypeId": "dt-string"},
+            {"id": "b2b2b2b2-0000-0000-0000-000000000002", "label": "Rows",
+             "direction": 3, "dataTypeId": "dt-object", "isList": True},
+        ]},
+    ],
+}
+
+
+class _CredClient(_FakeClient):
+    def get(self, path, query=None, **kw):
+        if path == "/api/Actions/node":
+            return {"actions": [CRED_ACTION]}
+        return super().get(path, query, **kw)
+
+
+def test_credential_input_is_a_literal_not_a_variable():
+    # a credential parameter has no data type: a process binds it as the credential
+    # instance id itself; a typed-less test variable is refused with a 400
+    body = ro._build_test_request(_CredClient(), "Cred Action",
+                                  {"Server": "4e0660ce-0000-0000-0000-000000000000", "Query": "SELECT 1"})
+    params = {p["TabPropertyId"]: p for p in body["Action"]["parameters"]}
+    cred = params["c3c3c3c3-0000-0000-0000-000000000003"]
+    assert cred["Value"] == "4e0660ce-0000-0000-0000-000000000000" and cred["Variable"] == []
+    assert all(v["DataType"] for v in body["variables"])
+    assert [v["Type"] for v in body["variables"]] == [10, 30]
+    assert [t["Value"] for t in body["TestValues"]] == ["SELECT 1"]
+    rows = [v for v in body["variables"] if v["Type"] == 30][0]
+    assert rows["IsList"] is True
+
+
 def test_unknown_value_label_is_rejected():
     import pytest
     with pytest.raises(ro.UsageError):

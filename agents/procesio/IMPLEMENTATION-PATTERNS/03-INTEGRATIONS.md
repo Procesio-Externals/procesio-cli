@@ -136,7 +136,8 @@ Each entry has five parts: **Pattern** / **Problem** / **Mechanics** / **When** 
   generic localized fallback. Branch on (1).
 - **When**: every write call.
 - **Pitfalls**: also bind the **HTTP status code** of the Call API and wire its error port. Otherwise a
-  timeout or 5xx looks the same as a business reject.
+  timeout or 5xx looks the same as a business reject. Gate on the explicit flag: a filled error envelope
+  passes `IS_NOT_EMPTY` ([O5](05-OPTIMIZING-A-WORKSPACE.md)).
 
 ### C4. Numbered step chain with lookup-first idempotency
 - **Problem**: creating a customer in an ERP takes a dependency chain (partner → site/meter → contract →
@@ -156,7 +157,8 @@ Each entry has five parts: **Pattern** / **Problem** / **Mechanics** / **When** 
   tables hold the external ids.
 - **When**: any multi-step external sync.
 - **Pitfalls**: write it **with parameters**, because error text from the external system contains quotes. Make
-  the orchestrator read the row and skip completed steps; otherwise it's only a log.
+  the orchestrator read the row and skip completed steps; otherwise it's only a log. A log `UPDATE` that matches
+  no row fails silently, and for a row a live screen reads see [05-OPTIMIZING-A-WORKSPACE](05-OPTIMIZING-A-WORKSPACE.md) O7-O9.
 
 ### C6. One credential per environment, switched centrally
 - **Problem**: nodes bound to a TEST credential one by one make going to PROD a manual re-bind of every node.

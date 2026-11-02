@@ -1,0 +1,20 @@
+/* PROCESIO form kit, the CRITICAL layer. Ship it as the first line of the form CSS:
+     @import url("data:text/css;base64,<this file, minified>");
+   An @import sheet is NOT scoped by the renderer, so these rules reach the host page (topbar,
+   html, body) from the very first frame, before any script runs. Keep it tiny: only what must
+   be right before the runtime arrives (about 1 s). Change the page colour below. */
+
+.pds-c-topbar { display: none !important; }
+.skip-link { display: none !important; }
+
+html, body, #app, .app-root, .app-main, .form.content, .form-builder, .form-builder-view {
+  background: transparent !important;
+}
+html, body { background: #0f2433 !important; }
+
+/* lets the runtime prove this sheet is live (ensureCritical() falls back to a <style> tag) */
+html { --kit-critical: 1; }
+
+/* UI mounted on <body> stays out of the page flow, unseen, until the form's scope reaches
+   <html>; before that the scoped sheet does not style it (measured: CLS 1.1-1.6) */
+html:not([data-form-css-scope]) body > .kit-ui { position: fixed !important; visibility: hidden !important; }

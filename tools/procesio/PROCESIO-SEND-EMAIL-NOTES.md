@@ -1,4 +1,4 @@
-# PROCESIO "Send Email" action — attachment + dynamic recipient
+# PROCESIO "Send Email" action - attachment + dynamic recipient
 
 How a PROCESIO **Send Email** action node sends an email with a **file
 attachment** and a **dynamic (variable) recipient**. Verified against both the
@@ -12,7 +12,7 @@ Flow **"Notification/Process Event with FILE"** -> action
 `TemplateId = c7673492-2912-4975-8cab-747fb9f4085d`, `Category = "cat1"`.
 
 This is a node-building note (how to author the action's `Parameters[]` in a
-flow DTO), complementing the API/auth notes — see
+flow DTO), complementing the API/auth notes - see
 [PROCESIO-API-NOTES.md](PROCESIO-API-NOTES.md).
 
 ---
@@ -28,7 +28,7 @@ The action catalog has four email-related actions:
 | Read Mailbox V2 | Read incoming mail (newer) |
 | Word Mail Merge | Mail-merge a Word template |
 
-There is **no SendGrid action** in PROCESIO — "Send Email" goes out over SMTP.
+There is **no SendGrid action** in PROCESIO - "Send Email" goes out over SMTP.
 Its **first** configuration field is `type="credentials"`, label
 **"Select SMTP credentials"**, with
 `credentialsTemplateId = 20202020-0001-0000-0000-aaaaaaaaaaaa`. The bound
@@ -51,7 +51,7 @@ Every configurable field is one entry in the action's `Parameters[]` array:
 
 - **`Value`** holds PROCESIO placeholders of the form **`<%N%>`**, where `N` is
   the `id` of the matching entry in `Variable[]`. Placeholders are **mixable
-  with literal text** — e.g. a Subject of `"Notificare mesaj: <%1%>"` injects
+  with literal text** - e.g. a Subject of `"Notificare mesaj: <%1%>"` injects
   flow variable `id:1` after the literal prefix.
 - Each `<%N%>` in `Value` must have a `Variable[]` entry whose `id == N`; that
   entry's `variableId` is the flow variable's GUID. `attribute` is `null` for a
@@ -60,14 +60,14 @@ Every configurable field is one entry in the action's `Parameters[]` array:
   literal string `Value` (e.g. From display name `"POSF Notification"`) or
   `""`/`null`.
 
-## 3. TabPropertyId map — Send Email fields
+## 3. TabPropertyId map - Send Email fields
 
 | TabPropertyId | Field | Type / notes |
 |---|---|---|
 | `f9d5da64-bbc0-4d53-a0ad-6f948cc3ff05` | **Select SMTP credentials** | `credentials` (credentialsTemplateId `20202020-0001-0000-0000-aaaaaaaaaaaa`) |
 | `90d1ec9f-803c-42bc-bd8b-ca11e4ef116c` | **From (Display Name)** | string |
-| `90d1ec9f-803c-42bc-bd8b-ca11e4ef11c6` | **From (Entity)** | string — WARNING: differs from Display Name only in the last 4 chars (`...11c6` vs `...116c`); easy to transpose |
-| `1def19eb-ec69-4a21-a756-4abec8ae3171` | **To** | string (dynamic recipient — see section 5) |
+| `90d1ec9f-803c-42bc-bd8b-ca11e4ef11c6` | **From (Entity)** | string - WARNING: differs from Display Name only in the last 4 chars (`...11c6` vs `...116c`); easy to transpose |
+| `1def19eb-ec69-4a21-a756-4abec8ae3171` | **To** | string (dynamic recipient - see section 5) |
 | `30ba958f-0d83-4259-97b9-d64ce7282d83` | **Cc** | string |
 | `1b6fbfac-183a-481b-9e0d-d4e7cf5543fe` | **Bcc** | string |
 | `9eeaf788-c023-4848-afe7-2454840bd321` | **Subject** | string |
@@ -75,7 +75,7 @@ Every configurable field is one entry in the action's `Parameters[]` array:
 | `5330da65-bd38-4419-88c7-93136bdb6dd9` | **Map attachment** | `file`, `isList=true`, dataTypeId `10c6ac59-3929-49e6-99dc-121212121219` (see section 4) |
 | `3fdba8f7-75b5-4350-9d85-b542f8e5a73d` | **Body is Html** | check-box (`Value: null`/false = plain text; true = HTML) |
 
-## 4. Attachment — bind a File-typed variable
+## 4. Attachment - bind a File-typed variable
 
 Bind TabPropertyId **`5330da65-bd38-4419-88c7-93136bdb6dd9`** (Map attachment)
 to a **File** flow variable.
@@ -86,12 +86,12 @@ to a **File** flow variable.
 - In the reference flow it is bound to variable **`mailList`** (a `List<File>`,
   `IsList=True`, DataType `10c6ac59-...121219`).
 - **No inline / base64 content.** Files travel as **PROCESIO File variable
-  references** — you build/obtain a File (e.g. via *Object To File*, *Export To
+  references** - you build/obtain a File (e.g. via *Object To File*, *Export To
   CSV*, a download action) earlier in the flow and pass that variable here. The
   binding is `Variable:[{id:N, variableId:<file var>, attribute:null}]`,
   `Value:"<%N%>"`.
 
-## 5. Dynamic recipient — bind a String variable
+## 5. Dynamic recipient - bind a String variable
 
 Bind TabPropertyId **`1def19eb-ec69-4a21-a756-4abec8ae3171`** (To) to a
 **String** flow variable (DataType `0317bfee-b2f5-4bde-bfe8-121212121214`).
@@ -124,11 +124,11 @@ Bind TabPropertyId **`1def19eb-ec69-4a21-a756-4abec8ae3171`** (To) to a
 
 ---
 
-## Reference — verbatim `Parameters[]` from the `notify` action
+## Reference - verbatim `Parameters[]` from the `notify` action
 
 Taken as-is from the reference flow. Note the byte between `Notificare mesaj:`
 and `<%1%>` in the Subject is **U+00A0 (non-breaking space)**, not a normal
-space — preserved verbatim below.
+space - preserved verbatim below.
 
 ```json
 [
@@ -238,7 +238,7 @@ The **"Map attachment"** field (`TabPropertyId 5330da65-bd38-4419-88c7-93136bdb6
 `type="file"`) is a **LIST of files** at runtime. Binding a **single** `File` variable
 (model `10c6ac59-3929-49e6-99dc-121212121219`, `isList:false`) makes the designer show
 **"Error: data type mismatch"** on the Send Email node and the email sends with **NO
-attachment** — and the run STILL returns **status 50** (the mismatch does not fail the run,
+attachment** - and the run STILL returns **status 50** (the mismatch does not fail the run,
 so a green run is NOT proof the file attached). The designer's "+ Add Variable" tooltip on
 that field literally reads **"Add Variable type=list <File>"**.
 
@@ -248,5 +248,30 @@ that field literally reads **"Add Variable type=list <File>"**.
 - A form file-upload control already holds a list, so a form→process attachment binds cleanly.
 
 A **dynamic recipient** is a normal variable bind: `To` Value `<%0%>` + `Variable:[{id:0,
-variableId: <recipientEmail var>}]` — verified delivering live to the entered address, with
+variableId: <recipientEmail var>}]` - verified delivering live to the entered address, with
 the `list<File>` PDF attached (form → Process 2 brief → Process 3 email, AAT_ use case).
+
+## Document -> email, end to end (re-measured live 2026-10-29)
+
+The chain that works: Generate Document (`Document Output` -> a `File` variable) -> `List Add`
+(`Input object to be added` = that File, `List to which the object is added` = a `list<File>`
+variable) -> Send Email `Map attachment` = the list. The mail arrives with the PDF attached.
+
+- **A single `File` in Map attachment still fails silently.** Re-measured through a SendGrid-backed
+  SMTP credential: the designer flags "data type mismatch", the email is delivered WITHOUT the file,
+  and the run ends as success (status 50). Always go through a list.
+- **The attachment's MIME type is `application/octet-stream`**, even for a generated PDF (read from
+  the received message). Clients open it; some previews do not.
+- **From (Entity) left empty** sends from the `From` property of the SMTP credential, so a flow only
+  needs a display name in `From (Display Name)`.
+- **Run dialog vs. a data-model input with a default value:** the designer's Run dialog shows the
+  default as `[object Object]`, and Run refuses it ("Not a valid JSON"). The same default works over
+  `POST /api/Projects/{id}/run`. For a flow run from the designer, leave the model default empty and
+  paste JSON into the field.
+- **Designer field editing:** the inline fields (From, To, Subject) take typing directly, and the
+  `+` at the field's right end opens the variable picker (a model's attributes are listed under it;
+  search, then click the attribute). In the Body (a code editor) `Ctrl + I` opens the same picker at
+  the cursor and inserts `<%var.attr%>`. **Esc toggles the full-screen field editor**; it does not
+  close anything, so a script must not press it to dismiss a field.
+- **After a successful save of a valid flow** the designer shows "Successfully saved" with its own
+  **Run** and **Close** buttons; Run there opens the Run dialog directly.

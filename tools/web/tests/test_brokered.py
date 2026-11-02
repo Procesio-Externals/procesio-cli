@@ -136,3 +136,22 @@ def test_save_session_stops_owning_broker(monkeypatch, isolated_sessions):
     out = sessmgmt.save_session(NS(name="google", url="https://g/",
                                    channel=None, persistent=False))
     assert "broker_stopped" not in out
+
+
+def test_perf_probe_against_a_broker_session_fails_with_actionable_guidance(monkeypatch):
+    """perf-probe has no broker translation (it needs exclusive control of the browser for CDP
+    throttling and a fresh context per variant). Against a broker-owned session it must fail with a
+    clear UsageError that names the escape hatch, not a bare 'no broker translation' ValueError."""
+    from tools.web.errors import UsageError
+    _unroute(monkeypatch)
+    with pytest.raises(UsageError, match="--direct"):
+        dispatch("perf-probe", ["--session", "ryver", "--url", "https://x/"])
+
+
+def test_direct_flag_keeps_perf_probe_out_of_the_broker(monkeypatch):
+    """--direct makes the probe eligible to run in-process, so it never reaches the broker guard."""
+    from types import SimpleNamespace as NS
+    _unroute(monkeypatch)
+    base = {"session": "ryver", "channel": None, "headed": False}
+    assert brokered.eligible(NS(**{**base, "direct": True}),
+                             driver_factory=None, allow_service=True) is None

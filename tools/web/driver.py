@@ -78,6 +78,8 @@ class BrowserDriver(Protocol):
 
     def eval_js(self, script: str, *, arg: Any = None) -> Any: ...
 
+    def cdp(self, method: str, params: dict | None = None) -> Any: ...
+
     def set_input_files(self, selector: str, files: Any,
                         *, timeout: int | None = None) -> None: ...
 
@@ -167,6 +169,7 @@ class PlaywrightDriver:
         # This is the observability that lets verification SEE runtime failures
         # (a 400 launch, a JS exception) instead of only guessing from a screenshot.
         self._diag = {"console": [], "page_errors": [], "failed_requests": [], "bad_responses": []}
+        self._cdp = None  # DevTools session on the page, opened by the first cdp() call
 
     # --- lifecycle --------------------------------------------------------
     def start(self) -> "PlaywrightDriver":
@@ -316,7 +319,7 @@ class PlaywrightDriver:
                     getattr(obj, meth)()
             except Exception:  # noqa: BLE001 - best-effort teardown
                 pass
-        self._page = self._context = self._browser = self._pw = None
+        self._page = self._context = self._browser = self._pw = self._cdp = None
 
     # --- helpers ----------------------------------------------------------
     @property
@@ -666,6 +669,20 @@ class PlaywrightDriver:
             return self.page.evaluate(script, arg)
         except Exception as exc:  # noqa: BLE001
             raise _wrap(exc, {"script": script[:120]})
+
+    def cdp(self, method: str, params: dict | None = None) -> Any:
+        """Send one Chrome DevTools Protocol command to the page and return its result.
+
+        The session is opened on first use and kept for the life of the page, so
+        settings it makes (CPU throttling, device metrics, init scripts) persist
+        across navigations. Chromium only.
+        """
+        try:
+            if self._cdp is None:
+                self._cdp = self.page.context.new_cdp_session(self.page)
+            return self._cdp.send(method, params or {})
+        except Exception as exc:  # noqa: BLE001
+            raise _wrap(exc, {"cdp": method})
 
     def set_input_files(self, selector: str, files: Any,
                         *, timeout: int | None = None) -> None:

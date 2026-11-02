@@ -1,10 +1,10 @@
-# flowmodel — offline flow graph reader
+# flowmodel - offline flow graph reader
 
 Parses a PROCESIO flow (a `.procesio` export bundle or a live flow DTO) into a canonical,
 JSON-ready node/edge graph model. Pure, offline, case-insensitive (handles PascalCase
 exports and camelCase live DTOs). Never mutates its input.
 
-This is the substrate the canvas layout tool, `inspect-flow`, and audit build on — parse
+This is the substrate the canvas layout tool, `inspect-flow`, and audit build on - parse
 once, reuse. The model it produces is documented in `../PROCESIO-RESOURCE-MODEL-NOTES.md` §1.
 
 ## Use
@@ -32,6 +32,6 @@ python -m tools.procesio.main read-flow-graph --in <export.procesio> --resource-
 
 ## Files
 
-- `model.py` — dataclasses: `FlowGraph`, `Node`, `Edge`, `Container`, `VarRef`, `SubprocessCall`.
-- `reader.py` — `read_flow` / `read_bundle` + the case-insensitive getter `_g`.
+- `model.py` - dataclasses: `FlowGraph`, `Node`, `Edge`, `Container`, `VarRef`, `SubprocessCall`.
+- `reader.py` - `read_flow` / `read_bundle` + the case-insensitive getter `_g`.
 - Tests: `../tests/test_flowmodel.py` (synthetic + real exports).

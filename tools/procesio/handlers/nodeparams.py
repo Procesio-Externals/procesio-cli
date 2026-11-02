@@ -67,6 +67,11 @@ def _lint(client, flow: dict) -> list[dict]:
 
 
 
+def _finding_key(f: dict) -> tuple:
+    # no action id: a finding on an unchanged node must match before and after the edit
+    return (f.get("code"), f.get("action"), f.get("text"))
+
+
 def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool = True) -> dict:
     """The tail every surgical writer shares: validate, lint, then save or say why not.
 
@@ -83,6 +88,11 @@ def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool
     The blocking rule is unchanged: the runtime validator refuses the PUT, a designer
     error does not. Saving a half-finished process is intended platform behaviour, and
     the stamped mark is how the result stays honest about it.
+
+    A surgical edit answers only for what it changes. The canvas is never re-arranged
+    here (`layout-flow` does that on request), and a flow the platform holds as valid
+    stays valid unless the edit ADDED a designer finding: our lint is stricter than the
+    designer's, so a flow saved valid there can carry findings it was already saved with.
     """
     valid, errors = _validate(client, flow)
     problems = _lint(client, flow)
@@ -101,12 +111,21 @@ def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool
             return result
     fe = run_fe_validation(client, flow)
     result["fe"] = fe
+    stamp = bool(valid and fe["clean"])
+    if not fe["clean"]:
+        # the stored flow is still the one before the edit: its mark and findings are the baseline
+        before = _fetch_flow(client, args.id)
+        known = {_finding_key(f) for f in run_fe_validation(client, before)["errors"]}
+        new = [f for f in fe["errors"] if _finding_key(f) not in known]
+        result["fe_preexisting"] = len(fe["errors"]) - len(new)
+        result["fe_new"] = new
+        stamp = bool(valid and before.get("isValid") is not False and not new)
     if args.dry_run:
-        result["isValid"] = bool(valid and fe["clean"])
+        result["isValid"] = stamp
         result["put"] = False
         result["dry_run"] = True
         return result
-    saved = save_flow(client, flow, flow_id=args.id, valid=valid and fe["clean"])
+    saved = save_flow(client, flow, flow_id=args.id, valid=stamp, layout=False)
     result["isValid"] = saved["isValid"]
     result["stamped"] = saved["stamped"]
     if "readback_error" in saved:
@@ -252,28 +271,7 @@ def variable_set_required(client, args) -> dict:
         result["put"] = False
         return result
 
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    result["lint_problems"] = _lint(client, flow)
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    # Every save decides the mark: the platform stores what the body carries,
-    # never computes it, so a pass-through PUT files a repaired flow as broken.
-    fe = run_fe_validation(client, flow)
-    result["fe"] = fe
-    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
-    result["isValid"] = saved["isValid"]
-    result["stamped"] = saved["stamped"]
-    if "readback_error" in saved:
-        result["readback_error"] = saved["readback_error"]
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
 def variable_add(client, args) -> dict:
@@ -291,28 +289,7 @@ def variable_add(client, args) -> dict:
               "direction": args.direction.lower(), "isList": var["isList"],
               "isRequired": var["isRequired"]}
 
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    result["lint_problems"] = _lint(client, flow)
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    # Every save decides the mark: the platform stores what the body carries,
-    # never computes it, so a pass-through PUT files a repaired flow as broken.
-    fe = run_fe_validation(client, flow)
-    result["fe"] = fe
-    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
-    result["isValid"] = saved["isValid"]
-    result["stamped"] = saved["stamped"]
-    if "readback_error" in saved:
-        result["readback_error"] = saved["readback_error"]
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
 def variable_set_default(client, args) -> dict:
@@ -355,28 +332,7 @@ def variable_set_default(client, args) -> dict:
         result["note"] = "default already set to that value; nothing to PUT"
         result["put"] = False
         return result
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    result["lint_problems"] = _lint(client, flow)
-    if not valid:
-        result["errors"] = errors
-        result["put"] = False
-        return result
-    if args.dry_run:
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    # Every save decides the mark: the platform stores what the body carries,
-    # never computes it, so a pass-through PUT files a repaired flow as broken.
-    fe = run_fe_validation(client, flow)
-    result["fe"] = fe
-    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
-    result["isValid"] = saved["isValid"]
-    result["stamped"] = saved["stamped"]
-    if "readback_error" in saved:
-        result["readback_error"] = saved["readback_error"]
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
 def node_insert(client, args) -> dict:
@@ -430,31 +386,8 @@ def node_insert(client, args) -> dict:
         result["put"] = False
         return result
 
-    valid, errors = _validate(client, flow)
-    result["isValid"] = valid
-    result["lint_problems"] = _lint(client, flow)
-    if not valid:                       # never PUT an invalid flow
-        result["errors"] = errors
-        result["inserted"] = False
-        result["put"] = False
-        return result
-    if args.dry_run:
-        result["inserted"] = True
-        result["put"] = False
-        result["dry_run"] = True
-        return result
-    # Every save decides the mark: the platform stores what the body carries,
-    # never computes it, so a pass-through PUT files a repaired flow as broken.
-    fe = run_fe_validation(client, flow)
-    result["fe"] = fe
-    saved = save_flow(client, flow, flow_id=args.id, valid=bool(valid and fe["clean"]))
-    result["isValid"] = saved["isValid"]
-    result["stamped"] = saved["stamped"]
-    if "readback_error" in saved:
-        result["readback_error"] = saved["readback_error"]
     result["inserted"] = True
-    result["put"] = True
-    return result
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
 def node_repair_designer(client, args) -> dict:
@@ -929,6 +862,8 @@ def node_add_binding(client, args) -> dict:
         raise UsageError(str(e)) from e
     result = {"id": args.id, "title": flow.get("title"), "node": node.get("actionName"),
               "property": param.get("tabPropertyId"), **change}
+    # the designer copy too, or a designer save / an export brings the old body back
+    result["normalized"] = normalize_designer_layer(flow)
     return _gate_and_put(client, flow, args, result)
 def _addbinding_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)

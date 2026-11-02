@@ -1,21 +1,21 @@
-# PROCESIO instance-history API — notes
+# PROCESIO instance-history API - notes
 
 How run history is read (endpoints + native actions), and the traps. Generalized
 API facts; no client data. Measured live against Internal-PROD, 28/08/2026.
 
 ## The endpoints (contract + measured shapes)
 
-- **`GET /api/Projects/{id}/history`** (`get-projects-by-id-history`) — finished,
+- **`GET /api/Projects/{id}/history`** (`get-projects-by-id-history`) - finished,
   non-archived instances of a process, in a **time window**. Query: `pageNumber`,
   `pageItemCount` (both required), `filter` (`ProcessTimeSpanFilterType`, default
   `Last30Days=5`), `monthFilter` (with `CertainMonth=14`).
-- **`GET /api/Projects/{id}/instances`** (`get-projects-by-id-instances`) — **live**
+- **`GET /api/Projects/{id}/instances`** (`get-projects-by-id-instances`) - **live**
   runtime instances only. Query: paging + `filterStatus` (repeatable `FlowStatus`).
   No date filter.
-- **`GET /api/Projects/{id}/instances/count`** — returns `{"result": <int>}`.
-- **`GET /api/Projects/{id}/archive`** — archived (Cassandra) instances, same query
+- **`GET /api/Projects/{id}/instances/count`** - returns `{"result": <int>}`.
+- **`GET /api/Projects/{id}/archive`** - archived (Cassandra) instances, same query
   as `/history`. Hidden from Swagger; reachable.
-- **`GET /api/Projects/instances/{id}/status`** (`get-instance-status`) — the
+- **`GET /api/Projects/instances/{id}/status`** (`get-instance-status`) - the
   **primary result reader**. `flowTemplateId` required; `isArchived`/`getActions`/
   `getVariables`/`getInternalVariables`/`addExtras` default true. Returns
   `{"instance": {...}}`.
@@ -50,11 +50,11 @@ the envelope can report `pageNumber: 0`.
   `webhookName` / `scheduleName`); timing = `createdOn` / `updatedOn` / `timeConsumed` /
   `totalTimeConsumed` / `actionsConsumed`; `status` = `FlowStatus` (50 `STATUS_FINISH`,
   40 `STATUS_RUNNING_WITH_ERRORS`, 6 `STATUS_STOP_BY_USER`). The **outcome is not in the
-  row** — read it per instance from `/status`.
+  row** - read it per instance from `/status`.
 - ⚠ **`/status` `instance.variables[]` is VariableDto SCHEMA, not runtime values on a
   historical read.** Each element has `id, name, type` (10 INPUT / 20 PROCESS / 30 OUTPUT /
   40 SYSTEM / 50 AUTO),
-  `dataType, isList, isError, isRequired, defaultValue` — **no `value` field**.
+  `dataType, isList, isError, isRequired, defaultValue` - **no `value` field**.
   Type 50 AUTO (new in v3.0.0, 2026-10) is engine-written and read-only: the engine creates
   it on the INSTANCE from action settings meant for it, named `{ActionName}_{PropertyName}`
   (suffix `_2`, `_3` on a clash, 64-char cap), with the value in `defaultValue`. Today only
@@ -65,29 +65,29 @@ the envelope can report `pageNumber: 0`.
   run's `/status` gives the run record + the variable *definitions*; the concrete output
   *values* are not on that path (use `isArchived=true` or the `Get Instance Outputs`
   action). `/output` (`GetInstanceOutput`) is deprecated ("Not used by FE+BE"); prefer
-  `/status`. Casing: **live reads are camelCase; export bundles are PascalCase** — running
+  `/status`. Casing: **live reads are camelCase; export bundles are PascalCase** - running
   one shape's keys against the other yields a census of zeros.
 
-## Reading history from INSIDE a flow — binding matters
+## Reading history from INSIDE a flow - binding matters
 
 - ✅ **Native actions read run history with NO credential and NO store binding**
   (`isProcesioAction=true`, `credential_params=0`):
-  - **`Get Recent Instances`** (`cf514e01-bd19-3b48-8e58-db786c0d7fd2`) — recent instances,
+  - **`Get Recent Instances`** (`cf514e01-bd19-3b48-8e58-db786c0d7fd2`) - recent instances,
     status filter ALL/1/6/30/50/40, optional process-id list.
   - **`Count Recent Instances`** (`d42b8056-4cba-d34d-819c-00295ef66d53`).
-  - **`Get Instance Outputs`** (`98ab31ca-1dd2-fb47-bde7-40171612e4b1`) — a specific
+  - **`Get Instance Outputs`** (`98ab31ca-1dd2-fb47-bde7-40171612e4b1`) - a specific
     instance's OUTPUT variables by name (needs flow + instance id + output selection).
   - Their process-template-id list is **optional**: *"If this list is null or empty … the
     entire workspace"* (`docs_info/Procesio Platform Actions.json`). So a flow reads its own
-    workspace's runs/counts/outputs with no foreign binding — the only ids are the pack's own.
+    workspace's runs/counts/outputs with no foreign binding - the only ids are the pack's own.
 - ⚠ **Call API to the platform's OWN REST API needs a bound REST credential.** `Call API`
   v1/v2/v3 carry a **required** `credentials` param; only the legacy `Call API`
-  (`cd8bd0bc-9c9c-476c-b16e-975acde804de`) makes it optional — and the history endpoints
+  (`cd8bd0bc-9c9c-476c-b16e-975acde804de`) makes it optional - and the history endpoints
   require a Bearer JWT, so a credential-less legacy call reaches them unauthenticated and
   fails. A REST credential is a per-workspace, id-bound object that does not travel with an
   exported pack. **To read run history binding-free, use the native actions, not Call API.**
 
-## Retention — how long a record lives
+## Retention - how long a record lives
 
 - **Customer process data: default UNLIMITED**, configurable per Master Workspace and per
   process (security refs `07-data-protection-gdpr.md`, `13-questionnaire-template.md`). The
@@ -98,11 +98,11 @@ the envelope can report `pageNumber: 0`.
   `DELETE /api/Projects/instances/{id}/dataRetention` deletes an instance's data.
   A flow/instance with `DataRetention: null` inherits the workspace default (unlimited).
 - **HIPAA Mode** is opt-in: "Controlled data retention + secure output retrieval"
-  (`08-application-security.md`) — can delete/secure outputs when enabled.
+  (`08-application-security.md`) - can delete/secure outputs when enabled.
 - Tiers: live `/instances` → `/history` (non-archived, windowed) → `/archive` (Cassandra,
   `isArchived=true`). Tier moves are storage progression, **not deletion by default**.
 - **Consequence for a run-history feature:** history is durable by default, so it can back a
-  log — but a customer's per-workspace/per-process retention policy or HIPAA Mode can delete
+  log - but a customer's per-workspace/per-process retention policy or HIPAA Mode can delete
   it, and a silently-aged-out history turns "did we process this?" into a confident wrong "no".
 
 ### Process-History v3.0.0 fixes (2026-10, shipped without an announcement)
@@ -114,7 +114,7 @@ the envelope can report `pageNumber: 0`.
 - Instances move from `/instances` to `/history` faster, so the window in which a fresh run is
   visible only in `/instances` is shorter. Still read both tiers before calling a run unlisted.
 
-## `Get Recent Instances` at RUNTIME — measured, and it corrects the action doc
+## `Get Recent Instances` at RUNTIME - measured, and it corrects the action doc
 
 Executed live (E-166); two documented behaviours did **not** reproduce, so verify before you
 rely on them:
@@ -125,26 +125,26 @@ rely on them:
   a well-formed zero for runs that really happened (the census-of-zeros, on the native action
   now, not only the `/history` calendar bucket).
 - **A single process id filters correctly** in EITHER `Select Process` or `Process Template
-  Id`. The Result rows carry `{Id, Status, UpdatedOn}` **only — no `parentId`/title**, so you
+  Id`. The Result rows carry `{Id, Status, UpdatedOn}` **only - no `parentId`/title**, so you
   cannot tell processes apart per-row; the *filter value* is the only scoping.
 - ⚠ **A LIST value in the process filter FAULTS at runtime.** A two-element id list
   (`[pidA, pidB]`) in either param validates and `put-projects` fine, but the run returns
-  `griTotal = null` / 0 rows (a fault, not "0 matches") — tested with both processes freshly
+  `griTotal = null` / 0 rows (a fault, not "0 matches") - tested with both processes freshly
   run, so not a window effect. The friendly builder DSL additionally rejects a list literal at
   the config-schema layer and a variable binding at back-end validation.
-- ⚠ **An omitted / null filter returns 0 — NOT the whole workspace.** The action doc's "if
+- ⚠ **An omitted / null filter returns 0 - NOT the whole workspace.** The action doc's "if
   this list is null or empty … the entire workspace" did not reproduce for an omitted filter.
-- **Therefore: to show N processes' histories, do N single-id reads and union them** — not one
+- **Therefore: to show N processes' histories, do N single-id reads and union them** - not one
   list value, not the null=whole-workspace shortcut. (Bounded residual: the designer's own
   multi-select picker may store a Value shape the action accepts that a bare id-list does not;
-  untested.) Reading a past run's OUTPUT *values* back works — via `/status` `defaultValue`
+  untested.) Reading a past run's OUTPUT *values* back works - via `/status` `defaultValue`
   and `/output` `result.variable[<name>]`, not gated by `isArchived` (E-164 F-1310).
 
-## Capturing a run's output — capture it LIVE, don't count on reading it back
+## Capturing a run's output - capture it LIVE, don't count on reading it back
 
 - ⚠ **`run-process` (POST /api/Projects/{id}/run) is fire-and-forget: it returns only
   `{instanceId}` and launches asynchronously.** To get the run's output in one call pass
-  **`--synchronous`** (`run-process --id … --synchronous --timeout N`) — it polls to a terminal
+  **`--synchronous`** (`run-process --id … --synchronous --timeout N`) - it polls to a terminal
   status and returns `{instanceId, status, variable{<name>: <value>}, error}`. Without it you get
   the id and nothing else. `run-process-with-file` already publishes → uploads → launches →
   **polls** → returns that same output shape, so it needs no flag.
@@ -153,8 +153,8 @@ rely on them:
   (`get-instance-status`) returned **HTTP 400 / statusCode 450 "Database requested information not
   found"** *even with `flowTemplateId` supplied*, and `/output` (`get-instance-output`) returned
   **HTTP 500 wrapping 403** (it is the deprecated path). This does **not** contradict E-164's
-  "past-run values readable via `/status` `defaultValue`" as a rule — that was measured on a
-  deployed card, likely inside its retention/live window — but it shows the read-back is **not
+  "past-run values readable via `/status` `defaultValue`" as a rule - that was measured on a
+  deployed card, likely inside its retention/live window - but it shows the read-back is **not
   guaranteed** for an arbitrary finished instance (retention policy, elapsed window, or workspace
   tier can take it away). **The reliable pattern: capture the output synchronously as the run
   finishes** (`--synchronous` / `run-process-with-file`); treat a later `/status` read-back as a
@@ -163,7 +163,7 @@ rely on them:
 
 ## Only FORM-launched instances are LISTED; API-launched ones are only COUNTED
 
-> ⚠⚠ **CONTRADICTED 2026-09-16 — re-measure before relying on this section.** Runs launched
+> ⚠⚠ **CONTRADICTED 2026-09-16 - re-measure before relying on this section.** Runs launched
 > through `POST /api/Projects/{id}/run` (synchronous and asynchronous) and through an anonymous
 > webhook launch WERE listed: they appeared in `…/instances` first and then in `…/history`
 > within minutes, in three workspaces, with and without recording enabled. The rows move
@@ -177,23 +177,23 @@ Verified live on one flow, both ways, same day:
 | launch route | `…/instances/count` | `…/instances` (list) | `Get Recent Instances` |
 |---|---|---|---|
 | process API (`/api/Projects/{id}/run`, publish→launch) | 41 | `totalItemCount: 0`, `pageItems: []` | `[]` |
-| form API (`/api/FormProcess/…` — what a browser does) | +1 | the run, with `formName` populated | the run |
+| form API (`/api/FormProcess/…` - what a browser does) | +1 | the run, with `formName` populated | the run |
 
 The listed row carries `formName`, `actionsConsumed`, `timeConsumed` and the submitter's
-name — fields an API launch has no value for. That is the tell: the history list is a record
+name - fields an API launch has no value for. That is the tell: the history list is a record
 of **form submissions**, not of flow executions.
 
 **Consequences.**
 
 - A run-history view tested only through the process API reads as permanently empty, and the
-  natural conclusion — "the history flow is broken" — is wrong. Nothing is broken; the query
+  natural conclusion - "the history flow is broken" - is wrong. Nothing is broken; the query
   is correct and the store genuinely holds no listable rows yet.
 - `Get Recent Instances` returning `[]` while `Count Recent Instances` returns a positive
   number is not a contradiction and not a bug. Count and list are answering different
   questions.
 - **Acceptance for any card shipping a run-history view must include one submission through
   `run-form-with-files`.** Without it the view cannot be distinguished from a broken one, and
-  a mockup render will fill the gap in review — which is exactly how a fabricated "-LIVE"
+  a mockup render will fill the gap in review - which is exactly how a fabricated "-LIVE"
   view gets shipped.
 
 Generalises: where a platform exposes both a machine route and a UI route to the same
@@ -206,27 +206,27 @@ These are the shapes anything that pre-fills a diagnostic bundle from the produc
 
 **Envelope:** `GET /api/Projects/instances/{id}/status` returns `{"result": {"instance": {…}}}`.
 
-**`instance` — 33 fields:** `actions, actionsConsumed, active, canvasData, createdBy, createdById,
+**`instance` - 33 fields:** `actions, actionsConsumed, active, canvasData, createdBy, createdById,
 createdOn, currentActionId, customResponse, dataRetention, debugMode, description, firstName, formName,
 id, isNotification, isValid, lastName, parentFlow, parentId, scheduleName, status, timeConsumed,
 timeout, title, updatedBy, updatedById, updatedOn, variables, webhookName, webhooks, workspaceId,
 workspaceName`.
 
-**`instance.actions[]` — 19 fields:** `actionName, actionTemplateName, breakPoint, category, customData,
+**`instance.actions[]` - 19 fields:** `actionName, actionTemplateName, breakPoint, category, customData,
 errorMessage, events, flowId, id, isDisabled, isTestable, parameters, parentId, ports, status,
 templateId, testValues, variableErrorId`.
 → **The error lives on the ACTION, not on the instance.** Select failed actions as those whose
 `errorMessage` is non-empty; `variableErrorId` names the error-port variable. `currentActionId` on the
 instance points at the action in flight.
 
-**`instance.variables[]` — 9 fields:** `contextId, dataType, defaultValue, id, isError, isList,
+**`instance.variables[]` - 9 fields:** `contextId, dataType, defaultValue, id, isError, isList,
 isRequired, name, type`. **No `value` field**, confirming that a historical read yields the variable
 SCHEMA and not runtime values. Values need the `Get Instance Outputs` native action or a synchronous run.
 `type` takes 10 INPUT / 20 PROCESS / 30 OUTPUT / 40 SYSTEM / 50 AUTO (50 added in v3.0.0, 2026-10:
 engine-written, value in `defaultValue`, always returned, survives retention cleanup; see the
 Traps section above). **Measured live in prod:** on 2026-10-21 the engine already created these variables with the new readable names (`Call_Subprocess_InstanceId`, `Call_Subprocess_ChildInstanceId` holding the child's id, `Call_Subprocess_ChildInstanceIdList`) but typed them 20 (PROCESS), because the Call Subprocess template still served those settings as `ignore`. From 2026-10-22 the template serves `auto` and new runs type `Call_Subprocess_ChildInstanceId` and `Call_Subprocess_ChildInstanceIdList` as **50 (AUTO)**, holding the child's id; `Call_Subprocess_InstanceId` stays 20 because its setting is still `ignore`. Instances started before the fix keep type 20, so a reader that must cover older history should match by NAME, not by `type == 50`. Survival through data-retention cleanup is not verified yet.
 
-**`/history` row — 26 fields:** as listed earlier in this note, plus confirmed presence of
+**`/history` row - 26 fields:** as listed earlier in this note, plus confirmed presence of
 **`currentActionId` and `workspaceId` on the row itself**, so a sweep can shortlist candidates without a
 per-instance `/status` call. The outcome is still not on the row.
 

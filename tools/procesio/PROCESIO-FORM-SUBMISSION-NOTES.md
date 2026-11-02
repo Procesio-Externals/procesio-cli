@@ -98,8 +98,8 @@ gate goes back to passing the defect it was built to catch.
 Two separate settings decide whether a form learns anything from the process it launched, and a
 form can be missing both while looking completely wired in the designer:
 
-- **`syncRun: false`** — the event fires and the form moves on. Nothing downstream can see a result.
-- **`outputMap: []`** — even a synchronous run maps nothing back, so the process's output variables
+- **`syncRun: false`** - the event fires and the form moves on. Nothing downstream can see a result.
+- **`outputMap: []`** - even a synchronous run maps nothing back, so the process's output variables
   stay inside the process.
 
 With both, the form falls through to its generic `SUBMIT_SUCCESS` message whatever happened, so a
@@ -108,17 +108,17 @@ that was written. This is the form-side twin of the `Execute Command` result-set
 (PROCESIO-SQL-ACTIONS-NOTES.md): at every layer the failure mode is *the outcome is discarded and
 success is assumed*, and at every layer it is invisible to validation and to a green run.
 
-**The shape that works** — three events on one button, in this order:
-1. `RUN_JAVASCRIPT` — validate, then write the process inputs into `ProcesioForm.variables`.
-2. `RUN_PROCESS` — `syncRun: true`, `inputMap` from those variables, `outputMap` from the
+**The shape that works** - three events on one button, in this order:
+1. `RUN_JAVASCRIPT` - validate, then write the process inputs into `ProcesioForm.variables`.
+2. `RUN_PROCESS` - `syncRun: true`, `inputMap` from those variables, `outputMap` from the
    process's output variable into a FORM variable.
-3. `RUN_JAVASCRIPT` — read that form variable and render the real outcome.
+3. `RUN_JAVASCRIPT` - read that form variable and render the real outcome.
 
 `form-set-element-event --replace-action RUN_PROCESS` swaps step 2 in place, preserving the other
 events and their order; a plain call appends, which is how step 3 lands last.
 
 **A result-set output arrives as a LIST even when it is one row**, so step 3 must take `[0]` (and
-tolerate a non-array). Guard the success test on both `true` and `1` — the same field comes back
+tolerate a non-array). Guard the success test on both `true` and `1` - the same field comes back
 as a SQL bit and as a JSON boolean depending on the path.
 
 **Do not hand-escape values in the form's JavaScript.** A `.replace(/'/g, "''")` in a submit
@@ -137,7 +137,7 @@ FIELD target.
 
 The single highest-yield form gotcha found so far, because it fails in the direction that looks
 fine: `ProcesioForm.data.fields.SomeParagraph.value = '…'` is accepted, throws nothing, logs
-nothing — and the page keeps its original placeholder text. A handler written that way reports
+nothing - and the page keeps its original placeholder text. A handler written that way reports
 nothing at all to the visitor, whatever happened underneath.
 
 ```js
@@ -152,17 +152,17 @@ successful run; with `.label` the new text appeared. Assume the same for any con
 authored as a label (heading, paragraph) rather than typed into by the user.
 
 **Test it by reading the DOM, not the handler.** The handler running is not evidence the reader saw
-anything — `document.body.innerText` before and after the click is.
+anything - `document.body.innerText` before and after the click is.
 
 ## Driving a published form headlessly, without a compositing browser pane
 
 Two facts make a real end-to-end click-through possible even when no pane is displayed and trusted
 mouse events are unavailable:
 
-1. **`element.click()` works on a PROCESIO form button.** The whole event chain fires — the JS
+1. **`element.click()` works on a PROCESIO form button.** The whole event chain fires - the JS
    handlers, the RUN_PROCESS, the result handler. Confirmed by the process instance appearing in
    `list-instances` attributed to the form, and by the row changing in the database.
-2. **Every control pre-fills from a URL query parameter named after the control** — including
+2. **Every control pre-fills from a URL query parameter named after the control** - including
    `visible: false` controls, whose values reach the process even though they are not in the DOM at
    all. That is what makes a hidden-token page (a cancel link) work, and it also lets a test skip
    custom pickers (dropdown, date, slot list) that need trusted events: pass their values on the

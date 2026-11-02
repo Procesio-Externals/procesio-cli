@@ -1,4 +1,4 @@
-# 04 — Interaction recipes
+# 04 - Interaction recipes
 
 Working patterns for the things a professional form actually needs: reading and
 writing values, hiding controls, gating navigation, turning static markup into a
@@ -27,13 +27,13 @@ function isFilled(el) {
 ```
 
 Checkboxes and radios are checked-state, everything else is `.value`. Always
-`.trim()` — a space is not a value.
+`.trim()` - a space is not a value.
 
 ## 2. Write a value: **click the control, never set the property**
 
 The renderer is Vue-bound. Setting `input.checked = true` or `input.value = 'x'`
 behind Vue's back changes what the user sees and **does not update the form's
-value** — the field looks filled and submits empty. Click the real control:
+value** - the field looks filled and submits empty. Click the real control:
 
 ```js
 function radioFor(kind) {
@@ -63,7 +63,7 @@ function setText(el, value) {
 ```
 
 Prefer to avoid this entirely. If values come from a process, let the event's
-`outputMap` write them natively — see [06](06-PROCESS-INTEGRATION.md).
+`outputMap` write them natively - see [06](06-PROCESS-INTEGRATION.md).
 
 ### Clearing a radio group
 
@@ -90,7 +90,7 @@ function clearChoice() {
 **Do not re-dispatch `change` here.** On a Vue-bound group that handler reads the
 option's value and would simply re-select what you just cleared.
 
-## 3. Hide a control — one class, `display: none`
+## 3. Hide a control - one class, `display: none`
 
 ```css
 .ux-gated { display: none !important; }
@@ -101,14 +101,14 @@ el.classList.toggle('ux-gated', shouldHide);
 ```
 
 **`display: none`, not `visibility` or `opacity`.** A control you can still reach
-with Tab but cannot see is a worse bug than a visible one — it traps keyboard users
+with Tab but cannot see is a worse bug than a visible one - it traps keyboard users
 in an invisible field. Hide the **whole element wrapper**
 (`b.closest('.form-builder--element')`), not just the inner button, so no empty row
 is left behind.
 
 ## 4. Gate a navigation button on a condition
 
-Hide the button's host rather than disabling it — a disabled control invites
+Hide the button's host rather than disabling it - a disabled control invites
 clicking; an absent one reads as "not yet".
 
 ```js
@@ -181,7 +181,7 @@ Then hide the raw group: `radioHost.classList.add('ux-gated')`.
 **The state is always read back from the real control**, never remembered on the
 card. That is what keeps the two in sync when the renderer rebuilds the step.
 
-Locating the cards without ids — match on content, and require a discriminator that
+Locating the cards without ids - match on content, and require a discriminator that
 separates the descriptive card from the radio label itself:
 
 ```js
@@ -264,7 +264,7 @@ function validate(el, key) {
 }
 ```
 
-An empty value is a *required* problem, not a *format* problem — flagging it as
+An empty value is a *required* problem, not a *format* problem - flagging it as
 malformed while the user is still typing is hostile. Note the create/remove pair:
 the function is idempotent, so it can run on every keystroke.
 
@@ -426,7 +426,7 @@ render, which reads as the page fighting the user.
 
 A button's `onClickEvents` is an ordered chain (e.g. `RUN_JAVASCRIPT` →
 `RUN_PROCESS` → `MAP_FORM_DATA` → `RUN_JAVASCRIPT`). A validation placed in the
-first `RUN_JAVASCRIPT` **cannot stop the rest of the chain** — a throw or `return`
+first `RUN_JAVASCRIPT` **cannot stop the rest of the chain** - a throw or `return`
 there ends only that block; the process still launches. Two layers:
 
 1. **Capture-phase guard in the runtime** (form-level JS, injected per §4 of
@@ -440,14 +440,14 @@ there ends only that block; the process still launches. Two layers:
    runtime did not load; the rules still live in one place.
 
 Same trick for a checkbox that must not be ticked: intercept its click in capture
-phase and `preventDefault()`. Do not rely on `input.disabled` alone — a Vue
+phase and `preventDefault()`. Do not rely on `input.disabled` alone - a Vue
 re-render of the row can reset it. To untick a checkbox programmatically, `click()`
 it (setting `.checked = false` does not reach the Vue model).
 
-Checkboxes inside a `dynamic-table-row` repeat the same DOM `id` on every row —
+Checkboxes inside a `dynamic-table-row` repeat the same DOM `id` on every row - 
 select them with `querySelectorAll('[id="<id>"]')` and read the row's other
 columns from the enclosing row's cells, in `tableColumnsSourceValue` order
-(the cell markup is not yet confirmed on a live render — check it before relying
+(the cell markup is not yet confirmed on a live render - check it before relying
 on the column index).
 
 ## 16. One click from a JS decision to a no-code reaction: the trigger field
@@ -571,6 +571,74 @@ Rules that each cost a debugging round:
 - **Page-specific CSS.** When only one page of a multi-page app uses the map,
   ship its stylesheet with that page alone. Concatenate a per-page CSS file at
   build time instead of growing the shared stylesheet that every page carries.
+
+## Buttons over a select (choice cards) - click the real option
+
+Replacing a short select with a row of buttons is safe only if the select stays the source of
+truth, so every MAP and RUN_PROCESS on its `onInputEvents` still fires. Verified on the live
+renderer (2026-10-22), from a runtime in the parent page:
+
+- **Open it with `focus()`.** The control is vue-multiselect: `ms.focus({ preventScroll: true })`
+  on `.multiselect` adds `.multiselect--active` and draws the `.multiselect__option` nodes (they do
+  not exist before the first open). If it does not open, dispatch `mousedown` on
+  `.multiselect__select` (the arrow toggles it).
+- **Click the option whose text matches**, compared without diacritics or case. The value lands
+  in the model, the shown label (`.multiselect__single`) updates, the list closes, and the
+  select's own input chain runs exactly as for a mouse click. Retry once or twice; a blur left
+  over from an earlier pick can stop the next focus from opening it.
+- **Read state back from the select, never from your buttons.** The component root
+  (`[id="<id config>"]`, class `form-builder--select`) reflects the model in its `value`
+  attribute (the option's value, e.g. `PF`, a JSON-sourced option's `value`), so a refresh pass
+  paints the buttons from it.
+- **Keep the select rendered.** Clip its `.pds-c-input-group--selector-holder` and label holder
+  (1 px, `clip-path: inset(50%)`), never `display: none`, which makes `focus()` a no-op. Set the
+  `.multiselect`'s `tabindex` to `-1` so Tab skips the invisible control. Its info-text renders
+  as a `.pds-c-message.pds-c-message-info` SIBLING of the root inside the element wrapper; hide
+  that too, it repeats what the buttons say.
+- **A custom validator's error node still lands on the root** (validators usually append it to
+  the element that carries `[id=...]`), so put the buttons BEFORE the root in the wrapper and the
+  message stays under them.
+- **Tell "locked" from "busy".** While any element's chain runs, the renderer disables every
+  control, so a select looks locked during a chain triggered elsewhere. A hidden field that only
+  your own code writes (a step-flow trigger, a bridge input) is disabled by nothing else: if it
+  is disabled, a chain is running; if it is not and the select is, the step was locked on purpose.
+- **Radios:** click the `input[type=radio]` whose value matches; state is the checked input.
+- **Serialize picks** (one queue): two dropdowns opened at once steal each other's focus.
+
+Options a process fills (a JSON source) appear only after that process answers; read them from
+its `/variables` answer (values in `defaultValue`, matched by variable `name`) or by opening the
+list once, and fall back to the native select when a label you expect is not in it.
+
+## A process-drawn chart as the selector for a table's rows
+
+When a process returns a chart of the same rows a table holds (a timeline of offer lines, say),
+the chart can BE the selector and the table can leave the screen, without touching what the
+processes receive. The table stays the data; the chart only clicks it.
+
+- **Match rows by data, never by order.** The chart sorts its own way. Have one node per row
+  that you can read: an SVG `<g><title>…</title>` per row survives the paragraph's DOMPurify and
+  carries the row's text. Normalize both sides with the chart node's own reductions (strip a
+  leading percentage, collapse spaces, the price's numeric part) and match on period first, then
+  reference or price. Take over only if EVERY table row maps to exactly one chart row.
+- **Click the real checkbox** (`input.click()`). The selection guard's capture listener (locks,
+  currency, totals), the Vue model and the row data the processes read all see a normal click.
+  Read checked / locked state back from the inputs and the guard's classes, every pass.
+- **Hide the table without `display: none`.** Guards and collectors test
+  `offsetParent !== null || offsetWidth > 0`; a `display: none` table makes them see no rows, and
+  an empty selection passes. Use `position: absolute` at its static position (parent
+  `position: relative`), `opacity: 0`, `pointer-events: none`, `aria-hidden`, `tabindex="-1"` on
+  its inputs. Keep it where it was rather than off-screen: a dynamic row with
+  `hasVirtualization` may only render what is in view.
+- **One-way fallback.** If the match breaks after the takeover (rows not rendered, text that no
+  longer matches), give the table back for that data and do not take over again; flipping on
+  every pass is worse than the old table.
+- **The overlay:** one transparent `<button role="checkbox">` per row over the chart, `top` and
+  `height` in percent of the SVG viewBox height (the chart scales with the card). Greying a row
+  that cannot be picked any more: a light veil with `backdrop-filter: grayscale(1)`. On a phone
+  give the chart and the overlay the same `min-width` and let the chart's box scroll sideways;
+  a 1,000-unit chart squeezed to 330 px has rows too small to tap.
+- **Mirror the messages.** Errors a guard or validator writes under the table now sit in a hidden
+  box: copy their text into the summary under the chart.
 
 ## A static location map (Google Maps embed, no key) in paragraph content
 

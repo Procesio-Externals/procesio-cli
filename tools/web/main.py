@@ -13,6 +13,7 @@ Actions:
   get-text          load a session, open a URL, return visible text
   screenshot        load a session, open a URL, save a screenshot
   archive-document  capture a published document (original + self-contained + extraction)
+  perf-probe        frame rate / main-thread cost / boot layout shifts under CPU throttling
 
 Playwright is imported lazily (inside the driver) so this tool and its tests
 load even before the browser binaries are installed.
@@ -47,11 +48,12 @@ class _Parser(argparse.ArgumentParser):
 
 def collect_actions() -> dict[str, ActionDef]:
     actions: dict[str, ActionDef] = {}
-    from tools.web.handlers import archive, browse, contacts, sessmgmt
+    from tools.web.handlers import archive, browse, contacts, perf, sessmgmt
     actions.update(sessmgmt.ACTIONS)
     actions.update(browse.ACTIONS)
     actions.update(archive.ACTIONS)
     actions.update(contacts.ACTIONS)
+    actions.update(perf.ACTIONS)
     return actions
 
 

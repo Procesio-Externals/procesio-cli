@@ -1,4 +1,4 @@
-# 06 — Wiring a form control to a process
+# 06 - Wiring a form control to a process
 
 How a control triggers a PROCESIO process, how data goes in, how results come back
 into fields, and the design rule that saves a day of debugging: **one process
@@ -24,7 +24,7 @@ A `RUN_PROCESS` event on a control's trigger ([01](01-ANATOMY.md) §6):
 }
 ```
 
-**`syncRun: true` holds the line open** until the process finishes — verified live
+**`syncRun: true` holds the line open** until the process finishes - verified live
 across a multi-second external API call. With `syncRun: false` the form fires and
 forgets, so an `outputMap` can never populate anything.
 
@@ -32,7 +32,13 @@ forgets, so an `outputMap` can never populate anything.
 process twice; the second result overwrites the first and the timing is not
 deterministic. When rewiring, use `--replace` rather than appending.
 
-## 2. The map rows — the shape that took three attempts to get right
+**Conditions.** A `RUN_PROCESS` config carries `conditions` (the same rows as a MAP's) with
+`areConditionsConfigured: true`; the event runs only when they hold. That is how one trigger can hold
+two process events safely, one per mutually exclusive case (one per document type, say). An upload's
+chain also fires when the file is REMOVED, so its process calls need `IS_NOT_EMPTY` on the upload's
+own value ([08](08-PITFALLS.md), "Removing an uploaded file starts the extraction again").
+
+## 2. The map rows - the shape that took three attempts to get right
 
 ```json
 {
@@ -44,7 +50,7 @@ deterministic. When rewiring, use `--replace` rather than appending.
 
 Four rules, each learned the hard way:
 
-1. **The process-variable GUID goes on the LEFT** — in `inputMap` *and* in
+1. **The process-variable GUID goes on the LEFT** - in `inputMap` *and* in
    `outputMap`. A variable *name* on the left is accepted by the API, but the
    designer then renders raw guids and the launch 400s.
 2. **Each side is an OBJECT, not a bare string.** Bare strings are accepted by the
@@ -53,7 +59,7 @@ Four rules, each learned the hard way:
    `path: null`. Discovered by reading a mapping the designer itself had written.
 4. **`path` carries the attribute chain** when a model-typed variable is mapped one
    attribute at a time. Rebuilding a row without carrying `path` over silently maps
-   the whole object into a single text field — the classic `[object Object]`
+   the whole object into a single text field - the classic `[object Object]`
    in every field.
 
 The form side's value is the full field path from [01](01-ANATOMY.md) §5:
@@ -164,7 +170,7 @@ left out simply leave their viewers empty.
 The tempting design is one structured output variable (a data model, or a JSON blob)
 mapped attribute-by-attribute into the fields. Do not. The attribute-path shape on
 the form side of a map row is typed `left: any` in the renderer, so it is **not
-derivable** — you would be guessing, and a wrong guess writes `[object Object]`
+derivable** - you would be guessing, and a wrong guess writes `[object Object]`
 into every field with no error anywhere.
 
 The design that works:
@@ -195,18 +201,20 @@ nothing at runtime and buy a wiring you can reason about.
 **Do not add a hidden "carrier" field to the form** to receive the blob and then
 distribute it in JavaScript. It puts a second copy of the data in the DOM, it needs
 its own gating so it never shows, and the outputMap already populates fields
-natively — which is also the honest completion signal (§6).
+natively - which is also the honest completion signal (§6).
 
 ## 5. Notes on the process side
 
+- **Changing a process behind a live form?** Audit, speed, failure handling and rollout are in
+  [05-OPTIMIZING-A-WORKSPACE](../../../agents/procesio/IMPLEMENTATION-PATTERNS/05-OPTIMIZING-A-WORKSPACE.md).
 - **A file input's variable is `FileDataModel`**, not a primitive type. `file` is
   not a type.
-- **`Call API v3` is superseded** — use `Call API`, with `Response Status`,
+- **`Call API v3` is superseded** - use `Call API`, with `Response Status`,
   `Response Body`, and `Time Out`. The framework's `process-create` refuses
   superseded actions outright.
 - **A `Node` action's `Timeout` must be 60–300.** `30` is rejected by the validation
   gate. `Node` returns its value raw; a `Javascript` action wraps it as
-  `{result: v}` — a difference that silently changes every downstream reference.
+  `{result: v}` - a difference that silently changes every downstream reference.
 - **`Decisional` is a diamond** and fans out any number of branches; they do not
   have to re-converge, but a `Join` is the explicit merge point when they should.
 - Parse defensively at the boundary and return a *diagnosable* object rather than
@@ -227,9 +235,17 @@ natively — which is also the honest completion signal (§6).
   A thrown error inside a Node stops the flow and tells the form nothing. A returned
   warning object flows on and can be surfaced to the user.
 
+- **A process does not know who launched it.** `ProcessInfo` carries the workspace,
+  instance, template, name and start time, nothing about the caller, and a form maps
+  `instance.currentUser.email` into the publish body from the browser. So a form-facing
+  process that gates an action on "is this an admin" is checking a claim. Do the check in
+  SQL anyway (it stops the honest mistakes and every other caller), make the action
+  reversible (a status change rather than a `DELETE`), and log who claimed to do what, so
+  misuse is visible and undoable. Refuse the self-harming cases in the same place: deleting
+  your own account, removing the last administrator.
 - Carry a **`warning_status` / `warning_message` pair** through to the form. When an
   external model returns mostly nulls (a partially legible document), that is an
-  *extraction quality* result, not a wiring failure — and the two are indistinguishable
+  *extraction quality* result, not a wiring failure - and the two are indistinguishable
   from the form unless the process says which it was.
 
 ## 6. The form side: detect arrival from the fields themselves
@@ -316,7 +332,7 @@ Three details that matter:
 ## 8. Offer a manual escape
 
 Extraction from a photographed document fails sometimes. When the veil's ceiling
-fires, say so and let the person continue by hand — a form that can only be
+fires, say so and let the person continue by hand - a form that can only be
 completed when a model cooperates is not a form.
 
 ```js

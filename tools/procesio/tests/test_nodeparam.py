@@ -824,3 +824,154 @@ def test_an_engine_owned_variable_cannot_be_given_a_default(name):
 
 def test_auto_is_a_known_direction():
     assert nodeparam.VAR_DIRECTION[50] == "auto"
+
+
+def test_handler_add_binding_regenerates_the_designer_copy(monkeypatch):
+    """A Node's Code lives twice: the runtime parameter the engine runs, and the designer
+    setting the editor shows and an export carries. node-add-binding used to rewrite only the
+    runtime one, so the edit ran but a designer save or an export brought the old body back.
+    The designer copy holds the variable's GUID where the runtime holds <%N%>."""
+    from types import SimpleNamespace
+    from tools.procesio.handlers import nodeparams
+
+    code_tab = "1e6a5523-2091-6c4c-94ac-c7984074673d"
+    flow = {"id": "p1", "title": "T", "variables": [
+        {"id": "var-row", "name": "offer_row", "type": 20},
+        {"id": "var-flex", "name": "flex", "type": 10}],
+        "actions": [{"id": "n1", "actionName": "Node (1)", "actionTemplateName": "Node",
+                     "parameters": [{"tabPropertyId": code_tab, "value": "const o = <%0%>;\nreturn o;",
+                                     "variable": [{"id": 0, "variableId": "var-row", "attribute": None}]}],
+                     "customData": {"configuration": [{"settings": [
+                         {"id": code_tab, "type": "code-editor", "label": "Code",
+                          "value": "const o = var-row;\nreturn o;"}]}]}}]}
+
+    class _Client:
+        def get(self, path, *a, **k):
+            return flow
+
+    monkeypatch.setattr(nodeparams, "_validate", lambda c, f: (True, None))
+    monkeypatch.setattr(nodeparams, "_lint", lambda c, f: [])
+    monkeypatch.setattr(nodeparams, "run_fe_validation", lambda c, f: {"clean": True})
+    args = SimpleNamespace(id="p1", node="Node (1)", property="Code", bind=["2=flex"],
+                           find="return o;", replace='return o || "<%2%>";', dry_run=True)
+
+    res = nodeparams.node_add_binding(_Client(), args)
+    designer = flow["actions"][0]["customData"]["configuration"][0]["settings"][0]["value"]
+    assert res["bindings_added"] == [2]
+    assert flow["actions"][0]["parameters"][0]["value"].endswith('return o || "<%2%>";')
+    assert designer.endswith('return o || "var-flex";')        # the designer copy moved too
+
+
+def _edit_with_findings(monkeypatch, *, stored_valid, before, after):
+    """node-replace-text on a stored flow whose designer findings are `before`; the edited
+    flow's are `after`. Returns (result, the save_flow kwargs)."""
+    import copy
+    from types import SimpleNamespace
+    from tools.procesio.handlers import nodeparams
+
+    code_tab = "1e6a5523-2091-6c4c-94ac-c7984074673d"
+    stored = {"id": "p1", "title": "T", "isValid": stored_valid, "variables": [],
+              "actions": [{"id": "n1", "actionName": "Node (1)", "actionTemplateName": "Node",
+                           "parameters": [{"tabPropertyId": code_tab, "value": "return 1;", "variable": []}],
+                           "customData": {"position": {"x": 10, "y": 20}, "configuration": [{"settings": [
+                               {"id": code_tab, "type": "code-editor", "label": "Code", "value": "return 1;"}]}]}}]}
+
+    class _Client:
+        def get(self, path, *a, **k):
+            return copy.deepcopy(stored)
+
+    def fe(c, f):
+        errs = before if f.get("actions")[0]["parameters"][0]["value"] == "return 1;" else after
+        return {"clean": not errs, "errors": errs}
+
+    saved = {}
+
+    def fake_save(client, flow, **kw):
+        saved.update(kw, position=flow["actions"][0]["customData"]["position"])
+        return {"isValid": kw["valid"], "stamped": kw["valid"]}
+
+    monkeypatch.setattr(nodeparams, "_validate", lambda c, f: (True, None))
+    monkeypatch.setattr(nodeparams, "_lint", lambda c, f: [])
+    monkeypatch.setattr(nodeparams, "run_fe_validation", fe)
+    monkeypatch.setattr(nodeparams, "save_flow", fake_save)
+    args = SimpleNamespace(id="p1", node="Node (1)", property="Code", find="return 1;",
+                           replace="return 2;", expect=None, allow_binding_change=False, dry_run=False)
+    return nodeparams.node_replace_text(_Client(), args), saved
+
+
+_OLD = {"code": "EXECQUERY_OUTPUT_TYPE", "action": "Execute Query", "text": "output type"}
+_NEW = {"code": "CODE_UNDECLARED", "action": "Node (1)", "text": "undeclared x"}
+
+
+def test_surgical_edit_keeps_valid_mark_over_preexisting_findings(monkeypatch):
+    """A flow the designer saved as valid can carry findings of our stricter lint. Stamping it
+    invalid after a code fix that added nothing misreports the edit, so the mark is kept;
+    and the canvas is never re-arranged by a surgical edit."""
+    res, saved = _edit_with_findings(monkeypatch, stored_valid=True, before=[_OLD], after=[_OLD])
+    assert saved["valid"] is True and saved["layout"] is False
+    assert saved["position"] == {"x": 10, "y": 20}
+    assert res["fe_preexisting"] == 1 and res["fe_new"] == []
+
+
+def test_surgical_edit_drops_valid_mark_for_a_finding_it_added(monkeypatch):
+    res, saved = _edit_with_findings(monkeypatch, stored_valid=True, before=[_OLD], after=[_OLD, _NEW])
+    assert saved["valid"] is False
+    assert res["fe_new"] == [_NEW]
+
+
+def test_surgical_edit_never_promotes_a_flow_stored_invalid(monkeypatch):
+    res, saved = _edit_with_findings(monkeypatch, stored_valid=False, before=[_OLD], after=[_OLD])
+    assert saved["valid"] is False
+
+
+# ------------------------------------------------- surgical writers share one save tail
+
+def test_every_surgical_save_routes_through_the_one_gated_tail():
+    """The layout=False + fe-baseline stamp lives in `_gate_and_put`. A writer that calls
+    `save_flow` itself is exactly how that fix stops arriving - it did, for four writers that
+    held drifted copies of the tail. Guard the invariant at the source: `save_flow` may be
+    called from one function only."""
+    import ast
+    import pathlib
+    from tools.procesio.handlers import nodeparams
+
+    tree = ast.parse(pathlib.Path(nodeparams.__file__).read_text(encoding="utf-8"))
+    callers = set()
+    for fn in [n for n in ast.walk(tree) if isinstance(n, ast.FunctionDef)]:
+        for node in ast.walk(fn):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id == "save_flow"):
+                callers.add(fn.name)
+    assert callers == {"_gate_and_put"}, f"save_flow escaped the shared tail: {sorted(callers)}"
+
+
+def test_variable_add_preserves_the_canvas_on_save(monkeypatch):
+    """A surgical variable edit must not re-arrange the canvas: the save goes out with
+    layout=False, now that the writer delegates to the shared tail instead of its old inline
+    save that re-triggered arrange()."""
+    from types import SimpleNamespace
+    from tools.procesio.handlers import nodeparams
+
+    flow = {"id": "p1", "title": "T", "actions": [], "variables": []}
+
+    class _Client:
+        def get(self, path, *a, **k):
+            return flow
+
+    saved = {}
+
+    def fake_save(client, f, **kw):
+        saved.update(kw)
+        return {"isValid": kw["valid"], "stamped": kw["valid"]}
+
+    monkeypatch.setattr(nodeparams, "_validate", lambda c, f: (True, None))
+    monkeypatch.setattr(nodeparams, "_lint", lambda c, f: [])
+    monkeypatch.setattr(nodeparams, "run_fe_validation", lambda c, f: {"clean": True, "errors": []})
+    monkeypatch.setattr(nodeparams, "save_flow", fake_save)
+
+    args = SimpleNamespace(id="p1", name="brandNew", data_type="string", direction="output",
+                           is_list=False, default=None, required=False, dry_run=False)
+    res = nodeparams.variable_add(_Client(), args)
+    assert res["put"] is True
+    assert saved["layout"] is False
+    assert saved["valid"] is True

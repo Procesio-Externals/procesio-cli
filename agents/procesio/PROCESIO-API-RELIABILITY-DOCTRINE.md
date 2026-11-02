@@ -1,7 +1,7 @@
 # PROCESIO API reliability doctrine
 
 How to drive the PROCESIO Web API **safely and predictably** when building or
-operating processes and forms. These are platform truths, not project quirks —
+operating processes and forms. These are platform truths, not project quirks - 
 they hold for any workspace. Each was learned by hitting it live; the `procesio`
 tool now ENFORCES most of them so you cannot silently violate them (see the
 guardrails table at the end), but the operating rules still shape how you sequence
@@ -23,17 +23,17 @@ return normally. Fast endpoints (`POST /api/Projects/{id}/run`, `GET /api/Schedu
 
 The leading explanation (a **hypothesis**, not confirmed): a process is many
 actions each with its own timeout, workspace execution capacity is finite, and
-under load both executions and definition reads/writes **queue** behind it — i.e.
+under load both executions and definition reads/writes **queue** behind it - i.e.
 the "hangs" are legitimate long/queued work, not a broken API. Whether or not that
 is the mechanism, the operating rule is the same: **one PROCESIO call in flight at
 a time.** Build loops sequentially; do not fan out.
 
-## 2. Behavioural verification over re-read — writes can lie
+## 2. Behavioural verification over re-read - writes can lie
 
 A success-shaped response is NOT proof the change persisted. A definition PUT has
 been seen to return `200` with an empty/`{"raw_text":""}` body while the change did
 **not** land server-side. The only trustworthy check is **behavioural**: run the
-process (or open/submit the form) and observe the effect — or re-read the
+process (or open/submit the form) and observe the effect - or re-read the
 definition and diff it. Never conclude "it worked" from the write's own echo.
 `put-projects` now warns you when the body comes back empty.
 
@@ -42,8 +42,8 @@ definition and diff it. Never conclude "it worked" from the write's own echo.
 The client's HTTP timeout is a *per-read inactivity* guard, not a total deadline:
 a connection that is accepted and then dribbles (or is held open) never trips it,
 so a stalled call used to run until the process was killed. The client now imposes
-a **total wall-clock deadline** per call, by class — definition/list/schedule
-**reads ~90 s**, definition **writes (PUT) ~180 s** — and on expiry raises a
+a **total wall-clock deadline** per call, by class - definition/list/schedule
+**reads ~90 s**, definition **writes (PUT) ~180 s** - and on expiry raises a
 structured `deadline_exceeded` error (`outcome:"unknown"`, exit non-zero) instead
 of hanging. `run-process` is **exempt** (see §4). Opt out with
 `AAT_PROCESIO_NO_DEADLINE=1` if you are deliberately waiting on something slow.
@@ -51,7 +51,7 @@ of hanging. `run-process` is **exempt** (see §4). Opt out with
 ## 4. Client-side abort ≠ server-side stop
 
 Aborting a slow synchronous run on the client does **not** stop the run on the
-server — it keeps executing and writing its side effects (Sheet rows, emails,
+server - it keeps executing and writing its side effects (Sheet rows, emails,
 social posts, DB writes). So `run-process --synchronous` is exempt from the total
 deadline: a many-action process legitimately runs for minutes, and killing it
 client-side is itself a hazard. If you must bound it, pass `--timeout`
@@ -82,15 +82,15 @@ These cost a debugging session each because the server accepts them without
 complaint. `form-update` now emits non-blocking **lint warnings** for the first
 three; full detail in `tools/procesio/FORM-DEV-GUIDE/08-PITFALLS.md`.
 
-- **Phantom `parentId`** — an element whose `parentId` matches no element id
+- **Phantom `parentId`** - an element whose `parentId` matches no element id
   renders on NO pane. Tab/container membership is by `parentId` = a container
   element's id; a dangling reference is invisible, not an error.
-- **`form-update` deep-merge** — arrays REPLACE wholesale (pass the whole new
+- **`form-update` deep-merge** - arrays REPLACE wholesale (pass the whole new
   array to change one item); `None` sets the key to `null` (it does not delete);
   and a patch wrapped as `{"Data": {...}}` becomes an inert junk key that changes
   nothing. Pass the INNER fields directly.
 - **Duplicate `id`/`name` configs** across elements collide for CSS/JS selectors
-  and process mapping — keep them unique.
+  and process mapping - keep them unique.
 - **Event editing is replace-then-append.** An element commonly carries
   `[RUN_PROCESS, RUN_JAVASCRIPT]` on one click trigger. A blanket "replace" wipes
   BOTH. Replace only the one action you mean (`form-set-element-event
@@ -109,5 +109,5 @@ three; full detail in `tools/procesio/FORM-DEV-GUIDE/08-PITFALLS.md`.
 | §6 retry reads only | GET-only retry with backoff; POST/PUT never retried (`AAT_PROCESIO_NO_RETRY=1` to opt out) |
 | §7 form traps | `form-update` DTO lints; `form-set-element-event --replace-action` |
 
-The rules the tool does NOT enforce — sequential sequencing (§1), behavioural
-verification (§2), and reading schedules (§5) — are on you. Follow them.
+The rules the tool does NOT enforce - sequential sequencing (§1), behavioural
+verification (§2), and reading schedules (§5) - are on you. Follow them.

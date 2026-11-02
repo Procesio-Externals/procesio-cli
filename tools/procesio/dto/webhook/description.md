@@ -1,6 +1,6 @@
 # Webhook sub-tool
 
-Create/edit a PROCESIO **webhook** — an inbound HTTP trigger. Its payload shape is
+Create/edit a PROCESIO **webhook** - an inbound HTTP trigger. Its payload shape is
 a webhook-type data model generated from a sample; attach the webhook to a process
 to fire the flow when the URL is called.
 
@@ -17,16 +17,16 @@ to fire the flow when the URL is called.
 }
 ```
 
-- **sample** — a representative payload; the builder calls `generate-data` to infer
+- **sample** - a representative payload; the builder calls `generate-data` to infer
   the webhook data model from it (or pass a raw `definition` string).
-- **type** — `manual` (1, fires on call — verified) or `auto` (0).
-- **customResponse** — optional synchronous response: `staticjson` / `javascript` / `jsonpath`.
+- **type** - `manual` (1, fires on call - verified) or `auto` (0).
+- **customResponse** - optional synchronous response: `staticjson` / `javascript` / `jsonpath`.
 
 ## API contract (verified live 2026-06-24)
 
 - **Generate model:** `POST /api/Webhooks/generate-data {Definition}` → `{dataModel, payloadIsList}`
   (the `dataModel` is a webhook-type model, `type:2`).
-- **Create:** `POST /api/Webhooks` (`WebhookDto`) — must embed the generated
+- **Create:** `POST /api/Webhooks` (`WebhookDto`) - must embed the generated
   `DataModel` + `DataModelId` + `Definition` + `IsEdited:true`, else a generic 502.
 - **Get:** `GET /api/Webhooks/{id}`. **Edit:** `PUT /api/Webhooks`. **Delete:** `DELETE /api/Webhooks/{id}`.
 - **Trigger (anonymous):** `GET|POST|PUT|PATCH|DELETE /api/Webhooks/launch/{id}`
@@ -57,8 +57,8 @@ side effect; do not infer mapping success from attachment alone.
 ## AUTO vs MANUAL (verified live 2026-06-24)
 
 Per the docs, **AUTO is the listen/capture method**, MANUAL is paste-the-payload:
-- **`type:"manual"`** — you supply `sample`; the builder generates the model from it.
-- **`type:"auto"`** — the builder runs the designer's flow: create the webhook →
+- **`type:"manual"`** - you supply `sample`; the builder generates the model from it.
+- **`type:"auto"`** - the builder runs the designer's flow: create the webhook →
   get its URL → **start listening** → **send the sample to the URL** → capture →
   stop. The `capture` log (`listening/sent_sample/captured`) is returned. The
   webhook is functional (triggers processes) either way.
@@ -70,7 +70,7 @@ Per the docs, **AUTO is the listen/capture method**, MANUAL is paste-the-payload
 
 The custom response is configured **on the process** (per the docs: "Custom
 Response: configured within a process; settings persist"): set the flow's
-`customResponse` (in `process-create`) to a process variable —
+`customResponse` (in `process-create`) to a process variable - 
 `"customResponse": {"var": "responseVar"}`. **A synchronous run returns this value
 directly** (verified: `POST /api/Projects/{id}/run?runSynchronous=true` returns
 the `customResponse` value, not the status object), and so does a form's
@@ -78,14 +78,14 @@ RUN_PROCESS trigger with `syncRun:true`. It's also stored on the instance
 (`GET …/instances/{iid}/customResponse`).
 - The webhook **definition**'s `CustomResponseConfig` (static/JS/JSON-path) is
   designer-only (not persisted by REST). The anonymous webhook **launch** fires the
-  flow asynchronously, so it doesn't block on the response — that webhook-side
+  flow asynchronously, so it doesn't block on the response - that webhook-side
   "respond synchronously" toggle isn't exposed over REST. The custom-response
   *value* mechanism itself is fully working via synchronous run / form trigger.
 
 ## Gotchas
 
 - `HasHeader`/`HasQuery` only persist if the data model includes header/query
-  sub-models — a body-only sample resets them to false.
+  sub-models - a body-only sample resets them to false.
 - One webhook launch can create an adapter instance, a retained child-process instance,
   and further nested instances. Count the complete causal tree in execution budgets.
 - After an ambiguous launch response, reconcile by webhook ID, stable business key,

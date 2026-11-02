@@ -152,13 +152,13 @@ usable for reads, and `DELETE /api/Workspace/{id}` also returned `500` with an u
 outcome.
 
 **Re-tested later and the create-anyway behaviour did NOT reproduce.** Five attempts across
-four request shapes all returned the same 500 and created nothing — the master's
+four request shapes all returned the same 500 and created nothing - the master's
 sub-workspace count and the account-wide workspace list were identical before and after. So
 this may be fixed, and the 500 may now be a clean refusal.
 
 The discipline stands either way, because the 500 says nothing about the outcome: **treat it
 as "unknown outcome, verify by listing", never as a failure**, or a retry manufactures
-orphans. Note the message is identical for every input, so it distinguishes nothing — not a
+orphans. Note the message is identical for every input, so it distinguishes nothing - not a
 malformed body, not a permission problem, not a quota.
 
 ---

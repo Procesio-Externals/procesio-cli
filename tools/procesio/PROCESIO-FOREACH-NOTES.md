@@ -1,8 +1,8 @@
-# PROCESIO `For Each` — construction quirks and the loop-timeout trap
+# PROCESIO `For Each` - construction quirks and the loop-timeout trap
 
 The `For Each` action is template id **`dbef0804-66a9-4f8f-872c-ece1b89b8fdb`**.
 Body membership is by **`ParentId`** (a child action's `parentId` == the loop's
-id), never by an enclosing edge, and only `TemplateId` identifies the action —
+id), never by an enclosing edge, and only `TemplateId` identifies the action - 
 `ActionTemplateName` is `null` on ~half of the corpus's For Each nodes and
 `ActionName` is free text.
 
@@ -10,7 +10,7 @@ id), never by an enclosing edge, and only `TemplateId` identifies the action —
 
 > ✅ **FIXED IN THE BUILDER (E-160, 28/08/2026).** `dto/process/builder.py` now
 > materialises the two template-default output params at build time, so a `For Each`
-> built through `process-create` / the compact config **iterates out of the box** — no
+> built through `process-create` / the compact config **iterates out of the box** - no
 > post-create splice. See `_template_default_params` and the "the fix" section below.
 > The description that follows is the diagnosis that led there; the workaround at the
 > bottom is retained only as history and is **no longer needed**.
@@ -24,7 +24,7 @@ parameter set** depending on how it was created:
 | **programmatic** (compact config → `process-create`, or hand-built flow JSON) | `…55f8c7`, `…adae8b`, `…df9db1` only | whatever you set |
 
 The programmatic build path **omits `…61724e` and `…808b0d`**, and they are **not
-defaulted in on save/validate** — the flow validates and creates cleanly with
+defaulted in on save/validate** - the flow validates and creates cleanly with
 three parameters.
 
 ## ⚠⚠ The failure mode: the loop times out without iterating a populated list
@@ -37,16 +37,16 @@ status 40
 {"errorMessage": "Foreach timeout exceeded!", "actionName": "...", "actionType": "For Each"}
 ```
 
-after the loop's `Action timeout` seconds, **writing nothing** — no body child
+after the loop's `Action timeout` seconds, **writing nothing** - no body child
 executes even once. This was isolated hard:
 
 - The `In List` parameter **is** bound (its `variable[0].variableId` points at the
-  list variable) — verified by reading the created flow back; it is not a
+  list variable) - verified by reading the created flow back; it is not a
   null/unbound-list problem.
-- The list variable **is** populated at runtime — the same run that times out
+- The list variable **is** populated at runtime - the same run that times out
   returns the list (e.g. 3 elements) in its output variables.
 - A **no-loop** flow proves the pieces are healthy: the list-producer Node yields
-  the elements, a Node reads them, and a Data Store `InsertRows` writes a row —
+  the elements, a Node reads them, and a Data Store `InsertRows` writes a row - 
   all at **status 50**. Only inside the For Each does it hang.
 - Reproduced in a **minimal** For Each (one Node → the loop → one Data Store
   `InsertRows` body child), independent of the body's contents and of whether the
@@ -68,28 +68,28 @@ real inserts 3 of 3** on a two-loop diff flow.
 
 - ⚠⚠ **The Action timeout does NOT matter.** The designer loop's `…df9db1` is 600
   and the programmatic one's is 120; the splice **held it at 120** and the body ran.
-  The two output parameters alone are sufficient — do **not** raise the timeout as
+  The two output parameters alone are sufficient - do **not** raise the timeout as
   part of the "fix" (that would be two changes at once and mis-attribute the cause).
 - ⚠⚠ **Both are OUTPUT parameters** (`direction 2`, type `ignore`): `…61724e`
   "Zero based list index" (the current-iteration counter) and `…808b0d` "Action
   start time". A loop with no index slot has nowhere to advance the iteration index,
-  consistent with never entering the body — mechanism plausible, the *measurement*
+  consistent with never entering the body - mechanism plausible, the *measurement*
   is that adding exactly these two flips 0 → N.
-- ⚠⚠ **The omission is in OUR builder, not the platform (E-158 refinement — A-42
+- ⚠⚠ **The omission is in OUR builder, not the platform (E-158 refinement - A-42
   WITHDRAWN as a platform defect).** The two output parameters are the `For Each`
   template's **own default-valued settings**: the live action catalog shows template
   `dbef0804` declaring `61724e` "Zero based list index" with default `value` `"-1"`
-  and `808b0d` "Action start time" with default the `2010-…Z` sentinel — both
+  and `808b0d` "Action start time" with default the `2010-…Z` sentinel - both
   `direction 2`, `type ignore`, **`isRequired false`**. The DESIGNER materialises every
   template setting into the flow; the compact-config builder
-  (`dto/process/builder.py::_action_parameters`) is **binding-driven** — it emits one
-  parameter per config *binding* and never walks the template's settings — so a param no
+  (`dto/process/builder.py::_action_parameters`) is **binding-driven** - it emits one
+  parameter per config *binding* and never walks the template's settings - so a param no
   one binds (a runtime-written output with a default) is never emitted. Neither API path
   defaults it in on save. **So the fix belongs in the builder: materialise the template's
   default-valued output settings** (at minimum emit these two for `For Each`; generally,
   any `direction:2/type:ignore` setting carrying a template `value`). Because the
   validator keys on `isRequired`, a 3-param loop validates + creates clean and only fails
-  at runtime with the generic timeout — a genuinely platform-side rough edge, but a minor
+  at runtime with the generic timeout - a genuinely platform-side rough edge, but a minor
   quality/parity note, not the "build path is broken" claim.
 - ✅ **DONE (E-160). The builder now materialises them.** `dto/process/builder.py`
   gained `_is_template_default_output` (predicate: `direction:2` or `type:ignore` with a
@@ -99,28 +99,28 @@ real inserts 3 of 3** on a two-loop diff flow.
   binding-driven / doc-mapper / decisional / subprocess params. It is **template-driven,
   not a For-Each special-case**: `For Each` gains `61724e`/`808b0d`, and `Call
   Subprocess`'s `a03fe2` started-flow slot (the only other member of the class in the live
-  233-action catalog) is subsumed — already emitted by `_build_subprocess`, so the dedupe
+  233-action catalog) is subsumed - already emitted by `_build_subprocess`, so the dedupe
   makes it a no-op there. Proven a TRANSFORM (a process with no such setting builds
   byte-identical; `For Each` differs by exactly the two params appended) and proven LIVE
   (a loop built by `process-create` iterates 3, no splice; both loops of a two-loop flow
   iterate → status 50, where the E-150 single-loop splice left status 40). ⚠ A separate,
   larger class is NOT fixed: 40 actions carry INPUT-side (`direction:1`) template defaults
-  the builder also drops when unbound — untested whether it matters; see
+  the builder also drops when unbound - untested whether it matters; see
   `todo/procesio-builder-input-default-materialisation.md`.
-- ⚠ **`put-projects` cannot create — it is PUT/edit only.** A create DTO (fresh
+- ⚠ **`put-projects` cannot create - it is PUT/edit only.** A create DTO (fresh
   client-supplied Id) PUT to `put-projects` returns HTTP 400 / statusCode 502 "missing or
   incorrect resource parameters" and persists nothing; creation is **POST /api/Projects**
   (what `process-create` wraps). As a save path `put-projects` stores the parameter set
-  literally — it does NOT materialise template defaults either. So there is no alternative
+  literally - it does NOT materialise template defaults either. So there is no alternative
   API build path that carries the two params for you; a loop built + saved via
   `put-projects` iterates iff they are present (measured 0→3 on the same object).
-- ✅ **Workaround (HISTORY — no longer needed since E-160):** before the builder fix,
+- ✅ **Workaround (HISTORY - no longer needed since E-160):** before the builder fix,
   the way to iterate was, after `process-create`, to read the flow back, append the two
   parameter objects to the loop action's `parameters`, and `put-projects` (verify by
-  reading the loop's `parameters` back — 5 present, originals unchanged — before running).
+  reading the loop's `parameters` back - 5 present, originals unchanged - before running).
   The builder now emits the two at create, so this post-create splice is retired. ⚠ One
   fact from it that still applies to any read-back diff: **on save the platform
-  normalises `…808b0d` from `"…00.0000000Z"` to `"…00:00:00Z"`** — the same parameter;
+  normalises `…808b0d` from `"…00.0000000Z"` to `"…00:00:00Z"`** - the same parameter;
   tolerate the trailing-precision reformat when you diff a stored loop.
 
 The parameter objects to append (authoritative `parameters`-array form):
@@ -129,20 +129,20 @@ and `{"tabPropertyId":"9d2d3483-f04b-48ac-9dea-2ef7ae808b0d","value":"2010-01-01
 
 ## Diagnosing a For Each that "does nothing"
 
-- **Prove the loop's INPUT is populated before you read its zero — a wrong-shaped
+- **Prove the loop's INPUT is populated before you read its zero - a wrong-shaped
   run payload reads identically to a dead loop.** If the flow's input variable is
   supplied in the wrong shape (e.g. a bare list where the process declares
   `{source, tenant}`), the input variable is left empty, any pre-loop JavaScript
   node that substitutes it via `<%N%>` dies with **`"Unexpected token ';'"`** (an
   empty token becomes `var x = ;`), the list the loop iterates comes back **null**,
-  and the loop iterates nothing — indistinguishable from the parameter-omission
+  and the loop iterates nothing - indistinguishable from the parameter-omission
   hang unless you check the pre-loop nodes' error variables and the list length.
   Gate on: the pre-loop nodes ran clean AND the In-List variable is the expected
   length, THEN read the loop's body count.
 - **A body node that never ran reports no error.** Clean per-node error variables
   are NOT evidence the body executed. Get positive evidence out-of-band: a Data
   Store `InsertRows` in the body writing to a disposable store, read from OUTSIDE
-  the flow — a timeout can suppress every *returned* output variable (observed:
+  the flow - a timeout can suppress every *returned* output variable (observed:
   `vars: {}` on a timed-out run), so never rely on a value returned into a flow
   variable to prove the body ran. Prove that marker can write with a **no-loop**
   run first, or its zero is uninterpretable.
@@ -157,7 +157,7 @@ and `{"tabPropertyId":"9d2d3483-f04b-48ac-9dea-2ef7ae808b0d","value":"2010-01-01
 
 ## Related Data Store facts used above
 
-- A Data Store **must have a primary key** — `datastore-from-json` without
+- A Data Store **must have a primary key** - `datastore-from-json` without
   `primaryKeyAttributeNames` is refused `502 "At least one column must be marked
   as a primary key."` So you cannot append identical rows as a pure log; a
   per-row distinct key is required to count iterations by row.
@@ -177,7 +177,7 @@ iteration** binding the loop ITEM's data-model attributes. Concretely:
   `InsertRows` Set-Values mapper binds `item.<attr>` exactly as the single-row splice
   does (b017 pattern), only the bound variable is the loop item, not a standalone one.
 - **Body-port wiring (edges, not just `parent`).** The `parent` key on the body action
-  sets ParentId (visual containment) but gives it **no ports** — ports come from edges.
+  sets ParentId (visual containment) but gives it **no ports** - ports come from edges.
   Read from a designer export, a For Each with one body child carries **two out-ports on
   the loop** (loop → continuation, e.g. the Join; and loop → body child) **plus one
   out-port on the body child back to the loop** (body → loop). So the compact-config
@@ -185,11 +185,11 @@ iteration** binding the loop ITEM's data-model attributes. Concretely:
   the build validates but the body node fails with **statusCode 390/391 "Action has too
   few input/output ports."** The platform infers body-vs-continuation from the child's
   ParentId, so edge order does not matter; supply all three edges.
-- **Idempotency comes free from the store PK — do NOT write dedupe logic.** Give each row
+- **Idempotency comes free from the store PK - do NOT write dedupe logic.** Give each row
   a **deterministic natural key** (stable per input, unique within the batch, e.g.
   `<tool>:<table>:r<zero-padded-index>`). A fresh batch lands all N at **status 50**; a
   re-run of the same input replays the same keys and the store PK rejects the duplicates,
-  so the instance **halts at status 40 with nothing written twice** — a clean NOOP, the
+  so the instance **halts at status 40 with nothing written twice** - a clean NOOP, the
   same dup-PK guard a single-row card shows (a re-run "must be a NOOP, not a double-load"
   is satisfied by this alone). Validate the WHOLE input up front (count, shape, any
   ceiling) and emit rows only on the clean branch, so a bad input never starts a partial
@@ -197,3 +197,21 @@ iteration** binding the loop ITEM's data-model attributes. Concretely:
 - **Cost scales with N.** One native `InsertRows` per row is billed per row: measured
   `timeConsumed ≈ fixed + ~14 ms × N` (vs a single-insert card that bills flat). Size the
   loop to the real table; a very large table is a v2 concern (bulk import), not this shape.
+
+## Collecting results across passes, and reading web pages in a loop (live, 2026-10)
+
+- **Accumulate with Concatenate (lists) into the same variable.** The list form of Concatenate
+  (`a363466e-05c6-4d94-9d3f-66ec5b6ffb8c`; a string Concatenate with the same name exists, so pin the id in a
+  builder config) with `First list` = `Concatenated list` = an output list variable whose default is `[]`, and
+  `Second list` = the pass's result, grows that list on every pass. A Text list from RegEx Extract goes in
+  without a type warning even though the template's list fields are typed Object.
+- **DeDuplicate takes a plain Text list** with `Duplicate identification JSON configuration` set to
+  `{"MatchType": "Exact"}` and can write back into the same variable (`Deduplicate list`). Run it once after the
+  loop, not inside it.
+- **A public web page needs no credential.** Call API with the item variable alone in `Endpoint` (`<%0%>` bound to
+  the URL) and `Response Body` bound to a Text variable puts the page's raw HTML in that variable.
+- **An email pattern catches file names too.** `[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}` with Ignore case also
+  matches retina image names such as `logo@2x.png` (checked with a RegEx Extract test run); filter or review the
+  list before using it. With Ignore case off, capitalised addresses are skipped.
+- **Designer save adds a `ProcessInfo` internal variable** to an API-built process; it shows in the instance
+  Variables list of every later run.

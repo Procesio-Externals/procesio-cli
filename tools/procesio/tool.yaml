@@ -10566,6 +10566,16 @@ actions:
           - type: object
             additionalProperties: false
             required:
+            - map
+            properties:
+              map:
+                type: object
+                description: 'map-parameters property (e.g. Word Mail Merge''s Word Mail Parameters): name -> binding (bare = literal)'
+                additionalProperties:
+                  $ref: '#/$defs/binding'
+          - type: object
+            additionalProperties: false
+            required:
             - template
             - vars
             properties:

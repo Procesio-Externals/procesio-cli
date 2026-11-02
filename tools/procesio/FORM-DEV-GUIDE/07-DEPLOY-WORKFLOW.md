@@ -1,4 +1,4 @@
-# 07 — Shipping it: tooling, testing, recovery
+# 07 - Shipping it: tooling, testing, recovery
 
 How the CSS and JS get onto a live form without destroying it, how to test before
 you publish, and how to get back when you do not.
@@ -9,7 +9,7 @@ you publish, and how to get back when you do not.
 
 `form-edit` is a **desired-state** editor: it rebuilds the whole DTO from a config.
 Pointing it at a large hand-authored form to change one thing means re-declaring
-every element — or losing them. On a form with a hundred-plus hand-built elements,
+every element - or losing them. On a form with a hundred-plus hand-built elements,
 that is the end of the form.
 
 Use the **surgical** actions. Each does a read-modify-write on the live DTO and
@@ -17,18 +17,18 @@ touches exactly one thing:
 
 | Action | Touches | Everything else |
 |---|---|---|
-| `form-get-code` | nothing (read) | — |
+| `form-get-code` | nothing (read) | - |
 | `form-set-code` | `Data.code` only | elements, theme, data model, events byte-identical |
-| `form-get-element-events` | nothing (read) | — |
+| `form-get-element-events` | nothing (read) | - |
 | `form-set-element-event` | one element's one event config | every sibling byte-identical |
-| `form-get-element` | nothing (read) | — |
+| `form-get-element` | nothing (read) | - |
 | `form-set-element-config` | one element's plain configs | every sibling byte-identical |
 | `form-set-element-chains` | the ordered event chains of the listed element triggers, in ONE save | every other element byte-identical; kept events verbatim |
 
 Every write path maps the GET's camelCase onto the PUT's PascalCase envelope
 explicitly, so an unexpected extra field is never echoed back.
 
-### `form-set-element-config` — content and per-field rules belong in the DTO
+### `form-set-element-config` - content and per-field rules belong in the DTO
 
 `label`, `placeholder`, `required`, `regex`, `visible`, `tooltip`, `defaultValue`.
 Rewriting a banner from the form-level JS instead is a trap worth naming: it is
@@ -53,7 +53,7 @@ Two refusals it makes on purpose, both before writing anything:
 - **an event config.** Those go through `form-set-element-event`, which resolves
   process-variable names to guids and enforces one event per trigger.
 
-Config **ids are preserved** on every rewrite — a fresh id there breaks every value
+Config **ids are preserved** on every rewrite - a fresh id there breaks every value
 path pointing at that attribute.
 
 ## 2. The loop
@@ -95,7 +95,7 @@ Success looks like:
 ```
 
 **Check `elements` on every write.** It is the count on the DTO you just PUT back.
-If it ever drops, you are not doing what you think you are doing — stop.
+If it ever drops, you are not doing what you think you are doing - stop.
 
 ### Omitting one side preserves it
 
@@ -130,7 +130,7 @@ report it; real data means another editor saved the form between your read and y
 
 ## 3. Credentials
 
-Two different secrets that look alike — both short opaque tokens:
+Two different secrets that look alike - both short opaque tokens:
 
 | Secret | What it does |
 |---|---|
@@ -142,7 +142,7 @@ python scripts/set-credential.py procesio form-code-key@Internal-QA
 ```
 
 The form-code passphrase is **installation-wide**: it decrypts the code blob of every
-form on that installation, and it cannot be cheaply rotated. Treat it accordingly —
+form on that installation, and it cannot be cheaply rotated. Treat it accordingly - 
 never in a file, never in a chat, never in a log.
 
 **One key per installation, stored per environment.** The platform team confirmed it:
@@ -178,8 +178,8 @@ catches the majority of DOM and timing bugs, and it lets you *measure* a transit
 instead of guessing:
 
 **Replicate the whole flow, not one screen.** A single-step mock cannot exercise the
-two things most likely to break — the step gate and whatever bridges the DOM to the
-platform's field model — so those are exactly what nothing tests. A replica worth
+two things most likely to break - the step gate and whatever bridges the DOM to the
+platform's field model - so those are exactly what nothing tests. A replica worth
 building carries: a fake `window.ProcesioForm.data.fields` with the DTO's own names,
 `required` flags and regexes; the form's own element-event visibility logic; the REAL
 `data-element-id` values; and a step change that **destroys and rebuilds** the controls
@@ -196,8 +196,44 @@ setTimeout(() => console.log('at600',
   box.classList.contains('ux-leaving'), getComputedStyle(box).opacity), 600);
 ```
 
-Run the same navigation **twice** and confirm nothing accumulates — a second copy of
+Run the same navigation **twice** and confirm nothing accumulates - a second copy of
 a listener, a class that never clears, a growing node count.
+
+**A replica that runs the form's REAL chains** reaches what an anonymous browser cannot (a
+step behind a login gate) and is the fastest way to find bugs between scripts. Draw the form from
+its own DTO and run its own `onInputEvents` / `onClickEvents` / FORM_LOAD chains in order:
+`RUN_JAVASCRIPT` in a sandbox whose `parent` is the page, `MAP_FORM_DATA` (conditions joined by the
+`logicOperator` of the PREVIOUS condition: 1 AND, 2 OR), `RUN_PROCESS` as publish / upload / launch
+/ variables against a local server answering with each process's real variable definitions.
+What it must reproduce or it lies (each one cost a debugging round):
+- typed and script-written input values reach the model 500 ms later, then the element's input
+  chain runs; a value written by a MAP or a process fires that chain at once;
+- a running chain disables every control IN PLACE, but not the stepper's Previous / Next;
+- the DOM is rebuilt only when a MAP or a process changed state, never between JS blocks of a chain
+  (a rebuild there wipes what a script just wrote before the debounce delivers it), and nodes a
+  script appended inside a control (an error message) survive a rebuild;
+- scripts that read the Vue model (`el._vnode.component.props.modelValue`) need a stand-in on each
+  control root, or they read every select as empty;
+- config ids repeat across elements: resolve paths by (element id, config id).
+Test data only on the local server. It verifies wiring and UI, not the live API: still finish
+with one real run by a person who can log in.
+- **Load the platform's own stylesheet and the form's theme.** The renderer's CSS is a public
+  asset of the forms host (`/assets/index-*.css`, listed by the page's `<link rel=stylesheet>`).
+  Link it before the form's CSS, write every `Data.theme` property as a CSS variable on
+  `.form-builder--form`, and every enabled entry of an element's `style` config on its wrapper. Only
+  then does the replica show the theme's frames, grey surfaces and minimum heights that the live
+  form shows.
+- **Mock a process's output with the process's own code.** When a process returns rendered
+  content (a chart, an HTML summary) from a code node, take that node's script from the process
+  definition, substitute its `<%n%>` inputs with test rows and run it in Node: the mock is then
+  the exact markup production will paint, which is what a UI layered on top of it must match.
+
+**A login-gated branch cannot be opened for a headless check, on purpose.** Two shortcuts are
+refused by the permission guard, and rightly: publishing a copy with the login gate removed (it
+exposes a staff-only form anonymously) and answering the gate's own load process with a forged
+"signed-in" result inside the test browser (it bypasses the gate on the real renderer). The legal
+routes are the replica above, and a real signed-in session the user creates for it
+(`web save-session --persistent --wait-seconds N`, the user logs in), driven read-only.
 
 **A small public test form on the live renderer**, for runtime mechanics a replica
 cannot reproduce (debounce timing, which chain fires when, the lock during a chain).
@@ -241,18 +277,18 @@ select hides a list the live form never hands over, and the first-frame flash ne
 real renderer (both in [08](08-PITFALLS.md)). Open the live form and log what the page
 does every 50 ms. That is how both were found.
 
-## 5. Keep the source under version control — outside the framework
+## 5. Keep the source under version control - outside the framework
 
 The CSS and JS are the form's real source. `Data.code` is a deployment target, not a
 repository: it is encrypted, it has no history, and it cannot be diffed.
 
 Keep the files in the user-data area (`context-state-knowledge/resources/...`), not
-in `tools/` — a specific client's form is user data, and the framework/user-data
+in `tools/` - a specific client's form is user data, and the framework/user-data
 boundary is hard. What belongs in the framework is the **generalized** knowledge:
 this guide.
 
 Alongside the CSS and JS, keep the process artifacts that are equally
-un-round-trippable — prompts, request bodies, the process definition — so a rebuild
+un-round-trippable - prompts, request bodies, the process definition - so a rebuild
 does not start from a screenshot.
 
 **Build each form from source in every workspace. Do not import it in.** An import keeps
@@ -269,7 +305,7 @@ empty. The tool's surgical actions refused in exactly that case.
 
 Both files should open with a header stating **how the thing runs** and **which rules
 must never be broken**, with the symptom attached. This is not decoration: `Data.code`
-carries no history and the next person to open it — including you, in three months —
+carries no history and the next person to open it - including you, in three months - 
 has no other way to know.
 
 ```css
@@ -286,7 +322,7 @@ otherwise chase, not just the rule.
 ## 7. Before you touch a shared form
 
 - Confirm the form id and the workspace, out loud, before the first write.
-- `form-get-code` first, always — even when you are sure the form has no code. The
+- `form-get-code` first, always - even when you are sure the form has no code. The
   output *is* your backup.
 - One change per write when debugging. Two changes in one write means a regression
   has two suspects.

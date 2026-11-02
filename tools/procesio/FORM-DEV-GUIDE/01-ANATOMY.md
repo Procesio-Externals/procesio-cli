@@ -1,4 +1,4 @@
-# 01 — Anatomy of a PROCESIO form
+# 01 - Anatomy of a PROCESIO form
 
 What the DTO contains, what each part is for, and which parts are load-bearing for
 runtime behaviour. Read this before you touch a form programmatically; the two
@@ -19,14 +19,14 @@ PATCH /api/FormTemplate/{id}?state=   -> publish/unpublish
 **The casing flips between the two directions.** The GET returns
 `{id, name, isPrivate, type, status, state, assignees, customUrl, data}`; the PUT
 wants `{Id, Name, IsPrivate, Type, Status, State, Assignees, CustomUrl, Data}`.
-Map explicitly — echoing back an unexpected extra field from the GET is how a PUT
+Map explicitly - echoing back an unexpected extra field from the GET is how a PUT
 starts failing for reasons nobody can see. The canonical map lives in
 `handlers/form_code.py::_PUT_KEYS`.
 
 `Status = 1` (PUBLISHED) + `State = true` publishes. A `CustomUrl` gives the form
 its public short link (`forms.<host>/{tinyUrl}`).
 
-## 2. `Data` — the five parts that matter
+## 2. `Data` - the five parts that matter
 
 ```
 Data = {
@@ -42,7 +42,7 @@ Data = {
 modified elements rendered the modified elements. The encrypted code blob is a
 presentation/behaviour layer on top, never a requirement.
 
-## 3. `elements` — a FLAT list with `parentId`
+## 3. `elements` - a FLAT list with `parentId`
 
 PROCESIO does **not** nest children inside a parent element. Every control is a
 top-level entry in one flat array and points at its parent:
@@ -71,7 +71,7 @@ top-level entry in one flat array and points at its parent:
   Each of those `.json` files is a **captured golden**: a real element of that type
   with every config present and valid. Building a new element = clone the golden,
   assign fresh ids, override the semantic configs. Never hand-author an element
-  from scratch — you will omit a config the renderer silently depends on.
+  from scratch - you will omit a config the renderer silently depends on.
 
 ### Layout containers
 
@@ -79,7 +79,7 @@ top-level entry in one flat array and points at its parent:
 contains the controls of that step. `section`, `tabs`/`tab`, `table` +
 `static-table-row`/`dynamic-table-row` follow the same parent/child pattern.
 
-## 4. `configs` — where all the meaning lives
+## 4. `configs` - where all the meaning lives
 
 A config is `{id, key, value}` (some carry `category`). The keys you will actually
 set:
@@ -93,9 +93,9 @@ set:
 | media/link | `src`, `url`, `alt`, `title`, `width`, `height`, `linkUrl` |
 | submit | `submit`, `disabledIfFormIsInvalid` |
 | tasks | `assignee`, `assigneeReplacement`, `approver`, `approverReplacement` |
-| **value** | `value` — the live field value (see §5) |
-| **styling** | `style` — a `CSSProperty[]`, per-element CSS variables |
-| **events** | `on…Events` — see §6 |
+| **value** | `value` - the live field value (see §5) |
+| **styling** | `style` - a `CSSProperty[]`, per-element CSS variables |
+| **events** | `on…Events` - see §6 |
 
 ### The `style` config (per-element styling)
 
@@ -104,7 +104,7 @@ set:
 `enabled: true` entries.
 
 - Valid variables for a type = that type's CSS group in the theme (the first theme
-  group whose `types` include the element type — so input / number / datetime /
+  group whose `types` include the element type - so input / number / datetime /
   textarea / select all share the **Input** group).
 - For `type == "css-variable-select"` (colours) pass a **theme variable**
   (`--c-neutral--50`), not a hex: the runtime emits `var(<value>)`. Plain variables
@@ -114,7 +114,7 @@ set:
 ### `visible` is NOT a hide
 
 `Element.component.vue` renders under `v-if`. Setting `visible: false` **removes
-the node from the DOM** — it is not hidden, it is destroyed. Consequences run
+the node from the DOM** - it is not hidden, it is destroyed. Consequences run
 through this whole guide: entrance animations re-fire on every step change (good),
 exit transitions are impossible (the node is already gone), and any state you
 attach to a node must be recomputed rather than remembered.
@@ -139,14 +139,14 @@ A process addresses a form field by the full path:
 **Two id rules that are not optional**, both verified against real production
 forms:
 
-1. The value segment must be the element's **own `value` config id** — not a fresh
+1. The value segment must be the element's **own `value` config id** - not a fresh
    guid. With a fresh id the process-designer's "Form variable" selector shows
    `Unknown`.
 2. Every data-model attribute id must equal the element's **config id for that
    key**. Measured on a real form: 15/16 attributes resolved with reused ids,
    0/16 with fresh ones.
 
-Get this wrong and nothing errors — the designer just renders raw guids and values
+Get this wrong and nothing errors - the designer just renders raw guids and values
 never flow.
 
 ## 6. Events on an element
@@ -161,7 +161,7 @@ Each trigger has its own config key whose value is `{debounce, events: [...]}`:
 ```
 
 **A fresh element carries the key with a `null` value.** That is what "no handler"
-looks like — it is not an error and not a missing field.
+looks like - it is not an error and not a missing field.
 
 ### Trigger → config key → event type
 
@@ -184,7 +184,7 @@ looks like — it is not an error and not a missing field.
 
 Source of truth: `dto/form/builder.py::_EVENT_KEY` / `_EVENT_TYPE`, verified against
 the renderer's `trigger.ts` `TriggerKey` enum and `FieldEvents.component.vue`.
-**Never re-derive this table in new code** — import the builder's maps, as
+**Never re-derive this table in new code** - import the builder's maps, as
 `handlers/form_events.py` does. A wrong event type is silently accepted by the API
 and simply never fires.
 
@@ -193,7 +193,7 @@ and simply never fires.
 | `action` | config |
 |---|---|
 | `RUN_JAVASCRIPT` | `{code: "<js source, plaintext>"}` |
-| `RUN_PROCESS` | `{processId, inputMap[], outputMap[], syncRun}` — see [06](06-PROCESS-INTEGRATION.md) |
+| `RUN_PROCESS` | `{processId, inputMap[], outputMap[], syncRun, conditions[], areConditionsConfigured}` - see [06](06-PROCESS-INTEGRATION.md) |
 | `MAP_FORM_DATA` | `{mapping: [{id, left, right}]}` |
 | `TRIGGER_FORM` | `{formId, mapping: [...]}` |
 
@@ -201,7 +201,7 @@ and simply never fires.
 
 | Surface | Scope | Where |
 |---|---|---|
-| Theme | whole form, by control type | `Data.theme` — ~190 CSS variables |
+| Theme | whole form, by control type | `Data.theme` - ~190 CSS variables |
 | Per-element style | one control | that element's `style` config |
 | Element event JS | one control, one trigger | that element's `on…Events` config (**plaintext**) |
 | Form-level CSS + JS | whole form | `Data.code` (**encrypted**) |

@@ -1,11 +1,11 @@
-# PROCESIO metering — where run cost actually lives, and where it does not
+# PROCESIO metering - where run cost actually lives, and where it does not
 
 How to read what a process run consumed. Written after an attempt to measure the
 cost of a long-running run found the obvious endpoint empty and a better one
 undocumented. Auth/connection mechanics stay in
 [PROCESIO-AUTH-NOTES.md](PROCESIO-AUTH-NOTES.md).
 
-> ## ⚠ CORRECTION, 31/08/2026 — READ THIS BEFORE §2
+> ## ⚠ CORRECTION, 31/08/2026 - READ THIS BEFORE §2
 >
 > **§2 below was wrong about what the per-instance figures mean, and the error
 > was the expensive kind: it named a live-looking instrument as the fallback for
@@ -22,7 +22,7 @@ undocumented. Auth/connection mechanics stay in
 > `timeConsumed` is **not** wall-clock occupancy and does **not** include time
 > spent waiting on a reply. It is flat in the single-to-low-double-digit
 > milliseconds whatever the action does, and `timeConsumed == totalTimeConsumed`
-> in every reading — including a five-minute wait, where §2 predicts the widest
+> in every reading - including a five-minute wait, where §2 predicts the widest
 > divergence. Treat both fields as **per-action orchestration overhead**, not as
 > a measure of work.
 >
@@ -30,10 +30,10 @@ undocumented. Auth/connection mechanics stay in
 > no endpoint that prices a run: the quota counter is dead (§1), the per-instance
 > figures are blind to compute and to waiting, and the per-process endpoints
 > return empty. If a decision needs the cost of a long wait, it cannot be
-> measured on an unmetered account — say so and name it as a blocker, rather than
+> measured on an unmetered account - say so and name it as a blocker, rather than
 > substituting a number from an instrument that has not been shown to track the
 > work. **Prove the instrument moves with the work before believing any figure it
-> reports** — the same rule §1 states for the quota counter applies to its
+> reports** - the same rule §1 states for the quota counter applies to its
 > replacement, and skipping that step is exactly how the fallback was adopted.
 >
 > The instance-level fields remain useful for what they DO report reliably:
@@ -55,7 +55,7 @@ undocumented. Auth/connection mechanics stay in
 ```
 
 **The budget is published even when nothing is counted against it.** On a workspace
-with **`subscriptionType: null`** every consumption field stays at `0` — before a
+with **`subscriptionType: null`** every consumption field stays at `0` - before a
 run, after it, and after many runs across an hour. It is not a settling lag and it
 is not a disabled recorder: `GET /api/ResourceTrackingConfig` reports
 **`isRecordingEnabled: true`** on the same workspace.
@@ -75,7 +75,7 @@ credential.
 
 Both are populated immediately and on any workspace, metered or not.
 
-**`GET /api/Projects/{processId}/instances`** — each `pageItems[]` entry carries:
+**`GET /api/Projects/{processId}/instances`** - each `pageItems[]` entry carries:
 
 | Field | Meaning |
 |---|---|
@@ -84,7 +84,7 @@ Both are populated immediately and on any workspace, metered or not.
 | `totalTimeConsumed` | **compute**, the time actions spent executing |
 | `timeout` | the instance's own timeout setting |
 
-**`GET /api/Resources/analytics/instances/{instanceId}/details`** — the same run
+**`GET /api/Resources/analytics/instances/{instanceId}/details`** - the same run
 broken down by action type:
 
 ```json
@@ -94,7 +94,7 @@ broken down by action type:
 
 `totalTime` ↔ `timeConsumed`; `actionExecutionTime` ↔ `totalTimeConsumed`.
 
-### The naming is inverted from intuition — check it, do not trust it
+### The naming is inverted from intuition - check it, do not trust it
 
 **`totalTimeConsumed` is the SMALLER figure.** It is compute. `timeConsumed`, which
 sounds like the subset, is the larger occupancy figure. Verify the pairing on a
@@ -132,20 +132,20 @@ Consequences:
   count can be a fraction of the request's true total once its callees are added.
   Comparing an entry instance's count against a whole-tree figure loses the
   difference silently.
-- **On the occupancy column the same stretch of time appears twice** — as the
+- **On the occupancy column the same stretch of time appears twice** - as the
   caller's wait and as the callee's run. On the compute column it appears once.
 
 ## 5. What the vendor documents about which time is charged
 
 From the PROCESIO docs (processing-time FAQ). **Documented, not verified by
-measurement** — the endpoint that would confirm it is the one in §1:
+measurement** - the endpoint that would confirm it is the one in §1:
 
 - *"the processing time is consumed while waiting for an external service to reply
-  as a running process consumes resources on our infrastructure"* — **a blocking
+  as a running process consumes resources on our infrastructure"* - **a blocking
   external call is charged for the whole wait.**
 - *"Delay action is counted only while during its processing. But for the period set
   to delay... the action is not processing, and therefore this delay time is not
-  counted"* — **a parked Delay is exempt.**
+  counted"* - **a parked Delay is exempt.**
 - *"webhooks that trigger a process are not counted against the processing time"*.
 - The stated platform average is **~100 ms per action**.
 
@@ -171,7 +171,7 @@ trips first.
 ## 7. Instance history is trimmed aggressively, and the two endpoints differ
 
 Only a handful of instances per process survive. **Do not plan to read an
-interesting run later** — capture its figures in the same script that launches
+interesting run later** - capture its figures in the same script that launches
 them.
 
 Trimming is faster than "within days": rows have been observed ageing out of
@@ -185,13 +185,13 @@ row in one is not proof the run is gone from the other.
 `GET /api/ResourceTrackingConfig` reports `isRecordingEnabled` per workspace, and
 a freshly created workspace can arrive with it **false** and a zeroed `gid`. In
 that state the analytics details endpoint returns an **empty array** while the
-instance list still answers — so a zero from the details endpoint is confounded
+instance list still answers - so a zero from the details endpoint is confounded
 between "not recorded" and "not consumed" until the flag is read.
 
 Check the flag before interpreting any analytics zero.
 `PUT /api/ResourceTrackingConfig/toggle/{true|false}` sets it (needs
 `Workspace.Admin`) and creates the per-workspace record. Note that enabling it
-does **not** make the figures track the work — see the correction at the top of
+does **not** make the figures track the work - see the correction at the top of
 this file; it only makes the details endpoint answer at all.
 
 ## 8. Wall-clock measured by a polling harness is not the run

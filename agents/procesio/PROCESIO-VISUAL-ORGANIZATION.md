@@ -5,13 +5,13 @@ production. Agent-scoped: these are standards a build should meet, not tool mech
 The DTO shapes behind every claim are in `tools/procesio/PROCESIO-RESOURCE-MODEL-NOTES.md`;
 the deterministic re-layout engine is `tools/procesio/layout/` (README there).
 Additive to [PROCESIO-BEST-PRACTICES.md](PROCESIO-BEST-PRACTICES.md) (§2 modularize,
-§10 speed) — it does not replace anything there.
+§10 speed) - it does not replace anything there.
 
 ---
 
 ## 1. Why layout matters
 
-A process is read far more often than it is built — by the next builder, by QA, by the
+A process is read far more often than it is built - by the next builder, by QA, by the
 person debugging a 2am failure. A tangled canvas hides the logic; a tidy one shows it.
 Layout is not cosmetic, it is part of "document & handover" (best-practices §7). The
 target: someone with no prior context can follow the flow left-to-right and see where it
@@ -32,14 +32,14 @@ frame, whose children sit *inside* it via `ParentId`. Given that, the rules:
    vertical center of that group (tidy-tree rule). Branches of a Decisional spread
    symmetrically around the diamond.
 4. **No overlaps, consistent gaps.** Equal horizontal gap between columns; minimum
-   vertical gap between siblings. When a deeper level grows, push siblings apart — never
+   vertical gap between siblings. When a deeper level grows, push siblings apart - never
    let boxes collide.
 5. **Lay out the For Each frame recursively.** Place a `For Each`'s children first, size
    the frame to fit them, then place the frame as one node at its level.
 6. **Error ports go down-and-out.** `Type 1` (error) edges route to a handler placed
    below the main lane, so the happy path stays a clean horizontal line.
 7. **Re-converge only where paths should reunite.** A Decisional's branches may end at
-   their own `Stop` or merge at a `Join` — don't force a Join where branches are genuinely
+   their own `Stop` or merge at a `Join` - don't force a Join where branches are genuinely
    independent. Where they do reunite, make the `Join` visible so the reader sees it.
 8. **Deterministic order.** Same graph → same layout. Order siblings by descendant-count
    then id, so re-running layout doesn't reshuffle the diagram.
@@ -53,10 +53,10 @@ The same algorithm, run on the **process→process** graph (`Call Subprocess` /
 ## 3. The For Each container
 
 The only container the Process Designer supports today is the `For Each` loop frame (an
-`area`). Keep its body small and self-contained — everything inside runs once per item,
+`area`). Keep its body small and self-contained - everything inside runs once per item,
 so cost multiplies (best-practices §10). **A `For Each` cannot contain another `For
 Each`.** To nest a loop, put a `Call Subprocess` (or `Trigger Subprocess`) inside the
-`For Each` and place the inner loop in that subprocess — that also keeps each loop body
+`For Each` and place the inner loop in that subprocess - that also keeps each loop body
 flat and independently testable. (Free-form grouping areas are not yet supported by the
 designer; don't rely on them.)
 
@@ -70,14 +70,14 @@ The actions that carry most real systems, and the shapes they form:
   `Trigger Subprocess` to fire-and-forget.
 - **Branch then (maybe) join.** `Decisional` + `Join` is the standard control shape:
   decide, run the branch-specific work, optionally re-merge. Keep decisionals single where
-  you can — five chained decisionals (~2s) collapse to one (<200ms) (best-practices §10).
+  you can - five chained decisionals (~2s) collapse to one (<200ms) (best-practices §10).
 - **Model JSON, don't chain extractors.** `Extract Objects/List/Object/Text` exist, but
   the fast path is a typed Data Model read directly (best-practices §10). Reserve the
   extract family for genuinely dynamic shapes.
 - **Script to do more per node.** A `Node` script often replaces a chain of primitives
-  (and `Node` returns raw, typed output; `Javascript` wraps `{result}` — see API notes).
+  (and `Node` returns raw, typed output; `Javascript` wraps `{result}` - see API notes).
   Fewer nodes = faster + more readable.
-- **Throw on purpose.** `Throw` raises a controlled error into the error port — use it to
+- **Throw on purpose.** `Throw` raises a controlled error into the error port - use it to
   fail loudly on a business-rule violation instead of letting bad data flow on.
 - **Centralize SQL through credentials.** `Execute Query`/`Execute Command` bind a
   credential by gid (never inline secrets). Apply the `sql-server-optimizer` skill.
@@ -90,15 +90,15 @@ The actions that carry most real systems, and the shapes they form:
   event should call a process of 1-3 actions, optimized for speed (best-practices §9).
   Prefer `syncRun:false` + a scoped loader for anything that might exceed 1s; fill the
   result back via `outputMap`. Drive option lists from a static `sourceType:JSON` where
-  the data is fixed — don't call a process to fetch constants.
+  the data is fixed - don't call a process to fetch constants.
 - **Approval = assign + show + capture + branch.** Put an `approval` control with a named
   `approver` (and `approverReplacement` fallbacks) on a task form (`Assignees` set). Show
   approver-only fields with `visibility:{type:"task-assignees"}`. The control captures
   `approved` + `comment` + `responseUser` + `responseDate`; branch the downstream process
   on `approved`. For sequential sign-offs use multi-step `approvalSteps`. Keep the
-  approver's screen minimal — they decide, they don't re-enter data.
+  approver's screen minimal - they decide, they don't re-enter data.
 - **Compose apps with `chainConfig`.** Several forms tied into one columnar dashboard is
-  the "App" pattern — use it for an operator landing page that links to sub-forms, rather
+  the "App" pattern - use it for an operator landing page that links to sub-forms, rather
   than one giant form.
 - **Style via theme variables, not hacks.** Set the `--c-*` theme variables; reserve
   `Data.code` (encrypted) for genuine custom CSS/JS, and run form JS against
@@ -107,7 +107,7 @@ The actions that carry most real systems, and the shapes they form:
   (the 16-var `DARK_PALETTE`), swapped at runtime by `themeMode`. Opt in via the form
   config (`themeMode` / `themeDark` overrides); don't fake dark mode with custom CSS.
 - **Element alignment.** Container elements (section, list-item, column, step, tab,
-  side-panel) accept three flex vars in their per-control style — `--fd-<scope>`
+  side-panel) accept three flex vars in their per-control style - `--fd-<scope>`
   (direction), `--jc-<scope>` (main axis), `--ai-<scope>` (cross axis). Use them to lay
   out contents instead of custom CSS.
 - **Trigger a Data Store operation like a process.** Besides `RUN_PROCESS`, a control can
@@ -119,18 +119,18 @@ The actions that carry most real systems, and the shapes they form:
 ## 6. Shapes in the Process Designer (decorative, execution-irrelevant)
 
 The designer's **Shapes** (rectangle / ellipse / diamond) are annotation objects on
-the canvas — they group and label a region and never affect execution. They persist
+the canvas - they group and label a region and never affect execution. They persist
 under the flow's opaque `canvasData.shapes` blob (not a top-level field) and sit in a
 z-order band **below** the connectors. Two rules for the agent: **never reason about a
 shape as a node** (it has no ports, no config, no run behavior), and **never let an edit
-or a re-layout drop `canvasData`** — the tool's `process-edit` carries the live canvas
+or a re-layout drop `canvasData`** - the tool's `process-edit` carries the live canvas
 through, and the layout engine leaves `canvasData` byte-identical; preserve that when
 touching a flow by hand.
 
 ## 7. When you build or re-organize a process
 
 - After building programmatically, the node positions the builder emits are functional
-  but not tidy. Run the layout tool to make the diagram readable before handover —
+  but not tidy. Run the layout tool to make the diagram readable before handover - 
   deterministic, so it won't fight a future edit:
   `python scripts/run-tool.py procesio layout-flow --in <export.procesio> --out <tidy.procesio>`
   (changes only positions; re-imports cleanly). `inspect-flow` gives a structural summary
@@ -138,7 +138,7 @@ touching a flow by hand.
 - Until then, if you place nodes by hand, follow §2: left-to-right by level, center
   children, error ports below, and a `Join` only where branches truly reunite.
 - Verify the diagram communicates: open it and check a stranger could narrate the flow.
-  That check is part of "done" (playbook §C/§E spirit — verified behavior + handover).
+  That check is part of "done" (playbook §C/§E spirit - verified behavior + handover).
 
 
 ## Layout engine upgrade 2026-07-05 (brief: "fix the tool so it layouts right")
@@ -170,6 +170,6 @@ LEGACY engine remains the default (ELK is opt-in backup via LAYOUT_ENGINE=elk).
    v2 = 0 crossings, 0 label collisions; ALL FOUR flows 0/0 by layout-report.
 6. **Designer code sync for authored Nodes**: when creating a Node via API, the customData Code
    setting must hold the GUID-reference form (variableId[.attributeId]), NOT the runtime `<%N%>`
-   form — the designer renders `<%N%>` literally and the variable picker breaks. Convert with
+   form - the designer renders `<%N%>` literally and the variable picker breaks. Convert with
    the param's variable map (flowpatch `_config_value_from_param` pattern). Synced on 9 authored
    Nodes across v2/HCT/SendExport/PEC.

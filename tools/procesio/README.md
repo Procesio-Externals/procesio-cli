@@ -8,10 +8,10 @@ The platform itself is **procesio.app** - that is where workspaces live and what
 tool points at. procesio.com is the product site and docs.procesio.com the
 documentation; neither is an API host.
 
-## Capabilities are ACTIONS — list them, don't reimplement
+## Capabilities are ACTIONS - list them, don't reimplement
 
 > If you want to *do* something to PROCESIO, there is almost certainly already an
-> action for it. **List them first — never reimplement a capability the notes
+> action for it. **List them first - never reimplement a capability the notes
 > describe as a recipe:** `python scripts/run-tool.py procesio` prints all 442.
 > Curated (ergonomic) actions win; a raw `<method>-<path>` wrapper or `request`
 > is the fallback only when no curated action fits.
@@ -33,7 +33,7 @@ documentation; neither is an API host.
 | **Schedules** | `create-schedule` / `get-schedule` / `update-schedule` / `delete-schedule` / `list-schedules` / `set-schedule-status` |
 | Anything else (raw 1:1) | `<method>-<path>` (e.g. `post-actions-test`) or `request --method --path` |
 
-## Authentication — two modes, many credentials
+## Authentication - two modes, many credentials
 
 PROCESIO supports two auth modes, and this tool keeps **multiple named
 credential profiles** so you can switch accounts/keys with `--profile`:
@@ -44,7 +44,7 @@ credential profiles** so you can switch accounts/keys with `--profile`:
 | **userpass** | form login on `webapi/api/authentication` → `__Host-procesio` **cookie session** (+ `x-requested-by`) | everything the UI has |
 
 > **Prefer `userpass` when you have a choice.** It carries the user's full access
-> (owner/admin + cross-workspace), so it reaches endpoints an API key can't — e.g.
+> (owner/admin + cross-workspace), so it reaches endpoints an API key can't - e.g.
 > listing a master workspace's sub-workspaces returns 401 for an API key but 200
 > for userpass. Use an API key only to pin to a single workspace. The stored default profile is `account` (userpass).
 
@@ -73,7 +73,7 @@ python scripts/run-tool.py procesio remove-credential --name old
 ```
 
 > **API-key `workspaceid`.** Most workspace-scoped keys require the `workspaceid`
-> header (the workspace GUID) to authenticate — without it you get `401`. A
+> header (the workspace GUID) to authenticate - without it you get `401`. A
 > master/personal key may work without one. Find a workspace's GUID with
 > `list-workspaces` (the `id` field).
 
@@ -84,15 +84,15 @@ python scripts/run-tool.py procesio check-auth --profile personal
 python scripts/run-tool.py procesio login --profile account   # caches the Bearer token
 ```
 
-## Endpoints — full 1:1 coverage
+## Endpoints - full 1:1 coverage
 
 **Every** Web-API endpoint (295 of them) is a dispatchable action, generated from
 the bundled Swagger index. There are three ways in, from most to least
 ergonomic:
 
-1. **Curated shortcuts** — hand-written, friendly names + arg mapping
+1. **Curated shortcuts** - hand-written, friendly names + arg mapping
    (`list-processes`, `run-process`, `list-workspaces`, …; see below).
-2. **Generated per-endpoint actions** — one per operation, named
+2. **Generated per-endpoint actions** - one per operation, named
    `<method>-<path-slug>` where `{param}` → `by-param`:
 
    | Endpoint | Action |
@@ -106,7 +106,7 @@ ergonomic:
    `--<name>` args, request bodies are passed as `--body '<json>'`, and every
    generated action takes **`--dry-run`** to compose-and-return the request
    without sending it.
-3. **`request`** — the raw escape hatch for anything (custom query keys, etc.).
+3. **`request`** - the raw escape hatch for anything (custom query keys, etc.).
 
 ```powershell
 # discover
@@ -123,10 +123,10 @@ python scripts/run-tool.py procesio request --profile personal `
 ```
 
 > Complex objects (process / form / data type / credential / webhook / document)
-> have **structured DTO sub-tools** — see below. The raw `post-*`/`put-*`
+> have **structured DTO sub-tools** - see below. The raw `post-*`/`put-*`
 > endpoints remain the escape hatch.
 
-## DTO sub-tools — `<component>-create` / `<component>-edit`
+## DTO sub-tools - `<component>-create` / `<component>-edit`
 
 Deterministic builders that turn a small validated `config` into a full PROCESIO
 DTO and create/edit the resource (build → JSON-Schema validate → merge onto a
@@ -150,11 +150,11 @@ procesio form-create      --workspace-id <ws> --config '{"name":"Reg","elements"
 ```
 
 Config shapes (full schemas in `dto/<component>/config.schema.json`):
-- **process** — `variables` (input/process/output, primitive or `model`), `actions`
+- **process** - `variables` (input/process/output, primitive or `model`), `actions`
   (`action` = catalog name; `params` bind by property label: literal / `{var}` /
   `{var,path}` / `{template,vars}`), `edges` (linear by default), `branches`
   (Decisional), `webhooks` (attach a trigger).
-- **form** — `elements[]` of `{type,label,name,required,options,children,...}`;
+- **form** - `elements[]` of `{type,label,name,required,options,children,...}`;
   renders at `forms.procesio.app/{tinyUrl}` after a CustomUrl is created.
 - After changing any handler/builder, regenerate the manifest:
   `python -m tools.procesio.gen_manifest` (it is too large to hand-edit).
@@ -195,7 +195,7 @@ procesio list-project-schedules    --profile account --id <pid>   # the target p
 and posts to `/api/Projects/{id}/run`. Use `--dry-run` to preview the request
 without executing the process.
 
-### Rewriting event chains on a live form — `form-set-element-chains`
+### Rewriting event chains on a live form - `form-set-element-chains`
 
 When a change moves, adds or conditions `MAP_FORM_DATA` blocks inside a button's
 chain (or spreads one behaviour over several elements), restate the chains in a
@@ -233,7 +233,10 @@ procesio form-set-element-chains --id <form> --plan-file plan.json
 The pattern this was built for (one-click validate + lock + advance on a stepper) is
 [FORM-DEV-GUIDE/04](FORM-DEV-GUIDE/04-INTERACTION-RECIPES.md) §16.
 
-## Export — `.procesio` bundle (Transport)
+**Redesigning a form?** Start with [FORM-DEV-GUIDE/10](FORM-DEV-GUIDE/10-REDESIGN-METHOD.md) and the
+neutral runtime in [`assets/form-kit`](assets/form-kit/README.md).
+
+## Export - `.procesio` bundle (Transport)
 
 ```powershell
 # names, ids, or "all" per type; credentials excluded by default; --dry-run to preview
@@ -250,7 +253,7 @@ names→IDs against the scoped workspace, builds the selection, calls
 
 ## `--workspace-id` (active workspace)
 
-Every client-backed action takes `--workspace-id <guid>` — it sets the
+Every client-backed action takes `--workspace-id <guid>` - it sets the
 `workspaceid` header, which **scopes a userpass session to a workspace** and
 **overrides an api-key profile's** own workspace. This is how the userpass
 `account` profile reaches owner/cross-workspace endpoints.
@@ -332,7 +335,7 @@ is a separate check of the **designer layer** (`customData`) with no server endp
   run the API validator, `--no-types` to skip the advisory type layer.
 
 - **Auto-gate (no conscious decision needed):** every `process-create` and `process-edit`
-  now runs **FE validation first, then BE validation, then saves** — and *blocks* the save
+  now runs **FE validation first, then BE validation, then saves** - and *blocks* the save
   (JSON error `validation_failed`, exit 2, with the full report) if either finds errors.
   Pass `--force` to override the gate; `--dry-run` shows the validation report without
   saving. Other components (form/document/…) are unaffected.

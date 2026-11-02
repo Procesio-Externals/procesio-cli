@@ -1,4 +1,4 @@
-# PROCESIO front-end (designer-layer) validation — notes
+# PROCESIO front-end (designer-layer) validation - notes
 
 Born 2026-07-06. Ports the Process Designer's client-side **"Process Errors"** checks
 (the ones that BLOCK designer *Save*) into an offline validator, and auto-runs it before
@@ -15,10 +15,10 @@ clicking Save. This closes that gap: FE (designer) checks run first, then BE, th
 
 ## Pieces
 
-- `flowmodel/fevalidation.py` — **pure**, offline, case-insensitive validator over a flow
+- `flowmodel/fevalidation.py` - **pure**, offline, case-insensitive validator over a flow
   DTO. `validate_flow(flow, *, datatypes=None, target_vars_of=None, include_types=True)`
   → `list[warning]`. `split_severity()` → `(errors, warnings)`.
-- `handlers/fevalidate.py` — impure layer: gathers the datatype catalog + subprocess-var
+- `handlers/fevalidate.py` - impure layer: gathers the datatype catalog + subprocess-var
   resolver from the live API, exposes the **`process-fe-validate`** action, and provides
   the **`pre_save_validate(client, dto, *, force)`** gate (FE → BE, raises
   `ValidationBlocked` on blocking errors unless `force`).
@@ -31,7 +31,7 @@ clicking Save. This closes that gap: FE (designer) checks run first, then BE, th
 
 ## Severity model (deliberate)
 
-- **error** (blocks save): the deterministic, high-signal checks — connectivity, exactly
+- **error** (blocks save): the deterministic, high-signal checks - connectivity, exactly
   1 Start / ≥1 Stop, node names, unique/primitive-named variables, numeric limits,
   required-empty fields, leftover placeholders, number/integer value-format, and
   subprocess required-input mapping.
@@ -42,10 +42,10 @@ clicking Save. This closes that gap: FE (designer) checks run first, then BE, th
   validator + column-definition; the other composite type-checks (TabsPayload,
   MapProcessData, Conditional) are left for a later tuned pass. `--no-types` skips it.
 
-## DTO ↔ FE-model mapping — quirks discovered the hard way
+## DTO ↔ FE-model mapping - quirks discovered the hard way
 
 The reference describes the FE's **in-memory** model; the persisted/live DTO differs.
-These bit me during live verification — get them right or you get false positives:
+These bit me during live verification - get them right or you get false positives:
 
 1. **Node name = `customData.name`, NOT `actionName`.** The FE's `node.name` (the canvas
    label, defaults from the template, e.g. "Start"/"Call API") is stored in
@@ -60,7 +60,7 @@ These bit me during live verification — get them right or you get false positi
    just reads as "other" (safe false-negative, never a false block).
 3. **Settings carry the FULL FE `Setting` shape** in `customData.configuration[].settings[]`:
    `id, type (SettingType), label, value, dataTypeId, isList, isRequired, limits`. So the
-   FE field-level checks CAN run offline — no need to enrich from `/api/Actions`.
+   FE field-level checks CAN run offline - no need to enrich from `/api/Actions`.
 4. **Empty ≠ format error.** The FE's `isValidNumber`/`isValidInteger` treat `""` as
    valid; emptiness is the *required* check's job. An optional numeric field left blank
    (e.g. a Delay's unused "Runtime Amount", `type=number dataTypeId=INTEGER value=""`)
@@ -89,7 +89,7 @@ the reference file: stale subprocess **side-pannel id**, Execute-Query **Output*
 scalar-typed, and Node **code binding error-scope/undeclared vars**. Those are
 complementary. **As of 2026-07-06 those three unique flow-lint checks are FOLDED INTO the
 gate**: `run_fe_validation` calls `flowlint.lint_flow_dto` and merges its unique findings
-(SIDEPANEL_ID, EXECQUERY_*, CODE_*, missing_error_variable) as blocking errors — the
+(SIDEPANEL_ID, EXECQUERY_*, CODE_*, missing_error_variable) as blocking errors - the
 overlapping subprocess-mapping ones are excluded to avoid double-reporting. It's
 best-effort (wrapped in try/except): a flow-lint infra hiccup never blocks a legit save.
 So a stale-sidepanel / bad-Execute-Query / error-scope-code flow is now blocked on save too.
@@ -97,7 +97,7 @@ So a stale-sidepanel / bad-Execute-Query / error-scope-code flow is now blocked 
 ## Gotchas / do-nots
 
 - The gate is process-only (via `Component.save_gate`); other components (form/document)
-  are unaffected — their existing `validate` oracle still runs.
+  are unaffected - their existing `validate` oracle still runs.
 - `--force` bypasses BOTH FE and BE and saves anyway. `--dry-run` runs the gate in
   report-only mode (forced open) so you see the validation without saving.
 - The type (warning) layer needs the datatype catalog (`GET /api/DataTypes`,

@@ -1,11 +1,11 @@
-# PROCESIO API docs — corrections needed
+# PROCESIO API docs - corrections needed
 
 Audience: the PROCESIO docs/dev team.
 Source of truth: a real login HAR from `procesio.app` + live calls against
 `webapi.procesio.app` (2026-06-23). Target page:
 `https://docs.procesio.com/developers-guide/procesio-api-documentation`.
 
-The **username/password authentication** chapter is materially out of date — it
+The **username/password authentication** chapter is materially out of date - it
 documents an OAuth/Bearer flow on a host that no longer serves it. The API-key /
 run-a-process chapter is mostly correct. Details below.
 
@@ -43,13 +43,13 @@ username=<user>&password=<pass>&client_id=procesio-ui
 Differences to correct:
 - **Content type is `application/x-www-form-urlencoded`**, not JSON.
 - Body fields are only **`username`, `password`, `client_id`**. `realm`,
-  `grant_type`, and `client_secret` are **not used** — drop them from the docs.
+  `grant_type`, and `client_secret` are **not used** - drop them from the docs.
 - A **`x-requested-by`** request header is **required**. Without it the gateway
   returns **`407`**. (The web app sends `x-requested-by: playground-v1`.) This
   header is currently undocumented and is the single most common reason an
   integration "mysteriously" fails to authenticate.
 - Path casing in production is lowercase `/api/authentication` (ASP.NET is
-  case-insensitive, so both resolve, but the docs/Swagger differ — align them).
+  case-insensitive, so both resolve, but the docs/Swagger differ - align them).
 
 ## 3. Token delivery: Bearer JWT → HttpOnly cookie session
 
@@ -57,7 +57,7 @@ Differences to correct:
 be able to use to access the Web API"* and a **"Bearer Authentication"** section
 (Authorize with `Bearer {token}`).
 
-**Reality:** the `200` response body contains **no token** — it is literally
+**Reality:** the `200` response body contains **no token** - it is literally
 `{"message":"Authentication successful"}`. Authentication is delivered as **two
 HttpOnly cookies**:
 
@@ -69,11 +69,11 @@ Set-Cookie: __Host-procesio.refresh  (HttpOnly, Secure, Path=/)
 Subsequent Web-API calls authenticate by **sending those cookies** (the SPA uses
 `fetch(..., {credentials:"include"})`; the server replies with
 `Access-Control-Allow-Credentials: true`) plus the same `x-requested-by` header.
-Lifetimes come from the cookies' own `Expires` attribute — observed
+Lifetimes come from the cookies' own `Expires` attribute - observed
 **~24 h for `.access`** and a longer window for `.refresh` (values were 961 and
 733 bytes, i.e. JWTs). The `x-session-expires-at` header is declared in
 `Access-Control-Expose-Headers` but was **empty** in the login response we
-captured — either populate it consistently or remove it from the contract.
+captured - either populate it consistently or remove it from the contract.
 
 **Fix:** replace the "access token + Bearer {token}" narrative for the
 username/password flow with a **cookie-session** description:
@@ -85,7 +85,7 @@ username/password flow with a **cookie-session** description:
   machine-to-machine use, document **how to obtain that token now** (the login
   no longer returns one); otherwise remove the Bearer section for this flow.
 
-## 4. API-key auth — mostly correct, two clarifications
+## 4. API-key auth - mostly correct, two clarifications
 
 The run-a-process chapter correctly lists the three headers `key` (key name),
 `value` (key value), `workspaceid` (workspace GUID) on
@@ -105,10 +105,10 @@ The run-a-process chapter correctly lists the three headers `key` (key name),
 - Process **list** is `GET /api/Projects`; **run** is `POST /api/Projects/{id}/run`
   (capital `P`; the run endpoint also accepts `runSynchronous` &
   `secondsTimeOut` query params). The "ProcessTemplate" tag maps to the
-  `/api/Projects` path — worth a note so readers don't look for `/api/ProcessTemplate`.
+  `/api/Projects` path - worth a note so readers don't look for `/api/ProcessTemplate`.
 - Workspace **list** is `GET /api/Workspaces` (plural). `GET /api/Workspace`
   (singular) is not a route → 401/404. Align docs/examples to the plural form.
-- The `webapi.procesio.app` v1.19 Swagger is accurate and reachable — keep it as
+- The `webapi.procesio.app` v1.19 Swagger is accurate and reachable - keep it as
   the canonical Web-API reference; just fix the **auth chapter** that precedes it.
 
 ---
@@ -116,7 +116,7 @@ The run-a-process chapter correctly lists the three headers `key` (key name),
 ### TL;DR for the doc owner
 1. Auth host: `auth.procesio.app` → `webapi.procesio.app`.
 2. Login is **form-urlencoded** with **`username`+`password`+`client_id`** and a
-   required **`x-requested-by`** header — not JSON/OAuth.
+   required **`x-requested-by`** header - not JSON/OAuth.
 3. Auth is a **cookie session** (`__Host-procesio.access`/`.refresh`), not a
    Bearer token in the body.
 4. Spell out that **`workspaceid` is required** for workspace-scoped API keys.

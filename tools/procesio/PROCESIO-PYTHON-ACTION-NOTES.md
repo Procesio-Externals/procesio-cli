@@ -1,10 +1,14 @@
-# PROCESIO `Python` scripting action — libraries, I/O, and the model problem
+# PROCESIO `Python` scripting action - libraries, I/O, and the model problem
 
 What the platform documents about the **Python** scripting action, and the traps that
 follow from it. Everything here is **vendor-documented** unless a line says otherwise;
 none of it has been executed against a live instance from this framework. Companion notes:
 [`PROCESIO-NODE-MODULE-WHITELIST.md`](PROCESIO-NODE-MODULE-WHITELIST.md) (probed live) and
 [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md).
+
+> **Superseded in part by live runs (2026-10).** The section "Live behaviour of the four
+> script actions" at the end of this file was measured on PROD, and it overrides the
+> documented I/O below where they differ: Python no longer wraps its output in `{"result"}`.
 
 > ## ⚠ A scripting action that returns an ARRAY must bind "List Result"
 >
@@ -21,7 +25,7 @@ none of it has been executed against a live instance from this framework. Compan
 >
 > Returning an array while bound to `Single Result` stores **null**. There is no
 > error on the action, no error variable is set, and the instance still reaches
-> status 50 — the run looks completely healthy while the payload is gone. A
+> status 50 - the run looks completely healthy while the payload is gone. A
 > sibling action publishing a COUNT from the same object succeeds, which makes it
 > worse: the run reports "3 entities" beside a null entity list.
 >
@@ -34,7 +38,7 @@ none of it has been executed against a live instance from this framework. Compan
 > so a null variable interpolates to nothing and what the engine compiles is
 > `var o = ;`. Read that error as "the variable upstream is empty" and look at
 > what wrote it. By the same mechanism a raw string interpolates UNQUOTED and
-> yields `Unexpected identifier` — which is why a string input has to ride inside
+> yields `Unexpected identifier` - which is why a string input has to ride inside
 > an object wrapper (`{"v": "..."}`) and be unwrapped in the script.
 
 ## Preinstalled libraries
@@ -45,12 +49,12 @@ none of it has been executed against a live instance from this framework. Compan
 **The same documentation page contradicts this list.** An earlier callout on it says the
 Python action "has a list of available libraries to be used: JSON, Base64". Treat the
 nine-package table as the current statement and the callout as stale, and **verify by
-importing before designing against any of them** — the two readings differ by everything.
+importing before designing against any of them** - the two readings differ by everything.
 
 **No route to add a library is documented**, and `pip install` appears nowhere in the
 documentation corpus. Assume the set is closed.
 
-## What is NOT documented — check before relying on any of it
+## What is NOT documented - check before relying on any of it
 
 - **The Python version.** Stated nowhere. This matters more than it looks: library and
   model wheels pin interpreter and framework ranges, so an unknown interpreter cannot be
@@ -64,7 +68,7 @@ documentation corpus. Assume the set is closed.
 - **Timeout, memory ceiling, payload size.** None documented. The Node action documents a
   timeout; the Python action documents none.
 
-## I/O mechanics — two traps
+## I/O mechanics - two traps
 
 **Output is whatever the script PRINTS**, wrapped as `{"result": ...}`. To get at the
 value, follow the action with a **JSON Mapper** using query `$.result`. Design for that
@@ -80,7 +84,7 @@ or quote-bearing text is unsafe through a raw scalar substitution.** A stray quo
 the script; a crafted string executes. **Pass untrusted text through a JSON or object
 channel** so it arrives escaped, and treat even that as unverified until measured.
 
-## Working with files — the base64 bridge
+## Working with files - the base64 bridge
 
 A Python script cannot open a file. The documented mechanism is a bridge through process
 variables:
@@ -118,7 +122,7 @@ plausible model name.** Everything else is downstream of that answer.
 | Model | Licence | Languages | NER labels |
 |---|---|---|---|
 | `en_core_web_sm` 3.8.0 | **MIT** (weights) | **English only** | 18: CARDINAL, DATE, EVENT, FAC, GPE, LANGUAGE, LAW, LOC, MONEY, NORP, ORDINAL, ORG, PERCENT, PERSON, PRODUCT, QUANTITY, TIME, WORK_OF_ART |
-| `xx_ent_wiki_sm` 3.8.0 | **MIT** (weights) | multilingual, **WikiNER languages — European, no Arabic** | **4**: LOC, MISC, ORG, PER |
+| `xx_ent_wiki_sm` 3.8.0 | **MIT** (weights) | multilingual, **WikiNER languages - European, no Arabic** | **4**: LOC, MISC, ORG, PER |
 
 **Package licence and training provenance are different questions, and a compliance review
 will ask about both.** `en_core_web_sm` ships MIT weights and a `LICENSES_SOURCES` file
@@ -138,7 +142,7 @@ waits. **In-action inference never raises that question: the EE is held for the 
 computation.** So moving model work into a Python action trades an integration for
 occupancy, and the fleet sizing has to be recomputed rather than inherited.
 
-> ## ⚠ An object-typed input reports its shape as `{}` — and a bare string reaches the API as an empty body
+> ## ⚠ An object-typed input reports its shape as `{}` - and a bare string reaches the API as an empty body
 >
 > Verified live on a `Node`-based flow driven through `run-process`.
 >
@@ -152,14 +156,64 @@ occupancy, and the fleet sizing has to be recomputed rather than inherited.
 >
 > **Why this is worth a note rather than a shrug: the failure arrives as a
 > plausible success.** Every node in the chain throws, so the variable feeding
-> the `Call API` body is null, so the platform posts an **empty body** — and the
+> the `Call API` body is null, so the platform posts an **empty body** - and the
 > remote service answers **200**. The instance reaches status 50. Read from the
 > status alone, the run is indistinguishable from a document in which the
 > detector correctly found nothing. The tell is in the response body, where a
 > well-built service says so (`warnings: ["empty input"]`, zero chunks). Read
-> the body, not the status, and check an early-stage variable — a null where a
+> the body, not the status, and check an early-stage variable - a null where a
 > local computation should have produced a value means the input never bound.
 >
 > The same trap applies to any required object input: a script that validates
 > its config (`if (!cfg || !cfg.recognisers) throw`) takes the whole chain down
 > when the caller omits it, and the run still reports as completed.
+
+## Live behaviour of the four script actions (measured on PROD, 2026-10)
+
+One probe process with Node, Python, Ruby and Javascript actions, run synchronously, then the
+same actions driven in the designer. Everything below was observed, not read in the docs.
+
+**Shared shape.** Node, Python and Ruby have `Code`, `Timeout` (10 to 180 s, default 60),
+`Single Result`, `List Result`, `Stdout` and `Error`. Javascript has `Code` and a required
+`Output`, nothing else.
+
+| | Node | Python | Ruby | Javascript |
+|---|---|---|---|---|
+| hand a value back | `return v` | top-level `return v` (the code runs as a function body) | `return v` | `setOutput(v)` |
+| what the output variable gets | `v` as is | `v` as is (a list of dicts arrives as a JSON array) | `v` as is | `{"result": v}` |
+| print / log | `console.log` -> `Stdout` | `print` -> `Stdout` | `puts` -> `Stdout` | none |
+| libraries | `require()` from the documented list | the preinstalled set (`pandas` imported, version 3.0.5, while the docs table says 2.0.3) | gems (`liquid` and `json` used; runtime Ruby 3.3.12) | none: `require` is undefined |
+| variables in `Code` | any type | **text variables only** | **text variables only** | any type |
+
+- **Python and Ruby accept only text (String) variables in `Code`.** Binding a Json variable
+  is refused on save with statusCode 142 "Data type mismatch" ("Action ... at parameter Code
+  has a data type mismatch variable"); the designer flags it as a type mismatch. So hand them
+  JSON as a text variable and parse it in the script (`json.loads('<%v%>')`,
+  `JSON.parse('<%v%>')`). Single quotes around the placeholder are fine for JSON text with no
+  apostrophes; the general text-substitution traps above still apply.
+- **Python's old I/O is gone.** The docs still teach "the output is always
+  `{"result": ...}`, add a JSON Mapper with `$.result`". Live, a `return` binds raw to
+  `Single Result` or `List Result`, and `print` goes to `Stdout`; a script that only prints
+  leaves `Single Result` null.
+- **A list goes to `List Result`.** A pandas `to_dict('records')` returned to `List Result`
+  bound to a `isList` Json variable arrived as an array of plain objects.
+- **Errors never fail the run.** A `throw` (Node), `raise` (Python, Ruby) or a timeout sets
+  the action's `Error` output and the instance still ends at status 50 (success); the actions
+  after it run. Messages seen: Node `throw 'x'` -> `x`; Python -> `ValueError: x (line 1)`;
+  Ruby -> `RuntimeError: x`; Node over its Timeout -> `Execution timed out after 10s`; Python
+  over its Timeout -> `TimeoutError`. Javascript has no Error output: its failure lands in
+  `Output` as `{"error": {"errorMessage", "errorContext", "lineNumber", "columnNumber"}}`.
+  So check `Error` (or the Javascript `Output`) before trusting a result; a native `Throw`
+  is what fails a run on purpose.
+- **docs.procesio.com/how-to/javascript serves the Python article** (its body is the Python
+  page), so the Javascript action has no page of its own today.
+
+**In the designer.**
+- The code box in the properties panel is narrow; with the cursor in it, **Esc opens a
+  full-size editor** and Esc closes it again (the hint under the box says so).
+- **Ctrl+I (Cmd+I on a Mac) opens the variable selector** in the code editor: the editor
+  registers `KeyMod.CtrlCmd | KeyCode.KEY_I` (and also the Insert key). The picked variable
+  is inserted as `<%name%>`; saved, it becomes `<%N%>` plus a variable binding.
+- **Test Action** (the vertical tab beside the panel) runs one script action on its own,
+  with test values prefilled from the variables' defaults, and it uses the panel's current,
+  unsaved code. The result shows as "Test status: Finished" plus one field per bound output.

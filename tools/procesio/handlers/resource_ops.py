@@ -174,9 +174,14 @@ def _build_test_request(client, action_ref, values) -> dict:
         if direction == 1:            # input: only bind what the caller supplied
             if pid not in want:
                 continue
+            if prop.get("type") == "credentials":
+                # a process binds a credential as the instance id itself; a variable for it
+                # has no data type and the test endpoint refuses it with a 400
+                parameters.append({"TabPropertyId": pid, "Value": want[pid], "Variable": []})
+                continue
             vid = str(uuid.uuid4())
             variables.append({"Id": vid, "DataType": dtid, "Type": 10, "Name": name,
-                              "IsList": False, "IsError": False, "IsRequired": False})
+                              "IsList": bool(prop.get("isList")), "IsError": False, "IsRequired": False})
             parameters.append({"TabPropertyId": pid, "Value": f"<%{counter}%>",
                                "Variable": [{"id": counter, "variableId": vid, "attribute": None}]})
             test_values.append({"VariableId": vid, "Value": want[pid], "Attribute": None})
@@ -184,7 +189,7 @@ def _build_test_request(client, action_ref, values) -> dict:
         elif direction == 3:          # output: bind so its value comes back in testResult
             vid = str(uuid.uuid4())
             variables.append({"Id": vid, "DataType": dtid, "Type": 30, "Name": name,
-                              "IsList": False, "IsError": False, "IsRequired": False})
+                              "IsList": bool(prop.get("isList")), "IsError": False, "IsRequired": False})
             parameters.append({"TabPropertyId": pid, "Value": f"<%{counter}%>",
                                "Variable": [{"id": counter, "variableId": vid, "attribute": None}]})
             counter += 1
