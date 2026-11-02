@@ -2,16 +2,16 @@
 
 PROCESIO runs as separate installations - production, QA, dev, and each client's own
 PROD/QA/STAGING. This tool calls each one an **environment**, named `<Client>-<ENV>`
-(e.g. `Internal-PROD`, `Internal-QA`, `Internal-DEV`, `Acme-PROD`, `Acme-DEVQA`).
+(e.g. `Main-PROD`, `Main-QA`, `Main-DEV`, `Acme-PROD`, `Acme-DEVQA`).
 Each environment has its own host URLs and its own credentials - there is no data path
 between them.
 
-## When the user says "work on PROCESIO Internal-QA" (or DEV, or a client env)
+## When the user says "work on PROCESIO Main-QA" (or DEV, or a client env)
 
 That is a **switch the default environment** request. Do:
 
 ```
-run-tool procesio set-environment --name Internal-QA
+run-tool procesio set-environment --name Main-QA
 ```
 
 From then on every process/form/instance action runs against that environment and uses
@@ -25,7 +25,7 @@ For a **one-off** call against a different environment without moving the defaul
 
 ## The built-in environments (zero setup)
 
-`Internal-PROD`, `Internal-QA`, `Internal-DEV` always exist for everyone. Production is
+`Main-PROD`, `Main-QA`, `Main-DEV` always exist for everyone. Production is
 the default until someone switches. Client environments are added at runtime.
 
 ## Adding a client environment
@@ -50,7 +50,7 @@ dashboard / `set-credential`.)
 ## What you can rely on
 
 - **Nothing to migrate.** An existing credential with no environment binding is treated
-  as `Internal-PROD` (production URLs, unchanged). Colleagues keep working with no
+  as `Main-PROD` (production URLs, unchanged). Colleagues keep working with no
   action from them.
 - **Credentials are tied to environments.** Switching environment switches the account
   too, as long as exactly one credential is bound there; otherwise pass `--profile`.

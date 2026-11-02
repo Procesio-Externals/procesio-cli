@@ -18,7 +18,7 @@ from agents.procesio.handlers import audit as audit_h
 from agents.procesio.handlers import verify as verify_h
 from agents.procesio.tests.conftest import action, flow
 
-WS = "3fd85e9d-121e-415b-877f-f488cd685ce3"
+WS = "11111111-1111-1111-1111-111111111111"
 START = action("Start")
 CONFIGURED = action("Add", params=[{"Value": "x", "Variable": []}],
                     settings=[{"value": "x"}])

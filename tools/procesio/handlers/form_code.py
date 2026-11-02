@@ -211,7 +211,7 @@ def set_code(client, args) -> dict:
     return {"updated": True, "verified": verified, "concurrency": guard, **result}
 
 
-# Seen live (2026-10-18, Internal-PROD): POST /api/FormTemplate, PUT /api/FormTemplate and
+# Seen live (2026-10-18, Main-PROD): POST /api/FormTemplate, PUT /api/FormTemplate and
 # .../duplicate all answered 2xx while dropping Data entirely: a new form or a duplicate came back
 # with data: null, and an update moved updatedOn but left every Data field (code, browserTitle)
 # as it was. A 2xx alone therefore proves nothing about a form write; read it back.

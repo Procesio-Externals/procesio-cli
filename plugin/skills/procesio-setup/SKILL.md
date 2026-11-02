@@ -13,6 +13,14 @@ last_verified: 2026-09-23
 
 # Connecting to PROCESIO
 
+**New to any of this?** PROCESIO is a low-code automation platform for building processes,
+forms and integrations. procesio-cli is a command-line tool (you run it in a terminal, or
+an AI agent runs it for you) that drives a PROCESIO workspace from the command line. To
+reach a workspace it needs a PROCESIO **API key**: a credential you create in the PROCESIO
+web app. A PROCESIO API key has TWO parts and you need BOTH - a name/handle (the key's
+label) and a secret value (the long token) - and you copy each from the PROCESIO UI at the
+moment you create the key.
+
 Nothing here reaches a PROCESIO workspace until one credential profile exists on this
 machine. This walks through that, verifies it, and covers the optional extras that
 individual tools need.
@@ -53,9 +61,14 @@ Give them this to run, with a profile name of their choosing:
 python scripts/run-tool.py procesio add-credential --name personal --type apikey --make-default
 ```
 
-Omitting `--key` and `--value` is deliberate: the command prompts for both without
-echoing. If they want a specific workspace rather than the account default, add
-`--workspace-id <guid>`.
+A PROCESIO API key has two parts and the CLI needs both: `--key` is the key's name/handle
+(its label in the PROCESIO UI) and `--value` is the secret token. Omitting both from the
+command is deliberate - it then prompts for each without echoing. You get both from the
+PROCESIO UI's API-keys page when you create the key.
+
+Leave `--workspace-id` out for a personal workspace: the key already resolves to it, so do
+not ask for a workspace ID there. Add `--workspace-id <guid>` only to target a specific,
+non-personal workspace.
 
 ### Username and password
 
@@ -101,7 +114,7 @@ fields, with secrets reported only as present or absent.
 
 ## Environments
 
-Calls go to `Internal-PROD` unless told otherwise. For a client installation or a QA
+Calls go to `Main-PROD` unless told otherwise. For a client installation or a QA
 environment, register it once and bind the credential to it:
 
 ```bash

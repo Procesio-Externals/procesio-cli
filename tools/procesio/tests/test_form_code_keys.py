@@ -19,12 +19,12 @@ from tools.procesio.handlers import form_code
 
 @pytest.fixture
 def store(monkeypatch):
-    """A fake Credential Manager for the procesio tool, with Internal-PROD as default."""
+    """A fake Credential Manager for the procesio tool, with Main-PROD as default."""
     secrets: dict[str, str] = {}
     monkeypatch.setattr("tools._lib.creds.get_optional",
                         lambda tool, name: secrets.get(name) if tool == "procesio" else None)
-    monkeypatch.setattr("tools.procesio.environments.get_default", lambda: "Internal-PROD")
-    known = {"internal-prod": "Internal-PROD", "internal-qa": "Internal-QA"}
+    monkeypatch.setattr("tools.procesio.environments.get_default", lambda: "Main-PROD")
+    known = {"internal-prod": "Main-PROD", "internal-qa": "Main-QA"}
     monkeypatch.setattr("tools.procesio.environments.canonical_name",
                         lambda name: known.get(str(name).lower()))
     return secrets
@@ -36,57 +36,64 @@ class _Client:
 
 
 def test_secret_name_carries_the_environment():
-    assert form_code_keys.secret_name("Internal-QA") == "form-code-key@Internal-QA"
+    assert form_code_keys.secret_name("Main-QA") == "form-code-key@Main-QA"
 
 
 def test_the_default_environment_still_reads_the_legacy_key(store):
     store["form-code-key"] = "L"
     assert form_code_keys.key_for(None) == "L"
-    assert form_code_keys.key_for("Internal-PROD") == "L"
+    assert form_code_keys.key_for("Main-PROD") == "L"
     assert form_code_keys.key_for("internal-prod") == "L"     # names are canonicalised
 
 
 def test_an_environment_key_wins_over_the_legacy_one(store):
     store["form-code-key"] = "L"
-    store["form-code-key@Internal-PROD"] = "P"
-    assert form_code_keys.key_for("Internal-PROD") == "P"
+    store["form-code-key@Main-PROD"] = "P"
+    assert form_code_keys.key_for("Main-PROD") == "P"
 
 
 def test_another_environment_uses_its_own_key(store):
     store["form-code-key"] = "L"
-    store["form-code-key@Internal-QA"] = "Q"
-    assert form_code_keys.key_for("Internal-QA") == "Q"
+    store["form-code-key@Main-QA"] = "Q"
+    assert form_code_keys.key_for("Main-QA") == "Q"
 
 
 def test_another_environment_never_borrows_the_default_key(store):
     """The one rule that keeps a form from going blank: no silent fallback."""
     store["form-code-key"] = "L"
     with pytest.raises(UsageError) as e:
-        form_code_keys.key_for("Internal-QA")
+        form_code_keys.key_for("Main-QA")
     message = str(e.value)
-    assert "set-credential.py procesio form-code-key@Internal-QA" in message
+    assert "set-credential.py procesio form-code-key@Main-QA" in message
     assert "never used for another installation" in message
 
 
 def test_form_get_and_set_code_use_the_clients_environment(store):
     store["form-code-key"] = "L"
-    store["form-code-key@Internal-QA"] = "Q"
-    assert form_code._code_key(_Client("Internal-QA")) == "Q"
-    assert form_code._code_key(_Client("Internal-PROD")) == "L"
+    store["form-code-key@Main-QA"] = "Q"
+    assert form_code._code_key(_Client("Main-QA")) == "Q"
+    assert form_code._code_key(_Client("Main-PROD")) == "L"
 
 
 def test_form_create_encrypts_with_the_environments_key(store):
-    store["form-code-key@Internal-QA"] = "Q"
-    blob = fb._build_code({"css": "a{color:red}"}, {"form_code_env": "Internal-QA"})
+    store["form-code-key@Main-QA"] = "Q"
+    blob = fb._build_code({"css": "a{color:red}"}, {"form_code_env": "Main-QA"})
     assert code_cipher.decrypt_code(blob, "Q")["CSS"] == "a{color:red}"
 
 
 def test_form_create_refuses_to_encrypt_with_another_installations_key(store):
     store["form-code-key"] = "L"
     with pytest.raises(UsageError):
-        fb._build_code({"css": "a{}"}, {"form_code_env": "Internal-QA"})
+        fb._build_code({"css": "a{}"}, {"form_code_env": "Main-QA"})
 
 
 def test_the_form_context_records_the_environment():
-    ctx = fb._prepare_ctx(_Client("Internal-QA"), {"name": "F", "elements": []})
-    assert ctx == {"form_code_env": "Internal-QA"}
+    ctx = fb._prepare_ctx(_Client("Main-QA"), {"name": "F", "elements": []})
+    assert ctx == {"form_code_env": "Main-QA"}
+
+
+def test_a_key_stored_under_the_pre_rename_name_still_resolves(store):
+    """No migration after the Internal-* -> Main-* rename: a form-code-key saved under the old
+    env name is still found when the call asks for the new canonical env."""
+    store["form-code-key@Internal-QA"] = "Q"
+    assert form_code_keys.key_for("Main-QA") == "Q"

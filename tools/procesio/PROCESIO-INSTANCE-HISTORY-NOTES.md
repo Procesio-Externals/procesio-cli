@@ -1,7 +1,7 @@
 # PROCESIO instance-history API - notes
 
 How run history is read (endpoints + native actions), and the traps. Generalized
-API facts; no client data. Measured live against Internal-PROD, 28/08/2026.
+API facts; no client data. Measured live against Main-PROD, 28/08/2026.
 
 ## The endpoints (contract + measured shapes)
 
@@ -201,7 +201,7 @@ action, the audit trail may only record the UI route. Test the route the user wi
 
 ## The three response shapes, measured field-by-field (10/09/2026)
 
-Measured against a scratch workspace on Internal-PROD. Field NAMES only; no values recorded.
+Measured against a scratch workspace on Main-PROD. Field NAMES only; no values recorded.
 These are the shapes anything that pre-fills a diagnostic bundle from the product has to bind to.
 
 **Envelope:** `GET /api/Projects/instances/{id}/status` returns `{"result": {"instance": {…}}}`.

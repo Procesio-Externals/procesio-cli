@@ -35,7 +35,7 @@ def _patch(monkeypatch, result, *, track_invalidate=True):
     return calls, invalidated
 
 
-_OK = {"ok": True, "data": {"default_environment": "Internal-QA"}, "error": None}
+_OK = {"ok": True, "data": {"default_environment": "Main-QA"}, "error": None}
 _ERR = {"ok": False, "data": None, "error": {"code": "x", "message": "boom"}}
 
 
@@ -67,8 +67,8 @@ def test_state_surfaces_errors(monkeypatch):
 
 def test_set_environment_builds_argv_and_invalidates(monkeypatch):
     calls, invalidated = _patch(monkeypatch, _OK)
-    out = PE.set_environment(_Req({"name": "Internal-QA"}))
-    assert calls[0]["argv"] == ["set-environment", "--name", "Internal-QA"]
+    out = PE.set_environment(_Req({"name": "Main-QA"}))
+    assert calls[0]["argv"] == ["set-environment", "--name", "Main-QA"]
     assert out["ok"] is True
     assert invalidated == [True]  # default moved -> card + probe must re-read
 

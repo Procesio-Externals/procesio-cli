@@ -88,7 +88,7 @@ class FakeSession:
 def _isolate_userdata(tmp_path, monkeypatch):
     """Pin the user-data root to a per-test temp dir so the environments registry
     (config/procesio/environments.json) is empty by default — every test resolves
-    the default environment to Internal-PROD (the historical production URLs) and no
+    the default environment to Main-PROD (the historical production URLs) and no
     test ever reads or writes the developer's real registry."""
     monkeypatch.setenv("AAT_USERDATA_DIR", str(tmp_path / "userdata"))
     yield

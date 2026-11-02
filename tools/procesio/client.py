@@ -65,7 +65,7 @@ class ProcesioClient:
             self.name, resolved = profiles.resolve(profile_name)
             self.profile = dict(resolved)
         # Resolve the active environment (explicit flag > credential binding >
-        # default env > Internal-PROD) and fold its host URLs into the profile so
+        # default env > Main-PROD) and fold its host URLs into the profile so
         # config.web_base/app_base/forms_base/auth_base pick them up. An explicit
         # per-profile URL override (rare) still wins via setdefault.
         self.env = environments.resolve(environment, self.profile)

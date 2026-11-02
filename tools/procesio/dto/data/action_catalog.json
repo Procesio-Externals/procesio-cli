@@ -1,5 +1,5 @@
 {
- "_note": "Live full action catalog (getFullAction=true) — the data-driven Process builder's source. Fetched 2026-06-24 from 4Export. Refresh: dto/data/_refresh.py. prepare_ctx fetches the live workspace catalog at build time for custom/connector actions; this bundle is the offline default.",
+ "_note": "Live full action catalog (getFullAction=true) — the data-driven Process builder's source. Fetched 2026-06-24 from a PROCESIO workspace. Refresh: dto/data/_refresh.py. prepare_ctx fetches the live workspace catalog at build time for custom/connector actions; this bundle is the offline default.",
  "actions": [
   {
    "actionId": "e798f492-5093-894b-bb77-5928c39d45ce",

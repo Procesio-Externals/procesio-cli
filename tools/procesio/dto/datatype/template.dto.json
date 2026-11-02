@@ -1,5 +1,5 @@
 {
-  "_note": "Golden CreateDataTypeDto shape (POST /api/DataTypes body). <PLACEHOLDERS> are filled by builder.py. The server REASSIGNS all Id/ParentDataTypeId values and derives attribute types from DataTypeId, so client ids are positional only. CsharpCorrespondent on the model is 0; on a primitive attribute it mirrors the PrimaryDataType enum (String=50, Integer=20, ...). Captured live 2026-06-24 against 4Export.",
+  "_note": "Golden CreateDataTypeDto shape (POST /api/DataTypes body). <PLACEHOLDERS> are filled by builder.py. The server REASSIGNS all Id/ParentDataTypeId values and derives attribute types from DataTypeId, so client ids are positional only. CsharpCorrespondent on the model is 0; on a primitive attribute it mirrors the PrimaryDataType enum (String=50, Integer=20, ...). Captured live 2026-06-24 against a PROCESIO workspace.",
   "Name": "<name>",
   "DisplayName": "<displayName>",
   "IsPublic": true,
