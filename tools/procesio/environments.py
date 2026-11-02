@@ -1,7 +1,7 @@
 """PROCESIO environments - named URL sets an installation is reached through.
 
 A PROCESIO *environment* is one installation of the platform: a `<Client>-<ENV>`
-label (e.g. `Internal-PROD`, `Internal-QA`, `Acme-DEVQA`) that carries the four
+label (e.g. `Main-PROD`, `Main-QA`, `Acme-DEVQA`) that carries the four
 host URLs that installation lives on:
 
     web_base   the Web API host (every REST call)                webapi-*.procesio.app
@@ -13,13 +13,13 @@ Environments are NON-secret (they are just hostnames). Credentials are stored
 separately (Credential Manager, see profiles.py) and each credential is *bound*
 to one environment by name - so switching environment also switches which
 account/key is used. A credential with no binding belongs to the DEFAULT
-environment, which itself defaults to `Internal-PROD`. That is what keeps every
+environment, which itself defaults to `Main-PROD`. That is what keeps every
 pre-existing single-credential setup working unchanged as production: no env
-config on disk + an unbound credential == Internal-PROD == the historical
+config on disk + an unbound credential == Main-PROD == the historical
 hard-coded URLs, with nothing to re-enter.
 
 Two layers, merged at read time:
-  * BUILT-IN presets in code (Internal-PROD/QA/DEV) - PROCESIO's own infra, shared
+  * BUILT-IN presets in code (Main-PROD/QA/DEV) - PROCESIO's own infra, shared
     with every teammate, available with zero setup.
   * a USER registry at ``config/procesio/environments.json`` (per-user, wipeable)
     holding client-specific environments (Acme-*, ...) and the default pointer.
@@ -43,40 +43,49 @@ REGISTRY_FILE = "environments.json"
 
 # The canonical fallback: an unbound credential and an unset default both resolve
 # here, and its URLs equal the historical hard-coded production defaults.
-DEFAULT_ENV_NAME = "Internal-PROD"
+DEFAULT_ENV_NAME = "Main-PROD"
 
 # The four hosts every environment defines. Keys are the field names injected into
 # a profile so config.web_base/app_base/forms_base/auth_base pick them up.
 URL_KEYS = ("web_base", "app_base", "forms_base", "auth_base")
 
-# Built-in PROCESIO-internal environments (framework-shared, non-secret infra).
+# Built-in PROCESIO environments (framework-shared, non-secret infra).
 # Production keeps the bare hostnames; QA/DEV use the -qa/-dev host family. auth_base
 # is only meaningful on PROD (the legacy Proxy host); QA/DEV omit it and fall back to
 # the config default, since login goes to web_base anyway.
 BUILTIN: dict[str, dict] = {
-    "Internal-PROD": {
-        "name": "Internal-PROD", "client": "Internal", "env": "PROD",
+    "Main-PROD": {
+        "name": "Main-PROD", "client": "Main", "env": "PROD",
         "web_base": "https://webapi.procesio.app",
         "app_base": "https://procesio.app",
         "forms_base": "https://forms.procesio.app",
         "auth_base": "https://auth.procesio.app",
         "builtin": True,
     },
-    "Internal-QA": {
-        "name": "Internal-QA", "client": "Internal", "env": "QA",
+    "Main-QA": {
+        "name": "Main-QA", "client": "Main", "env": "QA",
         "web_base": "https://webapi-qa.procesio.app",
         "app_base": "https://qa.procesio.app",
         "forms_base": "https://forms-qa.procesio.app",
         "builtin": True,
     },
-    "Internal-DEV": {
-        "name": "Internal-DEV", "client": "Internal", "env": "DEV",
+    "Main-DEV": {
+        "name": "Main-DEV", "client": "Main", "env": "DEV",
         "web_base": "https://webapi-dev.procesio.app",
         "app_base": "https://dev.procesio.app",
         "forms_base": "https://forms-dev.procesio.app",
         "builtin": True,
     },
 }
+
+# Legacy built-in names kept working after the Internal-* -> Main-* rename, so a stored
+# default or a credential bound to an old name resolves with no migration (same URLs).
+_ALIASES = {
+    "internal-prod": "Main-PROD",
+    "internal-qa": "Main-QA",
+    "internal-dev": "Main-DEV",
+}
+_LEGACY_BY_CANON = {"Main-PROD": "Internal-PROD", "Main-QA": "Internal-QA", "Main-DEV": "Internal-DEV"}
 
 _NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
@@ -139,6 +148,9 @@ def _find(name: str) -> tuple[str, dict] | None:
     for canon, env in envs.items():
         if canon.lower() == low:
             return canon, env
+    alias = _ALIASES.get(low)
+    if alias and alias in envs:
+        return alias, envs[alias]
     return None
 
 
@@ -162,11 +174,17 @@ def canonical_name(name: str) -> str | None:
     return hit[0] if hit else None
 
 
+def legacy_alias(canonical: str) -> str | None:
+    """The pre-rename built-in name for a canonical name, for secondary lookups (e.g. a
+    form-code-key stored under the old env name). None when there is no alias."""
+    return _LEGACY_BY_CANON.get(canonical)
+
+
 # -- default pointer --------------------------------------------------------
 
 def get_default() -> str:
     """The active environment name. The stored pointer if set and still valid,
-    else DEFAULT_ENV_NAME (Internal-PROD) - so a fresh box is production."""
+    else DEFAULT_ENV_NAME (Main-PROD) - so a fresh box is production."""
     stored = _load_registry().get("default")
     if stored and exists(stored):
         return canonical_name(stored)
@@ -253,7 +271,7 @@ def resolve(name: str | None, profile: dict | None = None) -> dict:
       1. an explicit environment name (the --environment flag),
       2. the credential's own `environment` binding,
       3. the stored default environment,
-      4. Internal-PROD.
+      4. Main-PROD.
     Always returns a full environment dict (never raises for the fallbacks;
     only an explicit unknown name raises)."""
     if name:

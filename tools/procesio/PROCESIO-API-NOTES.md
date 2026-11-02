@@ -1911,13 +1911,17 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    Building a process and running it `run-process --synchronous` (status 50/40)
    remains a fine end-to-end oracle too.
 
-7. **A public form URL requires a real workspace.** `POST /api/CustomUrl/FormTemplate`
-   fails with statusCode **1008** ("Not working on workspace") unless the call is
-   scoped with a `workspaceid` header, and the custom URL only resolves when the FORM
-   itself lives in that same workspace. A form created in the personal workspace
-   (`workspaceId` all-zeros) cannot be published under a workspace custom URL - create
-   the whole chain (credential, process, form) inside one workspace when the flow has
-   to be reachable by a human.
+7. **Forms work in the personal workspace; only a workspace CUSTOM URL does not.** A form,
+   with its process and credential, can be built, run and submitted in the personal
+   workspace like in any other. Do not read what follows as "the personal workspace cannot
+   do forms" - that is false. The single thing it cannot do is publish a form under a
+   workspace **custom URL**: `POST /api/CustomUrl/FormTemplate` fails with statusCode
+   **1008** ("Not working on workspace") unless the call is scoped with a `workspaceid`
+   header, and the custom URL only resolves when the form itself lives in that same
+   workspace. A personal-workspace form has `workspaceId` all-zeros, so there is no
+   workspace to scope the URL to. When a flow has to be reachable by a human through a
+   workspace custom URL, build the whole chain (credential, process, form) inside one
+   workspace.
 
 ## Forms: `form-create` takes an AUTHORING CONFIG, never a stored DTO
 
@@ -3580,7 +3584,7 @@ Forms read path is not a workaround** - `POST /api/Form/dataStore/{id}/rows/filt
 refuses first with `400 / 1005 "Form template id is required."`, so it needs a
 published form template bound to that store and cannot be reached generically.
 Escalate to platform support with the first-observed UTC timestamp and a store id;
-the `value` string says so literally. (Seen once platform-wide on Internal-PROD,
+the `value` string says so literally. (Seen once platform-wide on Main-PROD,
 independently reported by an unrelated tenant in the same window - the duration ran
 to hours, so treat it as an outage to report, not a wait-and-retry.)
 
@@ -3734,7 +3738,7 @@ action and the range: `LIMIT_RANGE  "Please make sure that the value is between
 not mean the script succeeded** - an action whose error was captured into a
 variable still finishes 50 with an empty top-level `error: []`.
 
-### The script engine's capabilities, MEASURED on Internal-PROD 25-08-2026
+### The script engine's capabilities, MEASURED on Main-PROD 25-08-2026
 
 | | |
 |---|---|

@@ -6,7 +6,7 @@ that there is one key per INSTALLATION: identical on every workspace of it, and 
 guaranteed to match on another. In this tool an installation is an environment
 (environments.py), so the key is stored per environment:
 
-    agents-and-tools:procesio:form-code-key@<environment>    e.g. form-code-key@Internal-QA
+    agents-and-tools:procesio:form-code-key@<environment>    e.g. form-code-key@Main-QA
 
 The bare `form-code-key` predates that and keeps working for the DEFAULT environment,
 the same rule an unbound credential profile follows (environments.resolve). It is never
@@ -38,6 +38,11 @@ def key_for(env_name: str | None) -> str:
     key = creds.get_optional(TOOL, secret_name(env))
     if key:
         return key
+    legacy = environments.legacy_alias(env)   # a key stored under the pre-rename env name still resolves
+    if legacy:
+        key = creds.get_optional(TOOL, secret_name(legacy))
+        if key:
+            return key
     if env == default:
         key = creds.get_optional(TOOL, LEGACY)
         if key:

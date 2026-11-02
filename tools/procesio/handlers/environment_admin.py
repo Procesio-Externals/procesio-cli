@@ -3,9 +3,9 @@
 A PROCESIO environment is one installation, named `<Client>-<ENV>`, carrying the
 host URLs it lives on (see environments.py). These actions let a user list the
 known environments, add a client-specific one, switch the default (the natural
-"I want to work on PROCESIO Internal-QA" gesture), and remove a user-defined one.
+"I want to work on PROCESIO Main-QA" gesture), and remove a user-defined one.
 
-Built-in Internal-PROD/QA/DEV always exist and are shared with every teammate;
+Built-in Main-PROD/QA/DEV always exist and are shared with every teammate;
 switching to one needs no setup beyond a credential bound to it.
 """
 from __future__ import annotations
@@ -18,7 +18,7 @@ from tools.procesio.actiondef import ActionDef
 
 def _creds_by_environment() -> dict[str, list[str]]:
     """Credential names grouped by the environment they are bound to (unbound ->
-    Internal-PROD), so listings can show which environments are usable."""
+    Main-PROD), so listings can show which environments are usable."""
     out: dict[str, list[str]] = {}
     for name in profiles.profile_names():
         blob = profiles.get_profile(name)
@@ -133,7 +133,7 @@ ACTIONS = {
     ),
     "set-environment": ActionDef(
         func=set_environment, add_args=_name_arg,
-        description="Switch the default environment (e.g. to Internal-QA); persists the choice.",
+        description="Switch the default environment (e.g. to Main-QA); persists the choice.",
     ),
     "remove-environment": ActionDef(
         func=remove_environment, add_args=_name_arg,

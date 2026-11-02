@@ -118,7 +118,7 @@ python scripts/run-tool.py procesio form-set-code --id <form-id> \
 The platform has answered form writes with 2xx while storing nothing: `PUT /api/FormTemplate`
 moved `updatedOn` but left every `Data` field as it was (the code, even `browserTitle`), and
 `POST /api/FormTemplate` and `.../duplicate` returned forms with `data: null` (seen on
-Internal-PROD 2026-10-18, every payload shape, PascalCase and camelCase alike; the designer UI
+Main-PROD 2026-10-18, every payload shape, PascalCase and camelCase alike; the designer UI
 saves through the same endpoint, so it is not a client bug). The public page then keeps serving
 the old code, which looks exactly like a CDN cache that never expires.
 
@@ -138,7 +138,7 @@ Two different secrets that look alike - both short opaque tokens:
 | `agents-and-tools:procesio:form-code-key@<environment>` | gets you **into** `Data.code` (AES passphrase), one per installation |
 
 ```bash
-python scripts/set-credential.py procesio form-code-key@Internal-QA
+python scripts/set-credential.py procesio form-code-key@Main-QA
 ```
 
 The form-code passphrase is **installation-wide**: it decrypts the code blob of every

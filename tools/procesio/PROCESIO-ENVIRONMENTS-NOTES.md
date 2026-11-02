@@ -19,7 +19,7 @@ The `-qa` / `-dev` installations follow a host family: `webapi-qa.` / `qa.` /
 
 ## Two layers, merged at read time
 
-- **Built-in presets** in `environments.py::BUILTIN` (`Internal-PROD/QA/DEV`) - PROCESIO's
+- **Built-in presets** in `environments.py::BUILTIN` (`Main-PROD/QA/DEV`) - PROCESIO's
   own infra, framework-shared, available with zero setup. These are *framework* data
   (public app hostnames), like the historical hard-coded defaults were.
 - **User registry** at `context-state-knowledge/config/procesio/environments.json`
@@ -34,7 +34,7 @@ Active **environment** for a call, highest first:
 1. `--environment <name>` flag,
 2. the credential's own `environment` binding,
 3. the stored `default` environment,
-4. `Internal-PROD`.
+4. `Main-PROD`.
 
 The resolved environment's URLs are folded into the profile the client holds, so
 `config.web_base/app_base/forms_base/auth_base` pick them up. An explicit per-profile
@@ -48,9 +48,9 @@ account/key is used, provided exactly one credential is bound there.
 ## Backward compatibility (why nothing breaks on upgrade)
 
 A pre-existing single-credential setup keeps working as production with **nothing to
-re-enter**: no registry file + an **unbound** credential ⇒ `Internal-PROD` ⇒ the exact
+re-enter**: no registry file + an **unbound** credential ⇒ `Main-PROD` ⇒ the exact
 historical hard-coded URLs. Existing credentials carry no `environment` field, so they
-resolve to `Internal-PROD` automatically.
+resolve to `Main-PROD` automatically.
 
 ## Operating it
 
@@ -58,9 +58,9 @@ resolve to `Internal-PROD` automatically.
 list-environments                       # what exists, which is default, bound creds
 add-environment --name Acme-PROD \     # register a client installation
     --web-base https://webapi.acme… --app-base https://acme… --forms-base https://forms.acme…
-set-environment --name Internal-QA       # move the default pointer (persists)
-add-credential --name qa-me --type userpass --username … --environment Internal-QA
-<any action> --environment Internal-DEV  # one call against another env, default unchanged
+set-environment --name Main-QA       # move the default pointer (persists)
+add-credential --name qa-me --type userpass --username … --environment Main-QA
+<any action> --environment Main-DEV  # one call against another env, default unchanged
 ```
 
 `add-environment` needs all three of `--web-base/--app-base/--forms-base`; `client`/`env`
@@ -83,12 +83,12 @@ the call's environment like everything else here (`form_code_keys.py`):
   form goes blank.
 
 ```
-python scripts/set-credential.py procesio form-code-key@Internal-QA
+python scripts/set-credential.py procesio form-code-key@Main-QA
 ```
 
 ## Tests / isolation
 
 The suite's autouse `_isolate_userdata` fixture (conftest) pins `AAT_USERDATA_DIR` to a
-temp dir, so every test starts from the built-ins with `default = Internal-PROD` and no
+temp dir, so every test starts from the built-ins with `default = Main-PROD` and no
 test reads or writes the developer's real registry. Userpass login tests must also take
 the `store` fixture (in-memory creds) or a persistent cached token skips the login.

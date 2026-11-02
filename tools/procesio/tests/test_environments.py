@@ -1,7 +1,7 @@
 """Environments: registry, default switching, credential binding, URL resolution.
 
 The autouse _isolate_userdata fixture (conftest) pins the registry to a temp dir,
-so every test starts from the built-in presets with the default = Internal-PROD.
+so every test starts from the built-in presets with the default = Main-PROD.
 """
 from __future__ import annotations
 
@@ -20,24 +20,24 @@ from tools.procesio.tests.conftest import FakeResp, FakeSession
 
 def test_builtin_presets_present():
     names = set(E.all_environments())
-    assert {"Internal-PROD", "Internal-QA", "Internal-DEV"} <= names
+    assert {"Main-PROD", "Main-QA", "Main-DEV"} <= names
 
 
 def test_default_is_prod_on_fresh_registry():
-    assert E.get_default() == "Internal-PROD"
+    assert E.get_default() == "Main-PROD"
 
 
 def test_prod_urls_match_historical_defaults():
-    prod = E.get("Internal-PROD")
+    prod = E.get("Main-PROD")
     assert prod["web_base"] == config.DEFAULT_WEB_BASE
     assert prod["app_base"] == config.DEFAULT_APP_BASE
     assert prod["forms_base"] == config.DEFAULT_FORMS_BASE
 
 
 @pytest.mark.parametrize("name,web,app,forms", [
-    ("Internal-QA", "https://webapi-qa.procesio.app",
+    ("Main-QA", "https://webapi-qa.procesio.app",
      "https://qa.procesio.app", "https://forms-qa.procesio.app"),
-    ("Internal-DEV", "https://webapi-dev.procesio.app",
+    ("Main-DEV", "https://webapi-dev.procesio.app",
      "https://dev.procesio.app", "https://forms-dev.procesio.app"),
 ])
 def test_qa_dev_urls(name, web, app, forms):
@@ -50,26 +50,37 @@ def test_qa_dev_urls(name, web, app, forms):
 # -- resolution precedence --------------------------------------------------
 
 def test_resolve_unbound_is_prod():
-    assert E.resolve(None, {"type": "apikey"})["name"] == "Internal-PROD"
+    assert E.resolve(None, {"type": "apikey"})["name"] == "Main-PROD"
 
 
 def test_resolve_uses_credential_binding():
-    assert E.resolve(None, {"environment": "Internal-DEV"})["name"] == "Internal-DEV"
+    assert E.resolve(None, {"environment": "Main-DEV"})["name"] == "Main-DEV"
 
 
 def test_explicit_name_beats_binding():
-    got = E.resolve("Internal-QA", {"environment": "Internal-DEV"})
-    assert got["name"] == "Internal-QA"
+    got = E.resolve("Main-QA", {"environment": "Main-DEV"})
+    assert got["name"] == "Main-QA"
 
 
 def test_default_pointer_beats_prod_fallback():
-    E.set_default("Internal-QA")
-    assert E.resolve(None, {"type": "apikey"})["name"] == "Internal-QA"
+    E.set_default("Main-QA")
+    assert E.resolve(None, {"type": "apikey"})["name"] == "Main-QA"
 
 
 def test_case_insensitive_lookup():
-    assert E.canonical_name("internal-qa") == "Internal-QA"
-    assert E.resolve("INTERNAL-DEV", None)["name"] == "Internal-DEV"
+    assert E.canonical_name("main-qa") == "Main-QA"
+    assert E.resolve("MAIN-DEV", None)["name"] == "Main-DEV"
+
+
+def test_legacy_internal_names_still_resolve():
+    """The Internal-* -> Main-* rename keeps the old names working with no migration: a stored
+    default or a credential binding written before the rename still resolves to the new preset."""
+    assert E.canonical_name("Internal-PROD") == "Main-PROD"
+    assert E.canonical_name("internal-qa") == "Main-QA"
+    assert E.get("Internal-DEV")["web_base"] == "https://webapi-dev.procesio.app"
+    assert E.resolve(None, {"environment": "Internal-QA"})["name"] == "Main-QA"
+    E.set_default("Internal-QA")            # an old stored default normalizes to the new canonical
+    assert E.get_default() == "Main-QA"
 
 
 def test_unknown_environment_raises():
@@ -109,17 +120,17 @@ def test_add_rejects_bad_name():
 
 
 def test_user_entry_overrides_builtin_url():
-    E.add("Internal-QA", web_base="https://moved-qa.example",
+    E.add("Main-QA", web_base="https://moved-qa.example",
           app_base="https://qa.moved.example",
           forms_base="https://forms.moved.example")
-    assert E.get("Internal-QA")["web_base"] == "https://moved-qa.example"
+    assert E.get("Main-QA")["web_base"] == "https://moved-qa.example"
     # still flagged builtin (name is a built-in) but URL is the override
-    assert E.get("Internal-QA")["builtin"] is True
+    assert E.get("Main-QA")["builtin"] is True
 
 
 def test_remove_builtin_blocked():
     with pytest.raises(UsageError):
-        E.remove("Internal-DEV")
+        E.remove("Main-DEV")
 
 
 def test_remove_user_env_resets_default():
@@ -127,7 +138,7 @@ def test_remove_user_env_resets_default():
           make_default=True)
     assert E.get_default() == "Z-PROD"
     E.remove("Z-PROD")
-    assert E.get_default() == "Internal-PROD"  # falls back
+    assert E.get_default() == "Main-PROD"  # falls back
 
 
 def test_set_unknown_default_raises():
@@ -140,20 +151,20 @@ def test_set_unknown_default_raises():
 def test_set_environment_handler_reports_credentials(store):
     from tools.procesio import profiles
     profiles.save_profile("qa-key", {"type": "apikey", "key": "N", "value": "V",
-                                     "environment": "Internal-QA"})
-    out = EA.set_environment(argparse.Namespace(name="Internal-QA"))
-    assert out["default_environment"] == "Internal-QA"
+                                     "environment": "Main-QA"})
+    out = EA.set_environment(argparse.Namespace(name="Main-QA"))
+    assert out["default_environment"] == "Main-QA"
     assert out["credentials"] == ["qa-key"]
 
 
 def test_list_environments_marks_default_and_creds(store):
     from tools.procesio import profiles
     profiles.save_profile("dev-key", {"type": "apikey", "key": "N", "value": "V",
-                                      "environment": "Internal-DEV"})
+                                      "environment": "Main-DEV"})
     out = EA.list_environments(argparse.Namespace())
     by_name = {e["name"]: e for e in out["environments"]}
-    assert by_name["Internal-PROD"]["is_default"] is True
-    assert by_name["Internal-DEV"]["credentials"] == ["dev-key"]
+    assert by_name["Main-PROD"]["is_default"] is True
+    assert by_name["Main-DEV"]["credentials"] == ["dev-key"]
 
 
 # -- client URL injection ---------------------------------------------------
@@ -168,14 +179,14 @@ def _run(profile, session, environment=None):
 def test_client_injects_bound_environment_url():
     sess = FakeSession(queue=[FakeResp(200, {})])
     _, call = _run({"type": "apikey", "key": "N", "value": "V",
-                    "environment": "Internal-QA"}, sess)
+                    "environment": "Main-QA"}, sess)
     assert call["url"] == "https://webapi-qa.procesio.app/api/Workspaces"
 
 
 def test_client_explicit_environment_overrides_binding():
     sess = FakeSession(queue=[FakeResp(200, {})])
     _, call = _run({"type": "apikey", "key": "N", "value": "V",
-                    "environment": "Internal-QA"}, sess, environment="Internal-DEV")
+                    "environment": "Main-QA"}, sess, environment="Main-DEV")
     assert call["url"] == "https://webapi-dev.procesio.app/api/Workspaces"
 
 
@@ -188,7 +199,7 @@ def test_client_unbound_is_prod():
 def test_explicit_profile_url_override_beats_environment():
     sess = FakeSession(queue=[FakeResp(200, {})])
     _, call = _run({"type": "apikey", "key": "N", "value": "V",
-                    "environment": "Internal-QA",
+                    "environment": "Main-QA",
                     "web_base": "https://custom.example"}, sess)
     assert call["url"] == "https://custom.example/api/Workspaces"
 
@@ -196,7 +207,7 @@ def test_explicit_profile_url_override_beats_environment():
 def test_client_does_not_mutate_caller_profile():
     sess = FakeSession(queue=[FakeResp(200, {})])
     original = {"type": "apikey", "key": "N", "value": "V",
-                "environment": "Internal-QA"}
+                "environment": "Main-QA"}
     ProcesioClient(profile=original, name="t", session=sess)
     assert "web_base" not in original  # injection copied, never mutated the input
 
@@ -208,7 +219,7 @@ def test_userpass_login_origin_is_environment_app_host(store):
                           headers={"x-session-expires-at": "9999999999"})
     sess = FakeSession(queue=[login_resp, FakeResp(200, {})])
     _run({"type": "userpass", "username": "u", "password": "p",
-          "environment": "Internal-QA"}, sess)
+          "environment": "Main-QA"}, sess)
     login = sess.calls[0]
     assert login["url"] == "https://webapi-qa.procesio.app/api/authentication"
     assert login["headers"]["Origin"] == "https://qa.procesio.app"

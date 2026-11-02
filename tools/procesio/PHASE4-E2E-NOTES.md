@@ -1,10 +1,10 @@
 # Phase 4 - end-to-end use case (AAT_ "Company Intelligence Brief")
 
-A full working demo in workspace **4Export** (`3fd85e9d-121e-415b-877f-f488cd685ce3`)
+A full working demo in a demo PROCESIO workspace 
 exercising every DTO sub-tool: 2 data models, 2 credentials, 1 document, 2 processes,
 1 webhook, 1 form. All resources prefixed `AAT_`. Built entirely programmatically.
 
-## Resource ids (4Export)
+## Resource ids
 
 | Resource | id |
 |---|---|
@@ -484,7 +484,7 @@ enterprise theme (verified by screenshot).
 ## Round 12 - DECISIVE functional test: list-bound document tables DO render; Round 4 was WRONG
 
 A scratch process functional render test settled the AAT_CompanyBrief "Unknown" mystery
-definitively. Two runs in the AAT workspace (`3fd85e9d-…`), Generate Document -> PDF,
+definitively. Two runs in the AAT workspace , Generate Document -> PDF,
 typed `hits` list fed via a **process-variable DefaultValue containing a JSON array**
 (option 2 - no Call API echo, no Javascript needed; it worked first try):
 
@@ -557,7 +557,7 @@ HOW THE LINK IS WRITTEN (and how PUT fails):
   `DELETE /api/DataTypes/attribute/{parentId}/{dupAttrId}`. The original attribute id (and
   thus all document cell references `<%hits.attr%>`) is preserved.
 
-LIVE FIX APPLIED (AAT workspace 3fd85e9d-…):
+LIVE FIX APPLIED (AAT workspace <workspace-id>):
 1. `POST /api/DataTypes/attribute/cfa383c7-…(AAT_SearchReport)` with a `hits` list attr
    pointing at `f675610e…(AAT_SearchHit)` → this set
    `AAT_SearchHit.parentIds = ["cfa383c7-…"]` and recompiled the model.

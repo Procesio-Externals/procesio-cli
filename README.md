@@ -41,7 +41,9 @@ Windows Credential Manager, the macOS login Keychain, or the Linux desktop keyri
 all under the name `agents-and-tools:procesio:<secret>`.
 
 PROCESIO accepts two ways of authenticating, and they are not equivalent. Store either
-one as a named profile:
+one as a named profile. An **API key** is created in the PROCESIO web app and has two
+parts you will both need: a name/handle (its label) and a secret value (the long token) -
+copy each when you create it. A **user account** is simply your PROCESIO login.
 
 ```bash
 # Your user account. Carries everything that account can do.
@@ -53,9 +55,10 @@ python scripts/run-tool.py procesio add-credential --name qa --type apikey     -
 python scripts/run-tool.py procesio check-auth
 ```
 
-Omit `--password`, `--key` or `--value` and you are prompted without echoing, so the
-secret never reaches your shell history or a process listing. Add
-`--environment <Client>-<ENV>` to bind a profile to a specific installation.
+For an API key, `--key` is the key's name/handle and `--value` is its secret token, and
+both come from the PROCESIO UI. Omit `--password`, `--key` or `--value` and you are
+prompted without echoing, so the secret never reaches your shell history or a process
+listing. Add `--environment <Client>-<ENV>` to bind a profile to a specific installation.
 
 ### Which one to use
 

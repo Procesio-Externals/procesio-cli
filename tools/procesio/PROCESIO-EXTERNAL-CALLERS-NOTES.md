@@ -1,6 +1,6 @@
 # Calling PROCESIO from outside: Web API, Swagger, SDKs
 
-What an external app, script or Swagger session meets when it starts a process over the REST API. Verified live against Internal-PROD in 2026-10 with a workspace-scoped API key and a cookie session. Auth itself (cookie session, key handle vs label) is in [PROCESIO-AUTH-NOTES.md](PROCESIO-AUTH-NOTES.md); this file is the caller's view.
+What an external app, script or Swagger session meets when it starts a process over the REST API. Verified live against Main-PROD in 2026-10 with a workspace-scoped API key and a cookie session. Auth itself (cookie session, key handle vs label) is in [PROCESIO-AUTH-NOTES.md](PROCESIO-AUTH-NOTES.md); this file is the caller's view.
 
 ## One host: sign-in moved into the Web API
 

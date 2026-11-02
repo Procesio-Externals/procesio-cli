@@ -44,7 +44,7 @@ per-action code.
 - **edges** - `["fromId", "toId"]` (or `{from, to, Type, Config}` for branch ports).
   `start`/`stop` are reserved ids (auto-injected). Omit `edges` for a linear chain.
 
-## API contract (verified live 2026-06-24, 4Export)
+## API contract (verified live 2026-06-24)
 
 - **Validate@source:** `POST /api/Projects/validate` - empty body = valid (the oracle).
 - **Create:** `POST /api/Projects` with the `FlowRequestDto`. Returns **empty**; the
@@ -62,7 +62,7 @@ per-action code.
   ErrorDataModel variable. (Start/Stop/Join/ForEach have no error port.)
 - **Join** - `{"id":"j","action":"Join"}` converges branches (accepts many inputs);
   wire each branch into it, then `j`→stop. Pinned to the flow-control Join template.
-- **Scripting** (verified live 2026-06-29, 4Export) - inputs inject by index `<%0%>`
+- **Scripting** (verified live 2026-06-29) - inputs inject by index `<%0%>`
   (an array/object injects as a JSON literal, so `const h = <%0%>;` is valid). **A STRING
   injects as a BARE token, not a quoted literal - wrap it yourself: `const s='<%0%>';`.
   Without quotes you get `const s=SDSDX0GM6L;` → ReferenceError → the Node returns null

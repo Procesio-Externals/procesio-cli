@@ -27,7 +27,7 @@
   async function open() {
     const body = el("div");
     shell("PROCESIO environments",
-      "An environment is one PROCESIO installation (<Client>-<ENV>) with its own hosts and credentials. Switching the default moves every action - and the credential bound to it - onto that installation. Unbound credentials stay on Internal-PROD.",
+      "An environment is one PROCESIO installation (<Client>-<ENV>) with its own hosts and credentials. Switching the default moves every action - and the credential bound to it - onto that installation. Unbound credentials stay on Main-PROD.",
       body, [el("button", { class: "btn ghost", onclick: closeModal }, "Close")]);
     await render(body);
   }
@@ -154,7 +154,7 @@
           el("span", { class: "dot " + (isDef ? "green" : "amber") }),
           " " + p.name + (isDef ? " (default)" : ""),
           el("span", { class: "meta", style: "margin-left:8px" },
-            (p.type || "") + " · " + (p.environment || "Internal-PROD")
+            (p.type || "") + " · " + (p.environment || "Main-PROD")
             + (p.workspace ? " · " + p.workspace : ""))),
         controls));
     });

@@ -82,7 +82,7 @@ TRIG = {
     "run a SQL Server query": "rulează o interogare SQL Server",
     "run a procesio process": "rulează un proces procesio",
     "run procesio against QA / DEV / staging / a client installation": "rulează procesio pe QA / DEV / staging / o instalare de client",
-    "switch procesio environment / work on PROCESIO Internal-QA / Internal-DEV / a client env": "schimbă mediul procesio / lucrează pe PROCESIO Internal-QA / Internal-DEV / un mediu de client",
+    "switch procesio environment / work on PROCESIO Main-QA / Main-DEV / a client env": "schimbă mediul procesio / lucrează pe PROCESIO Main-QA / Main-DEV / un mediu de client",
     "test / verify a procesio process or resource": "testează / verifică un proces sau o resursă procesio",
     "test a credential connection / test a custom action": "testează o conexiune de credential / testează un custom action",
     "trigger procesio flow": "declanșează un flux procesio",

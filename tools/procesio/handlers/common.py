@@ -80,8 +80,8 @@ def add_profile_arg(p: argparse.ArgumentParser) -> None:
     )
     p.add_argument(
         "--environment", dest="environment",
-        help="PROCESIO environment for this call, e.g. Internal-QA (defaults to the "
-             "credential's binding, else the default environment / Internal-PROD)",
+        help="PROCESIO environment for this call, e.g. Main-QA (defaults to the "
+             "credential's binding, else the default environment / Main-PROD)",
     )
 
 

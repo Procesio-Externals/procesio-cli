@@ -34,10 +34,10 @@ def _add_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--client-id", dest="client_id",
                    help="userpass: override client_id (default procesio-ui)")
     # environment binding: which PROCESIO installation this credential authenticates
-    # against. Its host URLs come from that environment; unbound == Internal-PROD.
+    # against. Its host URLs come from that environment; unbound == Main-PROD.
     p.add_argument("--environment", dest="environment",
-                   help="bind this credential to an environment, e.g. Internal-QA "
-                        "(default: Internal-PROD). Add a client env first with add-environment.")
+                   help="bind this credential to an environment, e.g. Main-QA "
+                        "(default: Main-PROD). Add a client env first with add-environment.")
     # shared optional base overrides (rare — normally the environment supplies these)
     p.add_argument("--web-base", dest="web_base", help="override Web API base URL")
     p.add_argument("--auth-base", dest="auth_base", help="override Proxy API base URL")
@@ -126,7 +126,7 @@ def list_credentials(_args) -> dict:
         blob = profiles.get_profile(name)
         view = profiles.public_view(blob, name)
         view["is_default"] = (name == default)
-        # An unbound credential belongs to Internal-PROD (backward-compatible).
+        # An unbound credential belongs to Main-PROD (backward-compatible).
         view["environment"] = blob.get("environment") or environments.DEFAULT_ENV_NAME
         out.append(view)
     return {

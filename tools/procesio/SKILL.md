@@ -5,7 +5,7 @@ description: 'PROCESIO low-code automation platform (procesio.app/.com). Full 1:
 
 # procesio
 
-PROCESIO low-code automation platform (procesio.app/.com). Full 1:1 coverage of the Web API: every endpoint is an action (<method>-<path> names) plus ergonomic shortcuts, a generic `request`, and an `export` (.procesio Transport). Dual auth (API key per-workspace, or username/password cookie session) with a multi-credential profile store; --profile picks the account/key, --workspace-id sets the active workspace. Multi-environment: named <Client>-<ENV> environments (Internal-PROD/QA/DEV built in, client envs added at runtime) each carry their own host URLs and bound credentials; switch the default with set-environment or per-call with --environment (unbound credentials stay on Internal-PROD).
+PROCESIO low-code automation platform (procesio.app/.com). Full 1:1 coverage of the Web API: every endpoint is an action (<method>-<path> names) plus ergonomic shortcuts, a generic `request`, and an `export` (.procesio Transport). Dual auth (API key per-workspace, or username/password cookie session) with a multi-credential profile store; --profile picks the account/key, --workspace-id sets the active workspace. Multi-environment: named <Client>-<ENV> environments (Main-PROD/QA/DEV built in, client envs added at runtime) each carry their own host URLs and bound credentials; switch the default with set-environment or per-call with --environment (unbound credentials stay on Main-PROD).
 
 ## How to call it
 
@@ -401,7 +401,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `node-delete` | `--id`, `--node` | Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) ->… |
 | `node-insert` | `--id`, `--after`, `--action` | Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor's successor and the anchor is repointed at… |
 | `node-params` | `--id` | List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only). |
-| `node-repair-designer` | `--id` | Repair a live process the designer cannot open (blank canvas, the instance view will not draw): rebuild customData.configuration for every node that has none… |
+| `node-repair-designer` | `--id` | Repair a live process the designer cannot open (blank canvas, instance view will not draw): rebuild customData.configuration for every node that has none from… |
 | `node-replace-text` | `--id`, `--node`, `--find`, `--replace` | Replace an EXACT literal in every string leaf of a node's runtime parameters AND designer settings on a live process - the safe way to reach a value nested… |
 | `node-set-error-port` | `--id`, `--node` | Wire ONE node's error port to a handler action on a live process, so a fault routes instead of killing the run. Writes all THREE parts the engine needs (the… |
 | `node-set-param` | `--id`, `--node`, `--property` | Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime… |
@@ -616,7 +616,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | action | required args | what it does |
 |---|---|---|
 | `set-default` | `--name` | Set the default profile used when --profile is omitted. |
-| `set-environment` | `--name` | Switch the default environment (e.g. to Internal-QA); persists the choice. |
+| `set-environment` | `--name` | Switch the default environment (e.g. to Main-QA); persists the choice. |
 | `set-schedule-notifications` | `--payload` | Set a schedule's notifications (POST /api/Schedules/notifications) from a JSON --payload. |
 | `set-schedule-status` | `--id`, `--active` | Enable/disable a schedule (PATCH /api/Schedules/{id}/status --active true|false). |
 

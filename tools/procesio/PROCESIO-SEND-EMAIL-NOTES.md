@@ -3,7 +3,7 @@
 How a PROCESIO **Send Email** action node sends an email with a **file
 attachment** and a **dynamic (variable) recipient**. Verified against both the
 offline `.procesio` export and the live `GET /api/Actions?getFullAction=true`
-catalog for workspace `3fd85e9d-121e-415b-877f-f488cd685ce3`.
+catalog for workspace `<workspace-id>`.
 
 **Reference flow (real, working):**
 `tools/procesio/docs_info/Exports/export_POSF_PROCESIO.procesio` ->
