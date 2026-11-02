@@ -1,0 +1,129 @@
+/* =====================================================================================
+   PROCESIO form kit, styles for what core.js and effects.js mount. Neutral on purpose:
+   set the --kit-* tokens to the form's brand, here or on .kit-ui and the scroller.
+   ===================================================================================== */
+
+/* tokens: declared on the scroller AND on every runtime-mounted root, because a node mounted
+   on <body> sits outside the form card */
+.form-builder-view--content, .kit-ui {
+  --kit-bg: #0f2433;
+  --kit-primary: #1f6f8b;
+  --kit-accent: #2fa89a;
+  --kit-ink: #14303e;
+  --kit-text: #3f5f6d;
+  --kit-muted: #7a939e;
+  --kit-line: rgba(20, 48, 62, .14);
+  --kit-soft: rgba(20, 48, 62, .05);
+  --kit-ring: rgba(47, 168, 154, .3);
+  --kit-ok: #4c9f38;
+  --kit-warn: #d99a2b;
+  --kit-danger: #cf5238;
+  --kit-ease: cubic-bezier(.22, 1, .36, 1);
+  --kit-spring: cubic-bezier(.34, 1.56, .64, 1);
+  --kit-fast: 160ms;
+  --kit-mid: 320ms;
+  --kit-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+  --kit-top: 16px;   /* the height of your header, if you mount one */
+}
+
+/* where FX.attach puts its button when the form has no header of its own */
+.kit-bar { position: fixed; top: 12px; right: 12px; z-index: 999999; display: flex; gap: 8px; }
+
+/* ---------- toasts ---------- */
+.kit-toasts { position: fixed; top: calc(var(--kit-top) + 14px); right: 16px; z-index: 1000000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+.kit-toast {
+  display: flex; align-items: flex-start; gap: 12px;
+  width: min(380px, calc(100vw - 32px));
+  padding: 14px 16px; border-radius: 16px; box-sizing: border-box;
+  background: #fff; color: var(--kit-ink);
+  border: 1px solid var(--kit-line);
+  box-shadow: 0 18px 44px rgba(0, 20, 28, .28);
+  font: 600 14px/1.45 var(--kit-font);
+  pointer-events: auto;
+  transform: translateX(120%); opacity: 0;
+  transition: transform 460ms var(--kit-spring), opacity 300ms ease;
+}
+.kit-toast.is-in { transform: none; opacity: 1; }
+.kit-toast__ico { flex: 0 0 26px; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--kit-primary); color: #fff; font-weight: 800; }
+.kit-toast--warn .kit-toast__ico { background: var(--kit-warn); }
+.kit-toast--err .kit-toast__ico { background: var(--kit-danger); }
+.kit-toast--ok .kit-toast__ico { background: var(--kit-ok); }
+
+/* ---------- blur off: give every surface that used backdrop-filter a more opaque tint ---------- */
+html[data-kit-fx-blur="0"] .kit-ui,
+html[data-kit-fx-blur="0"] .kit-ui *,
+html[data-kit-fx-blur="0"] .form-builder-view--content * {
+  -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+}
+
+/* ---------- the header button ---------- */
+.kit-fx-btn {
+  position: relative; flex: 0 0 auto;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 38px; margin: 0; padding: 0; border-radius: 999px; cursor: pointer;
+  background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14);
+  color: #fff; font: inherit;
+  transition: background var(--kit-mid) var(--kit-ease), transform var(--kit-fast) var(--kit-ease);
+}
+.kit-fx-btn svg { width: 18px; height: 18px; }
+.kit-fx-btn:hover, .kit-fx-btn:focus-visible, .kit-fx-btn[aria-expanded="true"] { background: rgba(255, 255, 255, .18); outline: none; }
+.kit-fx-btn:focus-visible { box-shadow: 0 0 0 3px var(--kit-ring); }
+/* a small amber mark while effects are reduced, so the viewer knows there is more */
+.kit-fx-btn.is-reduced::after {
+  content: ""; position: absolute; top: 5px; right: 5px; width: 8px; height: 8px; border-radius: 50%;
+  background: #e3a13a; box-shadow: 0 0 0 2px var(--kit-bg);
+}
+
+/* ---------- the panel ---------- */
+.kit-fx {
+  position: fixed; z-index: 1000001; width: 340px; max-width: calc(100vw - 24px); box-sizing: border-box;
+  padding: 14px 16px 12px; border-radius: 20px;
+  background: linear-gradient(165deg, #ffffff 0%, #f1f8fa 100%);
+  border: 1px solid var(--kit-line);
+  box-shadow: 0 30px 70px rgba(0, 20, 28, .4), 0 4px 14px rgba(0, 20, 28, .14);
+  font-family: var(--kit-font); color: var(--kit-ink); text-align: left;
+  opacity: 0; transform: translateY(-6px);
+  transition: opacity 180ms ease, transform 220ms var(--kit-ease);
+}
+.kit-fx[hidden] { display: none !important; }
+.kit-fx.is-in { opacity: 1; transform: none; }
+.kit-fx__head { display: flex; align-items: center; justify-content: space-between; margin: 0 0 6px; }
+.kit-fx__head b { font: 800 15px/1.2 var(--kit-font); color: var(--kit-ink); letter-spacing: .2px; }
+.kit-fx__x {
+  width: 30px; height: 30px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  font: 400 22px/1 var(--kit-font); color: var(--kit-muted);
+}
+.kit-fx__x:hover, .kit-fx__x:focus-visible { background: var(--kit-soft); color: var(--kit-ink); outline: none; }
+.kit-fx__row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; cursor: pointer; }
+.kit-fx__txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kit-fx__txt b { font: 700 13.5px/1.25 var(--kit-font); color: var(--kit-ink); }
+.kit-fx__txt small { font: 500 12px/1.35 var(--kit-font); color: var(--kit-text); }
+.kit-fx__row input { position: absolute; opacity: 0; width: 1px; height: 1px; margin: 0; pointer-events: none; }
+.kit-fx__sw {
+  position: relative; flex: 0 0 auto; width: 40px; height: 24px; border-radius: 999px;
+  background: #c9d6db; transition: background 180ms ease;
+}
+.kit-fx__sw::after {
+  content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px rgba(0, 30, 40, .3);
+  transition: transform 200ms var(--kit-ease);
+}
+.kit-fx__row input:checked + .kit-fx__sw { background: var(--kit-primary); }
+.kit-fx__row input:checked + .kit-fx__sw::after { transform: translateX(16px); }
+.kit-fx__row input:focus-visible + .kit-fx__sw { box-shadow: 0 0 0 3px var(--kit-ring); }
+.kit-fx__row--auto input:checked + .kit-fx__sw { background: var(--kit-accent); }
+.kit-fx__sep { height: 1px; margin: 4px 0; background: var(--kit-line); }
+.kit-fx__sub { margin: 0 0 0 12px; padding-left: 12px; border-left: 2px solid var(--kit-line); }
+.kit-fx__sub .kit-fx__row { padding: 7px 0; }
+.kit-fx.is-off .kit-fx__sub { opacity: .55; }
+.kit-fx__note {
+  margin: 8px 0 0; padding: 9px 11px; border-radius: 12px;
+  background: var(--kit-soft); font: 500 12px/1.4 var(--kit-font); color: var(--kit-text);
+}
+.kit-fx__note:empty { display: none; }
+
+@media (max-width: 760px) {
+  .kit-fx-btn { width: 34px; height: 34px; }
+  .kit-fx { left: 12px; right: 12px !important; width: auto; }
+}

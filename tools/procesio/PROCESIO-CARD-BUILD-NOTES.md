@@ -1,4 +1,4 @@
-# Building a PROCESIO card end to end — findings from the build loop
+# Building a PROCESIO card end to end - findings from the build loop
 
 Mechanics learned while shipping a two-process card with forms, a scripted engine and an
 oracle-checked acceptance pass. These are the things that cost time and were not already
@@ -14,7 +14,7 @@ product re-introduces the float error the minor-unit rule exists to remove.
 
 A default factor times a country multiplier is the canonical case: `11.2 * 1.15` evaluates
 to `12.879999999999999`, and any downstream exact-equality assertion then fails on a figure
-that is arithmetically right. Give the multiplier its own scale — **basis points, x10000** —
+that is arithmetically right. Give the multiplier its own scale - **basis points, x10000** - 
 and do the multiply as integers with a rounded integer divide:
 
 ```js
@@ -36,7 +36,7 @@ into a real newline by an intervening shell, heredoc, or quoting layer. The resu
 literal that ends mid-string, and the failure surfaces as `SyntaxError: unexpected end of
 string` at a line number that looks unrelated to the edit.
 
-**Rule:** write the generator as a **file** and execute the file — never pipe the generator
+**Rule:** write the generator as a **file** and execute the file - never pipe the generator
 source through a shell heredoc. Inside the generator, represent the escape as a token and
 substitute it at write time, so no layer can interpret it:
 
@@ -53,11 +53,11 @@ newlines inside string literals**, which a grep for the escape sequence confirms
 
 A `datetime-input` bound to a string process variable does not necessarily deliver
 `YYYY-MM-DD`. Given an ISO default it can render and submit a localised display value
-(`"1 July 2026, 04:00"` — note the time, which is a timezone offset applied to midnight).
+(`"1 July 2026, 04:00"` - note the time, which is a timezone offset applied to midnight).
 An engine that validates `^\d{4}-\d{2}-\d{2}$` then rejects a period the user set correctly.
 
 Normalise defensively at the top of the engine: accept an ISO date, an ISO datetime, the
-`DD/MM/YYYY` display form, and fall back to date parsing for anything else — reading the
+`DD/MM/YYYY` display form, and fall back to date parsing for anything else - reading the
 result back in **UTC**, so an offset cannot shift the day across a period boundary. Keep a
 clear fatal for what still will not parse, quoting the raw value.
 
@@ -77,8 +77,8 @@ sees zero variables from the other and reports a clean pass over nothing.
 
 In the built form DTO, an `inputMap` / `outputMap` row is `{id, left, right}`:
 
-- `left` — the **process variable GUID**
-- `right` — the **form value path**, `formId.FIELDS_NS.elementId.valueConfigId`
+- `left` - the **process variable GUID**
+- `right` - the **form value path**, `formId.FIELDS_NS.elementId.valueConfigId`
 
 A row whose `right` is still a raw field **name** is accepted by the API, renders blank in
 the designer, and never carries a value. Assert `right.split(".")` has **exactly four**
@@ -89,7 +89,7 @@ only the DTO, and catches the whole class before a single run.
 ## 6. A file output and a JSON output look identical in a run result
 
 In `run-process-with-file` output, a File variable arrives as an object
-(`{id, name, mimeType, size, path, hash}`) — and so does a `json` machine-channel variable.
+(`{id, name, mimeType, size, path, hash}`) - and so does a `json` machine-channel variable.
 "Count the object-valued outputs" is therefore not a way to count produced artefacts, and an
 assertion written that way fails the moment a structured output is added. Assert the file
 variables **by name**, and check `size` is present and non-zero.
@@ -102,7 +102,7 @@ pair, on the reasoning that the worst a stylesheet can do is look wrong. That is
 failure mode.
 
 If the public renderer cannot decrypt the blob it throws **`Malformed UTF-8 data`** out of
-`FormWrapper.component` and **never mounts the form at all** — a spinner forever, every
+`FormWrapper.component` and **never mounts the form at all** - a spinner forever, every
 control gone, the page unusable. Not "unstyled": absent. A form created with `code: ""`
 renders perfectly; the same form with a `css` string can be dead on arrival, so this is
 easy to introduce while believing you took the cautious option.
@@ -123,7 +123,7 @@ set on a textarea resolves on `.pds-c-input-group--wrapper` at runtime. But the 
 system paints that wrapper's `background-color` from its own rule, so the variable is
 plumbed and ignored, and the pane stays white. Colour vars must reference a theme variable
 rather than a hex, so redefining a neutral in `theme` and pointing the element style at it
-is the legal path — it just will not repaint a surface the design system hard-codes. Verify
+is the legal path - it just will not repaint a surface the design system hard-codes. Verify
 the computed `background-color`, not the custom property, before believing a colour landed.
 
 ## 8. Prove the engine off-platform, in a real JS engine
@@ -149,19 +149,19 @@ claims, and only the second one is worth making.
 ## 9. Assembling a file-in / file-out card through the builder (the renderer wiring)
 
 A reconciliation-style card is `File(s) in -> engine -> report renderers -> File(s) out`. Every
-piece is a native action the **compact builder can wire by property label** — you do not splice
+piece is a native action the **compact builder can wire by property label** - you do not splice
 raw DTO. The labels (from the live action catalog `configuration[].settings[]`, which the builder's
 `_property_index` reads, recursing into `side-pannel` nested `value` lists):
 
-- **File To Base64** — `File` (input file var) → `Base64 Content` (output string var).
-- **String To Base64** — `Input String` (input) → `Result` (output string var).
-- **HTML To PDF** — a **side-panel** `Configure` holding `HTML string` (the HTML var), `File Name`
+- **File To Base64** - `File` (input file var) → `Base64 Content` (output string var).
+- **String To Base64** - `Input String` (input) → `Result` (output string var).
+- **HTML To PDF** - a **side-panel** `Configure` holding `HTML string` (the HTML var), `File Name`
   (a literal, e.g. `Bank-Reconciliation.pdf`) and `File Output` (the output File var).
-- **Base64 To File** — `Base64 String` (the base64 var), `File Name` (a literal) and `File` (the
+- **Base64 To File** - `Base64 String` (the base64 var), `File Name` (a literal) and `File` (the
   output File var).
 
 ⚠ **A File variable is declared with `model:<File datatype GUID 10c6ac59-…-121212121219>`, NOT
-`type:"file"`** — the process-create schema's `type` enum has no `file` (it 400s: "'file' is not one
+`type:"file"`** - the process-create schema's `type` enum has no `file` (it 400s: "'file' is not one
 of [...]"). Same pattern as a Guid var (`model:<Guid GUID>`). The engine and the report builders are
 ordinary `Node` actions (`Code:{template,vars}`); a downstream Node reads an upstream Node's output
 by binding that output var as its input (`vars:["recon"]`). A linear `edges` chain is enough;
@@ -171,13 +171,13 @@ Start/Stop auto-inject.
 StatementFile=stmt.csv --file LedgerFile=ledg.csv --payload '{...non-file inputs...}'` publishes →
 uploads bytes → launches → polls. The File outputs arrive as objects `{id,name,path,size,hash}`;
 `file-download --from-run <result.json> --var ExcelFile --out out.xlsx` fetches one. Judge on
-opening the file (openpyxl sheets + values; the `%PDF-` magic), never on status 50 — a clean 50
+opening the file (openpyxl sheets + values; the `%PDF-` magic), never on status 50 - a clean 50
 returning a null File is this platform's failure signature (Rule 8).
 
 **Cross-workspace import is CONDITIONAL, not absolute.** The API-NOTES record `Transport/import`
 answering `403 "workspace migration"`; that is the RELOCATION case. `import --file <pack>
 --workspace-id <clean-different-ws>` into a workspace where the ids do not already exist **succeeds**
-(measured: PL-120 B-022, PL-004 B-023) and preserves the flow id — so the round-trip proof (import
+(measured: PL-120 B-022, PL-004 B-023) and preserves the flow id - so the round-trip proof (import
 into a clean different ws, run there, judge on the produced files) is achievable over the API for a
 process-bearing pack. Forms still need the designer (a form-bearing pack is not API-installable);
 the process is the marketplace artefact, the intake form is the designer front door.

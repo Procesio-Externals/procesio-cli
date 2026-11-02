@@ -1,7 +1,7 @@
-# PROCESIO — Node `Code` interpolation safety, and the credential-free run-history actions
+# PROCESIO - Node `Code` interpolation safety, and the credential-free run-history actions
 
 Two hard-won build facts, generalized. Keep the specifics (datatype ids, action names,
-param shapes) — they are the knowledge, not incidental to one case.
+param shapes) - they are the knowledge, not incidental to one case.
 
 ## 1. `<%N%>` substitution into a Node's `Code` is TEXT substitution, and only an OBJECT value is safe
 
@@ -15,7 +15,7 @@ each):
 |---|---|---|
 | bare `const v = <%0%>;` | raw text → syntax error (the node fails) | unusable for strings |
 | double-quote `const v = "<%0%>";` | a `"` in the value closes the string → syntax error | UNSAFE |
-| **backtick `` const v = `<%0%>`; ``** | **`${…}` EXECUTES** (`${(6*7)}`→42); a backtick breaks the script | **UNSAFE — code injection** |
+| **backtick `` const v = `<%0%>`; ``** | **`${…}` EXECUTES** (`${(6*7)}`→42); a backtick breaks the script | **UNSAFE - code injection** |
 | **Object/Json datatype, bare `const o = <%0%>;` then read `o.field`** | JSON-encoded by the platform → the value is a proper JS literal, everything escaped | **SAFE** |
 
 **So: a `"type":"string"` input spliced into a Code template is the injection signature.**
@@ -37,27 +37,27 @@ unchanged, so a deterministic output stays byte-identical.
 ⚠ **A null-valued injection is itself a defect.** When a bound variable is **null** at run
 time, `<%N%>` substitutes **empty text**: `const v = <%N%> || x;` becomes `const v = || x;`
 → SyntaxError, which the platform **captures** (the instance still finishes status 50) and
-the node's output is null — a silent failure. Any `<%N%>` whose variable can be null
+the node's output is null - a silent failure. Any `<%N%>` whose variable can be null
 (an optional output var, a file descriptor set on only one branch) must be written
-**`[<%N%>][0]`** — `[][0]` = `undefined` on a null injection, `[value][0]` = value
+**`[<%N%>][0]`** - `[][0]` = `undefined` on a null injection, `[value][0]` = value
 otherwise. Read a node's error variable to catch this (`"Unexpected token '||'"` /
 `"Unexpected token ';'"`).
 
 ## 2. A process can read its own workspace's run history in-flow, with NO credential
 
 Three `isProcesioAction` built-ins carry **zero credential parameters** (the Call API v1/v2/v3
-path needs a bound REST credential, which does not travel with a pack — avoid it):
+path needs a bound REST credential, which does not travel with a pack - avoid it):
 
-- **Get Recent Instances** (`actionId cf514e01-…`) — inputs `Page Number` + `Page Item Count`
+- **Get Recent Instances** (`actionId cf514e01-…`) - inputs `Page Number` + `Page Item Count`
   (required Integers; 0 = all), optional `Select Process` (flow-list) / `Process Template Id`
   / `Status type`; outputs `Result` and `Total Count`. ⚠ `Result` comes back as a **LIST of
-  run rows** (`{Id, Status, UpdatedOn}`, PascalCase), **carrying NO variable values** — the
+  run rows** (`{Id, Status, UpdatedOn}`, PascalCase), **carrying NO variable values** - the
   outcome is per-instance. Read `Total Count`, not the row count (a short page reads like a
   stable total).
-- **Count Recent Instances** — outputs `Process Instances Count` (Integer); optional process-id
+- **Count Recent Instances** - outputs `Process Instances Count` (Integer); optional process-id
   list (empty = whole workspace) + `Status type`.
-- **Get Instance Outputs** (`actionId 98ab31ca-…`) — the per-run outcome. Needs `Select Process`
-  (flow-list = the target process id), **`InstanceId` (Guid datatype, NOT String — a String
+- **Get Instance Outputs** (`actionId 98ab31ca-…`) - the per-run outcome. Needs `Select Process`
+  (flow-list = the target process id), **`InstanceId` (Guid datatype, NOT String - a String
   var is rejected on save)**, and an `Output Variables` **process-outputs** mapping (the
   selected process's output var → a local var). It wraps `GET /api/Projects/instances/{id}/output`.
 
@@ -68,7 +68,7 @@ var. Express `Get Instance Outputs` with a `subprocess` key:
 "subprocess":{"target":<pid>,"outputs":{"localVar":<subOutputVarId>}}}`, and type the
 `InstanceId` var as the Guid datatype via the builder's `"model":"0317bfee-b2f5-4bde-bfe8-121212121222"`
 escape hatch. This lets a form → process → native-actions topology list runs, count them,
-and show each run's summary with **no store, no credential, no foreign binding** — the
+and show each run's summary with **no store, no credential, no foreign binding** - the
 property a distributable pack needs. The card's side of the contract is one deliberate
 OUTPUT-oriented variable (orientation 30) carrying the summary; `/status?getVariables`
 returns its value in `defaultValue` and `/output` at `result.instance.variable[<name>]`
@@ -79,21 +79,21 @@ returns its value in `defaultValue` and `/output` at `result.instance.variable[<
 ⚠ **A Node action carries the `Code` TWICE in the persisted flow**, and an in-place edit that touches
 only one ships a stale card. The two copies (confirmed on a live store-write card, 2026-09-02):
 
-- **`Flows[i].Actions[j].Parameters[k].Value`** — the RUNTIME copy. This is what the engine executes.
-- **`Flows[i].Actions[j].CustomData.configuration[*].settings[*].value`** — the DESIGNER-layer copy
+- **`Flows[i].Actions[j].Parameters[k].Value`** - the RUNTIME copy. This is what the engine executes.
+- **`Flows[i].Actions[j].CustomData.configuration[*].settings[*].value`** - the DESIGNER-layer copy
   (the "Code" setting the designer shows and re-materialises from).
 
 **Why it bites.** A binding-driven / spliced `put-projects` that rewrites only the runtime parameter
 (e.g. to push a corrected engine body) leaves the customData copy STALE. Consequences: (1) the standing
 card RUNS correctly (runtime wins at execution), so a happy-path run looks fine and hides the drift;
-(2) **`export` serialises the customData copy**, so the exported pack carries the OLD body — a handover
+(2) **`export` serialises the customData copy**, so the exported pack carries the OLD body - a handover
 pack that imports a stale card even though the source card ran the new one; (3) any designer re-save can
 re-materialise the runtime FROM the stale customData, silently reverting your fix.
 
 **The discipline.** When you edit a Node's `Code` on a live flow, replace it in **both** places, then
 read the flow back and assert BOTH carry the new body (grep a marker that only the new body has, and a
 marker only the old one had, on the runtime `Value` AND every `customData…settings…value`). Only then is
-the card — and its export — actually on the new code. This is the specific, mechanical form of the
+the card - and its export - actually on the new code. This is the specific, mechanical form of the
 "read back, don't trust the write" rule (a `put:true` / HTTP 200 is not evidence the body changed, and it
 is certainly not evidence that BOTH copies changed). A full rebuild through `process-create` regenerates
 customData from the config and so avoids the split, but changes the flow id; editing in place (to keep a
@@ -101,7 +101,7 @@ standing card's id) is exactly when you must fix both copies.
 
 ## 4. A Node's `Code` can contain literal control characters, which `argv`-based editing cannot carry
 
-A Node body is stored as a plain string field, so it can hold **literal control characters** — in
+A Node body is stored as a plain string field, so it can hold **literal control characters** - in
 practice `\x00`, used as a composite-key separator because it cannot collide with real data:
 
 ```js
@@ -114,7 +114,7 @@ as a space. Two consequences for anyone editing a live body:
 - **`node-replace-text` (and any tool that shells out) fails if `--find` or `--replace` contains one.**
   Python's `subprocess` raises `ValueError: embedded null character` and rejects the *whole* command,
   so the error names no argument and points nowhere near the line responsible. `grep` likewise reports
-  `Binary file … matches` and prints nothing — pass `-a` to search a captured body.
+  `Binary file … matches` and prints nothing - pass `-a` to search a captured body.
 - **Never retype such a line.** Copying it by hand substitutes a space, and the code still runs: keys
   simply stop matching, with no error at any layer.
 
@@ -122,19 +122,19 @@ Editing around it, in order of preference:
 
 1. **Anchor on a NUL-free line.** Pick the nearest unique neighbouring line and insert before or after
    it, instead of rewriting the line that carries the separator.
-2. **Write the separator as a source-level escape** — `"\u0000"` — so the argument you pass is entirely
+2. **Write the separator as a source-level escape** - `"\u0000"` - so the argument you pass is entirely
    printable while the running code still builds the byte-identical key.
 3. **Locate them before choosing an anchor**: capture the body (`node-params`), then print every line
    where `'\x00' in line`. Do this first; it costs one read and removes the whole failure mode.
 
 Corollary for the code itself: keep per-record state **on the record object** (`obj._budget = …`)
-rather than in a side map keyed by the composite key — then no key has to be constructed, or typed,
+rather than in a side map keyed by the composite key - then no key has to be constructed, or typed,
 at all.
 
 As always, the edit must land on BOTH copies (§3): a NUL-free anchor is what makes `--expect 2`
 usable here.
 
-## 5. A `<%N%>` in your `--find` matches the RUNTIME layer only — expect 1, not 2
+## 5. A `<%N%>` in your `--find` matches the RUNTIME layer only - expect 1, not 2
 
 §3 says an in-place `Code` edit must reach both copies. That is still true, but the expected hit
 count is **not always two**, and getting it wrong looks like a successful edit that never happened.
@@ -143,11 +143,11 @@ The two layers store placeholders differently:
 
 | layer | path | how a bound variable appears |
 |---|---|---|
-| runtime | `parameters[…].value` | `var f = <%6%>;` — positional placeholder |
-| designer | `customData.configuration[…].settings[…].value` | `var f = 6161830e-…;` — the variable's **GUID** |
+| runtime | `parameters[…].value` | `var f = <%6%>;` - positional placeholder |
+| designer | `customData.configuration[…].settings[…].value` | `var f = 6161830e-…;` - the variable's **GUID** |
 
 So a `--find` that contains `<%N%>` can only ever match the runtime layer: `--expect 2` fails the
-assertion and — correctly — **writes nothing**. A find whose text has no placeholder matches both
+assertion and - correctly - **writes nothing**. A find whose text has no placeholder matches both
 and gives the familiar `replacements=2 leaves=2`.
 
 - Placeholder in the find → `--expect 1` (plus `--allow-binding-change`, which the tool demands
@@ -156,44 +156,44 @@ and gives the familiar `replacements=2 leaves=2`.
 
 After a runtime-layer hit the tool **regenerates the designer layer from runtime**, translating each
 `<%N%>` back to its variable GUID, so both copies end up consistent from the single edit. Read back
-and confirm that rather than assuming it — the check costs one call and is the whole of §3.
+and confirm that rather than assuming it - the check costs one call and is the whole of §3.
 
 **A mismatched `--expect` reports the hit count it found, not an error.** Print the `put` field, not
 just `replacements`: `put: false` is the difference between "edited" and "declined to edit".
 
 **Never spell `<%N%>` out in prose inside the body.** Substitution is textual and does not respect
-comments, so a placeholder written in a `/* … */` explanation is injected like any other occurrence —
+comments, so a placeholder written in a `/* … */` explanation is injected like any other occurrence - 
 it changes the binding footprint and can drop a value into the middle of your comment.
 
-## 6. Clearing `isRequired` does not make a File input optional — a native File action rejects null
+## 6. Clearing `isRequired` does not make a File input optional - a native File action rejects null
 
 Making a File input genuinely optional takes **two** changes, and the flag is the lesser one.
 
 1. **The Code node** must survive the absent value. A bare raw placeholder on the right of an
-   assignment (`var f = <%6%>;`) becomes `var f = ;` — a SyntaxError that kills the node before any
+   assignment (`var f = <%6%>;`) becomes `var f = ;` - a SyntaxError that kills the node before any
    of its own diagnostics can run. Guard it as `[<%6%>][0]`, which yields `undefined` when absent and
-   the object when present. (Quoted placeholders — `"<%1%>"` — are already safe: they collapse to `""`.)
+   the object when present. (Quoted placeholders - `"<%1%>"` - are already safe: they collapse to `""`.)
 2. **Every upstream native action that consumes the file** must be branched around. A native
-   `File To Base64` fails the whole run with `Input file can't be null.` (status 40) — it has no
+   `File To Base64` fails the whole run with `Input file can't be null.` (status 40) - it has no
    tolerant mode and no parameter that changes this. Clearing `isRequired` on its own therefore
    converts a form that *blocks* the user into a run that *crashes* on them, which is strictly worse.
 
-So the structural fix is a branch — a Decisional on "is the file null", with the encode on one leg
-and an empty-string assignment to the base64 variable on the other — added via `process-edit`'s
+So the structural fix is a branch - a Decisional on "is the file null", with the encode on one leg
+and an empty-string assignment to the base64 variable on the other - added via `process-edit`'s
 desired-state config (there is no `node-add`). Until that branch exists, **leave the flag required**:
 a required input is an honest constraint, an optional one that hard-fails is a defect.
 
 Generalises to any native action that takes a File: test the absent case before you advertise the
 input as optional.
 
-## 7. `validate` does NOT parse the Node body — syntax-check it yourself
+## 7. `validate` does NOT parse the Node body - syntax-check it yourself
 
 `node-replace-text` validates and flow-lints before it PUTs, and it will report `isValid: true` for a
 body containing a **syntax error**. The platform validator checks the flow graph and parameter
 shapes; it never parses the JavaScript. So a missing brace sails through validate, through the PUT,
 and through publish.
 
-At run time the node does not throw a catchable error — the body fails to compile, so the node's own
+At run time the node does not throw a catchable error - the body fails to compile, so the node's own
 top-level `try { OUT = run(); } catch` never executes and the node returns **null**. What you see is
 a downstream failure with a misleading message:
 
@@ -238,7 +238,7 @@ across the FIND and the REPLACE and require the deltas to match before writing.
 ## 8. Inserting an action into a live flow: two edits, and a casing trap
 
 `node-insert` exists now. Two things make a hand-rolled version go wrong, and both fail *silently*
-— the flow still validates.
+ - the flow still validates.
 
 **Ports live on the SOURCE action.** An edge is `{sourceId, destinationId}` stored on the node it
 leaves. So inserting X between A and B is two edits, not one: give X a port to B, then repoint A's
@@ -246,7 +246,7 @@ port at X. Do only the first and X is unreachable; do only the second and everyt
 orphaned. Neither is a validation error.
 
 **The DTO builder emits PascalCase; a live flow is camelCase.** `_action_node()` returns
-`{Id, FlowId, Ports, Parameters, CustomData}` — the CREATE shape — while `GET /api/Projects/{id}`
+`{Id, FlowId, Ports, Parameters, CustomData}` - the CREATE shape - while `GET /api/Projects/{id}`
 returns `{id, flowId, ports, parameters, customData}`. The API accepts both, so splicing one into
 the other is accepted and then renders inconsistently in the designer. Convert with
 `nodeparam.to_live_action()`, which also lowercases each `parameters` row
@@ -256,8 +256,8 @@ Refused rather than guessed: an anchor with more than one outgoing port. Which b
 belongs on is a design decision.
 
 **Related, and the reason this tool had to exist:** `process-edit` is a desired-state rebuild, so
-adding one action to a 22-node flow through it means re-expressing the whole flow — including a
-70 KB Node body — as config. `read-flow-graph` is an offline reader and does not produce that
+adding one action to a 22-node flow through it means re-expressing the whole flow - including a
+70 KB Node body - as config. `read-flow-graph` is an offline reader and does not produce that
 config, so there is no round-trip.
 
 ## A `<%N%>` placeholder is injected RAW - quote it yourself for a string
@@ -277,3 +277,46 @@ the step returns an empty result. Cost an hour on a slot generator that answered
 available" for every day. The same applies to any free text - a name with an apostrophe in it
 will end the string early, so a value that can contain quotes belongs in a JSON-serialised
 object placeholder rather than an interpolated string.
+
+## 9. A surgical edit keeps the canvas and the stored `isValid` (fixed 2026-10-27)
+
+Every `node-*` writer that patches existing nodes (`node-set-param`, `node-replace-text`,
+`node-add-binding`, `node-bind-var`, `node-delete`, `node-set-error-port`, `variable-set-type`,
+`process-rename`) saves through `_gate_and_put`. It used to run the auto-layout on the whole canvas
+(measured: every node moved by several hundred to several thousand pixels on a hand-arranged flow)
+and to stamp `isValid` with the tool's verdict, the runtime validator AND our designer-layer lint.
+Our lint is stricter than the designer's (an `Execute Query` whose output variable it considers the
+wrong type, say), so a flow the designer had saved as valid came back `isValid: false` after a code
+fix that added nothing.
+
+Now:
+- positions are never touched by these writers; `relayout-process` re-arranges a live flow on request;
+- when the edited flow has designer findings, the stored flow (still the pre-edit one) is the
+  baseline: `isValid` stays what it was unless the edit ADDED a finding. The result carries
+  `fe_preexisting` (count) and `fe_new` (the added findings). A flow stored invalid is never promoted
+  by an edit that leaves findings behind.
+
+A flow edited before this fix may still carry a moved canvas or a dropped mark: restore positions per
+action id from a pre-edit GET, and the mark with `save_flow(..., valid=<original>, layout=False)`;
+verify by diffing against the backup with positions excluded (only the edited nodes may differ).
+
+## 10. `node-add-binding` regenerates the designer copy (fixed 2026-10-26)
+
+It used to write the runtime `Code` only (§3): the new placeholder ran, but the designer copy kept the
+old body, so a designer save or an export would bring it back. The handler now normalizes the
+designer layer like `node-set-param` and `node-replace-text`. A flow edited with it before the fix
+can be repaired by re-running it with the same `--bind` and no `--find`: the binding is rewritten
+as it is and the designer copy is regenerated.
+
+## 11. A subprocess that reads a value back from the database runs before the caller has written it
+
+A caller passed a user-entered value to a document-generating subprocess as an input, and wrote the
+same value to its database row only AFTER the subprocess returned (the write needed the subprocess's
+outputs). The subprocess, built to be called from other places too, re-read the value from that row
+and overwrote its input with what it found: an empty column, every time it was called from this
+caller. The value never reached the document, and every individual step looked correct.
+
+**Rule:** when a step can get a value both from its caller and from a row, decide the order
+explicitly: the row's value when it has one, else the value passed in (or the reverse), and never
+let a read of a not-yet-written row overwrite an input. When tracing a value that "is not taken from
+the form", list every node that WRITES the variable, not only the ones that read it.

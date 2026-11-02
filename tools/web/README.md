@@ -7,7 +7,7 @@ lives behind a browser: tools like `whatsapp-personal` and the outreach agent
 call `web` whenever they need to connect to a site or do deeper web research.
 
 There is **no HTTP API** here. A small `BrowserDriver` abstraction wraps
-Playwright (imported lazily) so the tool — and its test suite — load even before
+Playwright (imported lazily) so the tool - and its test suite - load even before
 the browser binaries are installed.
 
 ## Why saved sessions
@@ -17,7 +17,7 @@ browser after a human logged in. Capture it once (`save-session`, headed) and
 every later headless run reuses that authentication.
 
 > **Sessions are SENSITIVE.** Each `tools/web/sessions/<name>.json` contains live
-> auth material — anyone with the file can act as you on that site until it
+> auth material - anyone with the file can act as you on that site until it
 > expires. They are **gitignored** (`tools/web/sessions/*.json`), never printed,
 > and never logged. `list-sessions` reports names + size + mtime only. Treat them
 > like passwords.
@@ -30,7 +30,7 @@ uv run playwright install chromium    # download the browser binary (~120 MB)
 ```
 
 If `playwright install chromium` is skipped, the tool still loads and the test
-suite still passes (Playwright is imported lazily) — but any action that opens a
+suite still passes (Playwright is imported lazily) - but any action that opens a
 real browser will fail with a `browser_error` telling you to install it.
 
 > **`browser_error: Executable doesn't exist` even after installing?** A prior
@@ -61,7 +61,7 @@ to the terminal, and press **ENTER**. The storageState is captured and written
 to `tools/web/sessions/linkedin.json`.
 
 Args: `--name` (required), `--url` (required), `--channel` (optional: `chrome`
-or `msedge` to drive a real installed browser instead of the bundled Chromium —
+or `msedge` to drive a real installed browser instead of the bundled Chromium - 
 useful when a site fingerprints the bundled build).
 
 ### list-sessions / delete-session
@@ -71,7 +71,7 @@ python scripts/run-tool.py web list-sessions
 python scripts/run-tool.py web delete-session --name linkedin
 ```
 
-### run — declarative step list
+### run - declarative step list
 
 ```powershell
 python scripts/run-tool.py web run --session linkedin --actions-file steps.json
@@ -127,7 +127,7 @@ Example `steps.json`:
 ]
 ```
 
-#### Anonymous browsing — a session with nothing in it
+#### Anonymous browsing - a session with nothing in it
 
 `run` always loads a session. For a public page that needs no login, give it an EMPTY
 storageState and it behaves as a fresh anonymous browser:
@@ -139,7 +139,7 @@ sessions.write_state("anon", {"cookies": [], "origins": []})
 
 Delete it afterwards with `web delete-session --name anon --confirm`.
 
-#### Human handoff — the agent stages, you submit
+#### Human handoff - the agent stages, you submit
 
 For anything outward-facing (Submit, Confirm, Send), the agent fills the form
 and **you** click the control. `--hold-seconds` keeps the headed browser open
@@ -157,21 +157,21 @@ as you act. The result gains a `hold` block:
 ```
 
 `reason` is `selector` | `url` | `timeout`. **An expired hold is still a
-successful run** (exit 0, `completed: false`) — the steps ran, you were just not
+successful run** (exit 0, `completed: false`) - the steps ran, you were just not
 at the desk. `--hold-seconds` requires `--headed` (usage error otherwise), and
 `completed` is advisory: confirm the outcome from `final_url` + `diagnostics`,
 never from a screenshot taken before you clicked.
 
-### get-text — convenience for research
+### get-text - convenience for research
 
 ```powershell
 python scripts/run-tool.py web get-text --session linkedin --url https://example.com --selector main --wait main
 ```
 
 `--selector` (optional) reads one element; without it, the whole page body.
-`--wait` (optional selector) is awaited first — handy for single-page apps.
+`--wait` (optional selector) is awaited first - handy for single-page apps.
 
-### page-contacts — published contacts on a public page (no browser)
+### page-contacts - published contacts on a public page (no browser)
 
 ```powershell
 python scripts/run-tool.py web page-contacts --url https://linktr.ee/someone
@@ -270,7 +270,7 @@ the most recent messages of a chat until the phone syncs history.
 ## Runtime diagnostics (verification)
 
 `run`, `get-text`, and `screenshot` results include a `diagnostics` object collected over
-the session — the observability for "verify before declaring done" (don't trust a
+the session - the observability for "verify before declaring done" (don't trust a
 screenshot alone; it hides JS errors and failed requests):
 
 ```json
@@ -284,7 +284,7 @@ screenshot alone; it hides JS errors and failed requests):
 
 Empty lists = a clean run. Any `page_errors`, `console` errors, or a 4xx/5xx on the page's
 OWN endpoints means the page is broken even if it looks fine in a screenshot. (Used to
-verify PROCESIO forms end-to-end — see `agents/procesio/PROCESIO-BUILD-AND-TEST-PLAYBOOK.md`.)
+verify PROCESIO forms end-to-end - see `agents/procesio/PROCESIO-BUILD-AND-TEST-PLAYBOOK.md`.)
 
 ## Output contract
 
@@ -345,7 +345,7 @@ delete_session(name: str) -> bool
 session_path(name: str) -> pathlib.Path
 ```
 
-### Programmatic example — drive a saved session step by step
+### Programmatic example - drive a saved session step by step
 
 ```python
 from tools.web import open_session

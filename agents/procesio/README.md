@@ -62,7 +62,7 @@ Two kinds of knowledge, two homes. Keep them apart on purpose.
 
 - **IMPLEMENTATION-PATTERNS/** - the house style: how this team actually builds processes, forms,
   integrations and SQL for PROCESIO, distilled (client data stripped) from a full workspace audit.
-  Served as `guidance --topic patterns` (index) + `patterns-processes|forms|integrations|database`.
+  Served as `guidance --topic patterns` (index) + `patterns-processes|forms|integrations|database|optimizing`.
   The index also defines where per-workspace knowledge lives (user data, never here).
 
 ## Tool notes this agent relies on (in `tools/procesio/`)

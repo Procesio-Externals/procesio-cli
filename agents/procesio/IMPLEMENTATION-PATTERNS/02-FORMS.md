@@ -7,7 +7,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
 
 ---
 
-## P1. Hidden status field as a JS → no-code bridge — NEW
+## P1. Hidden status field as a JS → no-code bridge - NEW
 - **Problem.** Validation logic lives in JavaScript, but the reaction (show a button, lock fields,
   reveal a step) is easiest to express as MAP_FORM_DATA conditions. A JS block cannot stop or steer
   the rest of an event chain.
@@ -31,7 +31,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
     confirm.
   - Make a "Modify" action reset the flag through MAP as well.
 
-## P2. Forward-only step unlocking: one-click Validate + Modify — NEW (supersedes the triad)
+## P2. Forward-only step unlocking: one-click Validate + Modify - NEW (supersedes the triad)
 - **Current form (build new steps this way).** One **Validate** button per step. Its chain runs the
   validator, then asks a global runtime to write the button's branch into a hidden
   `step-flow-branch` field and increment a hidden `step-flow-trigger` field. That field's own
@@ -63,7 +63,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - The programmatic Next still passes through any capture-phase Next guard (P6), which is
     intentional.
 
-## P3. Server-side "render" process drives visibility and options — NEW
+## P3. Server-side "render" process drives visibility and options - NEW
 - **Problem.** Which blocks, selects and validate buttons appear depends on a few configuration
   choices (applicant type × product type × date), and option lists are master data.
 - **Mechanics.** One process takes the configuration selects and returns primitive Booleans
@@ -81,7 +81,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
     must be `syncRun:true`, or they read the previous values (see P13).
   - Feed downstream processes from the source selects, not from the derived variables.
 
-## P4. Outcome flag pair (`e_ok` / `e_not_ok`) → screen swap — NEW
+## P4. Outcome flag pair (`e_ok` / `e_not_ok`) → screen swap - NEW
 - **Problem.** Show a result screen or keep the input screen after an action, without JS.
 - **Mechanics.** Every action process declares two Boolean outputs, `e_ok` (default **false**) and
   `e_not_ok` (default **true**), and sets them at the end. The outputMap writes `e_ok` → `visible` of
@@ -95,7 +95,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
     silently target nothing.
   - Never map a Boolean into a file or value slot.
 
-## P5. Cross-step value store read from the Vue model — REFINES 02 §7 / 04 §1
+## P5. Cross-step value store read from the Vue model - REFINES 02 §7 / 04 §1
 - **Problem.** The renderer destroys other steps' controls (`v-if`), so client-side validation or a
   semantic payload spanning steps cannot read their DOM. `ProcesioForm.data.fields` is incomplete
   for some props (08 "info-text").
@@ -115,7 +115,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - Dynamic-table rows repeat ids, so read them separately (P9).
   - Internals (`_vnode`, `modelValue`) are undocumented. Guard every access.
 
-## P6. Rules-table client validator with step scoping and a Next click-guard — CONFIRMS+ 04 §7 / §15
+## P6. Rules-table client validator with step scoping and a Next click-guard - CONFIRMS+ 04 §7 / §15
 - **Mechanics.**
   - `RULES = { <fieldId>: {required, regex, regexMessage, when(values), optional, date, stripSpaces} }`.
   - Only fields **currently rendered** are validated, which scopes validation per step for free.
@@ -136,7 +136,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - Port the regexes from the server-side validation and keep them in sync.
   - See P12 for versioning.
 
-## P7. Global branded loader API bracketing every process chain — REFINES 05 §5
+## P7. Global branded loader API bracketing every process chain - REFINES 05 §5
 - **Problem.** Async processes give no feedback, and chains mix JS, process and MAP events.
 - **Mechanics.**
   - Form-level JS defines `window.parent.__<name>Loader = {show(text,{unsafe,timeout,timeoutMessage}), hide()}`.
@@ -153,7 +153,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - The element-script `try/catch` around `window.parent.__loader` keeps forms without the loader
     working.
 
-## P8. Programmatic Next + multi-point scroll reset — REFINES 04 §14
+## P8. Programmatic Next + multi-point scroll reset - REFINES 04 §14
 - **Mechanics.**
   - Click the stepper's own Next button instead of changing the step index.
   - Then reset scroll on every candidate (parent window, `top`, `document.scrollingElement`, and any
@@ -164,14 +164,14 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
 - **Pitfalls.** The frame hierarchy decides which element scrolls, which is why every candidate is
   reset.
 
-## P9. Repeated-id rows: pick the visible instance, iterate rows by cell order — CONFIRMS+ 04 §15
+## P9. Repeated-id rows: pick the visible instance, iterate rows by cell order - CONFIRMS+ 04 §15
 - **Mechanics.** Dynamic-table rows repeat the child's DOM id. Use `querySelectorAll('[id="x"]')`
   and keep the instance with `offsetParent!==null || offsetWidth>0`. For per-row work, find the
   enclosing `tr` / `[role=row]` and read the cells in `tableColumnsSourceValue` order. Fall back to
   row text plus regex when the cell count does not match.
 - **Pitfalls.** Keep row inputs out of the scalar collector and validate them per row instance.
 
-## P10. Whole-form object → declarative SPEC mapper Node — NEW
+## P10. Whole-form object → declarative SPEC mapper Node - NEW
 - **Problem.** A final submit needs ~150 fields reshaped into a semantic JSON. Mapping each field to
   a process input is unmaintainable.
 - **Mechanics.**
@@ -192,7 +192,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
     resolve case-insensitively.
   - Files needed as `File` inputs should still be mapped explicitly.
 
-## P11. Process-built HTML into a paragraph label — NEW
+## P11. Process-built HTML into a paragraph label - NEW
 - **Mechanics.** A Node builds a self-contained, **inline-styled** HTML string (counts, percentage
   bars, inline SVG icons) and returns it as a String output mapped to a paragraph's `label`. Static
   decoration (separators, section cards, footers) uses the same trick directly in designer labels.
@@ -202,7 +202,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
     `<div>` written into a paragraph…").
   - Escape any user or DB text you interpolate, since the label is rendered as HTML.
 
-## P12. Versioned idempotent installers for element-event scripts — REFINES 02 §4–5
+## P12. Versioned idempotent installers for element-event scripts - REFINES 02 §4–5
 - **Mechanics.**
   - Each shared script family installs itself on `window.parent.__<family>` with a numeric `v`.
   - The guard is "install if missing or `v` differs". It runs its action on every execution: install
@@ -218,7 +218,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - Listeners created in the sandbox realm are more fragile than an injected `<script>` in the
     parent.
 
-## P13. Async RUN_PROCESS: outputs do land, but the chain does not wait — REFINES 06 §1 / 08 "outputMap populates nothing"
+## P13. Async RUN_PROCESS: outputs do land, but the chain does not wait - REFINES 06 §1 / 08 "outputMap populates nothing"
 - **Observation.** Production forms here map dozens of outputs from `syncRun:false` events (71 async
   events against 12 sync) and depend on them for visibility and tables. This matches
   `PROCESIO-API-NOTES.md`: async outputs **arrive later**. It contradicts the guide's "fire and
@@ -229,7 +229,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
 - **Pitfall.** Several async processes on one click (status change + notify + refresh) have no
   ordering guarantee. Chain them inside one process instead.
 
-## P14. File outputs: `src` to preview, upload `value` to download or carry — NEW
+## P14. File outputs: `src` to preview, upload `value` to download or carry - NEW
 - **Mechanics.** Map a generated or fetched File output to a file-viewer's `src` (preview) **and** to
   a file-upload's `value`. The upload then acts as a download link or holds the file so a later
   event can pass it on as a File input. For uploads, pair the extraction process with a
@@ -237,7 +237,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
 - **Pitfalls.** Keep outputMap targets pointed at existing elements. A deleted viewer leaves a raw
   path target that fails silently.
 
-## P15. Row object as process input (master/detail) with an explicit reset — NEW
+## P15. Row object as process input (master/detail) with an explicit reset - NEW
 - **Mechanics.**
   - A button inside a dynamic row maps `DynamicRowN.$.item` (the whole row object) into a JSON or
     typed process input.
@@ -249,7 +249,7 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - Ship only the columns needed. Whole DB rows in a table reach the browser.
   - Conditions on detail outputs need `syncRun:true` (P13).
 
-## P16. Identity gate via FORM_LOAD → exclusive sections — NEW (with a security caveat)
+## P16. Identity gate via FORM_LOAD → exclusive sections - NEW (with a security caveat)
 - **Mechanics.** FORM_LOAD passes `instance.currentUser.email/name` to a process that returns
   mutually exclusive Booleans (anonymous / known-but-unregistered / pending / approved), mapped to
   `visible` of four sections (or of the stepper).
@@ -260,8 +260,10 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
     evaluated on the variable's default, the TEXT "false", which a condition reads as true (measured
     live, P3). The load therefore runs for every visitor, and a correct condition would still be only
     a browser-side check.
+  - The re-check in the process is a claim check too: the e-mail it reads comes from the browser
+    ([05-OPTIMIZING-A-WORKSPACE](05-OPTIMIZING-A-WORKSPACE.md) O14).
 
-## P17. CSS by attribute-id families — NEW
+## P17. CSS by attribute-id families - NEW
 - **Mechanics.** Style with `[id="…"]` and prefix families (`[id^="separator"]`,
   `[id^="button-header-"]`) inside `:is()`. Class-level specificity is kept, and decorative elements
   intentionally share ids so a new one inherits its styling. Hide helper fields on the control and
@@ -271,12 +273,12 @@ section) or **CONFIRMS+** (covered, plus a field-tested detail).
   - Duplicate **ids** are fine for decoration only. Keep element **names** unique.
   - Never reuse a decorative id prefix for a field.
 
-## P18. Process-computed input constraints — NEW
+## P18. Process-computed input constraints - NEW
 - **Mechanics.** A load-time or click-time process returns `start_date`, `end_date`, `error` and
   `e_not_ok`, mapped to a datetime input's `minValue`, `maxValue`, `defaultValue` and `readonly`,
   and to an error paragraph `label`. Business calendars stay server-side.
 
-## P19. Public token-addressed signing form — NEW
+## P19. Public token-addressed signing form - NEW
 - **Mechanics.** An email link opens a public form with the token prefilled into an input inside a
   hidden section. FORM_LOAD verifies the token and returns the documents to viewers plus `e_ok` →
   section visible. The signature-pad value (a File) plus the token go to a signing process, and a

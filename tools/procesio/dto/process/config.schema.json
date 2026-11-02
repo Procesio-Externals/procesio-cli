@@ -139,6 +139,8 @@
           "properties": {"credential": {"type": "string", "description": "credential INSTANCE gid for a credentials-typed property (the action's credential template/type is fixed by the catalog)"}}},
         {"type": "object", "additionalProperties": false, "required": ["var"],
           "properties": {"var": {"type": "string"}, "path": {"type": "array", "items": {"type": "string"}}}},
+        {"type": "object", "additionalProperties": false, "required": ["map"],
+          "properties": {"map": {"type": "object", "description": "map-parameters property (e.g. Word Mail Merge's Word Mail Parameters): name -> binding (bare = literal)", "additionalProperties": {"$ref": "#/$defs/binding"}}}},
         {"type": "object", "additionalProperties": false, "required": ["template", "vars"],
           "properties": {"template": {"description": "string OR a JSON object/array with <%i%> placeholders in string leaves"}, "vars": {"type": "array", "items": {"anyOf": [
             {"type": "string"},

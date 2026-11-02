@@ -16,6 +16,7 @@ marks whether it is **NEW**, **REFINES** an existing rule, or **CONFIRMS** one.
 | `patterns-forms` | 02-FORMS.md | step and confirm structure, visibility driven by process flags, JS bridges into no-code conditions, validator and collector runtimes, the async-output caveat |
 | `patterns-integrations` | 03-INTEGRATIONS.md | inbound webhooks with API keys, ERP step orchestration with a run log, SFTP layout, LLM extraction with strict schemas, document generation |
 | `patterns-database` | 04-DATABASE.md | a JSON-in orchestrator SP, errors collected before writes, one fixed result shape, deploy conventions, how a process reads a result |
+| `patterns-optimizing` | 05-OPTIMIZING-A-WORKSPACE.md | changing a workspace someone else built: census audit, one call per view, side-effect order, progress rows, retry with resume, claim checks, rollout through side-by-side versions |
 
 ## Every pattern file also lists the anti-patterns the audit found
 

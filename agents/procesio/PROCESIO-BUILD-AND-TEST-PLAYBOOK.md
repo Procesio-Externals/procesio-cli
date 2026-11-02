@@ -42,6 +42,8 @@ Do not repeat it.
   accepted the write. `ok:true` proves *acceptance*, never *effect*. If `verify` cannot
   cover a step (forms/browser/E2E), it lists it in `manual_checks`; run those, do not
   wave them through.
+- **No value pasted into SQL.** After every create or edit from a config, run
+  `sql-parameterize --all`, then finish with `sql-scan`; `verify` does not check this yet.
 - **Clarify before you build.** In the Frame step, ask the questions that pin scope and
   the load-bearing decisions first - the data source, and especially the **cache
   mechanism** (native Data Store vs SQL; a cache MUST be a real Data Store / SQL action,
@@ -134,7 +136,7 @@ exercised live and the runtime diagnostics are clean. Screenshots alone are not 
 5. **Test the NEGATIVE / dismiss path of every stateful interaction**, not just the happy
    click: open a dropdown/menu then **click OUTSIDE** it → only the menu should close,
    nothing else should fire (a form-level click handler that substring-matches a menu label
-   up the ancestor chain will clear/trigger on outside-click — match exactly ONE label; see
+   up the ancestor chain will clear/trigger on outside-click - match exactly ONE label; see
    form `description.md`). For a **chat reply via a process**, send a message and confirm a
    bot reply renders (wire `messagesent`, NOT `messagesfetch`; produce the array with a
    **Node** action `return …`→`List Result`, not JS `setOutput` which wraps `{result}`).
@@ -153,7 +155,7 @@ exercised live and the runtime diagnostics are clean. Screenshots alone are not 
   (use `window.parent.document`). See `tools/procesio/dto/form/FORM-STYLING-NOTES.md`.
 - **Theme + alignment (new):** if the form uses dark mode, toggle it and confirm the
   16-var palette applies; if it uses element alignment, confirm the `--fd/--jc/--ai`
-  vars lay the container out — both only in a REAL browser (`form-theme-render`).
+  vars lay the container out - both only in a REAL browser (`form-theme-render`).
 - **Data Store trigger (new):** a `RUN_DATA_STORE_OPERATION` control must run its
   READ/ADD/UPDATE/DELETE against the store and map the result back
   (`form-datastore-trigger`). See the `datastore` guidance topic.

@@ -1,4 +1,4 @@
-# PROCESIO C# Custom Actions — packaging, whitelist, and the file channel
+# PROCESIO C# Custom Actions - packaging, whitelist, and the file channel
 
 What the platform documents about the **C# Custom Action** (`.nupkg` upload), and how
 that compares with the scripting actions. Everything below is **vendor-documented**,
@@ -62,7 +62,7 @@ from the public docs.
 - **Test-Action v2** is .NET 10 only, with no API change: `/api/Actions/test` and
   `/api/Credentials/test` are unchanged.
 
-## Lifecycle — plan for it, it is unusually rigid
+## Lifecycle - plan for it, it is unusually rigid
 
 - **A Custom Action cannot be updated in place.** The only route is a new package version
   and a fresh create.
@@ -70,8 +70,15 @@ from the public docs.
   while the action has never been placed on a canvas. **Anything that promises to clean up
   after itself must either never drag the action onto a process, or exercise it through the
   action's own test area** (`IsTestable = true` opens one), or the cleanup fails by design.
+- **Measured (2026-10): the API does not enforce that rule.** `DELETE /api/actions/{id}` answered
+  200 for an action used in a saved process, and the process still ran it afterwards (its
+  package stays in the store). The designer's own Delete was not tried on a used action. So the
+  rule is docs-only today; do not rely on it either way, and never delete an action a live
+  process may still run.
+- **The store keeps a package id + version for good** (details below): to re-upload after a
+  delete, keep the exact `.nupkg` file, because a rebuild of the same version is refused.
 
-## The dependency whitelist — two lists, and the second is the sharp one
+## The dependency whitelist - two lists, and the second is the sharp one
 
 "Other libraries that are not offered by Microsoft need to be whitelisted with us." The
 docs publish both lists as a JSON configuration block.
@@ -95,7 +102,7 @@ Four things fall out, and they decide designs:
    formats does not survive the namespace list. Untested; treat DOCX and PPTX in C# as
    unproven until someone runs it.
 2. **`System.IO` is absent** while the core assemblies are present. The file example in
-   the same docs uses a `Stream`. Read that as **streams yes, file system unstated** —
+   the same docs uses a `Stream`. Read that as **streams yes, file system unstated** - 
    and do not design against a temp path without measuring first.
 3. **Also absent**: `System.Net.Http`, `System.Security.Cryptography`, `System.Text.Json`,
    `System.IO.Compression`. No PDF library of any kind appears, so **PDF inside a Custom
@@ -111,7 +118,7 @@ artefact. Whether a self-hosted operator can edit it, and therefore whether the 
 constraint is topology-dependent, **is not documented**. Ask before promising a customer a
 library that is not on the list.
 
-## How a file reaches a Custom Action — a stream, never a path
+## How a file reaches a Custom Action - a stream, never a path
 
 ```csharp
 IEnumerable<FileModel> FileList { get; set; }   // or a single FileModel
@@ -137,10 +144,10 @@ Four exist, and they are not one sandbox with four languages.
 
 | Action | Libraries | File position |
 |---|---|---|
-| **Javascript** | none ("no access to specific libraries") | — |
+| **Javascript** | none ("no access to specific libraries") | - |
 | **Node** | a fixed list of **24**, no additions | docs state plainly it "does not support working with files" |
 | **Python** | 9 preinstalled, including **pdfplumber**, **PyPDF2**, **pandas**, **spacy**, **pillow** | "Files cannot be added in Python script", then the base64 bridge below |
-| **Ruby** | 9 gems, none document-related | — |
+| **Ruby** | 9 gems, none document-related | - |
 
 **The platform's documented file channel for a script is base64 through process
 variables**, not a file system: `File to BASE64` turns a File variable into a string, the
@@ -162,11 +169,11 @@ A large amount of file work needs no custom code, no upload and no whitelisting 
   Read file, File to Base64, plus an Archive sub-folder for compress and decompress.
 
 **Rule of thumb: catalogue action first, then Python action, then Node, then a Custom
-Action.** The order tracks cost — the first three need no upload, no versioning ritual, no
+Action.** The order tracks cost - the first three need no upload, no versioning ritual, no
 GitHub PAT and no vendor whitelisting request, and only the Custom Action carries a
 lifecycle you cannot undo.
 
-## Documented size limits — and which ones do not apply
+## Documented size limits - and which ones do not apply
 
 | Limit | Applies to |
 |---|---|
@@ -177,3 +184,54 @@ lifecycle you cannot undo.
 **None of these binds a Custom Action.** No size limit, timeout, memory limit or
 concurrency statement is documented for Custom Actions at all. Measure before quoting a
 figure to anyone.
+
+## Measured live (2026-10, Action-Core 2.1.0, `net10.0`, prod)
+
+Each point below was run, not read: packages built with the .NET 10 SDK, uploaded with
+`procesio customaction-upload`, exercised with the side-panel Test, `customaction-test` and a
+process run.
+
+**Upload and the package store**
+- **One package per id + version, kept even after every action using it is deleted.** The same
+  bytes upload again fine (a second action from the same file, or a re-upload after a delete).
+  A *different* build under an id + version the store already has is refused with `207` "Failed
+  to upload Action Template package to repository." A rebuild of an unchanged project counts as
+  different (the `.nupkg` carries timestamps), so either keep the exact file or bump the version.
+  The scope (per workspace or global) was not measured.
+- **A package refused by validation does not take the version.** After a `259` refusal, a fixed
+  build under the same version uploaded fine. (The older "a failed upload burns the version"
+  applies to failures after the push, such as the `207` above.)
+- Validation codes seen: `259` "FEDecoratorAttribute.DefaultValue value is not of the same type of
+  the current property." (target = the property): `DefaultValue` is an `object`, so an `int`
+  property needs `DefaultValue = 4`, not `"4"`. `202` "The .nupkg file contains more than 1
+  action." `213` "Forbidden assemblies." with target "Assembly reference is not allowed: <name>"
+  for a package outside the whitelist.
+- **A property of a user-defined class type is NOT refused at upload**, although the docs say
+  such types are not accepted. Run-time behaviour was not tested; keep to the documented types.
+- **`CanAddFromToolbar = false`** uploads fine and the action is then missing from the designer's
+  Custom Actions list.
+- **The documented `.csproj` template warns `NU5118`** on every build (the action's own dll is
+  added twice: once by the SDK, once by `IncludeDepsInPackage`). Harmless. `<BuildOutputInPackage
+  Include="$(OutDir)*" Exclude="$(OutDir)$(TargetFileName)" />` removes the warning.
+
+**In the designer**
+- The display name and icon come from the Create custom action panel (sent as headers), never
+  from the package; the canvas node and the properties title show that name.
+- The Create custom action panel has no `<input type=file>` in the DOM: "Choose file" creates one
+  on click. A scripted browser hands it a file by patching `HTMLInputElement.prototype.click`
+  once (assign a `DataTransfer` FileList, fire `input` and `change`); the panel then shows the file.
+- `IEnumerable<string>` with `FeComponentType.DataType` binds to a `list<String>` variable, both as
+  input and output; Test Action shows the output as a JSON array.
+- `DependencyDecorator` with `Operator.Equals` on a Select hides and shows the dependent field
+  live in the properties panel as the Select changes.
+- `FeComponentType.Credentials_Rest` renders a credential picker listing the workspace's REST API
+  credentials plus "Create credential". `Credential.Client.GetAsync("/relative/path", new(), new())`
+  is sent to the credential's URL: keep the base address in the credential, only paths in code.
+- `customaction-test` drives an action with a credential input by binding the credential's
+  instance id directly: a variable for it has no data type, and the API answers that with a 400.
+
+**The palette folders that hold non-core actions** (Platform Actions): `Community-Made`
+(community actions: time zone and temperature converters, list statistics), `Beta` (actions
+still being tested; it can be empty), and `To be decommissioned` (older versions such as
+Call API v1/v2/v3, Execute Query V1/V2 and Python (Old), kept for the processes that use them).
+

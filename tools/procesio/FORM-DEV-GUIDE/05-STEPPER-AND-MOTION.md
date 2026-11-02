@@ -1,4 +1,4 @@
-# 05 — Custom stepper, step transitions, and the loader veil
+# 05 - Custom stepper, step transitions, and the loader veil
 
 The moving parts of a form that feels finished: a step indicator you control, a
 transition that gives the step change a direction, a loader that hides the
@@ -13,7 +13,7 @@ animate anything out. You can only animate the *container*.
 ## 1. Why replace the platform's stepper at all
 
 The platform's `.form-builder--stepper--nav` renders only once the stepper's `steps`
-config names the real step elements — while it holds placeholder names the page has
+config names the real step elements - while it holds placeholder names the page has
 **no indicator at all**. And even when present, it offers no hook for progress
 states, sonar pulses, or check marks.
 
@@ -24,16 +24,16 @@ Two valid strategies:
 | **Style the platform's nav** (`.form-builder--stepper--nav--item`, `.pds-c-step--header--circle`) | you only want colour/scale changes and want zero maintenance |
 | **Draw your own rail and hide theirs** | you want full control over structure, states, labels, animation |
 
-If you draw your own, hide theirs — do not leave both:
+If you draw your own, hide theirs - do not leave both:
 
 ```css
 .form-builder--stepper--nav { display: none !important; }
 ```
 
 A common symptom of forgetting: "why is there a second, native stepper next to
-mine?" — it appeared the moment the `steps` config was saved with real step names.
+mine?" - it appeared the moment the `steps` config was saved with real step names.
 
-## 2. Build the rail — and steal its labels from the platform
+## 2. Build the rail - and steal its labels from the platform
 
 ```js
 function ensureRail() {
@@ -95,7 +95,7 @@ function paintRail(active) {
 }
 ```
 
-CSS for the three states — circles and connectors only, no surrounding card:
+CSS for the three states - circles and connectors only, no surrounding card:
 
 ```css
 .ux-rail__steps { display: flex; align-items: flex-start; gap: 0; }
@@ -144,7 +144,7 @@ CSS for the three states — circles and connectors only, no surrounding card:
 }
 ```
 
-The connector is a `::before` on each step reaching *backwards* — that way the
+The connector is a `::before` on each step reaching *backwards* - that way the
 first step simply suppresses it and no extra wrapper markup is needed. `z-index: 1`
 on the dot keeps the line behind the circle.
 
@@ -187,7 +187,7 @@ function endLeaving() {
 **Read that comment twice.** This is the single most expensive bug in this whole
 guide: an entire step rendered blank, permanently, because the class that hid it
 was removed only in response to a DOM mutation that sometimes never arrived. Any
-class that makes something invisible needs an unconditional escape — a timer, a
+class that makes something invisible needs an unconditional escape - a timer, a
 ceiling, a sweep.
 
 `endLeaving` clears the class **from every node that carries it** rather than from
@@ -212,7 +212,7 @@ between. Holding a reference to a node across a rebuild is how state gets strand
 ```
 
 This needs **no JavaScript at all**. Because controls are recreated on every step
-change, the animation re-fires by itself. Cap the stagger with `nth-child(n+4)` —
+change, the animation re-fires by itself. Cap the stagger with `nth-child(n+4)` - 
 an uncapped `nth-child` ramp makes a twelve-field step take two seconds to appear.
 
 ## 5. The loader veil
@@ -266,7 +266,7 @@ function settleThenHide() {
 }
 ```
 
-- **Quiet-timer mode** (`hold` falsy) — for a step change. There is no event that
+- **Quiet-timer mode** (`hold` falsy) - for a step change. There is no event that
   says "the rebuild finished", so the signal is *the DOM going quiet*. Every
   mutation while the veil is up restarts the timer:
 
@@ -277,7 +277,7 @@ function settleThenHide() {
   });
   ```
 
-- **Held mode** (`hold` truthy) — for work whose end the DOM cannot announce, such
+- **Held mode** (`hold` truthy) - for work whose end the DOM cannot announce, such
   as a network call that takes seconds of silence. The quiet heuristic would lift
   the veil almost immediately. A held veil is dismissed **explicitly by whoever
   raised it**.
@@ -305,12 +305,12 @@ depend on something that might not happen.
                   align-items: center; gap: 18px; }
 ```
 
-The veil is `position: absolute` inside the card — which requires
+The veil is `position: absolute` inside the card - which requires
 `.form-builder--form { position: relative }` and **must not** use `overflow: hidden`
-to clip its corners (that kills page scrolling — [03](03-DOM-CONTRACT.md) §5). Give
+to clip its corners (that kills page scrolling - [03](03-DOM-CONTRACT.md) §5). Give
 it the same `border-radius` as the card instead.
 
-### The indicator itself — concentric ripples
+### The indicator itself - concentric ripples
 
 ```css
 .ux-veil__drop { position: relative; width: 46px; height: 46px; }
@@ -397,7 +397,7 @@ its own except at most one slow ambient effect.
 @keyframes ux-sweep { to { left: 140%; } }
 ```
 
-Keep three duration tokens and two easings and use nothing else — that consistency
+Keep three duration tokens and two easings and use nothing else - that consistency
 is most of what makes a form read as designed rather than decorated:
 
 ```css
@@ -407,6 +407,34 @@ is most of what makes a form read as designed rather than decorated:
 --ux-ease:     cubic-bezier(0.22, 1, 0.36, 1);
 --ux-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 ```
+
+## 7. Effects tiers: decide per device, let the viewer override
+
+A heavy visual layer that runs well on a recent laptop can make the same form crawl on a budget
+one. The browser does not report the CPU or GPU model, so judge by signals and by measurement, decide
+**before** the expensive parts mount, and give the viewer a switch.
+
+- **Parts, not one flag.** Background animation, backdrop blur, repeating decorative loops, entrance
+  motion and transitions. Tiers are presets over them (all on / motion only / all off) and the viewer
+  can set each part.
+- **Signals, in order:** a saved manual choice; `prefers-reduced-motion` (all off); Save-Data (light);
+  the last measurement on this browser; hardware hints (`navigator.hardwareConcurrency`,
+  `navigator.deviceMemory`, Chromium only and capped); a GPU check: `getContext('webgl',
+  { failIfMajorPerformanceCaveat: true })` returns `null` when the browser would draw in software, the
+  case where every canvas frame and blur costs CPU. Release the test context
+  (`WEBGL_lose_context`) and remember the answer.
+- **Measure while it runs.** Feed frame times from the animation loop the page already has (no second
+  loop). Skip the first seconds (the boot has its own spikes), ignore gaps from a hidden tab, then judge
+  a few seconds: a slow median or a large share of frames past ~34 ms steps down and is remembered for
+  some days. Step **down** only during a visit, never back up, so the page does not flip.
+- **Apply with attributes on `<html>`** (`data-x-fx-<part>="0|1"`). CSS gates the blur (replace it with a
+  more opaque tint; a blurred disc becomes a `radial-gradient`, not a hard circle) and the loops
+  (generated, see [08](08-PITFALLS.md) "half the main thread"). Motion off reuses the form's own
+  reduced-motion rules under the attribute. JS listeners start or freeze the canvas.
+- **The switch** lives in the header, opens a small panel (Automatic + one row per part), says why the
+  automatic choice was made, and stores the choice in `localStorage` (try/catch: without storage it lasts
+  the page). Forms on the same origin share it, so one choice covers all of them.
+- **Prove it** with `web perf-probe` under CPU throttling, the page as served against each tier.
 
 ## Stepper JS navigation + accessibility (PRC-5141, 2026-09)
 

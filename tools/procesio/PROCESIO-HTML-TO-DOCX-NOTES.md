@@ -1,4 +1,4 @@
-# PROCESIO — HTML to Word (.docx) inside a process
+# PROCESIO - HTML to Word (.docx) inside a process
 
 How to produce a real Word document from the same HTML that `Generate Document` turns into a
 PDF, and the platform facts that decide the design. The converter is

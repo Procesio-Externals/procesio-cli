@@ -1,4 +1,4 @@
-# PROCESIO Form Development — the complete guide
+# PROCESIO Form Development - the complete guide
 
 Everything needed to build a **professional-grade** PROCESIO form: how the DTO is
 shaped, how form-level CSS and JavaScript actually execute, what the runtime DOM
@@ -9,7 +9,7 @@ form.
 
 Everything here was **verified against a live form and against the renderer's own
 source** (`docs_info/ui-builder-main`). Where something was learned by breaking
-the live form, the symptom is recorded next to the rule — see
+the live form, the symptom is recorded next to the rule - see
 [08-PITFALLS.md](08-PITFALLS.md), which is the fastest way to avoid repeating a
 day of debugging.
 
@@ -18,16 +18,21 @@ day of debugging.
 | File | Attach it when you need to… |
 |---|---|
 | [01-ANATOMY.md](01-ANATOMY.md) | understand the FormTemplate DTO: elements, configs, sections, the data model, value paths, steppers |
-| [02-CODE-INJECTION.md](02-CODE-INJECTION.md) | write ANY form-level JavaScript — this is the one non-negotiable prerequisite |
-| [03-DOM-CONTRACT.md](03-DOM-CONTRACT.md) | write CSS or query the DOM — the selector reference and what the renderer guarantees |
+| [02-CODE-INJECTION.md](02-CODE-INJECTION.md) | write ANY form-level JavaScript - this is the one non-negotiable prerequisite |
+| [03-DOM-CONTRACT.md](03-DOM-CONTRACT.md) | write CSS or query the DOM - the selector reference and what the renderer guarantees |
 | [04-INTERACTION-RECIPES.md](04-INTERACTION-RECIPES.md) | read/write a field, hide a field, gate a button, build a custom control, validate, toast, embed an interactive map (Leaflet) |
 | [05-STEPPER-AND-MOTION.md](05-STEPPER-AND-MOTION.md) | build a custom stepper, a step transition, a loader veil, entrance animations |
 | [06-PROCESS-INTEGRATION.md](06-PROCESS-INTEGRATION.md) | trigger a process from the form and land its results back in fields |
 | [07-DEPLOY-WORKFLOW.md](07-DEPLOY-WORKFLOW.md) | actually ship the CSS/JS to a live form, and test before you do |
-| [08-PITFALLS.md](08-PITFALLS.md) | anything — read it once, then keep it attached |
+| [08-PITFALLS.md](08-PITFALLS.md) | anything - read it once, then keep it attached |
+| [09-NAVIGATION-AND-HOSTING.md](09-NAVIGATION-AND-HOSTING.md) | link forms together, reason about public URLs and what the host shell always shows |
+| [10-REDESIGN-METHOD.md](10-REDESIGN-METHOD.md) | redesign a form or a family of forms: the order of work, which pattern for which need, lists, hostile input, shipping, verification, performance |
 
 **Minimum viable attachment set** for "add an animation / behaviour to an existing
-form": `02` + `03` + `05` + `08`.
+form": `02` + `03` + `05` + `08`. For a redesign, start with `10`.
+
+Start a form's runtime from [`../assets/form-kit`](../assets/form-kit/README.md): the network
+monitor, the run reader, effects tiers and the CSS gate, tested and free of any client's brand.
 
 ## The five-sentence version
 
@@ -40,16 +45,16 @@ form": `02` + `03` + `05` + `08`.
    `window.parent.document`.
 4. The renderer destroys and rebuilds controls on every step change (`v-if`), so
    **all state is recomputed from a MutationObserver**, never stored on a node.
-5. Behaviour is layered ON TOP of the platform's own — you click the platform's
+5. Behaviour is layered ON TOP of the platform's own - you click the platform's
    real control rather than setting values behind its back, because it is Vue-bound.
 
 ## Vocabulary
 
 | Term | Meaning |
 |---|---|
-| **element** | one control in `Data.elements` — input, paragraph, column, stepper, step… |
+| **element** | one control in `Data.elements` - input, paragraph, column, stepper, step… |
 | **config** | one `{id, key, value}` entry on an element; `label`, `name`, `visible`, `onClickEvents`… are all configs |
-| **value path** | `{dmRootId}.{FIELDS_NS}.{elementId}.{valueConfigId}` — how a process addresses a form field |
+| **value path** | `{dmRootId}.{FIELDS_NS}.{elementId}.{valueConfigId}` - how a process addresses a form field |
 | **`Data.code`** | the designer's "Switch to code" editor: the form-level `{CSS, JAVASCRIPT}` pair, stored encrypted |
 | **runtime layer** | the JS you inject into the parent document; it outlives individual script runs |
 | **veil** | a full-card loader overlay that masks the renderer rebuilding controls |
@@ -58,10 +63,10 @@ form": `02` + `03` + `05` + `08`.
 
 ## Related framework notes
 
-- [../dto/form/FORM-STYLING-NOTES.md](../dto/form/FORM-STYLING-NOTES.md) — the four
+- [../dto/form/FORM-STYLING-NOTES.md](../dto/form/FORM-STYLING-NOTES.md) - the four
   styling surfaces (theme, per-element style, element-event JS, form-level code)
-- [../PROCESIO-RESOURCE-MODEL-NOTES.md](../PROCESIO-RESOURCE-MODEL-NOTES.md) — the
+- [../PROCESIO-RESOURCE-MODEL-NOTES.md](../PROCESIO-RESOURCE-MODEL-NOTES.md) - the
   export DTO for every resource type, including the flow graph
-- [../PROCESIO-API-NOTES.md](../PROCESIO-API-NOTES.md) — auth, endpoints, casing
-- [../PROCESIO-FE-VALIDATION-NOTES.md](../PROCESIO-FE-VALIDATION-NOTES.md) — what the
+- [../PROCESIO-API-NOTES.md](../PROCESIO-API-NOTES.md) - auth, endpoints, casing
+- [../PROCESIO-FE-VALIDATION-NOTES.md](../PROCESIO-FE-VALIDATION-NOTES.md) - what the
   save-time validation gate rejects

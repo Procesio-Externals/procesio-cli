@@ -1,6 +1,6 @@
 # Credential sub-tool
 
-Create/edit a PROCESIO **credential instance** — saved values for a connection
+Create/edit a PROCESIO **credential instance** - saved values for a connection
 template (REST API, SMTP, SQL, SFTP, OAuth2 services, …). Actions reference a
 credential by its instance id.
 
@@ -20,19 +20,19 @@ credential by its instance id.
 }
 ```
 
-- **template** — the connection type **name** (from `GET /api/Credentials/types`;
+- **template** - the connection type **name** (from `GET /api/Credentials/types`;
   e.g. `REST API`, `Outbound e-mail (SMTP)`, `SQL`, `SFTP`).
-- **properties** — property **label** (or id) → value. Secret values (passwords,
+- **properties** - property **label** (or id) → value. Secret values (passwords,
   keys) go here. For `select`/`radio` properties you may pass the option **name**
-  (e.g. `"No authentication"`, `"GET"`) — it is resolved to the option's value.
+  (e.g. `"No authentication"`, `"GET"`) - it is resolved to the option's value.
 
-## Database credentials — SQL Server, MySQL, and Redis
+## Database credentials - SQL Server, MySQL, and Redis
 
 The DB credential type (named **`SQL`** in the live catalog) is now multi-engine: the
 platform added `DbClientType.MYSQL = 2` alongside `MSSQL = 1` (Web-Api / Process-Execution
 `CustomMySQLClient`, PRC-3696), so the SAME credential template creates a **MySQL**
 connection by choosing the **"Server Type"** option `MySQL` (live-confirmed option value
-`40404040-0001-0001-0002-cccccccccccc`; MSSQL is `…-0001-…`). No new tool code — the builder
+`40404040-0001-0001-0002-cccccccccccc`; MSSQL is `…-0001-…`). No new tool code - the builder
 resolves the option name to its guid like any other select property. The DB actions
 (**Execute Query** / **Execute Command**, GUIDs `76470756-…` / `a1625da6-…`; the newer V2 variants add a Timeout + Parameters tab) then run against it
 unchanged, and the credential's Test button opens a real `MySqlConnection`. Live property
@@ -54,7 +54,7 @@ Name, Encrypt, Pooling, Trust Server Certificate, Authentication Type, Username,
 }
 ```
 
-**Redis** is its own standalone credential type — `CredentialsType.REDIS = 9`, NOT a
+**Redis** is its own standalone credential type - `CredentialsType.REDIS = 9`, NOT a
 `DbClientType`/SQL sub-type (Web-Api #1452 / Action-Core #130 / Process-Execution #250).
 Set `template` to `Redis` and pass its properties: **Host** (req; bare host/IP), **Port**
 (6379), **Username**, **Password**, **Database** (0), **UseTls** (false),
@@ -64,13 +64,13 @@ Operation; 19 typed ops across Key/String, Expiration, Hash, List, Set/SortedSet
 outputs Response / Found / AffectedCount; no raw-command execution). Template GUID referenced
 by the connector: `80808080-0001-0000-0000-aaaaaaaaaaaa`.
 
-> ⚠ **Redis shipped to prod but is not yet activated** — its credential template is not
+> ⚠ **Redis shipped to prod but is not yet activated** - its credential template is not
 > seeded in DataBase-Update, so `Redis` does not yet appear in `GET /api/Credentials/types`
 > (only 34 types today; MySQL via `SQL` is live). The contract above is stable and will
 > work as-is once activated; until then a Redis credential cannot be created. Verify with
 > the property/option names before relying on the literals above. Still not activated at
 > the v3.0.0 release (2026-10-21). (Outbound DB hosts are
-> also SSRF-guarded by a host blacklist — `DbHostBlacklistChecker` — so a blacklisted /
+> also SSRF-guarded by a host blacklist - `DbHostBlacklistChecker` - so a blacklisted /
 > private host is rejected at connect time.)
 
 **Prelude** ships as a REST-derived credential - `template: "REST API/ Prelude"`, Bearer
@@ -105,7 +105,7 @@ Storage"** (`REST_API_OAUTH_PREDEFINED`), which is an OAuth2 REST credential, no
 
 ## API contract (verified live 2026-06-24)
 
-- **Validate@source:** `POST /api/Credentials/test` — a **live connection probe**
+- **Validate@source:** `POST /api/Credentials/test` - a **live connection probe**
   (e.g. a real GET for REST). Run via `--dry-run` (returns the built DTO + test
   result) or automatically on create.
 - **Create:** `POST /api/Credentials` (`CredentialsDto {gtid, gtpid, name, properties[]}`)
@@ -119,10 +119,10 @@ Storage"** (`REST_API_OAUTH_PREDEFINED`), which is an OAuth2 REST credential, no
 The credential list shows **validated** / **not validated** (the DTO `status` flag).
 On create/edit the builder runs `POST /api/Credentials/test`; if it returns
 `isSuccess`/2xx, the credential is saved as **validated** (`status:true`). A
-not-validated credential is functionally identical — this is cosmetic. To make a
+not-validated credential is functionally identical - this is cosmetic. To make a
 credential validate, give it whatever its connection type needs to probe: for REST,
 set `Method` and a `Test endpoint` (e.g. `"?cx=...&q=..."`); for SMTP the connection
-probe alone suffices. **These test parameters are for validation only — they do NOT
+probe alone suffices. **These test parameters are for validation only - they do NOT
 flow into the action**, so the action still needs its own request params (e.g. Call
 API's `Request Parameters` queryParams).
 
@@ -141,10 +141,10 @@ is bound by passing the credential **id** as the param value:
   made every custom-action upload whose action had a `Credentials_Rest` property fail with
   `TEMPLATE_ERROR`. A derived template and its root now report the same root type.
 - Some required properties are *conditional* (depend on a radio choice, e.g.
-  Basic-auth fields only matter when Basic auth is selected) — send only what your
+  Basic-auth fields only matter when Basic auth is selected) - send only what your
   chosen path needs.
 
-## Editing an existing credential — what a partial `--config` silently costs
+## Editing an existing credential - what a partial `--config` silently costs
 
 `credential-edit` builds a **whole** DTO from the config you pass; it does not
 merge with what is on the server. Everything you leave out is re-derived or
@@ -157,7 +157,7 @@ sent empty, so an edit meant to change one field can quietly move several.
   `target` rather than guessing. For REST API that is at least `Method`; a
   credential that carries a test probe also needs its `Test endpoint`.
 - **Re-send the current value of every property you want left alone**, read
-  from `credential-get` — not typed from a console display. A value copied out
+  from `credential-get` - not typed from a console display. A value copied out
   of terminal output is truncated at the terminal width, and the edit then
   shortens the stored field to whatever fitted on screen. A description silently
   went from 183 characters to 88 this way. Read the field, pass the field.
@@ -174,7 +174,7 @@ sent empty, so an edit meant to change one field can quietly move several.
   The server starts emitting a `be_id` per sub-field and stops emitting
   `configurations`/`pill`, and it drops blank placeholder rows from table
   properties. None of that is a value change. When diffing a before/after
-  export, reduce each property to its `{sub-field id -> value}` leaves — do not
+  export, reduce each property to its `{sub-field id -> value}` leaves - do not
   compare the raw blobs (five phantom differences) and do not skip the
   properties (a real change would hide).
 - **⚠ The tool's response echoes secret-bearing property values back**, in both
@@ -185,7 +185,7 @@ sent empty, so an edit meant to change one field can quietly move several.
 ## No Bearer option in the REST API template
 
 The authentication selector offers `NoAuth`, `BasicAuth`, `ApiKey`, `OAuth2`
-and `Certificate` — there is **no Bearer**. To send `Authorization: Bearer
+and `Certificate` - there is **no Bearer**. To send `Authorization: Bearer
 <token>`, choose API key authentication and set `Key` = `Authorization`,
 `Value` = `Bearer <token>`, with the `Header` checkbox true (it routes the pair
 to a header rather than a query parameter). The auth method must be given as the

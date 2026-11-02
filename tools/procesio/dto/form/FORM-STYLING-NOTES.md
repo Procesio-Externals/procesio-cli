@@ -1,25 +1,25 @@
-# PROCESIO form styling — RESOLVED & implemented (2026-06-25)
+# PROCESIO form styling - RESOLVED & implemented (2026-06-25)
 
 All four styling surfaces are now understood (verified against the ui-builder frontend
 source in `docs_info/ui-builder-main`) and buildable via `builder.py`.
 
 > **Building a real form?** This file is the reference for the four *surfaces*. The
-> full development guide — execution model, DOM contract, interaction recipes,
-> custom steppers and motion, process wiring, deployment, and the pitfall catalogue —
+> full development guide - execution model, DOM contract, interaction recipes,
+> custom steppers and motion, process wiring, deployment, and the pitfall catalogue - 
 > is [`tools/procesio/FORM-DEV-GUIDE/`](../../FORM-DEV-GUIDE/00-INDEX.md). Those files
 > are written to be attached as chat context.
 
-## 1. Form Theme — ✅ implemented
+## 1. Form Theme - ✅ implemented
 `Data.theme`: 18 sections, ~190 CSS variables (`{label,types,properties:[{type,label,
 value,cssVariable}]}`). Pass `theme:{"--c-primary":"#0039e3","--h-input":"44px"}`;
 `_apply_theme` overrides by `cssVariable`. Form-wide, by control type. Defaults =
 `docs_info/form-theme.ts` `getDefaultTheme()` (== `data_shell.json` theme).
 
-## 2. Element event JavaScript — ✅ implemented
+## 2. Element event JavaScript - ✅ implemented
 Per-control onClick/onInput/etc → `{action:"RUN_JAVASCRIPT", config:{code}}` (plaintext)
 in the element's event config. `events:[{on:"click",do:"js",code:"..."}]`.
 
-## 3. Per-component styling — ✅ implemented
+## 3. Per-component styling - ✅ implemented
 Each element has a `{key:"style", category:"styling"}` config whose value is a
 `CSSProperty[]` (`{label,value,cssVariable,type,enabled}`). The runtime
 (`useThemable.themeStyle`) applies ONLY `enabled:true` props, overriding
@@ -29,21 +29,21 @@ Build it by passing per-element `style:{cssVariable:value}`:
 {"type":"input","label":"Name","style":{"--h-input":"50px","--c-input-background":"--c-neutral--50"}}
 ```
 - Valid vars = the element type's CSS group (frontend `getCssGroupByElementType`: FIRST
-  theme group whose `types` include the type — so input/number/datetime/textarea/select all
+  theme group whose `types` include the type - so input/number/datetime/textarea/select all
   use the **Input** group). Unknown var → hard error (lists valid ones). Non-stylable types
   (heading, paragraph, divider, image…) → error.
 - For `css-variable-select` vars (colors) pass a theme color VARIABLE (e.g. `--c-neutral--50`),
-  NOT a hex — the runtime emits `var(<value>)`. Plain vars (height/padding) take raw values.
+  NOT a hex - the runtime emits `var(<value>)`. Plain vars (height/padding) take raw values.
 - Builder: `_apply_element_style` + `_style_props_for` (reads groups from `data_shell.json`).
 
-## 4. Form-level CSS + JavaScript ("Switch to code") — ✅ implemented
+## 4. Form-level CSS + JavaScript ("Switch to code") - ✅ implemented
 Stored encrypted in `Data.code`. **Scheme (verified by decrypting real exports):**
 `code = AES_encrypt( JSON.stringify({"JAVASCRIPT":js,"CSS":css}) )` using CryptoJS
 `AES.encrypt(text, passphrase)` = OpenSSL AES-256-CBC, key+IV via EVP_BytesToKey(MD5,1),
 output `base64("Salted__"+salt+ct)`. Passphrase = a static key.
 - **Key is in Credential Manager**, one per installation, stored per environment as
   `agents-and-tools:procesio:form-code-key@<environment>` (the bare `form-code-key` is
-  the default environment's; `tools/procesio/form_code_keys.py`) — NEVER in any file
+  the default environment's; `tools/procesio/form_code_keys.py`) - NEVER in any file
   (Hard rule 1). Declared in `tool.yaml` secrets.
 - Build via `css:"..."` / `javascript:"..."` (or `code:{css,javascript}`) on the form
   config. Empty → `code:""` (forms render fine without it). Impl: `code_cipher.py`
@@ -52,7 +52,7 @@ output `base64("Salted__"+salt+ct)`. Passphrase = a static key.
   the JS as a RUN_JAVASCRIPT form event at render; the host webapp does the AES step. There
   is NO plaintext css/js field on the DTO (team confirmed: no unencrypted path).
 
-## 5. Restyling an EXISTING form — use `form-set-code`, never `form-edit`
+## 5. Restyling an EXISTING form - use `form-set-code`, never `form-edit`
 `form-edit` is a desired-state editor: it rebuilds the whole DTO from a config, so
 pointing it at a large hand-authored form to change one field means re-declaring every
 element or losing them. Use the surgical pair instead (handlers/form_code.py):
@@ -61,16 +61,16 @@ element or losing them. Use the surgical pair instead (handlers/form_code.py):
 of css/js preserves that side; the overwritten code comes back under `previous`, so a
 mistaken overwrite is recoverable from the tool output alone.
 - `PUT /api/FormTemplate` wants the PascalCase envelope (`Id/Name/IsPrivate/Type/Status/
-  State/Assignees/Data/CustomUrl`) while the GET returns it camelCase — map explicitly.
+  State/Assignees/Data/CustomUrl`) while the GET returns it camelCase - map explicitly.
 
 - **`{"JAVASCRIPT": null, "CSS": null}` is a NORMAL decrypt result, not a corrupt blob.**
   The designer seeds both slots to null, so that is what every form that never opened
-  "Switch to code" carries — and a form can also carry a JS slot holding only the
+  "Switch to code" carries - and a form can also carry a JS slot holding only the
   designer's boilerplate comment. Normalize null → `""` before doing anything with a
   length or a concatenation (`_decode` does; a `len(None)` crash here was a real bug).
 - **A wrong passphrase and a corrupt blob are indistinguishable at the API layer**: both
   surface as a `UnicodeDecodeError` after AES runs and emits garbage. Diagnose by
-  round-tripping `encrypt_code`/`decrypt_code` with a throwaway key — if that works, the
+  round-tripping `encrypt_code`/`decrypt_code` with a throwaway key - if that works, the
   blob is fine and the KEY is wrong. Note also that the workspace API key (name + value)
   and the form-code passphrase are DIFFERENT secrets that look alike (short opaque
   tokens); the API key gets you *at* the form, the passphrase gets you *into* `Data.code`.
@@ -95,10 +95,10 @@ mistaken overwrite is recoverable from the tool output alone.
 - **Form-level JS is replayed as a synthetic RUN_JAVASCRIPT event on mount and on every
   re-trigger, inside a throwaway sandbox iframe whose window is destroyed and rebuilt each
   time.** So anything that must OUTLIVE one run (listeners, MutationObservers, timers)
-  cannot live in that scope — it dies with the iframe. The pattern that works: from the
+  cannot live in that scope - it dies with the iframe. The pattern that works: from the
   sandbox, inject a `<script>` ONCE into `window.parent.document`, carrying the real
   runtime (`'(' + fn.toString() + ')();'` avoids escaping). Guard both layers with a
-  flag — the installer re-runs, and a second copy means doubled handlers. The platform
+  flag - the installer re-runs, and a second copy means doubled handlers. The platform
   confirms the reach itself: the JS slot's shipped boilerplate reads
   `console.log(window.parent.document); -> to access the DOM`.
 - **Controls are re-created, not hidden**: `Element.component.vue` renders under `v-if`,
@@ -114,7 +114,7 @@ mistaken overwrite is recoverable from the tool output alone.
   `pds-c-radiobox--is-checked`, `pds-c-button--solid-primary`, `pds-c-step--header--circle`
   `[--active]`, `pds-c-step-connector`). The `pds-c-*` INTERNALS are not in this repo
   (they ship in `@procesio/procesio-design-system`), so only the ones the renderer's own
-  SCSS references are safe to target — anything deeper must be checked against a live
+  SCSS references are safe to target - anything deeper must be checked against a live
   render first.
 
 ## Source of truth

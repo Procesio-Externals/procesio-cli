@@ -1,4 +1,4 @@
-# 08 — Pitfalls: symptom → cause → rule
+# 08 - Pitfalls: symptom → cause → rule
 
 Every one of these was found by breaking something real. Scan the **symptom**
 column first; that is how you will meet them.
@@ -45,7 +45,7 @@ everything from the current DOM on every pass.
 
 ### An entire step renders completely blank
 **Cause.** A class that sets `opacity: 0` was removed only in response to an
-observed DOM mutation — and that mutation did not arrive (or the observer's target
+observed DOM mutation - and that mutation did not arrive (or the observer's target
 had been replaced). Measured: `at200 opacity=0.002 → at1500 opacity=0`, never
 lifting.
 **Rule.** **A visual state must never depend on an event that may not come.** Lift
@@ -62,6 +62,17 @@ fires the user is told what to do instead ([05](05-STEPPER-AND-MOTION.md) §5).
 **Cause.** Readiness counted hidden fields. A field that is gated can never be
 filled, so the gate never opens.
 **Rule.** Only `el.offsetParent !== null` fields count toward readiness.
+
+### The runtime cannot see what the form-load process was sent
+**Cause.** The form-load RUN_PROCESS publishes before the `Data.code` runtime has installed
+its XHR / fetch hook, so the request body (the inputs, for example the signed-in user's name
+and e-mail from `instance.currentUser`) is never captured. The browser's resource-timing
+buffer lets the runtime see that the call happened, never what it carried. Seen on a live
+form: the greeting stayed without a name while the same code worked on a replica, where the
+hook was in place first.
+**Rule.** Read anything the runtime needs from a call the runtime itself triggers (a hidden
+RUN_PROCESS button it clicks after installing), or have the process return it as an output.
+Never depend on the body of a request that leaves before the runtime exists.
 
 ### A field is invisible but Tab still lands in it
 **Cause.** Hidden with `visibility: hidden` or `opacity: 0`.
@@ -90,6 +101,13 @@ invisible from the first frame, the form-level CSS in `Data.code` is the only su
 applied at render that can hide it. Per-element `style` takes only theme variables
 ([01](01-ANATOMY.md) §4), and writing `Data.code` needs the right key
 ([07](07-DEPLOY-WORKFLOW.md) §2).
+When every section stays hidden until a load process answers (an account check that shows one
+of several sections), the card is empty for those seconds. Give every state paragraph a shared
+class and draw a skeleton from CSS alone:
+`.form-builder--form-body:not(:has(.state-a)):not(:has(.state-b))::before { … }`. It shows from
+the first frame and leaves by itself when any section renders, with or without the JS. The
+scoper keeps `:has()` written this way, one simple selector per `:has()` (verified on a live
+form, 2026-10-26).
 
 ---
 
@@ -103,11 +121,11 @@ from the reactive field object, so assigning `infoText` on
 than `value`, `visible`, `required` and `readonly`: on a select built through the API it
 carried 15 properties, `label` and `placeholder` among them. What it carries follows the
 form's data model; see *A script reads a select's options and gets nothing*.)
-**Rule.** Drive live text — counters, running totals, quota hints — by writing the DOM
+**Rule.** Drive live text - counters, running totals, quota hints - by writing the DOM
 node. Note that when `info-text` is empty the message component is never rendered at all
 (`v-if` on a truthy value), so there is no node to write into: either set a non-empty
 `info-text` in the designer, or create the node yourself.
-See [`../dto/form/description.md`](../dto/form/description.md) for the selector details —
+See [`../dto/form/description.md`](../dto/form/description.md) for the selector details - 
 the control's DOM `id` equals its `name` config and sits on the `.pds-c-input-group`
 wrapper, not on the `<input>`.
 
@@ -124,7 +142,7 @@ the option's value and re-selects it.
 state, and dispatch nothing.
 
 ### Every field-matching function silently returns null, on every field
-**Cause.** The form's inputs carry an **empty `label` config** — their visible label
+**Cause.** The form's inputs carry an **empty `label` config** - their visible label
 is a separate `paragraph` element sitting above each one, which is a common way to
 build a form whose labels need styling the control does not offer. The label-matching
 handle then has nothing to match on: `.pds-c-input-group--label` is absent and the
@@ -132,7 +150,7 @@ control's own `textContent` is empty (a placeholder is an attribute, not text). 
 on a live form where an entire step's gating had never once executed, with no error
 anywhere and no visible symptom other than the feature simply not happening.
 **Rule.** Before building anything on label matching, **check that the labels exist**
-— one `querySelectorAll('.pds-c-input-group--label')` on the rendered form answers it.
+ - one `querySelectorAll('.pds-c-input-group--label')` on the rendered form answers it.
 When they do not, fall back to an **element-id → field-name map generated from the
 DTO**, say in a comment where it came from and how to regenerate it, and keep the rest
 of the code speaking names. Ids are the weaker handle, but a weak handle that resolves
@@ -142,12 +160,12 @@ beats a strong one that returns null.
 **Cause.** A lookup returned null and every caller guarded it with `if (!key) return;`.
 Defensive early-returns turn a wiring failure into silence.
 **Rule.** When a mapping function can legitimately return null for SOME nodes, assert
-that it resolves for **at least one** — a `console.warn` when a whole pass resolves
+that it resolves for **at least one** - a `console.warn` when a whole pass resolves
 zero fields would have caught the above on first load.
 
 ### The wrong field gets a value / a label match hits the wrong control
-**Cause.** A substring label match, ordered shortest-first. `'id — series'` matches
-inside `'id representative — series'`.
+**Cause.** A substring label match, ordered shortest-first. `'id - series'` matches
+inside `'id representative - series'`.
 **Rule.** Order the label table **most specific first**, and normalize diacritics
 and case on both sides of every comparison.
 
@@ -238,19 +256,235 @@ scripts survived it.
 before and after and diff them, rerun the form's live checks, and Publish. Better still,
 change API-built forms only through the builder.
 
+### A validator reports filled fields as empty, but only after an earlier step ran
+**Cause.** Two element scripts install the same shared runtime (a field collector, a validator)
+behind the same version guard (`if (!W.__x || W.__x.v !== 14)`) but with different payloads, for
+example a short field list on step 1 and the full list on step 2. Whichever runs first wins; the
+second sees "v14 already there" and never installs, so its fields are never collected and every
+one of them reads as empty. Each script is correct alone, so testing a step on its own passes.
+**Rule.** One payload per version number, identical wherever it is pasted. A script with a
+different payload gets its own version (or its own global). When auditing, list every copy of a
+runtime with its guard and a hash of its payload: same guard + different hash = this bug.
+
+### A "checked" rule on a table's checkbox passes only when the FIRST row is ticked
+**Cause.** A control placed in a dynamic table row renders once per row with the same `id`. A
+collector that reads `[id="checkboxN"]` takes the first rendered match, so a validator rule
+"checkboxN must be checked" really means "row 1 must be checked". Any valid selection that leaves
+row 1 out (a line in another currency, the other half of a 50/50 pair) fails, with the error
+anchored under row 1. It hides well: the first test usually ticks row 1.
+**Rule.** A rule about a table's selection is a rule about ALL its rows: call the selection
+guard's own `check()` (the one the submit button already runs) instead of reading one id.
+
+### Buttons drawn over a radio group never show the selection
+**Cause.** The design system's radio renders the option value as a `modelvalue` ATTRIBUTE on the
+`<input type="radio">` and gives it no `value` attribute, so `input.value` is the browser default
+`"on"` for every option. Code that matches options by `input.value` never finds one, and code that
+reads the checked input's `.value` reads `"on"`. The click still lands (the model changes), so the
+form looks unclickable while the data is right. A local replica that draws its own radios with a
+`value` attribute passes every test. Measured in the forms bundle (Radiobox.component), 2026-10-26.
+**Rule.** Read a radio's value with `input.getAttribute('modelvalue')`, falling back to `.value` only
+when the attribute is absent. Each option is `label.pds-c-radiobox--group > input.pds-c-radiobox--field
++ span[role=radio][aria-checked] + span.pds-c-radiobox--label`. Draw it the same way in a replica.
+
+### Every row of a dynamic table comes with two empty padded strips and a frame inside the frame
+**Cause.** The design system's table puts each item between two helper rows
+(`tr.pds-c-table--row--before` / `--after`, one `td[colspan]` each) and a dynamic row nests its own
+`table.pds-c-table` inside the Table's `tbody` ([03](03-DOM-CONTRACT.md)). A stylesheet rule that gives
+every `td` a padding and a bottom border, and every `.pds-c-table--container` a frame, turns each data
+row into three bands and draws a second frame inside the first. A column defined with no key and no
+label still draws an empty `th#th` and an empty cell in every row.
+**Rule.** Hide the helper rows, take the frame and padding off the inner container and its wrapper
+cells, and style only the data rows (`tr.pds-c-table--row:not(.pds-c-table--row--before):not(.pds-c-table--row--after)`)
+as flex rows sharing the header's columns. Hide `th#th` and a cell holding neither an element nor
+text. Measure on the live structure: a replica that builds tables with one `innerHTML` cannot nest a
+`div` in a `tbody` or a `tr` in a `tr` (the parser moves them), so build that structure with
+`createElement`.
+
+### Changing anything on an earlier step throws the user forward to the step they left
+**Cause.** A copy of the "go to the next step" script (click the stepper's Next, scroll to the top)
+was left at the end of input chains (a select, an upload) where a loader-hide belongs. While the later
+steps are hidden, Next has nowhere to go and nothing shows. Once they are open, every change on the
+earlier step (a new choice, a re-uploaded document) jumps forward without the change being confirmed.
+**Rule.** An input chain ends by hiding the loader, nothing else; only a confirm or validate button
+moves the stepper. When auditing a form, hash the last script of every chain and look at where each
+copy of a navigation script sits.
+
+### Re-confirming an earlier step leaves the later steps built for the old choice
+**Cause.** A step's confirm chain renders the next step for the current choice (which branch shows,
+which Validate button, the lists), but nothing resets what the later steps already did: their
+Validate / Modify buttons, their validation flags, their visibility. After switching a choice and
+confirming again, a later step can show the old branch, or a Modify next to a Validate, until every
+step is passed again.
+**Rule.** Lock an earlier step once it is confirmed, the way validated steps are locked, and give it
+its own Modify. Make its confirm chain reset the later steps with the same MAP rows their Modify
+buttons write (fields unlocked, flags 0, later steps hidden), generated from those buttons rather
+than typed again. Keep the forward navigation closed while the earlier step is open for changes.
+
+### Injecting an icon next to process-drawn content breaks the code that reads that content
+**Cause.** Code located the chart a process drew with the first `svg[viewBox]` in the element's
+wrapper. A header added at the top of that wrapper carried icons, which are `svg[viewBox]` too, so the
+next pass read an icon as the chart, found no data, turned the feature off and removed the header, and
+the pass after found the chart again: an on/off loop every refresh, a DOM that never went quiet and a
+loader that waited for quiet and never closed.
+**Rule.** Query process-drawn content inside its own container (`.form-builder--paragraph svg`), never
+by tag in a wrapper you also decorate. A loader or "settled" check that waits for a quiet DOM turns
+any such loop into a frozen form, so when one hangs, count mutations per target for two seconds first.
+
+### A choice drawn over a select falls back to the native list for good
+**Cause.** Buttons that pick through the real vue-multiselect (open it, click the option, check the
+shown label) verified the pick on the nodes the pick started on. The option's own chain often
+re-renders that select (a MAP showing the fields of the chosen document type), so the check read a
+detached node, counted the pick as failed and switched that field to the native dropdown for the rest
+of the session, while the value had in fact been set.
+**Rule.** Verify on the field as it is now: query it again by id, and after a failed check wait for the
+chain to finish and compare the value attribute before calling it a failure. A fallback to the native
+control lasts until the field has a value, then the buttons come back showing it.
+
+### One control that changes form with the data reads as two controls
+**Cause.** A picker laid over a chart a process had drawn (each chart row matched to its table row)
+gave the table back whenever one row could not be matched. Depending on the document, the user met
+either the chart as a selector or the table as a selector, and reported it as a bug.
+**Rule.** One selector, always in the same form. A chart drawn by a process stays a picture; the choice
+is made in a control of its own, preferably the one the form's own checks already measure.
+
+### A field shows a required mark that nothing enforces
+**Cause.** The step validators were scripts that each carried the WHOLE form's rules but checked only
+the fields rendered on their own step. Required marks taken from "whichever validator has a rule for
+this field" marked fields that the validator of their own step had dropped on purpose (a legal
+representative's personal-ID number on a company client), so the page claimed a requirement that no
+validation ever applied.
+**Rule.** Take a field's required flag only from a validator of its own step or branch; a rule found
+only in another step's validator may still lend its format hint, never the mark. Apply the same test
+before trusting the platform's own `required` flag on a field: when no validator of its step checks it,
+say so to whoever owns the form instead of guessing which one is wrong.
+
+### A process warning outlives the file it was about, or shows in two looks
+**Cause.** An upload's process wrote its warning into a paragraph (visible + label from the outputs),
+and the page also showed its own message under the dropzone. The paragraph was hidden only while the
+page's message was up: when the message cleared (the file was removed) the paragraph, still holding
+the old warning, came back, and on the paths where the page's message did not fire the paragraph
+showed alone in its own design.
+**Rule.** When the page reports an upload's outcome, it owns that warning paragraph completely: the
+paragraph never shows, its text appears in the page's message, and only while the file is there.
+
+### The page runs hot with nothing happening
+**Cause.** A decorative full-screen canvas (gradients, particles) redrawn on every animation frame at
+the device pixel ratio. On a 2x screen that is four times the pixels of the CSS size, sixty times a
+second. The script time per frame is small (about 0.25 ms measured), so a JS profile hides it: the
+cost is the painting, which a headless measurement on a 1x screen does not show either.
+**Rule.** Draw a soft background at 1 pixel per CSS pixel and cap it at about 30 frames a second; stop
+it when the page is hidden. Keep the refresh pass that styles the form cheap and measured (a counter of
+passes and milliseconds per pass), and keep a network log's response bodies to the newest per address:
+a polled answer otherwise stays in memory once per poll.
+Measured at 4x CPU throttling (`web perf-probe`), the 1x / 30 fps canvas still held the main thread at
+about 100% (16 fps, every frame a long task) while its script took under 1 ms a frame: the four
+full-screen gradient fills were the cost. Draw the soft gradients on a second canvas at an eighth of
+the pixels, let the compositor scale it up (identical to the eye), redraw it a few times a second, and
+keep only the small shapes on a transparent full-size canvas, links batched into a few strokes. On a
+machine that is still too slow, freeze one frame instead of animating
+([05](05-STEPPER-AND-MOTION.md) §7).
+
+### The whole page jumps when the runtime arrives (layout shift above 1)
+**Cause.** The runtime mounted its body-level UI (a background canvas, a header, a loader) before it
+copied the form's CSS scope onto `<html>` ([02](02-CODE-INJECTION.md) §2). Until then the scoped
+sheet does not reach those nodes: the canvas is an inline element sized by its `width` / `height`
+attributes, a full screen tall, and pushes the whole app below the fold; the header shows its logo
+SVG at natural size. One refresh pass later the scope arrives and everything jumps back. Two shifts of
+about 0.57 each, invisible on a fast machine, a visible flash on a slow one.
+**Rule.** Propagate the scope before the first mount, not inside the first refresh. As a backstop, put
+one rule in the critical (unscoped) import: `html:not([data-form-css-scope]) body > .<runtime-root>
+{ position: fixed !important; visibility: hidden !important; }`.
+
+### A thin moving strip on the card repaints the whole form every frame
+**Cause.** The strip was the card's own background, animated with `background-position`. A background
+change repaints the element, so the card, its content and its large shadow were painted again on
+every frame, forever.
+**Rule.** Move whatever moves into a pseudo-element no bigger than the moving part. A strip along the
+top edge: `::before`, absolutely positioned, as tall as the corner radius, `border-radius: inherit`
+with the bottom corners at 0, so the same corners clip it. The look is the same; the repaint is a band.
+
+### With the canvas gone, the repeating CSS animations still take half the main thread
+**Cause.** Two dozen `infinite` animations on paint properties (`box-shadow` pulses, `background-position`
+sheens, `fill` waves on SVG dots, `left` sweeps), each repainted and restyled every frame. Measured at
+4x: about 50% of the main thread, against 3-6% with them stopped.
+**Rule.** Keep them for devices that can afford them and stop them on the others behind an attribute
+on `<html>`. Generate the stop rules from the CSS at build time (every rule with a repeating
+animation gets a twin under the attribute that keeps only its finite parts), so a new animation is
+covered the day it is written; exempt the loops that report progress (spinners, skeletons, a loader).
+
+### A heading (or paragraph) holding a banner shrinks to its text
+**Cause.** The element wrapper is a flex item in the step's layout; `width: 100%` on the inner
+heading is 100% of a wrapper that has already shrunk to its content.
+**Rule.** Widen the innermost wrapper that holds the banner and everything below it:
+`.form-builder--element:has(.banner):not(:has(.form-builder--element .banner))` and its
+`:has(.banner)` descendants. Never `.form-builder--element:has(.banner)` alone: the step and
+stepper wrappers contain the banner too, and a `display` rule there shows the hidden steps.
+
+### Columns stacked on top of each other leave a tall empty band under short ones
+**Cause.** The theme sizes every column wrapper with `.form-builder--columns > .form-builder--element
+{ flex: 1 0 var(--min-w-column) }` (150px by default) and every column with `height: 100%`. Turn the
+block into a vertical stack (`flex-direction: column`) and that flex-basis becomes a 150px minimum
+HEIGHT: a two-line question in the first column gets ~80px of nothing under it. The theme's column
+defaults add more: 16px paddings, `--min-h-column: 84px`, a grey column background, and a block
+frame whenever a `Border color` is enabled in the element's style config (the width defaults to 1px).
+**Rule.** When you stack columns, set the wrappers to `flex: 0 0 auto` and the column and its
+`--content` to `height: auto`, and zero the theme variables (`--pv-column`, `--ph-column`,
+`--min-h-column`, `--bw-columns`) on the block. Measure in a browser that loads the platform's own
+stylesheet; a replica without it shows none of this.
+
+### A dialog's content jumps up when someone ticks a box in it
+**Cause.** A visually hidden checkbox (1px, absolutely positioned) got focus on the click and the
+browser scrolled it into view. The nearest scrollable ancestor was the dialog card itself:
+`overflow: hidden` still lets the browser scroll an element from code, so the header, body and
+footer slid up inside the card and left an empty block below.
+**Rule.** Give dialog cards `overflow: clip` (it cannot be scrolled at all), lay the real input over
+its own label (`position: absolute; inset: 0; opacity: 0`) so focusing it needs no scrolling, and
+reset `scrollTop` on the card's `scroll` event as a fallback.
+
+### A rule that hides an element loses to an older `display: flex !important`
+**Cause.** Two `!important` declarations: the one with higher specificity wins, wherever it sits.
+`.element--inline:has(> .button)` (two classes) beats a single-class `.is-hidden`.
+**Rule.** A state class that hides an element needs at least the specificity of every rule that
+displays it (`.form .element.is-hidden`), and a check in the browser that it is really hidden
+(`getClientRects().length === 0`), not just a class on the node.
+
+### Icons injected into a paragraph come out huge
+**Cause.** A rule written for the paragraph's own content (`.paragraph svg { width: 100%
+!important }`, to scale a chart) also hits every icon a runtime appends there later.
+**Rule.** Scope content rules to what the content is (`svg[role="img"]` for a chart the process
+draws), never to the tag alone.
+
+### A long AI extraction is reported as failed while it is still running
+**Cause.** One fixed ceiling was used both to close the loader and to declare failure; a
+multi-page PDF read by a language model can take longer, and the result then lands on a screen
+that already said "nothing found".
+**Rule.** Separate a soft ceiling (the message changes to "taking longer than usual", the wait
+goes on) from a hard cap. Count what the run produced from the page when it lands (tables and
+charts arrive only after the MAP that follows the process), not at the moment the run ends. In
+the `/variables` answer, instance status 6 (stopped) and 40 (finished with errors) end the wait
+as failures.
+
+### A value written to `<element>.<config>` lands on a different element
+**Cause.** Config ids are NOT unique across a form: elements built from the same template share
+config ids (several steps carried the same id for `visible`). A lookup keyed by config id alone
+resolves the value path `{root}.{FIELDS_NS}.{elementId}.{configId}` to whichever element was
+indexed last.
+**Rule.** Resolve by the pair (element id, config id), always. The tool's handlers do; a script
+or a replica that builds its own index must too.
+
 ## Mapping and processes
 
 ### `[object Object]` lands in every field
 **Cause.** A structured variable was mapped as a whole, or the row's `path`
 attribute chain was dropped during a rewrite. The form side's path shape is typed
-`any` in the renderer — it is **not derivable** and cannot be guessed correctly.
+`any` in the renderer - it is **not derivable** and cannot be guessed correctly.
 **Rule.** Eliminate paths: one process output variable per field, all primitives,
 split by small Node actions ([06](06-PROCESS-INTEGRATION.md) §4).
 
 ### The designer shows raw guids and the launch 400s
 **Cause.** A variable **name** on the left of a map row. The API accepts it.
 **Rule.** The process-variable GUID goes on the left, always. Let
-`form-set-element-event` resolve names — it fails before writing if one is unknown.
+`form-set-element-event` resolve names - it fails before writing if one is unknown.
 
 ### The designer cannot render a mapping row you wrote via the API
 **Cause.** The sides were written as bare strings.
@@ -258,7 +492,7 @@ split by small Node actions ([06](06-PROCESS-INTEGRATION.md) §4).
 process side and `path: null` on the form side.
 
 ### The process runs but the outputMap populates nothing
-**Cause.** `syncRun: false` — the form fired and forgot.
+**Cause.** `syncRun: false` - the form fired and forgot.
 **Rule.** `syncRun: true`. Verified to hold the line open across a multi-second
 external call.
 **Observed timing with `syncRun: false` (2026-10-22, FORM_LOAD and click chains):** the
@@ -280,7 +514,9 @@ success output leaves the signer looking at a button that did nothing.
 
 ### The process launches twice per interaction
 **Cause.** Two `RUN_PROCESS` events on the same trigger.
-**Rule.** One event per trigger; rewire with `--replace`.
+**Rule.** One event per trigger; rewire with `--replace`. Read their conditions first: two events
+whose conditions exclude each other are one run per interaction, and they are a valid way to route
+one trigger to two inputs.
 
 ### A Node action is rejected at save time
 **Cause.** `Timeout` outside 60–300, or a superseded action (`Call API v3`).
@@ -288,15 +524,24 @@ success output leaves the signer looking at a button that did nothing.
 / `Time Out`. Remember `Node` returns raw while `Javascript` wraps as `{result: v}`.
 
 ### Fields come back empty but the call succeeded (status 200, valid body)
-**Cause.** Extraction quality — the model returned mostly nulls for a partially
+**Cause.** Extraction quality - the model returned mostly nulls for a partially
 legible document. Not a wiring failure.
 **Rule.** Carry a `warning_status` / `warning_message` pair out of the process so
-the form can tell the two apart, and never throw inside a parse Node — return a
+the form can tell the two apart, and never throw inside a parse Node - return a
 diagnosable object.
 
 ### A file variable is rejected
 **Cause.** `file` is not a type.
 **Rule.** Use the `FileDataModel` model.
+
+### Removing an uploaded file starts the extraction again, on nothing
+**Cause.** An upload's input chain also runs when the file is removed (the value becomes empty). A
+`RUN_PROCESS` event in it without a condition then calls the extraction with no file: a paid call, a
+loader for nothing, and outputs that may or may not clear what the last file produced.
+**Rule.** Give every process call on an upload chain the condition `IS_NOT_EMPTY` on the upload's own
+value (the same path an `IS_EMPTY` MAP of that chain already tests), as a sibling upload's chain
+usually does already. Hide or clear what the old file produced (tables, a chart) in the `IS_EMPTY`
+branch or from the page, so nothing chosen from a removed file stays on screen.
 
 ---
 
@@ -304,7 +549,7 @@ diagnosable object.
 
 ### The page will not scroll; the bottom of the form is unreachable
 **Cause.** `overflow: hidden` on `.form-builder--form`.
-**Rule.** Never. Clip with a **background** instead — backgrounds honour
+**Rule.** Never. Clip with a **background** instead - backgrounds honour
 `border-radius` for free.
 
 ### The pinned footer lands on top of the content
@@ -314,7 +559,7 @@ for `position: fixed` descendants.
 `perspective`, or `will-change: transform` on the card.
 
 ### An animated gradient bar vanishes after the first cycle
-**Cause.** `background-repeat: no-repeat` while animating `background-position` —
+**Cause.** `background-repeat: no-repeat` while animating `background-position` - 
 the gradient simply slid away.
 **Rule.** `repeat-x`, gradient starting and ending on the same colour, travel
 exactly one tile per cycle.
@@ -327,15 +572,24 @@ selectors when the structure is unknown.
 
 ### A `<div>` written into a paragraph is not where the CSS expects it
 **Cause.** `Paragraph.component.vue` renders `<p v-html="sanitizeHtml(...)">`, and the
-HTML parser cannot nest a `<div>` inside a `<p>` — the block is hoisted out and lands
+HTML parser cannot nest a `<div>` inside a `<p>` - the block is hoisted out and lands
 as a SIBLING of an now-empty `<p>`. Selectors written against `p > .my-block` match
 nothing, and the wrapper is `display: flex`, so the hoisted block becomes a flex ITEM
 sized to its content: a centred block sits off to one side of the column it should fill.
 **Rule.** Style the wrapper's children, not the `<p>`:
 `.form-builder--paragraph { align-items: stretch } .form-builder--paragraph > * { flex: 1 1 auto; min-width: 0 }`.
 DOMPurify's defaults keep `class`, `style` and `data-*`, so authored paragraph HTML can
-carry real classes — do that instead of inline styles, which only `!important` can
+carry real classes - do that instead of inline styles, which only `!important` can
 override later.
+**Where the block lands depends on how the HTML was parsed, so write CSS for both.** Measured
+on a live form (2026-10-26): `v-html` sets `innerHTML` on the `<p>` itself, and fragment parsing
+in that context keeps the `<div>` INSIDE the `<p>` (`block.parentElement.tagName === 'P'`). A
+page parsed as a whole document, or a local replica that builds the body with one `innerHTML`
+on a container, hoists it out as described above. So never select `p > .block` or
+`.form-builder--paragraph > .block`; select the block's own class and give it its own layout.
+The sanitizer is `DOMPurify.sanitize(html, { ADD_ATTR: ['target'] })`, so `target="_top"` on a
+paragraph link survives. Inside a link keep the content inline (`<span>`s styled as blocks): on
+the hoisting path a `<div>` inside an `<a>` inside a `<p>` is split by the parser.
 
 ### An `<img>` icon will not take a colour
 **Cause.** The colour is baked into the icon service URL; `color` does nothing and
@@ -383,7 +637,7 @@ that a narrow-screen media query comes after the wider one in the file: a
 
 ### A second, native stepper appears next to the custom one
 **Cause.** The platform's nav renders as soon as the stepper's `steps` config names
-the real step elements — which happens the next time the form is saved.
+the real step elements - which happens the next time the form is saved.
 **Rule.** If you draw your own rail, hide theirs explicitly:
 `.form-builder--stepper--nav { display: none !important; }`.
 
@@ -394,7 +648,7 @@ information is worse than a stale frame.
 
 ### Step detection breaks after a redesign
 **Cause.** Matching on a design-system wrapper class.
-**Rule.** Match on the visible banner text — that text is the form's own content.
+**Rule.** Match on the visible banner text - that text is the form's own content.
 
 ### Custom step labels drift from the form's
 **Cause.** A second, hand-maintained list.
@@ -404,7 +658,7 @@ back to the hard-coded list only if the counts disagree.
 ### A gated "next" button lets a fast clicker straight through
 **Cause.** Two independent leaks, both measured on a replica:
 1. the gate was a **class on the button**, and the renderer destroys and recreates the
-   nav buttons on every step change — the class is gone by the next click;
+   nav buttons on every step change - the class is gone by the next click;
 2. a step change is **not synchronous**. Until the swap lands, `currentStep()` still
    reports the step you just left, so a burst of clicks each read "this step is fine"
    and each advances one step. Three clicks jumped from step 1 to step 4, past two
@@ -419,14 +673,14 @@ last advanced FROM, released when `currentStep()` actually changes.
 arrives, and readiness counts those hidden required fields. If the prerequisite fails,
 the step is unreachable in both directions.
 **Rule.** Whenever a step hides what it also requires, ship the **manual way out in the
-same change** — an always-visible control that opens the fields — not a timeout. A
+same change** - an always-visible control that opens the fields - not a timeout. A
 toast promising "you can fill these in by hand" over fields that are still hidden is
 worse than no promise.
 
 ### The recompute loop stops the moment nobody is looking
 **Cause.** `requestAnimationFrame` does not fire in a **backgrounded or hidden tab**,
 and the recompute loop hangs entirely off it. Harmless for a person (nothing to see),
-but it makes the form look frozen to any automated check — the page renders once and
+but it makes the form look frozen to any automated check - the page renders once and
 never updates, with no error to find.
 **Rule.** Know this before debugging a "form.js stopped working" in a headless or
 side-panel browser. Give the local replica a switch (`?raf=timeout`) that swaps rAF for
@@ -455,7 +709,7 @@ not a corrupt blob.
 **Cause.** Both surface identically as a `UnicodeDecodeError`.
 **Rule.** Round-trip `encrypt_code`/`decrypt_code` with a throwaway key. If that
 works, the blob is fine and the key is wrong. Also check you are not confusing the
-workspace API key with the form-code passphrase — both are short opaque tokens.
+workspace API key with the form-code passphrase - both are short opaque tokens.
 
 ### A PUT starts failing for no visible reason
 **Cause.** An unexpected extra field from the GET was echoed back, or camelCase was
@@ -526,17 +780,17 @@ the first three (see `tools/procesio/formlint.py`); the doctrine is in
 
 ### An element saves fine but renders on NO tab / pane
 **Symptom.** The element exists in the DTO and the PUT succeeds, but it appears on
-no tab — invisible in the rendered form.
+no tab - invisible in the rendered form.
 **Cause.** Its `parentId` references no element on the form (a phantom parent). Tab
 and container membership is by `parentId` = a container element's id (§01-ANATOMY);
 a dangling id is silently placed nowhere.
 **Rule.** Point `parentId` at a real container/tab element id, or `null` for a
-top-level element. (Lint: "phantom parent — renders on NO pane".)
+top-level element. (Lint: "phantom parent - renders on NO pane".)
 
 ### A form-update patch changes nothing, silently
 **Symptom.** `form-update` returns applied, but the form is unchanged.
 **Cause.** The `--data` patch was wrapped as `{"Data": {...}}` (or a top-level key
-was mistyped). The deep-merge adds it as a NEW key inside `Data` — inert junk — and
+was mistyped). The deep-merge adds it as a NEW key inside `Data` - inert junk - and
 never touches the field you meant. Deep-merge also REPLACES arrays wholesale and
 sets `null` rather than deleting.
 **Rule.** Pass the INNER fields directly: `--data '{"hideBranding": true}'`, not

@@ -1,4 +1,4 @@
-# PROCESIO environments — model & mechanics
+# PROCESIO environments - model & mechanics
 
 PROCESIO ships as independent installations with no data path between them (each has
 its own hosts, its own accounts). This tool models each installation as a named
@@ -9,9 +9,9 @@ credential to one environment.
 
 | field        | what it is                              | prod value                 |
 |--------------|------------------------------------------|----------------------------|
-| `web_base`   | Web API — every REST call                | `https://webapi.procesio.app` |
-| `app_base`   | designer / front-end — designer URLs + the login CORS `Origin`/`Referer` | `https://procesio.app` |
-| `forms_base` | public forms host — rendered-form URLs   | `https://forms.procesio.app` |
+| `web_base`   | Web API - every REST call                | `https://webapi.procesio.app` |
+| `app_base`   | designer / front-end - designer URLs + the login CORS `Origin`/`Referer` | `https://procesio.app` |
+| `forms_base` | public forms host - rendered-form URLs   | `https://forms.procesio.app` |
 | `auth_base`  | legacy Proxy/Authentication host (login actually goes to `web_base`; rarely used) | `https://auth.procesio.app` |
 
 The `-qa` / `-dev` installations follow a host family: `webapi-qa.` / `qa.` /
@@ -19,11 +19,11 @@ The `-qa` / `-dev` installations follow a host family: `webapi-qa.` / `qa.` /
 
 ## Two layers, merged at read time
 
-- **Built-in presets** in `environments.py::BUILTIN` (`Internal-PROD/QA/DEV`) — PROCESIO's
+- **Built-in presets** in `environments.py::BUILTIN` (`Internal-PROD/QA/DEV`) - PROCESIO's
   own infra, framework-shared, available with zero setup. These are *framework* data
   (public app hostnames), like the historical hard-coded defaults were.
 - **User registry** at `context-state-knowledge/config/procesio/environments.json`
-  (per-user, wipeable) — client-specific environments (`Acme-*`, …) and the
+  (per-user, wipeable) - client-specific environments (`Acme-*`, …) and the
   `default` pointer. A user entry with a built-in's name **overrides** it (correct a
   moved Internal host without a code change). Client installation URLs are
   customer-specific, so they are **user data** and live here, never in shared code.
@@ -38,7 +38,7 @@ Active **environment** for a call, highest first:
 
 The resolved environment's URLs are folded into the profile the client holds, so
 `config.web_base/app_base/forms_base/auth_base` pick them up. An explicit per-profile
-URL override (a rare `web_base` on the credential blob itself) still wins — injection
+URL override (a rare `web_base` on the credential blob itself) still wins - injection
 uses `setdefault`.
 
 Active **credential** for a call: `--profile` → the credential bound to the active

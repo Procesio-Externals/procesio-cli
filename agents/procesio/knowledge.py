@@ -69,6 +69,8 @@ TOPICS: dict[str, tuple[str | Path, str]] = {
                      "Publishing a form and its custom URL"),
     "forms-pitfalls": (FORM_GUIDE / "08-PITFALLS.md",
                        "Known form traps and their signatures"),
+    "forms-redesign": (FORM_GUIDE / "10-REDESIGN-METHOD.md",
+                       "Redesigning a form or a family of forms: order of work, patterns, shipping, verification, performance"),
 
     "patterns": (PATTERNS / "00-INDEX.md",
                  "House implementation patterns - START HERE, names the sub-topics + the "
@@ -81,6 +83,8 @@ TOPICS: dict[str, tuple[str | Path, str]] = {
                               "How we build integrations: webhooks, ERP, SFTP, LLM extraction, documents"),
     "patterns-database": (PATTERNS / "04-DATABASE.md",
                           "How we design tables and stored procedures for PROCESIO"),
+    "patterns-optimizing": (PATTERNS / "05-OPTIMIZING-A-WORKSPACE.md",
+                            "Changing a workspace someone else built: audit, speed, recoverable failures, safe rollout"),
 }
 
 # `topic=all` concatenates everything it lists, so the form guide's chapters stay out of
