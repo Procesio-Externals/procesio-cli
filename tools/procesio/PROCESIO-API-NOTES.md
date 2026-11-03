@@ -1872,6 +1872,13 @@ Learned while installing and exercising an uploaded `.nupkg` connector end to en
    ("Failed to upload Action Template package to repository") - which reads like an
    infrastructure fault but means "duplicate version". **Increment the version after
    every failed attempt, not only after a successful one.** Use 3-segment SemVer.
+   The same 207 ("Internal Error!") comes back for a successful upload too, once its custom
+   action is deleted: the repository keeps every PackageId+Version it was given, so a NEW
+   package (different content) under an id and version it already holds is refused, while
+   the byte-identical file uploads again without complaint (seen 2026-10-29). AI Connector
+   Builder packages all start at `1.0.0.1` and the model picks the package id, so two builds
+   of a similar connector can collide: set a higher version at the Plan stage
+   (`connector-builder set-version`) before uploading a rebuild.
 
 3. **Decorator constraints enforced at upload** (`statusCode` → meaning):
    - `265` / `266` - `Min`/`Max` are accepted only on a **non-nullable `int`**. An
@@ -3385,6 +3392,14 @@ sort, and the outputs `Result Rows` (a10a), `Total Count` (a10b) and
 > that names no field. Bound to a non-list variable of the same data type it is
 > accepted, and it returns the rows as a list anyway. Isolated by posting the
 > same flow twice with one field changed.
+>
+> **Update (measured 2026-10-29): a LIST variable is now accepted and is the better
+> binding.** `process-create` with `Result Rows` bound to a `json` + `isList: true`
+> variable created the process (FE clean, BE valid), and a synchronous run read and
+> wrote the store correctly. The non-list binding still works, but the designer then
+> shows a red "Error: data type mismatch" under `Result Rows` in the Configure
+> Operation panel (it expects `list<Json>`), which is visible on camera. Binding the
+> list variable into a Node's `Code` raises only an advisory type warning.
 
 > ### ⚠ A mapper row's target is `column`, and it resolves by NAME
 >
@@ -7069,6 +7084,8 @@ their summary/description, so do not derive permissions from Swagger text alone.
   User variables (`SET @v`) work, except a text variable compared with a text column: a collation
   mismatch makes it fail with the generic "The query could not be executed." (measured 2026-10-22);
   add `COLLATE utf8mb4_0900_ai_ci` to that comparison. Detail: `PROCESIO-QUERY-STORE-NOTES.md`.
+  Fixed by Data-Store v3.1.0 plus its conversion script (prod, 2026-11-03): see the v3.1.0 / v3.2.0
+  wave below.
 
 ### Execution
 - A disabled action on the Error route is skipped (it used to be dispatched).
@@ -7343,27 +7360,40 @@ below comes from a real run.
   recorded, instead of stopping at status 40. Inside a For Each, the error branch needs its own target action
   (one incoming connection per action) and then joins the other branches.
 
-## SMTP credentials and Send Email: ports, encryption, sender (measured 2026-10-29)
-
-- **Outbound e-mail (SMTP) `Encryption` is None / TLS / Auto, and it is port-sensitive.** Measured with
-  `POST /api/Credentials/test` against a commercial relay: port 587 (and 25) connects with all three; port 465
-  (implicit TLS) connects ONLY with **Auto**. With None or TLS on 465 the test request never answers (the client
-  times out after 60 s), which reads like an outage. Rule: 587 -> TLS, 465 -> Auto.
-- **A wrong login answers state `125 CONNECT_TO_SMTP_ERROR`** with "Couldn't connect to SMTP. Either authentication
-  or connection data is invalid." followed by the server's own reason (e.g. `535 5.7.3 Authentication
-  unsuccessful`). In the UI that text sits in a read-only textarea (not DOM text): a script waits on the state
-  badge, not on the message.
-- **Send Email `From (Entity)` left empty falls back to the credential's `From`** (the mail arrived from the
-  credential's address, display name from `From (Display Name)`).
-- **A sender the relay does not accept fails the run (status 40) with the relay's own text as the action error**,
-  e.g. SendGrid's "The from address does not match a verified Sender Identity...". On SendGrid's relay the
-  credential is `smtp.sendgrid.net`, 587, user `apikey`, password = an API key with Mail Send.
-- **Call API `X_WWW_FORM_URLENCODED` body with `<%N%>` placeholders in the values** goes out as
-  `application/x-www-form-urlencoded` with the variables filled in (checked against a public echo service);
-  this is the shape an SMS provider's `/send` endpoint takes (e.g. SMSO: base `https://app.smso.ro/api/v1`, key in
-  the `X-Authorization` header, form fields `to`, `sender`, `body`; `GET /credit-check` is a free smoke test).
-- The docs.procesio.com integration pages still name the credential types "Rest API Configuration" and
-  "SMTP Server Configuration"; the type list now says "REST API" and "Outbound e-mail (SMTP)".
+## List, text, number and date actions: measured behaviour (live, 2026-10)
+- **Palette folders:** List, Numerical, String (with sub-folders RegEx and URLs) and DateTime. Search by name
+  filters actions, not folder names, and shows each hit under its folder. A few names exist twice in different
+  folders (Add, Contains, Get Index, Length, Concatenate): in a `process-create` config pin those by template id.
+- **Select options take their option VALUE in a builder config, not the label** (a label fails the designer gate
+  with `VALUE_INTEGER`): First/Last N `Sorted:` 1 Unsorted / 2 ascending / 3 descending; Sort `Input Order (A/D)`
+  `ASC` / `DESC`; Update DateTime `Unit Of Time` 1 Year ... 3 Day ... 6 Seconds; Date Difference `Unit of Time`
+  4 Day ... 8 Year; Get Week Number rules 1-3; Language fields take a culture (`ro-RO`, `en-US`).
+- **Side-panel actions build from their inner labels.** RegEx Extract / Validate / Replace, Similarity Search, Filter,
+  Simple Filter and Sort Data Model keep their fields inside a side panel; `params` keyed by the inner labels
+  (`RegEx expression`, `String to extract from`, `Filter JSON configuration`...) build and run.
+- **Sort changes the list in place** (input and output are the same variable). **First N Elements' `Sorted:`
+  option sorts only the N items it returns**: on an unsorted list it takes the first N, then orders them.
+- **Zero-based positions:** Get Index, Get Element, Substring (`Input Position`) and Take From Middle
+  (`Index starting at`). List To String renders a number list as `[1200,1200,640,250,80]`.
+- **Contains (list)** takes the item as text and matches a number list (`"1200"` in a Double list is true).
+- **To Title Case leaves a word written in capitals unchanged** (`ȘTEFAN popesku` -> `ȘTEFAN Popesku`): run
+  To Lower first. Normalize Diacritics turns `Ș` into `S`. Trim Start / Trim End trim one side.
+- **RegEx Validate is a search, not a whole-value match** (`[0-9]+` on `order 4521` is true); anchor with `^...$`
+  for a full check. RegEx Extract and Between return LISTS. Patterns without backslashes (`[0-9]`, `[.]`) avoid
+  escaping trouble when a config passes through a shell.
+- **Similarity Search** (threshold 0-1, default 0.85, limit 100) found a one-letter typo at 0.8 and returned only
+  the close name. Simple Filter `{"MatchType":"Contains","FilterExpression":"x","KeepIfTrue":true}` and Filter
+  `{"FieldMatches":[{"FieldName":"city","MatchType":"Exact","FilterExpression":"x","KeepIfTrue":true}]}` both keep the
+  matching items.
+- **⚠ Sort Data Model compares numeric fields of a Json list as TEXT:** `amount` 1200 / 250 / 80 sorts Asc as
+  1200, 250, 80 and Desc as 80, 250, 1200. Sort numbers with Sort on a number list, or pad them.
+- **Modulo takes Integers only** (a Double variable fails the BE validator with a data type mismatch). Round,
+  Round Up and Round Down take a digit count (246.912 -> 246.91 / 247.0 at one digit up / 246.9 down).
+- **String To Number** parses `1234.56`. **String To DateTime** with `Format` `dd.MM.yyyy` reads `05.11.2026`.
+  Update DateTime accepts a negative amount (goes back). Format DateTime takes a .NET pattern
+  (`dddd, d MMMM yyyy`, `en-US` -> `Saturday, 5 December 2026`); DateTime To String takes a standard letter
+  (`D` in `ro-RO` -> `sâmbătă, 5 decembrie 2026`). Today returns midnight UTC; UTC Now carries the time.
+  Date Difference / Time Difference count whole units from the first to the second date.
 
 ## Checking an email address in a process: format, MX lookup, Decisional on a json answer (live, 2026-10)
 
@@ -7389,80 +7419,6 @@ below comes from a real run.
 - **Instance view side list** ("View all instances"): its rows have no Show details button; clicking the run's id
   opens it in the same view (the small icon beside the id opens a new tab). Its search box is a placeholder
   (`Search by id`), not text.
-
-## Get File Data and row-by-row criteria loops
-
-See [PROCESIO-GET-FILE-DATA-NOTES.md](PROCESIO-GET-FILE-DATA-NOTES.md): the two layers of Get File Data's Column Definition the builder does not write, and the designer-only checks (For Each body back-connection, Decisional operand types, Validate before Run).
-
-### Export / import in the UI: what travels, and what Override data really does (2026-10, measured)
-- **Where:** the `Import / Export` button at the bottom of the admin left menu (not in the Process Designer).
-  It opens "Select action" with Export and Import. API and UI both need the workspace Admin role.
-- **Export dialog:** file name (default `export`, `.procesio` appended), an `Export all` toggle, one checkbox
-  per type with `ALL | SELECT ITEMS`. Select items adds a tab per type ("Processes (n)", "Data models (n)",
-  "Credentials (n)") with a searchable table. `Export with sensitive data` appears only once Credentials is
-  ticked. After Export the footer button turns into `Close`; the file is handed over through
-  `URL.createObjectURL` (no server download URL).
-- **Import dialog:** a drop zone with `Choose file` (no `<input type=file>` exists until the button is
-  clicked), `Override data` (default off), `Import all` plus Processes, Data models, Data stores,
-  Credentials, Documents, Forms, all unticked by default (no Webhooks checkbox: webhooks ride inside flows).
-  Success is the toast `Import completed`.
-- **A process exported alone carries neither its data model nor its credential** (`DataTypes: 0`,
-  `Credentials: 0`); select them too.
-- **Without sensitive data** a credential travels with its settings (URL, key name, header flag) and its
-  secret value `null`. **With it**, the secret is in the file in an encrypted form and works after import.
-  An exported credential also carries its creator's `firstName` / `lastName`.
-- **Override data off:** a resource whose id already exists is skipped (a process renamed after the export
-  keeps its new name). **On:** it is replaced by id, whatever its name.
-- ⚠ **Override on + a credential exported without sensitive data empties the working credential's
-  secret.** Runs then send the auth header with no value (seen against an echo service). Untick
-  Credentials on import (`importCredentials=false`) to keep the existing one; re-importing a sensitive
-  export restores it.
-- **Ready-made use cases:** the docs moved them under `docs.procesio.com/docs/marketplace/...`; a page ends
-  with its `.procesio` file. The in-app PROCESIO Library (`/FlowZy/Marketplace/Usecases`) is a form app that
-  takes 30 to 40 s to load and never finishes with the push channel blocked. The docs say its `Get free`
-  imports into a NEW `MarketPlace_...` workspace (not tried: it creates a workspace).
-
-## Plan usage, limits and the Analytics pages (seen while filming, 2026-10-29)
-
-- **Where usage is shown.** A sub-workspace dashboard has a "Workspace usage" card (processing time in
-  hours, a month picker, average platform and custom action time). The MASTER dashboard has "Plan
-  details" (plan name, monthly processing time, "Buy resources", "Your SaaS Agreement"), a "Plan usage"
-  bar ("Processing time resets on <1st of next month>"; the info icon's tooltip is "Remaining processing
-  time: hh:mm:ss") and a per-workspace "Workspace usage" list. The personal workspace shows the same Plan
-  details card for its own plan.
-- **Analytics lives in the sub-workspace, not the master**: sidebar More tools > Analytics
-  (`/admin/analytics`). "Processes Analytics" has PROCESS NAME, TOTAL PROCESSING TIME, TOTAL PROCESS
-  RUNS, ACTION RUNS, LAST UPDATE and "View instances" per row, a month picker, no search, sorted by last
-  update. "View instances" (`/admin/analytics/instances/<processId>`) lists the runs: INSTANCE ID,
-  PROCESSING TIME, ACTION RUNS, STARTED ON, LAST UPDATE, SUBMITTED BY, STATUS, and "Show details" (the
-  run's own instance view). Its range picker defaults to "Last 3 days" (Last hour ... Last year, or a
-  month). Deleted processes are rolled into one "Deleted Processes" row.
-- **Both tables pick runs up minutes late** (a run was missing for 3 to 5 minutes, then appeared), and
-  the page size chosen at the bottom stays for the rest of the browser session.
-- **Action runs leave out Start, Stop and Delay**: a Call API followed by a 5 s Delay reads 1 action run
-  and a processing time that rounds to 00:00:00.00, while STARTED ON and LAST UPDATE are 5 s apart.
-- **A run can be recorded with 0 action runs and 0 processing time** although it did the same work as
-  its neighbours: two of three `run-process --synchronous` runs of one process, and later one of seven
-  asynchronous runs, while every other run read 1. Run a few more than you need when the counters
-  matter on screen.
-- **"Record time analytics" (master > Workspaces > Edit > Resource Tracking) does not gate the Analytics
-  pages**: process and instance analytics fill in with it off. It is off for a new sub-workspace, has a
-  "Time analytics end date" and a "Time analytics storage limit", and is the `isRecordingEnabled` flag of
-  `GET /api/ResourceTrackingConfig`; the per-action breakdown `GET /api/Resources/analytics/instances/{id}/details`
-  stays `[]` while it is off.
-- **Soft and hard limits, as the UI states them**: the soft limit is the plan's monthly processing time;
-  past it processes keep running and the extra time is charged; the hard limit is "30% processing time
-  on top of your current plan" (tooltip in the workspace form). `GET /api/Resources/used` returns
-  `limit.hard` as that 30% EXTRA in ms (a 100 h plan: soft 360000000, hard 108000000), not as the total.
-  At the hard limit the app's banner says "Process execution is currently suspended until usage resets."
-- **Per-workspace execution setting**: master > Workspaces > Edit > General > "Process execution
-  settings:" offers "Suspend process execution on workspace when Company workspace resources reach soft
-  limit to avoid extra cost generated." (the default seen) or "Do not suspend ... until the hard limit".
-- **"Request upgrade" is now "Buy resources"**: the dialog "Buy resources - <Plan> Plan" picks a monthly
-  amount (from "1 hour/month"), is "Paid annually", shows "Total to be paid (without VAT)", allocates the
-  hours to a new or an existing workspace and ends in "Continue to payment" (2Checkout). The bundle
-  still carries a "Request Upgrade" button text linking to the pricing page, not shown on any dashboard
-  seen. `/admin/execution-analytics` exists only for a master on a Thread licence (it redirects otherwise).
 
 ## Find Duplicates and DeDuplicate: list deduplication, measured behaviour (live, 2026-10)
 
@@ -7499,6 +7455,81 @@ in the tree) checks a list of plain values. Both take `List to process`, the cod
   Run dialog and in Edit Variable's Default value field (saving that field would overwrite the list with the
   text). The default itself is intact: an API run with `{}` uses it. A process with no input variables starts
   at once from the designer's Run button, with no dialog.
+
+
+## SMTP credentials and Send Email: ports, encryption, sender (measured 2026-10-29)
+
+- **Outbound e-mail (SMTP) `Encryption` is None / TLS / Auto, and it is port-sensitive.** Measured with
+  `POST /api/Credentials/test` against a commercial relay: port 587 (and 25) connects with all three; port 465
+  (implicit TLS) connects ONLY with **Auto**. With None or TLS on 465 the test request never answers (the client
+  times out after 60 s), which reads like an outage. Rule: 587 -> TLS, 465 -> Auto.
+- **A wrong login answers state `125 CONNECT_TO_SMTP_ERROR`** with "Couldn't connect to SMTP. Either authentication
+  or connection data is invalid." followed by the server's own reason (e.g. `535 5.7.3 Authentication
+  unsuccessful`). In the UI that text sits in a read-only textarea (not DOM text): a script waits on the state
+  badge, not on the message.
+- **Send Email `From (Entity)` left empty falls back to the credential's `From`** (the mail arrived from the
+  credential's address, display name from `From (Display Name)`).
+- **A sender the relay does not accept fails the run (status 40) with the relay's own text as the action error**,
+  e.g. SendGrid's "The from address does not match a verified Sender Identity...". On SendGrid's relay the
+  credential is `smtp.sendgrid.net`, 587, user `apikey`, password = an API key with Mail Send.
+- **Call API `X_WWW_FORM_URLENCODED` body with `<%N%>` placeholders in the values** goes out as
+  `application/x-www-form-urlencoded` with the variables filled in (checked against a public echo service);
+  this is the shape an SMS provider's `/send` endpoint takes (e.g. SMSO: base `https://app.smso.ro/api/v1`, key in
+  the `X-Authorization` header, form fields `to`, `sender`, `body`; `GET /credit-check` is a free smoke test).
+- The docs.procesio.com integration pages still name the credential types "Rest API Configuration" and
+  "SMTP Server Configuration"; the type list now says "REST API" and "Outbound e-mail (SMTP)".
+
+## Get File Data and row-by-row criteria loops
+
+See [PROCESIO-GET-FILE-DATA-NOTES.md](PROCESIO-GET-FILE-DATA-NOTES.md): the two layers of Get File Data's Column Definition the builder does not write, and the designer-only checks (For Each body back-connection, Decisional operand types, Validate before Run).
+
+### Export / import in the UI: what travels, and what Override data really does (2026-10, measured)
+- **Where:** the `Import / Export` button at the bottom of the admin left menu (not in the Process Designer).
+  It opens "Select action" with Export and Import. API and UI both need the workspace Admin role.
+- **Export dialog:** file name (default `export`, `.procesio` appended), an `Export all` toggle, one checkbox
+  per type with `ALL | SELECT ITEMS`. Select items adds a tab per type ("Processes (n)", "Data models (n)",
+  "Credentials (n)") with a searchable table. `Export with sensitive data` appears only once Credentials is
+  ticked. After Export the footer button turns into `Close`; the file is handed over through
+  `URL.createObjectURL` (no server download URL).
+- **Import dialog:** a drop zone with `Choose file` (no `<input type=file>` exists until the button is
+  clicked), `Override data` (default off), `Import all` plus Processes, Data models, Data stores,
+  Credentials, Documents, Forms, all unticked by default (no Webhooks checkbox: webhooks ride inside flows).
+  Success is the toast `Import completed`.
+- **A process exported alone carries neither its data model nor its credential** (`DataTypes: 0`,
+  `Credentials: 0`); select them too.
+- **Without sensitive data** a credential travels with its settings (URL, key name, header flag) and its
+  secret value `null`. **With it**, the secret is in the file in an encrypted form and works after import.
+  An exported credential also carries its creator's `firstName` / `lastName`.
+- **Override data off:** a resource whose id already exists is skipped (a process renamed after the export
+  keeps its new name). **On:** it is replaced by id, whatever its name.
+- ⚠ **Override on + a credential exported without sensitive data empties the working credential's
+  secret.** Runs then send the auth header with no value (seen against an echo service). Untick
+  Credentials on import (`importCredentials=false`) to keep the existing one; re-importing a sensitive
+  export restores it.
+- **Ready-made use cases:** the docs moved them under `docs.procesio.com/docs/marketplace/...`; a page ends
+  with its `.procesio` file. The in-app PROCESIO Library (`/FlowZy/Marketplace/Usecases`) is a form app that
+  takes 30 to 40 s to load and never finishes with the push channel blocked. The docs say its `Get free`
+  imports into a NEW `MarketPlace_...` workspace (not tried: it creates a workspace).
+
+## Designer behaviour seen while filming (2026-10-29)
+
+- **Run greys out after you only LOOK at configuration panels.** Opening a node's
+  properties or a side panel (Configure Operation, Configure Request) marks the process
+  dirty even when nothing is changed; the Run button then disables with the tooltip
+  "Please validate the process to ensure consistency checks before running." Despite the
+  wording, a clean **Validate** did NOT re-enable it (twice); **Save** did. Validate also
+  surfaces designer-only errors the API create accepted (a non-list `Result Rows`, see
+  above), and while one is open Run stays disabled. A `goto` to the same designer URL does
+  not reload the page (only the hash would change), so it does not clear this state.
+- **A For Each frame draws its own inner Start**, about 23 px in from the frame's left edge
+  at the children's row, and the designer then labels the process's real Start "Start (1)".
+  Children of the frame are positioned RELATIVE to the frame (screen = frame position +
+  child position + 24 with no pan), so leave the first ~150 px of the frame free or the
+  inner Start overlaps the first child. The frame's size is `customData.areaSize`.
+- **Node code editor:** with the caret inside the small editor in the properties panel,
+  Esc enlarges it to a full-page editor and Esc again collapses it. Ctrl+/ toggles a line
+  comment (Monaco). Editor lines render spaces as U+00A0, so match code text with
+  `has-text` (whitespace-normalised) rather than exact strings.
 
 ## OnPrem Agent v1.0.3 and its two actions, measured end to end (2026-10-29)
 
@@ -7547,41 +7578,111 @@ decompiled agent and action code.
   found", and `get-instance-output` 500. The synchronous run response still carried the
   outputs.
 
-## List, text, number and date actions: measured behaviour (live, 2026-10)
-- **Palette folders:** List, Numerical, String (with sub-folders RegEx and URLs) and DateTime. Search by name
-  filters actions, not folder names, and shows each hit under its folder. A few names exist twice in different
-  folders (Add, Contains, Get Index, Length, Concatenate): in a `process-create` config pin those by template id.
-- **Select options take their option VALUE in a builder config, not the label** (a label fails the designer gate
-  with `VALUE_INTEGER`): First/Last N `Sorted:` 1 Unsorted / 2 ascending / 3 descending; Sort `Input Order (A/D)`
-  `ASC` / `DESC`; Update DateTime `Unit Of Time` 1 Year ... 3 Day ... 6 Seconds; Date Difference `Unit of Time`
-  4 Day ... 8 Year; Get Week Number rules 1-3; Language fields take a culture (`ro-RO`, `en-US`).
-- **Side-panel actions build from their inner labels.** RegEx Extract / Validate / Replace, Similarity Search, Filter,
-  Simple Filter and Sort Data Model keep their fields inside a side panel; `params` keyed by the inner labels
-  (`RegEx expression`, `String to extract from`, `Filter JSON configuration`...) build and run.
-- **Sort changes the list in place** (input and output are the same variable). **First N Elements' `Sorted:`
-  option sorts only the N items it returns**: on an unsorted list it takes the first N, then orders them.
-- **Zero-based positions:** Get Index, Get Element, Substring (`Input Position`) and Take From Middle
-  (`Index starting at`). List To String renders a number list as `[1200,1200,640,250,80]`.
-- **Contains (list)** takes the item as text and matches a number list (`"1200"` in a Double list is true).
-- **To Title Case leaves a word written in capitals unchanged** (`ȘTEFAN popesku` -> `ȘTEFAN Popesku`): run
-  To Lower first. Normalize Diacritics turns `Ș` into `S`. Trim Start / Trim End trim one side.
-- **RegEx Validate is a search, not a whole-value match** (`[0-9]+` on `order 4521` is true); anchor with `^...$`
-  for a full check. RegEx Extract and Between return LISTS. Patterns without backslashes (`[0-9]`, `[.]`) avoid
-  escaping trouble when a config passes through a shell.
-- **Similarity Search** (threshold 0-1, default 0.85, limit 100) found a one-letter typo at 0.8 and returned only
-  the close name. Simple Filter `{"MatchType":"Contains","FilterExpression":"x","KeepIfTrue":true}` and Filter
-  `{"FieldMatches":[{"FieldName":"city","MatchType":"Exact","FilterExpression":"x","KeepIfTrue":true}]}` both keep the
-  matching items.
-- **⚠ Sort Data Model compares numeric fields of a Json list as TEXT:** `amount` 1200 / 250 / 80 sorts Asc as
-  1200, 250, 80 and Desc as 80, 250, 1200. Sort numbers with Sort on a number list, or pad them.
-- **Modulo takes Integers only** (a Double variable fails the BE validator with a data type mismatch). Round,
-  Round Up and Round Down take a digit count (246.912 -> 246.91 / 247.0 at one digit up / 246.9 down).
-- **String To Number** parses `1234.56`. **String To DateTime** with `Format` `dd.MM.yyyy` reads `05.11.2026`.
-  Update DateTime accepts a negative amount (goes back). Format DateTime takes a .NET pattern
-  (`dddd, d MMMM yyyy`, `en-US` -> `Saturday, 5 December 2026`); DateTime To String takes a standard letter
-  (`D` in `ro-RO` -> `sâmbătă, 5 decembrie 2026`). Today returns midnight UTC; UTC Now carries the time.
-  Date Difference / Time Difference count whole units from the first to the second date.
+## For Each frame layout and the loop's instance view (2026-10-29)
 
+- **The layout engine sizes a For Each frame for ONE row.** When the loop body fans out (a
+  Decisional into three branches), the created frame (`customData.areaSize`, here 416 x 200)
+  covers only the top row and the other branches are drawn outside the shaded box. Set
+  `areaSize` yourself to cover every child (children are frame-relative, see above) and PUT
+  the flow back.
+- **The frame centres its inner Start vertically**: the inner Start (and the frame's in and out
+  ports) sit at `areaSize.height / 2`. Put the loop's main row at `height / 2 - 24` and fan the
+  branches above and below it; changing the height moves the row, so recompute both together.
+  Branch labels sit on the vertical segment near the Decisional: leave about 170 px between
+  branch rows or a label overlaps the caption of the node above it.
+- **The instance view of a loop run marks the LAST item's path**: the canvas shows the checks
+  for the branch the final item took (the other branches show a plain outline, not a check).
+  Do not read it as "the other branches never ran"; check the per-item effect (here, the
+  emails each branch sent).
+- **Send Email's Subject picker (the plus) lists a data-model variable's attributes**; picking
+  one stores the Subject as `<%N%>` with `variable[N].attribute.attributeId` set, so literal
+  text plus a picked attribute is a valid, bound template.
+
+## Plan usage, limits and the Analytics pages (seen while filming, 2026-10-29)
+
+- **Where usage is shown.** A sub-workspace dashboard has a "Workspace usage" card (processing time in
+  hours, a month picker, average platform and custom action time). The MASTER dashboard has "Plan
+  details" (plan name, monthly processing time, "Buy resources", "Your SaaS Agreement"), a "Plan usage"
+  bar ("Processing time resets on <1st of next month>"; the info icon's tooltip is "Remaining processing
+  time: hh:mm:ss") and a per-workspace "Workspace usage" list. The personal workspace shows the same Plan
+  details card for its own plan.
+- **Analytics lives in the sub-workspace, not the master**: sidebar More tools > Analytics
+  (`/admin/analytics`). "Processes Analytics" has PROCESS NAME, TOTAL PROCESSING TIME, TOTAL PROCESS
+  RUNS, ACTION RUNS, LAST UPDATE and "View instances" per row, a month picker, no search, sorted by last
+  update. "View instances" (`/admin/analytics/instances/<processId>`) lists the runs: INSTANCE ID,
+  PROCESSING TIME, ACTION RUNS, STARTED ON, LAST UPDATE, SUBMITTED BY, STATUS, and "Show details" (the
+  run's own instance view). Its range picker defaults to "Last 3 days" (Last hour ... Last year, or a
+  month). Deleted processes are rolled into one "Deleted Processes" row.
+- **Both tables pick runs up minutes late** (a run was missing for 3 to 5 minutes, then appeared), and
+  the page size chosen at the bottom stays for the rest of the browser session.
+- **Action runs leave out Start, Stop and Delay**: a Call API followed by a 5 s Delay reads 1 action run
+  and a processing time that rounds to 00:00:00.00, while STARTED ON and LAST UPDATE are 5 s apart.
+- **A run can be recorded with 0 action runs and 0 processing time** although it did the same work as
+  its neighbours: two of three `run-process --synchronous` runs of one process, and later one of seven
+  asynchronous runs, while every other run read 1. Run a few more than you need when the counters
+  matter on screen.
+- **"Record time analytics" (master > Workspaces > Edit > Resource Tracking) does not gate the Analytics
+  pages**: process and instance analytics fill in with it off. It is off for a new sub-workspace, has a
+  "Time analytics end date" and a "Time analytics storage limit", and is the `isRecordingEnabled` flag of
+  `GET /api/ResourceTrackingConfig`; the per-action breakdown `GET /api/Resources/analytics/instances/{id}/details`
+  stays `[]` while it is off.
+- **Soft and hard limits, as the UI states them**: the soft limit is the plan's monthly processing time;
+  past it processes keep running and the extra time is charged; the hard limit is "30% processing time
+  on top of your current plan" (tooltip in the workspace form). `GET /api/Resources/used` returns
+  `limit.hard` as that 30% EXTRA in ms (a 100 h plan: soft 360000000, hard 108000000), not as the total.
+  At the hard limit the app's banner says "Process execution is currently suspended until usage resets."
+- **Per-workspace execution setting**: master > Workspaces > Edit > General > "Process execution
+  settings:" offers "Suspend process execution on workspace when Company workspace resources reach soft
+  limit to avoid extra cost generated." (the default seen) or "Do not suspend ... until the hard limit".
+- **"Request upgrade" is now "Buy resources"**: the dialog "Buy resources - <Plan> Plan" picks a monthly
+  amount (from "1 hour/month"), is "Paid annually", shows "Total to be paid (without VAT)", allocates the
+  hours to a new or an existing workspace and ends in "Continue to payment" (2Checkout). The bundle
+  still carries a "Request Upgrade" button text linking to the pricing page, not shown on any dashboard
+  seen. `/admin/execution-analytics` exists only for a master on a Thread licence (it redirects otherwise).
+
+## Approval forms, form-to-form triggers and the task inbox (live, 2026-10)
+
+Measured while building a two-step approval (an entry form, then a user-task form with an
+approval control), every point from a real submit and approve in the form runtime.
+
+- **The runtime URLs.** A form opens at `https://forms.procesio.app/forms/<formTemplateId>#<workspaceId>`
+  (a private form uses the PROCESIO session). The task inbox is `https://procesio.app/admin/form-assignments`
+  (sidebar Forms & Tasks > Assigned to me), and Review opens
+  `https://forms.procesio.app/forms/assignments/<formInstanceId>#<workspaceId>`.
+- **When the person who opens a user-task form is also its approver, the form skips the first step.**
+  The submit button of the unassigned section is not rendered, Approve and Reject show at once, and
+  Approve submits the fields and the approval together. Moving the approval into its own section
+  assigned to the approver does not change it. So one account cannot play "submitter, then approver"
+  on ONE form.
+- **Two forms do it with one account**: an entry form (type general) whose submit button has a
+  `TRIGGER_FORM` click event (`form-create` event `{on: click, do: form, formId: <approval form>,
+  mapping: [{to: <approval form field path>, from: <entry field name>}]}`), and a user-task form holding
+  read-only copies of the fields plus an approval section assigned to the approver. On submit the
+  approval form's instance appears in Assigned to me at the approval step ("pending action", step name
+  = the approval section's label) with every mapped field filled. Mapping orientation, verified:
+  `left` = the TARGET form's field path, `right` = the SOURCE form's field.
+- **An approval control has no `value` config.** Its outcome lives in the `response` and `comment`
+  configs, so a RUN_PROCESS map addresses them as
+  `{formDataModelRoot}.{FIELDS_NS}.{approvalElementId}.{responseConfigId}` (and `commentConfigId`);
+  `form-create` resolves names only for `value` configs, so read the live form and wire these with
+  `form-set-element-event`. Wired on `afterapprovalsubmit` (`AFTER_APPROVE_OR_REJECT`), the process
+  receives the response (stored upper case, `APPROVE`/`REJECT`; compare case-insensitively) and the
+  comment, and runs after both Approve and Reject.
+- **`commentRequiredOnReject: true`** keeps Reject disabled (pale) until the comment box has text;
+  Approve stays enabled.
+- **Removing a task that waits**: `get-form-assigned --awaitingAction true` lists them (`id` = the form
+  instance), and `delete-form-by-id --id <instance>` removes it from Assigned to me.
+- **Assigned to me lists every open task of the account in the workspace**, other people's test tasks
+  included. An automated click on "the first Review" can approve somebody else's task: type the form
+  name in the inbox search and scope the click to the row (`tr:has-text("<form name>") >> ...Review`).
+- **Data Store `Result Rows` takes a LIST json variable now**: a `json` variable with `isList: true`
+  saves, validates and runs (SelectRows returns the matching rows), and the designer shows "Error:
+  data type mismatch" on the property when the bound json variable is NOT a list. This supersedes the
+  earlier "must bind a non-list variable" observation for the current build.
+- **A new task can be missing from Assigned to me for a while.** Once, a task created by a form
+  trigger was listed by `get-form-assigned --awaitingAction true` but the inbox page opened about
+  40 s later still showed "You have no assignments yet!" (Showing 0 out of 0). Switching the Open /
+  Completed tabs refetches the list; an automated take should retry that way before failing.
 
 ## Webhook query parameters, and a webhook as a tracking pixel (2026-10)
 
@@ -7682,6 +7783,65 @@ variable mapped into a String column of a Data Store insert is stored as its tex
   deletes the element at once, no confirmation. Duplicating then deleting by position deletes the original if
   the selector picks the first match: address the copy by its new id.
 
+## Webhooks in the UI: listen vs manual, answering the caller, filter rules; API keys and the run call (2026-10-29)
+
+Measured on the live web app and the Web API.
+
+**Creating a webhook (Automation > Webhooks > Create webhook)**
+- The name refuses special characters, `/` included ("Error: special characters are not accepted"). The API
+  (`POST /api/Webhooks`) accepts a name with `/`, so an API-made webhook can carry a name the UI rejects.
+- Two ways to get the payload shape: **Start listening** (default) or, in the button's arrow menu, "I want to
+  manually define webhook payload" (a JSON editor, then Generate data model). `GET /api/Webhooks/{id}` shows
+  `type: 0` for listen and `type: 1` for manual.
+- ⚠ **Only a listening webhook has Configure Response** (Handshake response body, Custom response body). A
+  manual-payload webhook shows no Configure Response at all, in create or in edit, and its
+  `customResponseConfig` stays `null`.
+- **Advanced configuration > Capture on webhook: Headers, Query parameters** (both ticked by default, listen
+  mode only; DTO `hasHeader` / `hasQuery`). With them on, assigning the webhook creates three variables: the
+  payload one plus `<name>_params` and `<name>_header` (Json).
+- Start listening is disabled while Configure Response is open ("Close Configure Response panel to Start
+  listening for events"). The listen screen runs a 5-minute timer and receives the sample event over the push
+  channel (`notifications.procesio.app`): a browser that blocks it never sees the event, although the POST to
+  the launch URL answers 200.
+
+**What the caller gets back**
+- Custom response body, Static response (JSON), defaults to `<%request.content%>`: the caller gets its own
+  request echoed (`customResponseConfig: {"configType": 1, "config": "<%request.content%>"}`). Ctrl+I in that
+  editor opens a selector with `request.content`, `request.headers`, `request.params` and `response.content`
+  (list<Object>).
+- ⚠ **`<%response.content%>` makes the launch wait for the process** and answer with the process's own
+  Custom response (designer side tab Custom response, flow field `customResponse`) as a JSON list, e.g.
+  `["Welcome, Ana"]`, in about 1.1 to 1.4 s for a one-action process.
+- A manual webhook, or one without that template, answers an empty 200 at once, even when the bound process
+  sets a Custom response.
+- ⚠ **With `<%response.content%>`, an event the filter rules reject gets no HTTP answer at all**: the call
+  was still open after 400 s. A malformed template (a stray `>`) also left the launch hanging.
+
+**Assigning (designer side tab Webhooks > Assign webhook)**
+- The local variable is an **input** variable (`type: 10`) of the webhook's data model, renameable in the
+  panel; the binding's `webhookVariables` entry is `variableType: 3` (Body).
+- Filter rules: the left operand picks an attribute of the payload, operators start with equals / does not
+  equal / contains / belongs. A non-matching event starts no instance (without `response.content` its caller
+  still gets an empty 200).
+- A webhook-started instance shows `Submitted by: Webhook: <name>` in Process instances.
+- ⚠ **Unassigning (clear Select webhook, save the panel, save the process) also removes the webhook's
+  variables from the process**; actions bound to them are left pointing at nothing.
+- Deleting a webhook still bound to a process is refused: `400`, `statusCode 501`, "User is not authorized
+  for the requested action.", target "Webhook with the id : <id> is used inside flows".
+  `GET /api/Webhooks/{id}/used` lists the processes that hold it.
+
+**API keys (Automation > API Key)**
+- Up to 25 keys at a time (page text). Create API Key asks for an optional **Name** (DTO `label`); the
+  generated **Key handle** is DTO `name`. The value is shown in the table once, with a warning that it is
+  encrypted after you leave the page; a pencil renames, the bin asks "Revoke API key?" (Revoke).
+- `POST /api/Projects/{id}/run` with headers `key` = the handle, `value`, `workspaceid` and body
+  `{"payload": {<inputs by name>}}`. A `workspace` header with the workspace NAME (as the public docs page
+  describes) answers 403. `?runSynchronous=true` answers with the process's Custom response body as it is
+  (a bare JSON string such as `"Welcome, Ana"`) when one is set; without it you get `{"instanceId": ...}` at
+  once.
+- CORS on webapi allows the origin `https://procesio.app` for both the launch URL and the run call, with the
+  headers `key, value, workspaceid`, so a page on procesio.app can send either request with `fetch`.
+
 ## Forms: user task forms, assignees, approvals and the task inbox (live, 2026-10)
 
 - **Type**: `type` 0 = user task, 1 = general (list badge "user task" / "general"). Assignees live on a
@@ -7771,85 +7931,6 @@ UI facts of the Form Designer (`/admin/forms/designer`), measured by driving it,
 - **Date-time input** settings: Mode, Inline view, Min/Max value, Available and Disabled intervals, Minute interval. The picker on the live form has a "Today" button.
 - **File upload** settings: Allow multiple files upload; Validation holds Required, Max file size, Allowed file types.
 
-## Webhooks in the UI: listen vs manual, answering the caller, filter rules; API keys and the run call (2026-10-29)
-
-Measured on the live web app and the Web API.
-
-**Creating a webhook (Automation > Webhooks > Create webhook)**
-- The name refuses special characters, `/` included ("Error: special characters are not accepted"). The API
-  (`POST /api/Webhooks`) accepts a name with `/`, so an API-made webhook can carry a name the UI rejects.
-- Two ways to get the payload shape: **Start listening** (default) or, in the button's arrow menu, "I want to
-  manually define webhook payload" (a JSON editor, then Generate data model). `GET /api/Webhooks/{id}` shows
-  `type: 0` for listen and `type: 1` for manual.
-- ⚠ **Only a listening webhook has Configure Response** (Handshake response body, Custom response body). A
-  manual-payload webhook shows no Configure Response at all, in create or in edit, and its
-  `customResponseConfig` stays `null`.
-- **Advanced configuration > Capture on webhook: Headers, Query parameters** (both ticked by default, listen
-  mode only; DTO `hasHeader` / `hasQuery`). With them on, assigning the webhook creates three variables: the
-  payload one plus `<name>_params` and `<name>_header` (Json).
-- Start listening is disabled while Configure Response is open ("Close Configure Response panel to Start
-  listening for events"). The listen screen runs a 5-minute timer and receives the sample event over the push
-  channel (`notifications.procesio.app`): a browser that blocks it never sees the event, although the POST to
-  the launch URL answers 200.
-
-**What the caller gets back**
-- Custom response body, Static response (JSON), defaults to `<%request.content%>`: the caller gets its own
-  request echoed (`customResponseConfig: {"configType": 1, "config": "<%request.content%>"}`). Ctrl+I in that
-  editor opens a selector with `request.content`, `request.headers`, `request.params` and `response.content`
-  (list<Object>).
-- ⚠ **`<%response.content%>` makes the launch wait for the process** and answer with the process's own
-  Custom response (designer side tab Custom response, flow field `customResponse`) as a JSON list, e.g.
-  `["Welcome, Ana"]`, in about 1.1 to 1.4 s for a one-action process.
-- A manual webhook, or one without that template, answers an empty 200 at once, even when the bound process
-  sets a Custom response.
-- ⚠ **With `<%response.content%>`, an event the filter rules reject gets no HTTP answer at all**: the call
-  was still open after 400 s. A malformed template (a stray `>`) also left the launch hanging.
-
-**Assigning (designer side tab Webhooks > Assign webhook)**
-- The local variable is an **input** variable (`type: 10`) of the webhook's data model, renameable in the
-  panel; the binding's `webhookVariables` entry is `variableType: 3` (Body).
-- Filter rules: the left operand picks an attribute of the payload, operators start with equals / does not
-  equal / contains / belongs. A non-matching event starts no instance (without `response.content` its caller
-  still gets an empty 200).
-- A webhook-started instance shows `Submitted by: Webhook: <name>` in Process instances.
-- ⚠ **Unassigning (clear Select webhook, save the panel, save the process) also removes the webhook's
-  variables from the process**; actions bound to them are left pointing at nothing.
-- Deleting a webhook still bound to a process is refused: `400`, `statusCode 501`, "User is not authorized
-  for the requested action.", target "Webhook with the id : <id> is used inside flows".
-  `GET /api/Webhooks/{id}/used` lists the processes that hold it.
-
-**API keys (Automation > API Key)**
-- Up to 25 keys at a time (page text). Create API Key asks for an optional **Name** (DTO `label`); the
-  generated **Key handle** is DTO `name`. The value is shown in the table once, with a warning that it is
-  encrypted after you leave the page; a pencil renames, the bin asks "Revoke API key?" (Revoke).
-- `POST /api/Projects/{id}/run` with headers `key` = the handle, `value`, `workspaceid` and body
-  `{"payload": {<inputs by name>}}`. A `workspace` header with the workspace NAME (as the public docs page
-  describes) answers 403. `?runSynchronous=true` answers with the process's Custom response body as it is
-  (a bare JSON string such as `"Welcome, Ana"`) when one is set; without it you get `{"instanceId": ...}` at
-  once.
-- CORS on webapi allows the origin `https://procesio.app` for both the launch URL and the run call, with the
-  headers `key, value, workspaceid`, so a page on procesio.app can send either request with `fetch`.
-
-## For Each frame layout and the loop's instance view (2026-10-29)
-
-- **The layout engine sizes a For Each frame for ONE row.** When the loop body fans out (a
-  Decisional into three branches), the created frame (`customData.areaSize`, here 416 x 200)
-  covers only the top row and the other branches are drawn outside the shaded box. Set
-  `areaSize` yourself to cover every child (children are frame-relative, see above) and PUT
-  the flow back.
-- **The frame centres its inner Start vertically**: the inner Start (and the frame's in and out
-  ports) sit at `areaSize.height / 2`. Put the loop's main row at `height / 2 - 24` and fan the
-  branches above and below it; changing the height moves the row, so recompute both together.
-  Branch labels sit on the vertical segment near the Decisional: leave about 170 px between
-  branch rows or a label overlaps the caption of the node above it.
-- **The instance view of a loop run marks the LAST item's path**: the canvas shows the checks
-  for the branch the final item took (the other branches show a plain outline, not a check).
-  Do not read it as "the other branches never ran"; check the per-item effect (here, the
-  emails each branch sent).
-- **Send Email's Subject picker (the plus) lists a data-model variable's attributes**; picking
-  one stores the Subject as `<%N%>` with `variable[N].attribute.attributeId` set, so literal
-  text plus a picked attribute is a valid, bound template.
-
 ## v3.1.0 / v3.2.0 production wave (2026-11-02): signing in forms, feature flags, the collation fix
 
 Backend services went to v3.1.0 on 2026-11-02 (Web-Api also v3.2.0 the same day, Process-History
@@ -7930,12 +8011,15 @@ design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: t
 - Data-Store v3.1.0 creates databases and tables in `utf8mb4_0900_ai_ci`, the driver's session
   collation, so `SET @c = 'x'; ... WHERE TextCol = @c` works in a Query Store script on a NEW store
   (measured: status 50, `COLLATION(col)` = `utf8mb4_0900_ai_ci`).
-- ⚠ Stores created before 2026-11-02 were NOT converted on prod: `COLLATION(col)` still answers
-  `utf8mb4_general_ci` and the same comparison still fails with "The query could not be executed."
-  (measured on a store from 2026-09). Keep `COLLATE utf8mb4_0900_ai_ci` on a text-variable comparison
-  unless `SELECT COLLATION(col)` shows the new collation. A conversion script exists for installations
-  that run it (`9_datastore_v3.1_ConvertDataStoreTablesToUtf8mb40900AiCi.sql` in DataBase-Update; it
-  stops with 1062 on keys that collide under the new collation).
+- Stores created before 2026-11-02 are NOT converted by the release itself: they keep
+  `utf8mb4_general_ci` and the comparison keeps failing with "The query could not be executed."
+  until `9_datastore_v3.1_ConvertDataStoreTablesToUtf8mb40900AiCi.sql` (DataBase-Update) runs on that
+  installation. On prod it ran on 2026-11-03, a day after the release: a retest on a store from
+  2026-09 then answered `COLLATION(col)` = `utf8mb4_0900_ai_ci`, and `SET @c = '<value>'; ... WHERE
+  TextCol = @c` matched its row with no `COLLATE`. On any other installation (on-prem, client), check
+  `SELECT COLLATION(col)` and keep `COLLATE utf8mb4_0900_ai_ci` on a text-variable comparison while a
+  column still answers `utf8mb4_general_ci`. The script stops with 1062 on keys that collide under
+  the new collation.
 - ⚠ The new collation is NO PAD: trailing spaces count (`'abc'` and `'abc '` are different keys, and a
   filter without the space misses a value stored with one). Comparisons stay case- and
   accent-insensitive, `Æ` equals `AE`, and emoji are distinct.
