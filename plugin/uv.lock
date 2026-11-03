@@ -31,11 +31,11 @@ wheels = [
 
 [[package]]
 name = "certifi"
-version = "2026.10.19"
+version = "2026.10.23"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/a6/bd/1436c50cc46699de0230fbaacc1d1de7bfec413176099949e9d5112e88f2/certifi-2026.10.19.tar.gz", hash = "sha256:035c1e85572b141bf1c3a3eff0e33a8eb74917522f2559075ff8d2fea780a1ae", size = 137598, upload-time = "2026-10-20T02:24:16.604Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/fd/11/b524cbd9bbdaca58608e4cf4053fd463417549e1959fa8d3aa18319f9555/certifi-2026.10.23.tar.gz", hash = "sha256:a9895e6e2758b371e0545e321a3a8fd1fcfd9829ada8824a936dfb16aaaf36cd", size = 136225, upload-time = "2026-10-23T11:36:16.478Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c4/51/29046e48f693c54e5b7412216d447a1d8362c9653148d98c02cdf65fa733/certifi-2026.10.19-py3-none-any.whl", hash = "sha256:42d35340cc5b9ba78e818ddbff0c5b1c2b779de448a340fd1b989f5fa8670e1b", size = 136464, upload-time = "2026-10-20T02:24:15.072Z" },
+    { url = "https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl", hash = "sha256:e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1", size = 135082, upload-time = "2026-10-23T11:36:14.763Z" },
 ]
 
 [[package]]
@@ -363,14 +363,14 @@ wheels = [
 
 [[package]]
 name = "importlib-metadata"
-version = "9.0.1"
+version = "10.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "zipp" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6f/7e/1e7e8dc30634b93ebb3d58a3dea569ad146e656218d3960ab04f62047b29/importlib_metadata-9.0.1.tar.gz", hash = "sha256:ab830580bc0ef3db61ce8fae716389e5462b67e033018bab6d8f80ef17172f99", size = 59124, upload-time = "2026-08-28T15:30:34.646Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/f6/4eda8458eb00ec03e715c376c6b23b3def69687924c68d36d1c4003d3bc4/importlib_metadata-10.1.0.tar.gz", hash = "sha256:82b04047fa09792c1a8cfeddfe08bec79e4b13c29c8469b0d3949860f61017e8", size = 67761, upload-time = "2026-10-24T00:01:44.856Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/55/ecca97ae19075f1fac62def77731e7f535e6c1fb8f92ff08160c5e6dade8/importlib_metadata-9.0.1-py3-none-any.whl", hash = "sha256:bba5600596a7e21f3eef53281cf28d6a5195634d2f2b78ff9501a3272c6eaab0", size = 27920, upload-time = "2026-08-28T15:30:33.433Z" },
+    { url = "https://files.pythonhosted.org/packages/65/b6/495438ad95e0102aff8f6786b5474202f38cd5d4700d03a72b77977dec10/importlib_metadata-10.1.0-py3-none-any.whl", hash = "sha256:cf45ce66a929c64e994185a809c04840d0501db17e663810d993d0f4829265c7", size = 32221, upload-time = "2026-10-24T00:01:43.507Z" },
 ]
 
 [[package]]
@@ -474,7 +474,7 @@ wheels = [
 
 [[package]]
 name = "procesio-cli"
-version = "0.1.5"
+version = "0.1.6"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -484,21 +484,21 @@ dependencies = [
     { name = "pyyaml" },
     { name = "requests" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/96/c5/74c8d9e8f02bc28c7ea85f0f17e960c7f332395b8e09bdb5b0a4053f17dd/procesio_cli-0.1.5.tar.gz", hash = "sha256:c6603c0622220232ae4d7fbf95ad36055889e0ad2c2207d16ce94c0bd891f64e", size = 2286340, upload-time = "2026-10-29T18:51:20.345Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/26/f5/a4016851adb0051a877b05c7afbcfbf8879680ae7dce9e6aa7236d320570/procesio_cli-0.1.6.tar.gz", hash = "sha256:806ca141f9de9cd3af4203206b5ab862b7727af279a19688a08366714166b418", size = 2443335, upload-time = "2026-11-03T10:15:06.745Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/67/08/bd0aa11a3a506dc071d82b3f9a929d12432f10eb42dbf9c281201d08942d/procesio_cli-0.1.5-py3-none-any.whl", hash = "sha256:0ee682f10980f4c968ac02a130326edd6f80f3fb8f198be2f745160d3904394b", size = 2433615, upload-time = "2026-10-29T18:51:18.612Z" },
+    { url = "https://files.pythonhosted.org/packages/66/b5/6a6d6f28a19165a03690e3a8c88384ba748fbb0774cd0b1cfb61690383cb/procesio_cli-0.1.6-py3-none-any.whl", hash = "sha256:8a748a8d7b1c61131d55fd11d19295e540156479b3aabab60f7b0f920dec99ec", size = 2607647, upload-time = "2026-11-03T10:15:04.569Z" },
 ]
 
 [[package]]
 name = "procesio-plugin-runtime"
-version = "0.1.5"
+version = "0.1.6"
 source = { virtual = "." }
 dependencies = [
     { name = "procesio-cli" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "procesio-cli", specifier = "==0.1.5" }]
+requires-dist = [{ name = "procesio-cli", specifier = "==0.1.6" }]
 
 [[package]]
 name = "pycparser"
