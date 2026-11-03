@@ -8,7 +8,8 @@ DTO and touch ONLY the target element's event config.
 
 The event model (see PROCESIO-RESOURCE-MODEL-NOTES.md): each element carries
 per-trigger configs — `onClickEvents`, `onInputEvents`, `onStepChangeEvents`,
-`onPaginationChangedEvents` — whose value is `{debounce, events:[…]}`. A fresh
+`onPaginationChangedEvents` — whose value is `{debounce, events:[…]}` (the runtime also
+accepts a bare list of events; both are read, `{debounce, events}` is written). A fresh
 element has the key present with a `null` value, which is what "no handler" looks
 like; it is not an error and not a missing field.
 
@@ -69,6 +70,18 @@ def _resolve_trigger(on: str) -> tuple[str, str]:
         return _EVENT_KEY[friendly], _EVENT_TYPE[friendly]
     raise UsageError(
         f"unknown trigger {on!r}; use one of {', '.join(sorted(_EVENT_KEY))}")
+
+
+def _slot_data(value) -> dict:
+    """A trigger slot's value as `{debounce, events}`.
+
+    The runtime accepts two shapes: `{debounce, events:[...]}` (what the designer and this
+    tool write) and a bare list of events (ui-builder trigger.ts::getTriggersDataByKey wraps
+    it with the default debounce). A slot written by hand through form-update is often the
+    bare list, so reading it as a dict crashed. null still means "no handler"."""
+    if isinstance(value, list):
+        return {"debounce": 0, "events": value}
+    return value if isinstance(value, dict) else {}
 
 
 def _cfg(element: dict, key: str):
@@ -300,7 +313,7 @@ def set_element_event(client, args) -> dict:
         slot = _backfill_slot(element, cfg_key)     # refuses when the type has no such slot
         backfilled.append(cfg_key)
 
-    current = slot.get("value") or {}
+    current = _slot_data(slot.get("value"))
     previous = list(current.get("events") or [])
     event = {"id": str(uuid.uuid4()),
              "type": (args.type or default_type),
@@ -377,7 +390,7 @@ def get_element_events(client, args) -> dict:
     for c in element.get("configs") or []:
         k = c.get("key") or ""
         if "vent" in k:
-            out[k] = (c.get("value") or {}).get("events") or []
+            out[k] = _slot_data(c.get("value")).get("events") or []
     return {"id": args.id, "element": args.element, "elementId": element.get("id"),
             "type": element.get("type"), "events": out}
 

@@ -1,6 +1,6 @@
 # PROCESIO - the ANONYMOUS surface, enumerated
 
-**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready c0648c8 2026-11-02). **Do not hand-edit** - regenerate.
+**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready 3b58134 2026-11-03). **Do not hand-edit** - regenerate.
 
 > **Why this exists.** Anonymous endpoints used to be met one incident at a time: a webhook launch id that travels in exported packs, a public form's process launch, and a form data-store route that reads and writes any store its path names. All were documented; none was read before it mattered.
 
@@ -37,16 +37,16 @@
 | `POST` | `api/Form/dataStore/{dataStoreId}/rows` | `AddRows` | `{dataStoreId}` | `07-forms.md:504` |
 | `PUT` | `api/Form/dataStore/{dataStoreId}/rows` | `UpdateRows` | `{dataStoreId}` | `07-forms.md:514` |
 | `DELETE` | `api/Form/dataStore/{dataStoreId}/rows` | `DeleteRows` | `{dataStoreId}` | `07-forms.md:524` |
-| `POST` | `api/form/signing/public/envelope` | `CreateEnvelope` | `{(none in route)}` | `07-forms.md:690` |
-| `POST` | `api/form/signing/public/envelope/from-template` | `CreateEnvelopeFromTemplate` | `{(none in route)}` | `07-forms.md:708` |
-| `GET` | `api/form/signing/public/envelope/{id}` | `GetEnvelope` | `{id}` | `07-forms.md:719` |
-| `PUT` | `api/form/signing/public/envelope/{id}` | `UpdateDraft` | `{id}` | `07-forms.md:729` |
-| `POST` | `api/form/signing/public/envelope/{id}/send` | `Send` | `{id}` | `07-forms.md:742` |
-| `DELETE` | `api/form/signing/public/envelope/{id}` | `DiscardDraft` | `{id}` | `07-forms.md:754` |
-| `GET` | `api/form/signing/public/envelope/{id}/document` | `Download` | `{id}` | `07-forms.md:765` |
-| `GET` | `api/form/signing/public/envelope/{id}/my-session` | `GetMySession` | `{id}` | `07-forms.md:777` |
-| `POST` | `api/form/signing/public/envelope/{id}/my-session/sign` | `Sign` | `{id}` | `07-forms.md:787` |
-| `GET` | `api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}` | `DownloadTemplateDocument` | `{workspaceId}` · `{formTemplateId}` · `{fileId}` | `07-forms.md:800` |
+| `POST` | `api/form/signing/public/envelope` | `CreateEnvelope` | `{(none in route)}` | `07-forms.md:694` |
+| `POST` | `api/form/signing/public/envelope/from-template` | `CreateEnvelopeFromTemplate` | `{(none in route)}` | `07-forms.md:713` |
+| `GET` | `api/form/signing/public/envelope/{id}` | `GetEnvelope` | `{id}` | `07-forms.md:725` |
+| `PUT` | `api/form/signing/public/envelope/{id}` | `UpdateDraft` | `{id}` | `07-forms.md:735` |
+| `POST` | `api/form/signing/public/envelope/{id}/send` | `Send` | `{id}` | `07-forms.md:748` |
+| `DELETE` | `api/form/signing/public/envelope/{id}` | `DiscardDraft` | `{id}` | `07-forms.md:760` |
+| `GET` | `api/form/signing/public/envelope/{id}/document` | `Download` | `{id}` | `07-forms.md:771` |
+| `GET` | `api/form/signing/public/envelope/{id}/my-session` | `GetMySession` | `{id}` | `07-forms.md:784` |
+| `POST` | `api/form/signing/public/envelope/{id}/my-session/sign` | `Sign` | `{id}` | `07-forms.md:794` |
+| `GET` | `api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}` | `DownloadTemplateDocument` | `{workspaceId}` · `{formTemplateId}` · `{fileId}` | `07-forms.md:807` |
 | `GET` | `api/DataStore/restricted` | `GetRestrictedDataStores` | `{(none in route)}` | `10-datastore.md:147` |
 | `GET` | `api/DataTypes/primary` | `GetPrimaryTypes` | `{(none in route)}` | `11-datatypes.md:189` |
 | `GET` | `api/DataTypes/procesio` | `GetProcesioTypes` | `{(none in route)}` | `11-datatypes.md:201` |

@@ -311,7 +311,8 @@ def _spot_geometry_problem(s: dict) -> str | None:
 def lint_document_signing(data: Any) -> list[str]:
     """Traps in a document-signing element's design that the server stores without a word
     and that only show when someone tries to sign: a spot whose party is not a signer, a
-    signer with no SIGNATURE spot (the prod runtime refuses that submit), a MEMBER with no
+    signer with no SIGNATURE spot (the prod runtime refuses that submit and cannot let such a
+    signer place their own; only the retired 0.x fill line could), a MEMBER with no
     user, more than one FILLER, geometry off the page, and a PDF stored inline."""
     out = []
     for el in _elements(data):
@@ -368,8 +369,9 @@ def lint_document_signing(data: Any) -> list[str]:
         missing = [i for i in ids if i and i not in signed]
         if missing:
             out.append(f"document-signing {who}: signers {missing} have no SIGNATURE spot; the "
-                       f"form runtime refuses that submit ('Every signer needs a signature'), so "
-                       f"place one per signer")
+                       f"form runtime refuses that submit ('Every signer needs a signature') "
+                       f"and has no way for such a signer to place their own, so place one per "
+                       f"signer")
         doc = _cfg_value(el, "document")
         if isinstance(doc, dict) and str(doc.get("src") or "").startswith("data:"):
             out.append(f"document-signing {who}: the PDF is inline in the form (a data: URL); "
