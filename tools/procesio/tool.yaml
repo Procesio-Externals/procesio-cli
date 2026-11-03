@@ -2824,6 +2824,9 @@ actions:
               - afterapprovalsubmit
               - messagesfetch
               - messagesent
+              - signed
+              - declined
+              - completed
             do:
               type: string
               enum:
@@ -3285,7 +3288,7 @@ actions:
   - name: 'on'
     type: string
     required: true
-    description: 'trigger: afterapprovalsubmit | afterapprove | afterreject | beforeapprovalsubmit | beforeapprove | beforereject | blur | change | click | close | focus | hover | input | messagesent | messagesfetch | nextstep | open | paginated | previousstep | ready | rowadded | rowdeleted | stepchange | tabchange (case, ''-'' and ''_'' are ignored). A slot missing from an element saved before that trigger existed is added from the element template and reported under `backfilled`'
+    description: 'trigger: afterapprovalsubmit | afterapprove | afterreject | beforeapprovalsubmit | beforeapprove | beforereject | blur | change | click | close | completed | declined | focus | hover | input | messagesent | messagesfetch | nextstep | open | paginated | previousstep | ready | rowadded | rowdeleted | signed | stepchange | tabchange (case, ''-'' and ''_'' are ignored). A slot missing from an element saved before that trigger existed is added from the element template and reported under `backfilled`'
   - name: action
     type: string
     required: true

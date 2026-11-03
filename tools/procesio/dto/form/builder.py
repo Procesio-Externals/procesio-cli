@@ -67,6 +67,9 @@ _EVENT_KEY = {
     "beforeapprovalsubmit": "onBeforeApprovalSubmitEvents",
     "afterapprovalsubmit": "onAfterApprovalSubmitEvents",
     "messagesfetch": "onMessagesFetchEvents", "messagesent": "onMessageSentEvents",
+    # document-signing element (TriggerKey.ON_SIGNING_*)
+    "signed": "onSignedEvents", "declined": "onDeclinedEvents",
+    "completed": "onCompletedEvents",
 }
 _EVENT_TYPE = {
     "click": "CLICK", "input": "INPUT", "change": "INPUT", "focus": "FOCUS",
@@ -81,6 +84,8 @@ _EVENT_TYPE = {
     "beforeapprovalsubmit": "BEFORE_APPROVE_OR_REJECT",
     "afterapprovalsubmit": "AFTER_APPROVE_OR_REJECT",
     "messagesfetch": "CHAT_MESSAGES_FETCH", "messagesent": "CHAT_MESSAGE_SENT",
+    "signed": "SIGNING_SIGNED", "declined": "SIGNING_DECLINED",
+    "completed": "SIGNING_COMPLETED",
 }
 _KEY_ALIASES = {"infoText": "info-text", "default": "defaultValue"}
 

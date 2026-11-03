@@ -7867,6 +7867,9 @@ Measured on the live web app and the Web API.
   page is `forms.procesio.app/forms/assignments/<instanceId>`. The inbox is per user, so every test run by the same
   account in the same workspace lands in one list; its search box filters by form name after a short debounce
   (about 3 s), and leaving the page drops the filter.
+  The Completed tab's first load can take about half a minute (then it is fast for a while), and while it
+  loads it shows its empty state ("You have no assignments yet!"), not a spinner: wait for a real row,
+  not for the page, before reading it or filming it.
 - **Assignment email**: from `nocode@procesio.com`, subject "Form action request from <name>", body "New Form
   Assignment ... Complete form", link `procesio.app/admin/form-assignments/<instanceId>#<workspaceId>`. Sent with
   no configuration. "Set form notifications" (designer right rail) is separate: addresses + submitted / failed.
@@ -7918,6 +7921,7 @@ Measured while filming a Data Store tutorial in a clean workspace (UI and REST, 
 UI facts of the Form Designer (`/admin/forms/designer`), measured by driving it, not from the docs:
 
 - **A new form is private** (`isPrivate: true`) and is a draft until Publish. Publish shows only a toast ("Form was published successfully."), no dialog, and creates **no** `CustomUrl` entity: the Share form panel shows `https://forms.procesio.app/forms/{formId}#{workspaceId}`. No custom-URL or short-link field appears in the designer when the workspace and master have no custom URL configured (`GET /api/CustomUrl/MasterWorkspace` and `/Workspace` both empty).
+- **Custom and tiny URLs in the UI: two names in the master, then one per form.** With the MASTER workspace active, the sidebar has **Custom URLs** (`/admin/custom-urls`; the route redirects to the dashboard from a sub-workspace): "Customize Master Workspace URL" (input, Generate, Save, delete) and "Sub Workspace custom URL" (pick a workspace, then its own input, Generate, Save, delete). Each Save toasts "Custom URL was saved."; a taken name toasts "This custom URL is already taken."; allowed characters are A-Z, a-z, 0-9, `_` and `-`. The designer's right-hand rail then shows a **Custom URL** tab (`button[aria-label="Custom URL"]`, icon `dataset_linked`) on a SAVED form, and only when both names are set (store getter `isCustomEntityUrlAllowed` = master URL and sub-workspace URL both non-empty, loaded with the workspace). Saving the form's part there ("Customize Form URL") mints the tiny code, shown read-only as "Tiny Form URL", and the share menu (header share icon, and the form list's row menu) gains "Copy/Open **tiny** URL" and "Copy/Open **custom** URL". The three addresses all open the same form: `forms.procesio.app/forms/{id}#{ws}`, `forms.procesio.app/{tiny}`, `forms.procesio.app/{master}/{workspace}/{form}`; a form custom URL works on an already published form with no new Publish. The personal workspace has no master, so it never gets a custom URL (see the personal-workspace note above). Read back over the API: `GET /api/CustomUrl/Workspace/master` (the master's record, readable from a sub-workspace, where `GET /api/CustomUrl/MasterWorkspace` answers empty), `GET /api/CustomUrl/Workspace`, `GET /api/CustomUrl/FormTemplate/{formId}`; delete by the RECORD id (`DELETE /api/CustomUrl/MasterWorkspace/{id}` scoped to the master workspace).
 - **Share form** holds Form URL, Iframe embed code, and two switches, `Make form public` and `Hide branding` (the "Built with PROCESIO" bar under a published form). The switches are `input[role=switch]` of zero size inside a `label`; click the `.pds-c-input-group--selection` span next to them.
 - **The form list groups by the name part before "/"** into a folder row that starts collapsed. A search that matches one form shows it flat; two or more matches come back grouped and collapsed again, so a script must open the folder row.
 - **Duplicate** (row menu) makes "<name> (Copy)" as a disabled draft (`status 0`, `state false`). Delete asks for confirmation ("Delete "<name>" form?").
@@ -8004,8 +8008,15 @@ design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: t
 - Public signing uses the `x-signing-token` header returned once by the public envelope create; there
   is no public decline. `FormAssigneeType.SIGNER = 3` is written only by the Web API (SIGNER assignees
   sent with a submit are dropped); a submission at its signing step lists as "pending signature".
-- The upstream API reference (`docs_info/API-DOCUMENTATION/endpoints/07-forms.md`, 2026-10-28) still
-  describes `OrderMode` and 409 711 for these spot and send cases: the behaviour above is the code's.
+- The upstream API reference (`docs_info/API-DOCUMENTATION/endpoints/07-forms.md`) was corrected on
+  2026-11-03 (no `OrderMode`, the 400 714/715 answers above, 409 712 as "try again", 204 on a draft
+  discard) and re-synced with `procesio-release api-docs-sync --write`.
+- ⚠ Upstream's element reference (ai-ready `FE/.features/forms/document-signing.md`, 2026-11-03) says a
+  signer without a placed signature clicks where to sign on their turn. Only the ui-builder 0.x line
+  does that, and prod no longer fills forms on it: form-runtime's 1.x line (1.46.0, same on its main)
+  has no own-signature placement, refuses the preparer's submit ("Every signer needs a signature on
+  the document"), and leaves a signer sent without a spot over the API unable to sign in the form.
+  Its other facts (settings, mapping limits, statuses, limits) match the code and are in the recipe.
 
 ### Data Store collation (measured 2026-11-03)
 - Data-Store v3.1.0 creates databases and tables in `utf8mb4_0900_ai_ci`, the driver's session

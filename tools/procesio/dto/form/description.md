@@ -49,7 +49,7 @@ fine), so forms are fully buildable server-side.
   `on` ∈ click/input/change/focus/blur/hover/ready/open/close/tabchange/rowadded/
   rowdeleted/paginated/stepchange/nextstep/previousstep/beforeapprove/afterapprove/
   beforereject/afterreject/beforeapprovalsubmit/afterapprovalsubmit/messagesfetch/
-  messagesent (each fires on a control that has that slot; type/key verified vs
+  messagesent/signed/declined/completed (each fires on a control that has that slot; type/key verified vs
   ui-builder trigger.ts + EventType enum).
   `do` ∈ **map** (`mapping:[{to,value|from}]`), **process** (`processId,syncRun,
   inputs:[{to,from}],outputs`), **js** (`code`), **form** → EventAction.TRIGGER_FORM

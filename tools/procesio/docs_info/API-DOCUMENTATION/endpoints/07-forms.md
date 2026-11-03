@@ -572,6 +572,7 @@ Controller route is explicitly **`api/form/signing`**. Controller auth entity: `
   - `200 OK` → `GetSigningEnvelopeDto` (status `DRAFT`, `FormId` empty until the send)
   - `400 Bad Request` → `502` (field too long), `716` (document invalid)
   - `403 Forbidden` → `501` — the caller may not fill the form, the form has no such signing element, or the element's document is the designer's (use `envelope/from-template`)
+  - `409 Conflict` → `712` — the document could not be stored; create again
 
 #### `POST api/form/signing/envelope/from-template`
 
@@ -579,9 +580,10 @@ Controller route is explicitly **`api/form/signing`**. Controller auth entity: `
 - **Auth:** Bearer JWT — **Permission:** None (summary: whoever may fill the form)
 - **Request body** (`application/json`): `CreateSigningEnvelopeFromTemplateDto`
 - **Responses:**
-  - `200 OK` → `GetSigningEnvelopeDto` (the seeded `DRAFT`)
+  - `200 OK` → `GetSigningEnvelopeDto` (the seeded `DRAFT`; an empty one when the design names no signers)
   - `400 Bad Request` → `502`, `716` (the element's document cannot be opened), or the draft save's errors (for example `714` when a designer signer is no longer a workspace member); the envelope is then discarded
   - `403 Forbidden` → `501` — as for the upload
+  - `409 Conflict` → `712` — as for the upload
 
 #### `GET api/form/signing/envelope/{id}`
 
@@ -595,16 +597,16 @@ Controller route is explicitly **`api/form/signing`**. Controller auth entity: `
 
 #### `PUT api/form/signing/envelope/{id}`
 
-- **Operation:** `UpdateDraft` — Replace the draft's name, order mode, spots and signers. `DRAFT` only.
+- **Operation:** `UpdateDraft` — Replace the draft's name, spots and signers. `DRAFT` only. The signing order is each party's `OrderIndex`.
 - **Auth:** Bearer JWT — **Permission:** None (summary: the envelope's creator, or `FormInstance.Update`)
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Request body** (`application/json`): `SetSigningEnvelopeDto`. `Spots` and `Parties` replace the stored ones whole. Every signer is a member of the envelope's workspace given by `UserId` (on a personal workspace, only its owner); a signer by e-mail is refused here.
 - **Responses:**
   - `200 OK` → `GetSigningEnvelopeDto` (with the new `RowVersion`)
-  - `400 Bad Request` → `502` (no body, unknown `OrderMode`, `Name` over 256); `714` (over 50 parties, a party without exactly one of `UserId` / `Email`, a duplicate signer, a negative `OrderIndex`, a non-member); `715` (over 1000 spots, empty or duplicate `SpotId`, empty `PartyId`, `Page` < 1, bounds outside 0..1, unsupported `Type`, `Value` over 256, `Label` over 128)
+  - `400 Bad Request` → `502` (no body, `Name` over 256); `714` (over 50 parties, a party without exactly one of `UserId` / `Email`, a duplicate signer, a negative `OrderIndex`, a name over 128, a non-member); `715` (over 1000 spots, empty or duplicate `SpotId`, empty `PartyId`, `Page` < 1, bounds outside 0..1, unsupported `Type`, `Value` over 256, `Label` over 128, a spot whose party is not in `Parties`, a page past the document's last)
   - `403 Forbidden` → `501`
   - `404 Not Found` → `710`
-  - `409 Conflict` → `711` (not a `DRAFT`, a spot whose party is not in `Parties`, or a page past the document's last), `712` (stale `RowVersion`)
+  - `409 Conflict` → `711` (not a `DRAFT`), `712` (stale `RowVersion`)
 
 #### `DELETE api/form/signing/envelope/{id}`
 
@@ -612,37 +614,39 @@ Controller route is explicitly **`api/form/signing`**. Controller auth entity: `
 - **Auth:** Bearer JWT — **Permission:** None (summary: the envelope's creator, or `FormInstance.Update`; `DRAFT` only)
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Responses:**
-  - `200 OK` → empty
+  - `204 No Content`
   - `403 Forbidden` → `501`
   - `404 Not Found` → `710`
   - `409 Conflict` → `711` — the envelope was already sent
 
 #### `POST api/form/signing/envelope/{id}/send`
 
-- **Operation:** `Send` — Send for signing: binds the envelope to the submitted form instance, freezes spots and parties, opens the first order group, sets `ExpiresOn` (14 days by default) and e-mails the first group's signers, except the sender.
+- **Operation:** `Send` — Send for signing: binds the envelope to the submitted form instance, freezes spots and parties, opens the first order group, sets `ExpiresOn` (14 days by default) and e-mails the first group's signers, except the sender. A signer without a `SIGNATURE` spot is sent too: they place their own when they sign. With no signers the envelope completes at once — the source, flattened, is the signed document — and the form instance goes on to its next step, unless another of its documents is still to be sent.
 - **Auth:** Bearer JWT — **Permission:** None (summary: the envelope's creator, or `FormInstance.Update`)
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Query params:**
   - `formId` — `string (uuid)`, required — the form instance the submit created; its values must name this envelope under its signing element.
   - `rowVersion` — `number`, required — from the last read.
 - **Responses:**
-  - `200 OK` → `GetSigningEnvelopeDto`, also when the envelope is already `SENT` or `IN_PROGRESS`
+  - `200 OK` → `GetSigningEnvelopeDto` (status `COMPLETED` when there were no signers), also when the envelope was already sent
+  - `400 Bad Request` → `714` (a signer the element's design named when the envelope was created is missing from `Parties`), `716` (no signers, and the document cannot be rendered; the envelope stays a `DRAFT`)
   - `403 Forbidden` → `501`
   - `404 Not Found` → `710` — also when the instance is outside the caller's scope, belongs to another template, or does not name this envelope
-  - `409 Conflict` → `711` (no parties, a party without a required `SIGNATURE` spot, no `formId`, or the envelope has ended), `712` (stale `rowVersion`)
+  - `409 Conflict` → `711` (no `formId`, or the envelope was declined or voided), `712` (stale `rowVersion`, or, with no signers, the signed document could not be stored — send again)
 
 #### `GET api/form/signing/envelope/{id}/document`
 
 - **Operation:** `Download` — Stream a rendition of the document.
 - **Auth:** Bearer JWT — **Permission:** None (summary: as the envelope's read; `my-step`: the envelope's parties)
 - **Path params:** `{id}` — `string (uuid)`, required.
-- **Query params:** `version` — `string`, optional, default `current`, case-insensitive; an unknown value reads as `current`:
+- **Query params:** `version` — `string`, optional, default `current`, case-insensitive, one of:
   - `current` — the document with every signature captured so far.
   - `signed` — the final signed PDF, once the envelope is `COMPLETED`.
   - `source` — the original upload.
   - `my-step` — the caller's step-scoped view: the source plus the fulfilled spots of their order group and earlier ones, rendered on each call. Parties only.
 - **Responses:**
-  - `200 OK` → `application/pdf` stream, named after the document (`-signed` before the extension for `signed`)
+  - `200 OK` → `application/pdf` stream, named after the document (`-signed` before the extension for `signed`, `-my-step` for `my-step`)
+  - `400 Bad Request` → `502` (target `version`) — any other `version`
   - `404 Not Found` → the caller may not read it, is not a party (`my-step`), or the rendition does not exist yet
 - **Notes:** Returns a binary file download, not JSON.
 
@@ -658,16 +662,16 @@ Controller route is explicitly **`api/form/signing`**. Controller auth entity: `
 
 #### `POST api/form/signing/envelope/{id}/my-session/sign`
 
-- **Operation:** `Sign` — Apply the signature image to every spot of the caller; the auto-filled spots (names, date) get their value. The envelope moves to the next order group, or completes, once every party of the group signed.
+- **Operation:** `Sign` — Apply the signature image to every spot of the caller; the auto-filled spots (names, date) get their value. A caller the preparer placed no `SIGNATURE` spot for (`PlacesOwnSignature` on their session) places one with the signature (`SignatureSpot`): it is added as a required `SIGNATURE` spot of theirs, and the audit trail keeps where it went. The envelope moves to the next order group, or completes, once every party of the group signed.
 - **Auth:** Bearer JWT — **Permission:** None (summary: authenticated signers only)
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Request body** (`application/json`): `SubmitSignatureDto`
 - **Responses:**
   - `200 OK` → `SigningSessionDto`, also when the caller already signed
-  - `400 Bad Request` → `719` — missing, not base64, not a PNG, or over the size or pixel cap
+  - `400 Bad Request` → `719` (the signature is missing, not base64, not a PNG, or over the size or pixel cap), `714` (no `SignatureSpot` from a caller who places their own), `715` (a `SignatureSpot` outside the page or past the document's last page, or from a caller who has a `SIGNATURE` spot)
   - `403 Forbidden` → `501`
   - `404 Not Found` → `710`
-  - `409 Conflict` → `713` (not the caller's turn), `711` (the caller declined, or the envelope is not `SENT` / `IN_PROGRESS`)
+  - `409 Conflict` → `713` (not the caller's turn), `711` (the caller declined, or the envelope is not `SENT` / `IN_PROGRESS`), `712` (the envelope kept changing, or the signature could not be stored — sign again)
 
 #### `POST api/form/signing/envelope/{id}/my-session/decline`
 
@@ -679,7 +683,7 @@ Controller route is explicitly **`api/form/signing`**. Controller auth entity: `
   - `200 OK` → `SigningSessionDto` (the party carries `DeclineReason`), also when the caller already declined
   - `403 Forbidden` → `501`
   - `404 Not Found` → `710`
-  - `409 Conflict` → `713` (not the caller's turn), `711` (the caller already signed, or the envelope is not `SENT` / `IN_PROGRESS`)
+  - `409 Conflict` → `713` (not the caller's turn), `711` (the caller already signed, or the envelope is not `SENT` / `IN_PROGRESS`), `712` (the envelope kept changing — decline again)
 
 ---
 
@@ -704,6 +708,7 @@ Controller route is explicitly **`api/form/signing/public`**. Controller auth en
   - `400 Bad Request` → `502`, `714` (signer fields), `716`
   - `403 Forbidden` → `501` — a signed-in caller, a form that is not enabled, published and public, no such signing element, or an element holding the designer's document
   - `404 Not Found` → `710` — public signing is off
+  - `409 Conflict` → `712` — the document could not be stored; create again
 
 #### `POST api/form/signing/public/envelope/from-template`
 
@@ -715,6 +720,7 @@ Controller route is explicitly **`api/form/signing/public`**. Controller auth en
   - `400 Bad Request` → `502`, `714`, `716`, or the draft save's errors (the envelope is then discarded)
   - `403 Forbidden` → `501` — as for the upload
   - `404 Not Found` → `710` — public signing is off
+  - `409 Conflict` → `712` — as for the upload
 
 #### `GET api/form/signing/public/envelope/{id}`
 
@@ -732,7 +738,7 @@ Controller route is explicitly **`api/form/signing/public`**. Controller auth en
 - **Auth:** Anonymous — **Permission:** None (access token)
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Special headers:** `x-signing-token` — `string`, required.
-- **Request body** (`application/json`): `SetSigningEnvelopeDto`. `Parties` and `OrderMode` are ignored; an `OrderMode` given must still be a valid name.
+- **Request body** (`application/json`): `SetSigningEnvelopeDto`. `Parties` is ignored.
 - **Responses:**
   - `200 OK` → `GetSigningEnvelopeDto`
   - `400 Bad Request` → `502`, `715`
@@ -758,7 +764,7 @@ Controller route is explicitly **`api/form/signing/public`**. Controller auth en
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Special headers:** `x-signing-token` — `string`, required.
 - **Responses:**
-  - `200 OK` → empty
+  - `204 No Content`
   - `404 Not Found` → `710`
   - `409 Conflict` → `711` — already sent
 
@@ -771,6 +777,7 @@ Controller route is explicitly **`api/form/signing/public`**. Controller auth en
 - **Query params:** `version` — `string`, optional, default `current`.
 - **Responses:**
   - `200 OK` → `application/pdf` stream
+  - `400 Bad Request` → `502` (target `version`) — a `version` the in-app download does not name either, refused before the token is looked at
   - `404 Not Found`
 - **Notes:** Returns a binary file download, not JSON.
 
@@ -786,16 +793,16 @@ Controller route is explicitly **`api/form/signing/public`**. Controller auth en
 
 #### `POST api/form/signing/public/envelope/{id}/my-session/sign`
 
-- **Operation:** `Sign` — Apply the drawn signature to every spot of the signer.
+- **Operation:** `Sign` — Apply the drawn signature to every spot of the signer, who places their own `SIGNATURE` spot (`SignatureSpot`) when none was placed for them, as in the in-app sign.
 - **Auth:** Anonymous — **Permission:** None (access token)
 - **Path params:** `{id}` — `string (uuid)`, required.
 - **Special headers:** `x-signing-token` — `string`, required.
 - **Request body** (`application/json`): `SubmitSignatureDto`
 - **Responses:**
   - `200 OK` → `SigningSessionDto`, also when already signed
-  - `400 Bad Request` → `719`
+  - `400 Bad Request` → `719`, `714`, `715` — as in the in-app sign
   - `404 Not Found` → `710`
-  - `409 Conflict` → `711` — the envelope is not `SENT` / `IN_PROGRESS`
+  - `409 Conflict` → `711` (the envelope is not `SENT` / `IN_PROGRESS`), `712` — as in the in-app sign
 
 #### `GET api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}`
 
@@ -983,7 +990,7 @@ Inherits `OwnershipAuditDto` (audit fields below).
 |---|---|---|---|
 | `StepId` | `string (uuid)` | required | step id |
 | `OrderId` | `number` | required | order |
-| `Type` | `FormAssigneeType` (enum) | required | assignee vs approver |
+| `Type` | `FormAssigneeType` (enum) | required | assignee, approver or signer |
 | `Users` | array of `FormUserDto` | optional (defaults to empty) | assigned users |
 
 ### `FormUserDto`
@@ -1051,7 +1058,6 @@ Inherits `OwnershipAuditDto`; its `firstName`, `lastName`, `createdBy` and `upda
 | `ElementId` | `string` | optional | signing element id |
 | `Name` | `string` | optional | document name |
 | `Status` | `SigningEffectiveStatus` (string) | required | effective status, `EXPIRED` included — read this, never infer it from the dates |
-| `OrderMode` | `SigningOrderMode` (string) | required | how the preparer described the order; round-trips for the setup UI |
 | `CurrentOrderIndex` | `number` | required | the order group whose turn it is |
 | `RowVersion` | `number` | required | echo on the draft save and the send |
 | `Document` | `SigningDocumentDto` | optional | the document |
@@ -1112,7 +1118,6 @@ On an in-app draft save each party carries exactly one of `UserId` / `Email`, an
 | wire field | type | req/opt | description |
 |---|---|---|---|
 | `Name` | `string` | optional, max 256 | blank keeps the current name |
-| `OrderMode` | `SigningOrderMode` (string) | optional, default `NONE` | |
 | `RowVersion` | `number` | required | from the last read |
 | `Spots` | array of `SigningSpotDto` | required (defaults to empty), max 1000 | replaces every spot |
 | `Parties` | array of `SigningPartyDto` | required (defaults to empty), max 50 | replaces every party; ignored on a public form |
@@ -1132,6 +1137,7 @@ Carries the caller's own party and spots only, never another signer's.
 | `SignedPartyCount` | `number` | required | parties that signed |
 | `TotalPartyCount` | `number` | required | all parties |
 | `IsMyTurn` | `boolean` | required | the caller's group is the current one and the envelope is `SENT` or `IN_PROGRESS` |
+| `PlacesOwnSignature` | `boolean` | required | the preparer placed no `SIGNATURE` spot for the caller: their sign carries `SignatureSpot` |
 
 ### `SubmitSignatureDto` (request — sign)
 
@@ -1139,6 +1145,17 @@ Carries the caller's own party and spots only, never another signer's.
 |---|---|---|---|
 | `SignaturePngBase64` | `string` | required | the signature as a base64 PNG, no `data:` prefix; applied to every spot of the caller |
 | `TimeZone` | `string` | optional | the signer's IANA time zone (for example `Europe/Bucharest`) for `DATE_SIGNED` spots; unknown ids fall back to UTC |
+| `SignatureSpot` | `SigningSpotPlacementDto` | required when the session's `PlacesOwnSignature`, else refused | where the caller places their own signature |
+
+### `SigningSpotPlacementDto`
+
+A box on one page, in the same normalized 0..1 coordinates as `SigningSpotDto` (top-left origin).
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Page` | `number` | required | 1-based, at most the document's `PageCount` |
+| `X`, `Y` | `number` | required | top-left corner, 0..1 |
+| `W`, `H` | `number` | required | size, above 0; `X + W` and `Y + H` at most 1 |
 
 ### `SigningDeclineDto` (request — decline)
 
@@ -1274,6 +1291,9 @@ All names are explicit `[JsonProperty]` wire names.
 |---|---|
 | `ASSIGNEE` | 1 |
 | `APPROVER` | 2 |
+| `SIGNER` | 3 |
+
+`SIGNER` assignees are the signers whose turn it is on a document of the form instance; the signing flow sets them, a submit never does.
 
 ### `FormApplicationType`
 | name | value |
@@ -1318,7 +1338,7 @@ The signing enums travel as their **names** (strings), not numbers.
 | `DRAFT` | being prepared; spots and parties editable |
 | `SENT` | sent, nobody has signed yet |
 | `IN_PROGRESS` | at least one party signed |
-| `COMPLETED` | every party signed; the signed PDF exists |
+| `COMPLETED` | every party signed, or there was none; the signed PDF exists |
 | `DECLINED` | a signer declined; the envelope stopped circulating |
 | `VOIDED` | withdrawn because its form instance or template was deleted |
 | `EXPIRED` | derived at read time: `ExpiresOn` passed while `SENT` or `IN_PROGRESS` |
@@ -1326,20 +1346,11 @@ The signing enums travel as their **names** (strings), not numbers.
 ### `SigningPartyStatus`
 | name | meaning |
 |---|---|
-| `PENDING` | not asked yet |
+| `PENDING` | not e-mailed a sign request: a later group's signer, the sender in the first group, or a public form's signer |
 | `NOTIFIED` | sent a sign request |
 | `VIEWED` | opened their session |
 | `SIGNED` | signed |
 | `DECLINED` | declined |
-
-### `SigningOrderMode`
-| name |
-|---|
-| `NONE` |
-| `SEQUENTIAL` |
-| `MIXED` |
-
-The order itself is each party's `OrderIndex`; the mode only restores the editor the preparer used.
 
 ### `SigningSpotType` (accepted values)
 | name | filled with |

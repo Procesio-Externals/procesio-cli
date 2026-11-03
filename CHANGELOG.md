@@ -9,8 +9,21 @@ there, not here.
 
 ## [Unreleased]
 
+### Added
+- `form-set-element-event --on signed | declined | completed` wires the document-signing
+  triggers, and `form-get-element-events` lists them. An event slot saved as a bare list
+  no longer makes `form-get-element-events` fail.
+
 ### Changed
 - The plugin runs procesio-cli 0.1.6 (`plugin/pyproject.toml` and `plugin/uv.lock`).
+- The bundled API reference has PROCESIO's signing corrections. `OrderMode` is gone, a
+  signer can send their own signature spot, and 409 712 now means "try again".
+- `FORM-DEV-GUIDE/11-DOCUMENT-SIGNING.md` says what the designer and the fill page do.
+  It also covers what a process can't do (choose the signers), the statuses, limits and
+  error codes. The signing lint now explains why every signer needs a signature spot: the
+  form runtime gives a signer no way to place their own.
+- `PROCESIO-API-NOTES.md` covers custom and tiny URLs in the web app, and the slow first
+  load of the Completed tab under Assigned to me.
 
 ## [0.1.6] - 2026-11-03
 

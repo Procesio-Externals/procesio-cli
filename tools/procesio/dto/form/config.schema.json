@@ -62,7 +62,7 @@
       "type": "object",
       "required": ["on", "do"],
       "properties": {
-        "on": {"type": "string", "enum": ["click", "input", "change", "focus", "blur", "hover", "ready", "open", "close", "tabchange", "rowadded", "rowdeleted", "paginated", "stepchange", "nextstep", "previousstep", "beforeapprove", "afterapprove", "beforereject", "afterreject", "beforeapprovalsubmit", "afterapprovalsubmit", "messagesfetch", "messagesent"]},
+        "on": {"type": "string", "enum": ["click", "input", "change", "focus", "blur", "hover", "ready", "open", "close", "tabchange", "rowadded", "rowdeleted", "paginated", "stepchange", "nextstep", "previousstep", "beforeapprove", "afterapprove", "beforereject", "afterreject", "beforeapprovalsubmit", "afterapprovalsubmit", "messagesfetch", "messagesent", "signed", "declined", "completed"]},
         "do": {"type": "string", "enum": ["map", "process", "js", "form", "datastore"]},
         "processId": {"type": "string"}, "formId": {"type": "string"},
         "dataStoreId": {"type": "string", "description": "datastore trigger: target data store id"},

@@ -161,7 +161,10 @@ Each trigger has its own config key whose value is `{debounce, events: [...]}`:
 ```
 
 **A fresh element carries the key with a `null` value.** That is what "no handler"
-looks like - it is not an error and not a missing field.
+looks like - it is not an error and not a missing field. The runtime also accepts a bare
+list of events as the value (`trigger.ts::getTriggersDataByKey` wraps it with the default
+debounce); `form-get-element-events` reads both shapes, and `form-set-element-event`
+writes `{debounce, events}`.
 
 ### Trigger → config key → event type
 
@@ -181,6 +184,7 @@ looks like - it is not an error and not a missing field.
 | beforereject / afterreject | `onBeforeRejectEvents` / `onAfterRejectEvents` | `BEFORE_REJECT` / `AFTER_REJECT` |
 | beforeapprovalsubmit / afterapprovalsubmit | `onBeforeApprovalSubmitEvents` / `onAfterApprovalSubmitEvents` | `BEFORE_APPROVE_OR_REJECT` / `AFTER_APPROVE_OR_REJECT` |
 | messagesfetch / messagesent | `onMessagesFetchEvents` / `onMessageSentEvents` | `CHAT_MESSAGES_FETCH` / `CHAT_MESSAGE_SENT` |
+| signed / declined / completed (document-signing) | `onSignedEvents` / `onDeclinedEvents` / `onCompletedEvents` | `SIGNING_SIGNED` / `SIGNING_DECLINED` / `SIGNING_COMPLETED` |
 
 Source of truth: `dto/form/builder.py::_EVENT_KEY` / `_EVENT_TYPE`, verified against
 the renderer's `trigger.ts` `TriggerKey` enum and `FieldEvents.component.vue`.
