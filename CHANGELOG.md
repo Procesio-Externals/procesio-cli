@@ -9,7 +9,40 @@ there, not here.
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-11-03
+
+### Added
+- `procesio features` lists the optional modules an installation has switched on (Forms,
+  Data Store, Execution Environment). Calling a module that is off now fails with the
+  error code `feature_disabled` and a hint to check `procesio features`. Before, it was a
+  bare HTTP 400.
+- Document signing in forms. This adds the `document-signing` element template and
+  `procesio form-signing-upload-document`, which stores the PDF a form asks people to sign
+  and points the element at it. Lint rules check signing designs, and
+  `FORM-DEV-GUIDE/11-DOCUMENT-SIGNING.md` has the recipe.
+- A form element spec takes `classes`. It sets the CSS class setting that every control
+  now has.
+- `web perf-probe --direct` drives the browser in-process while the serializing broker is
+  stopped.
+- A neutral form kit (`tools/procesio/assets/form-kit/`), a method for redesigning a form,
+  and a guide to optimizing a workspace.
+
 ### Changed
+- When the PROCESIO Web API refuses a request, the error shows the API's own message, code
+  and target.
+- The form element templates follow ui-builder 1.46.0, which is what forms.procesio.app
+  runs. They add icon, side panel, stepper and chart settings.
+- The built-in environments are now `Main-PROD`, `Main-QA` and `Main-DEV`. The old
+  `Internal-*` names still resolve.
+- Node and variable edits keep the canvas layout and the process's stored validity flag.
+- `web perf-probe` scales its navigation timeout with the CPU throttle. When another
+  process owns the browser session, it says so plainly.
+- The setup guide explains that a PROCESIO API key has two parts and that a personal
+  workspace needs no workspace id. A note claiming personal workspaces cannot use forms
+  has been corrected.
+- The endpoint index covers 296 operations. The bundled API reference is split by domain.
+- New notes cover the PROCESIO 3.1 and 3.2 production release: the signing contract, Data
+  Store collation on new and older stores, workspace refusals and OAuth2 authorization.
 - The plugin runs procesio-cli 0.1.5 (`plugin/pyproject.toml` and `plugin/uv.lock`).
 
 ## [0.1.5] - 2026-10-29
