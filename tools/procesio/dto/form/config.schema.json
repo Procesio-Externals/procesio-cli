@@ -54,7 +54,8 @@
         "optionsSource": {"type": "object", "description": "options data source: {type: json|static-list|url, value: <array|string|url>}. json -> sourceType JSON; url -> sourceType URL."},
         "children": {"type": "array", "items": {"$ref": "#/$defs/element"}, "description": "nested controls for containers (section/columns/tabs)"},
         "style": {"type": "object", "description": "per-control style overrides {cssVariable: value}, e.g. {\"--h-input\":\"50px\"}. Only vars of the control's CSS group are valid (input/number/datetime/textarea/select use the Input group). For color vars (type css-variable-select) pass a theme color variable like \"--c-neutral--50\", NOT a hex."},
-        "configs": {"type": "object", "description": "advanced: set any element config key by name"}
+        "classes": {"oneOf": [{"type": "array", "items": {"type": "string"}}, {"type": "string"}], "description": "CSS class names put on the element's WRAPPER div (the `class` config), as a list or one space-separated string, no leading dot. Define them in the form's CSS (form-set-code) and style the inner control, e.g. .pill button {...}."},
+        "configs": {"type": "object", "description": "advanced: set any element config key by name (e.g. a document-signing element's templateSigners / templateSpots / document)"}
       }
     },
     "event": {

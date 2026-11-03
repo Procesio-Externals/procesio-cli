@@ -537,6 +537,30 @@ Controller permission entity: `Schedule`. The `[controller]` token resolves to `
 
 ---
 
+#### `POST api/Schedules/validate-crontab`
+
+- **Operation:** `ValidateCrontab` — validate a crontab expression and preview its next occurrences. Does not create or modify anything.
+- **Auth:** Bearer JWT — **Permission:** `Schedule:Read` (Swagger: "Permission required: Schedule.Read")
+- **Request body** (`application/json`): `CronValidationRequestDto`
+  - `CronExpression` — `string`, required — 5-field crontab expression (`minute hour day month weekday`), including `L` / `W` / `#` tokens.
+  - `TimeZone` — `string`, nullable — IANA time zone id the expression is evaluated in. Defaults to UTC.
+  - `Count` — `number`, nullable — how many occurrences to preview. Defaults to `5`, clamped server-side to `1..20`.
+  - `StartDate` — `string (date-time)`, nullable — activation-window start (UTC). Occurrences are computed from `max(now, StartDate)`.
+  - `EndDate` — `string (date-time)`, nullable — activation-window end (UTC). Occurrences past it are not returned.
+- **Responses:**
+  - `200 OK` → `CronValidationResultDto`
+  - `400 Bad Request` → composed schedules-error response (`INVALID_REQUEST`) when the body is missing
+- **Notes:** An invalid expression is reported **inside** the `200 OK` payload (`IsValid: false` plus `Error`), not as a `400`. Only a null request body yields `400`.
+
+**`CronValidationResultDto`**
+
+- `IsValid` — `boolean`.
+- `Error` — `string`, nullable — user-facing error when the expression or time zone is invalid.
+- `Description` — `string`, nullable — natural-language (English) description of the expression.
+- `NextOccurrences` — array of `string (date-time)` — next occurrences as UTC instants. Empty when invalid or when the expression never fires.
+
+---
+
 #### `POST api/Schedules/notifications`
 
 - **Operation:** `CreateScheduleNotification` — create/update email-notification settings for a schedule.

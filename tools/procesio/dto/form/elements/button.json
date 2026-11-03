@@ -118,6 +118,15 @@
    "subCategory": "general",
    "type": "hidden",
    "value": []
+  },
+  {
+   "id": "6930eac4-2616-51a1-a7b9-4601cd8a8fb1",
+   "key": "class",
+   "label": "CSS Classes",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
   }
  ],
  "parentId": null,

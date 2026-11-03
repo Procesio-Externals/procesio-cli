@@ -30,6 +30,10 @@ a debugging session to find (see PROCESIO-API-NOTES.md and FORM-DEV-GUIDE/08):
   the name under "1"). A form at "1" keeps its names through a designer save (measured
   2026-09-25 and 2026-10-05), so it draws no warning; form-create writes "1" since 2026-10-05.
 
+* **Document-signing design** — a spot whose party is not a signer, a signer with no
+  SIGNATURE spot, a MEMBER with no user, two FILLERs, a spot off the page, a PDF kept
+  inline. The server stores all of these; they only fail when someone tries to sign.
+
 Pure and side-effect-free: each returns a list of human-readable warning strings.
 Warnings, never blockers — the caller attaches them to its result JSON.
 """
@@ -283,10 +287,102 @@ def lint_form_code_scope(css: str | None, js: str | None) -> list[str]:
             f"container's {_SCOPE_ATTR} value onto <html> (FORM-DEV-GUIDE/02-CODE-INJECTION.md §2)."]
 
 
+# Document-signing element limits and vocabulary (Web-Api signing manager + ui-builder
+# documentSigning.ts). The designer places SIGNATURE / PRINTED_NAME / DATE_SIGNED / TEXT;
+# the API also takes FIRST_NAME / LAST_NAME.
+_SIGNER_KINDS = {"MEMBER", "FILLER"}
+_SPOT_TYPES = {"SIGNATURE", "PRINTED_NAME", "DATE_SIGNED", "TEXT", "FIRST_NAME", "LAST_NAME"}
+_MAX_SIGNERS, _MAX_SPOTS, _MAX_TEXT, _MAX_LABEL = 50, 1000, 256, 128
+
+
+def _spot_geometry_problem(s: dict) -> str | None:
+    try:
+        page = s.get("page")
+        x, y, w, h = (float(s.get(k)) for k in ("x", "y", "w", "h"))
+    except (TypeError, ValueError):
+        return "needs numeric x, y, w, h"
+    if not isinstance(page, int) or page < 1:
+        return f"page {page!r} must be a 1-based integer"
+    if w <= 0 or h <= 0 or x < 0 or y < 0 or x + w > 1.0001 or y + h > 1.0001:
+        return "x, y, w, h are fractions of the page (0..1, top-left origin) and must fit on it"
+    return None
+
+
+def lint_document_signing(data: Any) -> list[str]:
+    """Traps in a document-signing element's design that the server stores without a word
+    and that only show when someone tries to sign: a spot whose party is not a signer, a
+    signer with no SIGNATURE spot (the prod runtime refuses that submit), a MEMBER with no
+    user, more than one FILLER, geometry off the page, and a PDF stored inline."""
+    out = []
+    for el in _elements(data):
+        if not isinstance(el, dict) or el.get("type") != "document-signing":
+            continue
+        who = _label(el)
+        signers = _cfg_value(el, "templateSigners") or []
+        spots = _cfg_value(el, "templateSpots") or []
+        if not isinstance(signers, list) or not isinstance(spots, list):
+            out.append(f"document-signing {who}: templateSigners and templateSpots must be lists")
+            continue
+        ids = [s.get("id") for s in signers if isinstance(s, dict)]
+        kinds = [str(s.get("kind") or "MEMBER").upper() for s in signers if isinstance(s, dict)]
+        for s in signers:
+            if not isinstance(s, dict) or not s.get("id"):
+                out.append(f"document-signing {who}: a signer without an id is ignored")
+                continue
+            kind = str(s.get("kind") or "MEMBER").upper()
+            if kind not in _SIGNER_KINDS:
+                out.append(f"document-signing {who}: signer {s['id']!r} kind {kind!r} is "
+                           f"dropped by the designer (MEMBER or FILLER)")
+            elif kind == "MEMBER" and not s.get("userId"):
+                out.append(f"document-signing {who}: MEMBER signer {s['id']!r} needs the "
+                           f"userId of a workspace member")
+        if kinds.count("FILLER") > 1:
+            out.append(f"document-signing {who}: at most one FILLER signer (the person "
+                       f"filling the form); found {kinds.count('FILLER')}")
+        if "MEMBER" in kinds:
+            out.append(f"document-signing {who}: a MEMBER signer keeps the form private "
+                       f"(the designer refuses Make form public while one is set)")
+        if len(signers) > _MAX_SIGNERS or len(spots) > _MAX_SPOTS:
+            out.append(f"document-signing {who}: at most {_MAX_SIGNERS} signers and "
+                       f"{_MAX_SPOTS} spots per envelope")
+        signed = set()
+        for sp in spots:
+            if not isinstance(sp, dict):
+                continue
+            sid = sp.get("spotId") or "?"
+            if sp.get("partyId") not in ids:
+                out.append(f"document-signing {who}: spot {sid!r} names party "
+                           f"{sp.get('partyId')!r}, which is not a templateSigners id")
+            stype = str(sp.get("type") or "")
+            if stype not in _SPOT_TYPES:
+                out.append(f"document-signing {who}: spot {sid!r} type {stype!r} is not one of "
+                           f"{sorted(_SPOT_TYPES)}")
+            if stype == "SIGNATURE":
+                signed.add(sp.get("partyId"))
+            if len(str(sp.get("value") or "")) > _MAX_TEXT or len(str(sp.get("label") or "")) > _MAX_LABEL:
+                out.append(f"document-signing {who}: spot {sid!r} text is limited to "
+                           f"{_MAX_TEXT} characters and its label to {_MAX_LABEL}")
+            problem = _spot_geometry_problem(sp)
+            if problem:
+                out.append(f"document-signing {who}: spot {sid!r} {problem}")
+        missing = [i for i in ids if i and i not in signed]
+        if missing:
+            out.append(f"document-signing {who}: signers {missing} have no SIGNATURE spot; the "
+                       f"form runtime refuses that submit ('Every signer needs a signature'), so "
+                       f"place one per signer")
+        doc = _cfg_value(el, "document")
+        if isinstance(doc, dict) and str(doc.get("src") or "").startswith("data:"):
+            out.append(f"document-signing {who}: the PDF is inline in the form (a data: URL); "
+                       f"store it with form-signing-upload-document and set "
+                       f"document={{fileId, name}} instead")
+    return out
+
+
 def lint_form_data(data: Any) -> list[str]:
     """All structural (element-level) lints for a form's Data."""
     return (lint_phantom_parent(data)
             + lint_duplicate_configs(data)
             + lint_multiple_select_islist(data)
             + lint_string_boolean_conditions(data)
-            + lint_field_names(data))
+            + lint_field_names(data)
+            + lint_document_signing(data))

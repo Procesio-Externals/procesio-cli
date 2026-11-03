@@ -96,8 +96,9 @@ Notes:
 ## 6. Pagination, filtering, sorting
 
 There is no single global paging envelope; patterns vary by domain:
-- **Common `Pagination` DTO** (subscriptions/resources): `PageNumber` (only applied when > 1), `PageItemCount` (only applied when > 0). See `11-subscriptions-resources-analytics.md`.
-- **Data Store rows** use **query-string** filters, not a JSON body: `filters[N].displayName`, `filters[N].operator` (numeric `DataStoreRowsFilterOperator`), `filters[N].value`, plus `sort.displayName` + `sort.direction` (1=Asc, 2=Desc). See `09-datastore-datatypes.md`.
+- **Paged responses (`PageRequestResult`)**, wherever the query string carries `pageNumber` and `pageItemCount`: a `pageNumber` below 1 is page 1; a page past the end returns the **last** page, never an empty one, so stop after `ceil(totalItemCount / pageItemCount)` rather than waiting for an empty page (on an empty result the response `pageNumber` is `0`); a `pageItemCount` of 0 or less returns every item in one page. In the response, `pageNumber` is the page that came back and `pageItemCount` echoes the requested size, capped at `totalItemCount` on page 1 and equal to it when every item was asked for. It is **not** the number of items on the page: count `pageItems`.
+- **Common `Pagination` DTO** (subscriptions/resources): `PageNumber` (only applied when > 1), `PageItemCount` (only applied when > 0). See `13-subscriptions-resources-analytics.md`.
+- **Data Store rows** filter via a **JSON body**, with pagination on the query string. Reads are `POST .../rows/filter?pageNumber=&pageItemCount=` carrying an optional `Filter` (a recursive tree of AND/OR groups and conditions) plus a `Sort` array for multi-column ordering; the update and delete paths take the same `Filter` shape. Columns are given as display names, and operator / logic / direction values are numeric enums. See `10-datastore.md`.
 - Many list endpoints expose `searchName`, `count` sibling endpoints, and entity-specific filters — documented inline.
 
 ---
@@ -106,7 +107,7 @@ There is no single global paging envelope; patterns vary by domain:
 
 Several operations are **asynchronous**: the HTTP call starts the work and the result is delivered later.
 - **Process launch** can be synchronous (`runSynchronous=true`, blocks up to `secondsTimeOut`) or async (returns `{ "instanceId": "<guid>" }`; poll `GET api/Projects/instances/{id}/status`). See `04-processes.md`.
-- **Connector/test-action runs and CSV import/export** push their results over **SignalR**. Obtain a `connectionId` from the hub and pass it (body `ConnectionId` or header `connectionId`) to the start endpoint. See `13-realtime-signalr.md`.
+- **Connector/test-action runs and CSV import/export** push their results over **SignalR**. Obtain a `connectionId` from the hub and pass it (body `ConnectionId` or header `connectionId`) to the start endpoint. See `16-realtime-signalr.md`.
 
 ---
 

@@ -12,7 +12,25 @@
    "subCategory": "general",
    "type": "select",
    "value": "bar",
-   "exposed": true
+   "exposed": true,
+   "options": [
+    {
+     "name": "Bar",
+     "value": "bar"
+    },
+    {
+     "name": "Line",
+     "value": "line"
+    },
+    {
+     "name": "Combo",
+     "value": "combo"
+    },
+    {
+     "name": "Pie",
+     "value": "pie"
+    }
+   ]
   },
   {
    "id": "8931e5e6-42d4-58ab-bc86-e16878abe93f",
@@ -71,10 +89,7 @@
    "id": "366843c9-4a62-55eb-9544-15bcb7a59493",
    "key": "categoriesSourceValue",
    "label": "Categories source value",
-   "placeholder": [
-    "@bare",
-    "JSON.stringify()"
-   ],
+   "placeholder": "[\n  \"Jan\",\n  \"Feb\",\n  \"Mar\",\n  \"Apr\",\n  \"May\",\n  \"Jun\"\n]",
    "category": "content",
    "subCategory": "data-source",
    "type": "chart-categories-source-value",
@@ -106,10 +121,7 @@
    "id": "cc8641f0-8663-5e91-aa6f-c11c0e0991dd",
    "key": "seriesSourceValue",
    "label": "Series source value",
-   "placeholder": [
-    "@bare",
-    "JSON.stringify()"
-   ],
+   "placeholder": "[\n  {\n    \"name\": \"Revenue\",\n    \"data\": [\n      120,\n      180,\n      150,\n      220,\n      260,\n      300\n    ]\n  },\n  {\n    \"name\": \"Cost\",\n    \"data\": [\n      80,\n      110,\n      100,\n      140,\n      170,\n      190\n    ]\n  }\n]",
    "category": "content",
    "subCategory": "data-source",
    "type": "chart-series-source-value",
@@ -120,10 +132,7 @@
    "id": "c5e7602a-9a1d-574e-ab8d-8b1a745b8c33",
    "key": "colors",
    "label": "Colors",
-   "placeholder": [
-    "@bare",
-    "JSON.stringify()"
-   ],
+   "placeholder": "[\n  \"#0039E3\",\n  \"#00917D\",\n  \"#FF9307\"\n]",
    "category": "content",
    "subCategory": "data-source",
    "type": "textarea",
@@ -330,6 +339,15 @@
    "id": "0293676f-9e7c-58d0-b9d9-3fa5fcd3e30f",
    "key": "style",
    "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "3e82f6e2-4b5c-591c-88e7-a6b0ae08e780",
+   "key": "class",
+   "label": "CSS Classes",
    "category": "styling",
    "subCategory": "general",
    "type": "hidden",

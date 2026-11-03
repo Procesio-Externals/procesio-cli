@@ -116,7 +116,7 @@ The same auth endpoints serve two client styles, decided by whether the request 
 
 ## 5. API keys (headless auth) — alternative to JWT
 
-API keys let a machine integration authenticate without a user login. They are **workspace-scoped** and managed under `api/ApiKey` (see `12-webhooks-notifications-misc.md`).
+API keys let a machine integration authenticate without a user login. They are **workspace-scoped** and managed under `api/ApiKey` (see `15-notifications-apikeys-transport.md`).
 
 - **Create:** `POST api/ApiKey` (JWT-authenticated) returns the secret **once**. A user may hold up to **25** keys.
 - **Use:** send two headers on every request:
@@ -177,4 +177,4 @@ When building an app that spans multiple workspaces, pass the target workspace e
 3. **Pick the workspace** with `workspaceId`/`targetWorkspace` when needed.
 4. **Refresh** before `expires_in` elapses via `POST /api/Authentication/refreshToken`.
 5. **Call the domain endpoints** documented in [`endpoints/`](endpoints/). The most common goal — *run an automation* — is in [`04-processes.md`](endpoints/04-processes.md).
-6. **For realtime results** (async action/test/CSV runs) open the SignalR hub — see [`13-realtime-signalr.md`](endpoints/13-realtime-signalr.md).
+6. **For realtime results** (async action/test/CSV runs) open the SignalR hub — see [`16-realtime-signalr.md`](endpoints/16-realtime-signalr.md).

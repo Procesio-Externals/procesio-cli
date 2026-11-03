@@ -47,6 +47,16 @@
    "exposed": true
   },
   {
+   "id": "46282ccf-7588-5665-bbad-4fc0b136210f",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
    "id": "6c9a432d-e73a-52f0-986d-96b2b3d73853",
    "key": "visible",
    "label": "Visible",
@@ -96,6 +106,15 @@
    "id": "ab9d397a-5c77-5794-9f92-39a45a846e11",
    "key": "style",
    "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "ea60758f-f1b3-5ea7-b525-d13ad653fb70",
+   "key": "class",
+   "label": "CSS Classes",
    "category": "styling",
    "subCategory": "general",
    "type": "hidden",

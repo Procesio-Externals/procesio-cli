@@ -1,0 +1,278 @@
+{
+ "id": "4c60b515-f666-5437-83c1-aec65b561309",
+ "category": "fields",
+ "type": "document-signing",
+ "configs": [
+  {
+   "id": "481f9a4b-ff7c-5649-ba79-0354d39e1cb2",
+   "key": "label",
+   "label": "Label",
+   "placeholder": "Add label here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "Document signing",
+   "exposed": true
+  },
+  {
+   "id": "aff58183-bbf0-5572-963a-106d23ea7a65",
+   "key": "tooltip",
+   "label": "Tooltip",
+   "placeholder": "Add tooltip here",
+   "tooltip": "Tooltip can only be displayed with Label",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "ba14047c-e582-5fc1-ac4a-4b669286772c",
+   "key": "maxFileSize",
+   "label": "Max document size (MB)",
+   "tooltip": "Documents above this size are rejected before upload - at most 10 MB, the signing service's limit",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": 10,
+   "exposed": true
+  },
+  {
+   "id": "af92e506-7f7c-50d8-a7d4-e0c70a0a68ce",
+   "key": "maxHeight",
+   "label": "Max height",
+   "placeholder": "auto",
+   "tooltip": "Default: auto - the whole document is shown. Set a value with a unit (e.g. 600px, 75vh) to scroll the document inside the element instead",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "e771e6b6-012a-5ccd-b505-a61897a69107",
+   "key": "required",
+   "label": "Required",
+   "tooltip": "A document must be attached for signing before the form can be submitted",
+   "category": "content",
+   "subCategory": "validation",
+   "type": "toggle",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "9e709ea2-6ea3-50d7-9ea1-8b318003400b",
+   "key": "allowDecline",
+   "label": "Signers can decline",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "c424679a-89eb-5d9d-bf3e-71fbba5316d0",
+   "key": "document",
+   "label": "Document",
+   "placeholder": "Add PDF URL here",
+   "tooltip": "The PDF to sign (up to 10 MB). Leave it empty and the person filling the form drops one.",
+   "category": "content",
+   "subCategory": "general",
+   "type": "url-or-file",
+   "value": "",
+   "hasTopDivider": true,
+   "exposed": true,
+   "accept": [
+    "pdf"
+   ],
+   "maxFileSizeMB": 10,
+   "uploadEvent": "UPLOAD_SIGNING_TEMPLATE_DOCUMENT",
+   "downloadEvent": "DOWNLOAD_SIGNING_TEMPLATE_DOCUMENT"
+  },
+  {
+   "id": "4019144d-4a3a-571f-8f77-c23c7e791b95",
+   "key": "templateSigners",
+   "label": "Signers",
+   "tooltip": "Who signs the attached document: one step each, in this order - drag to change it. Place each signer's signature on the document in the canvas",
+   "category": "content",
+   "subCategory": "general",
+   "type": "signing-signers",
+   "value": [],
+   "hasTopDivider": true,
+   "exposed": false
+  },
+  {
+   "id": "340eb56c-8aa7-565e-91da-a693a42ee9e6",
+   "key": "setupEditable",
+   "label": "Preparer can set up signing",
+   "tooltip": "Off: the attached document goes out with exactly the signers and signatures set here - the person filling the form cannot change them, and signs their own right away. A PDF dropped while filling is always set up by whoever drops it",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "696d49dc-a464-5bbb-a10e-fbefc85b17f2",
+   "key": "templateSpots",
+   "label": "Template signature blocks",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": [],
+   "exposed": false
+  },
+  {
+   "id": "08b96059-ed17-51f8-b9b1-836b09c96d47",
+   "key": "blockFields",
+   "label": "Signature block fields configuration",
+   "tooltip": "The fields each placed signature block starts with, above the signature",
+   "category": "content",
+   "subCategory": "general",
+   "type": "signing-block-fields",
+   "value": [
+    {
+     "id": "cab7fd8e-9d5c-5451-bc9d-6002e4458991",
+     "type": "PRINTED_NAME"
+    },
+    {
+     "id": "14bd3573-1a41-5c2a-b753-a57b7dfc69ad",
+     "type": "DATE_SIGNED"
+    }
+   ],
+   "hasTopDivider": true,
+   "exposed": false
+  },
+  {
+   "id": "5af56246-8346-50ff-a906-784edbb188ad",
+   "key": "fieldsEditable",
+   "label": "Preparer can edit fields",
+   "tooltip": "Off: every block has exactly the fields above - nothing can be renamed, added or removed while filling",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "554f8b24-e2ba-58a5-b536-942c39a4f55e",
+   "key": "onSignedEvents",
+   "label": "onSigned",
+   "tooltip": "Triggered once the current user's signature is applied in the signing ceremony ($event: envelopeId, status, party, signedPartyCount, totalPartyCount, completed)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "e090d7bc-eb9f-5524-80b8-19e4df7a2e7c",
+   "key": "onDeclinedEvents",
+   "label": "onDeclined",
+   "tooltip": "Triggered once the current user declines to sign ($event as onSigned, plus reason)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "2dc587f2-43b2-5377-b99b-f0dcb3f1eda5",
+   "key": "onCompletedEvents",
+   "label": "onCompleted",
+   "tooltip": "Triggered right after onSigned when that signature was the last one and the document is completed ($event as onSigned)",
+   "category": "content",
+   "subCategory": "events",
+   "type": "field-events",
+   "value": null
+  },
+  {
+   "id": "5e0a0815-19a3-564a-8fb4-b8ee4405272f",
+   "key": "readonly",
+   "label": "Readonly",
+   "category": "content",
+   "subCategory": "general",
+   "type": "readonly-or-disabled",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "bb7c1620-9e78-5955-a2bf-e3b4e8e0f6bf",
+   "key": "disabled",
+   "label": "Disabled",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": false,
+   "exposed": true
+  },
+  {
+   "id": "47150c1a-3c0e-5ff2-9c38-23549d0929bd",
+   "key": "visible",
+   "label": "Visible",
+   "category": "content",
+   "subCategory": "general",
+   "type": "toggle",
+   "value": true,
+   "exposed": true
+  },
+  {
+   "id": "2528b72f-2d38-5a42-9ff4-15342365e8b9",
+   "key": "value",
+   "label": "Value",
+   "category": "content",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": null,
+   "exposed": true,
+   "events": [
+    "EMIT_INPUT"
+   ]
+  },
+  {
+   "id": "05c428d9-4353-5dfe-8e7a-626891feb6b4",
+   "key": "name",
+   "label": "Name",
+   "placeholder": "Element name",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "DocumentSigning",
+   "hasTopDivider": true,
+   "exposed": true,
+   "events": [
+    "REMAP",
+    "EMIT_ELEMENTS_UPDATE"
+   ]
+  },
+  {
+   "id": "8cebbbad-ed97-55c1-ae3a-38cece744698",
+   "key": "id",
+   "label": "ID",
+   "placeholder": "Add ID here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "copyable-input",
+   "value": "document-signing",
+   "exposed": true
+  },
+  {
+   "id": "dceaa0e0-b856-5e6b-9ab7-bcf1886ccf20",
+   "key": "style",
+   "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "38c9bffb-f8a3-59eb-a651-247f1665d05b",
+   "key": "class",
+   "label": "CSS Classes",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  }
+ ],
+ "parentId": null,
+ "section": "body"
+}

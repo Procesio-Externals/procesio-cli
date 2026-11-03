@@ -1,12 +1,23 @@
 import { ElementConfigType } from ".";
 import { ElementType } from "../element";
+import { OptionValue } from "./option";
 
 export type Theme = CSSPropertyGroup[];
+
+export enum ThemeMode {
+  LIGHT = "light",
+  DARK = "dark",
+}
+
+export interface ModeProperties {
+  [ThemeMode.LIGHT]: CSSProperty[];
+  [ThemeMode.DARK]: CSSProperty[];
+}
 
 export interface CSSPropertyGroup {
   label: CSSGroups;
   types: ElementType[] | null;
-  properties: CSSProperty[];
+  properties: CSSProperty[] | ModeProperties;
 }
 
 export interface CSSProperty {
@@ -17,6 +28,7 @@ export interface CSSProperty {
   group?: CSSGroups;
   isEditable?: boolean;
   enabled?: boolean;
+  options?: OptionValue[];
 }
 
 export enum CSSGroups {
@@ -30,144 +42,261 @@ export enum CSSGroups {
   RADIOBOX = "Radiobox",
   APPROVAL = "Approval",
   FILE_UPLOAD = "File Upload",
+  DOCUMENT_SIGNING = "Document Signing",
   SECTION = "Section",
   LIST = "List",
   TABLE = "Table",
   COLUMNS = "Columns",
+  COLUMN = "Column",
   STEPPER = "Stepper",
+  STEP = "Step",
   TABS = "Tabs",
+  TAB = "Tab",
   SIDE_PANEL = "Side Panel",
   ICON = "Icon",
   DROPDOWN = "Dropdown",
   TEST = "Test",
 }
 
+const FLEX_DIRECTION_OPTIONS: OptionValue[] = [
+  { name: "Vertical", value: "column", icon: "table_rows" },
+  { name: "Horizontal", value: "row", icon: "view_week" },
+  { name: "Vertical reverse", value: "column-reverse", icon: "swap_vert" },
+  { name: "Horizontal reverse", value: "row-reverse", icon: "swap_horiz" },
+];
+
+const JUSTIFY_CONTENT_OPTIONS: OptionValue[] = [
+  { name: "Start", value: "flex-start", icon: "align_horizontal_left" },
+  { name: "Center", value: "center", icon: "align_horizontal_center" },
+  { name: "End", value: "flex-end", icon: "align_horizontal_right" },
+  {
+    name: "Space between",
+    value: "space-between",
+    icon: "align_space_between",
+  },
+  { name: "Space around", value: "space-around", icon: "align_space_around" },
+  { name: "Space evenly", value: "space-evenly", icon: "align_space_even" },
+];
+
+const ALIGN_ITEMS_OPTIONS: OptionValue[] = [
+  { name: "Stretch", value: "stretch", icon: "height" },
+  { name: "Start", value: "flex-start", icon: "align_vertical_top" },
+  { name: "Center", value: "center", icon: "align_vertical_center" },
+  { name: "End", value: "flex-end", icon: "align_vertical_bottom" },
+  { name: "Baseline", value: "baseline", icon: "text_fields" },
+];
+
+export const LAYOUT_DEFAULTS = {
+  FD: "column",
+  JC: "flex-start",
+  AI: "stretch",
+};
+
+const getLayoutProperties = (suffix: string): CSSProperty[] => [
+  {
+    label: "Inner direction",
+    value: LAYOUT_DEFAULTS.FD,
+    cssVariable: `--fd-${suffix}`,
+    type: ElementConfigType.CSS_SELECT,
+    options: FLEX_DIRECTION_OPTIONS,
+  },
+  {
+    label: "Inner main axis",
+    value: LAYOUT_DEFAULTS.JC,
+    cssVariable: `--jc-${suffix}`,
+    type: ElementConfigType.CSS_SELECT,
+    options: JUSTIFY_CONTENT_OPTIONS,
+  },
+  {
+    label: "Inner cross axis",
+    value: LAYOUT_DEFAULTS.AI,
+    cssVariable: `--ai-${suffix}`,
+    type: ElementConfigType.CSS_SELECT,
+    options: ALIGN_ITEMS_OPTIONS,
+  },
+];
+
+const DARK_PALETTE: Readonly<Record<string, string>> = {
+  "--c-primary": "#4663f5", // --c-accent-1
+  "--c-primary-variant": "#8aa0ff", // --c-accent-1--400
+  "--c-error": "#ff6b6b", // --c-danger--400
+  "--c-success": "#32d583", // --c-success--400
+  "--c-on-error": "#141922", // --c-neutral--0
+  "--c-on-success": "#141922", // --c-neutral--0
+  "--c-info": "#53b1fd", // --c-info--400
+  "--c-neutral--900": "#f8fafd",
+  "--c-neutral--800": "#f2f5fa",
+  "--c-neutral--700": "#c8cfdb",
+  "--c-neutral--600": "#b0b8c4",
+  "--c-neutral--500": "#98a0ae",
+  "--c-neutral--400": "#3b4557",
+  "--c-neutral--300": "#2a3241",
+  "--c-neutral--200": "#222936",
+  "--c-neutral--100": "#1a202b",
+  "--c-neutral--50": "#0b0e14",
+  "--c-neutral--0": "#141922",
+  "--pds-text-muted": "#98a0ae",
+  "--fb-border-form": "#2a3241",
+};
+
+const getColorProperties = (): ModeProperties => {
+  const light = getLightColorProperties();
+
+  return {
+    [ThemeMode.LIGHT]: light,
+    [ThemeMode.DARK]: light.map((property) => ({
+      ...property,
+      value: DARK_PALETTE[property.cssVariable] ?? property.value,
+    })),
+  };
+};
+
+const getLightColorProperties = (): CSSProperty[] => [
+  {
+    label: "Muted text",
+    value: "#8d9bb5",
+    cssVariable: "--pds-text-muted",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Border",
+    value: "#e3e8f3",
+    cssVariable: "--fb-border-form",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Primary",
+    value: "#0039e3",
+    cssVariable: "--c-primary",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Primary Variant",
+    value: "#2a64ff",
+    cssVariable: "--c-primary-variant",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "On Primary",
+    value: "#fff",
+    cssVariable: "--c-on-primary",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Error",
+    value: "#f42727",
+    cssVariable: "--c-error",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "On Error",
+    value: "#fff",
+    cssVariable: "--c-on-error",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Success",
+    value: "#409920",
+    cssVariable: "--c-success",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "On Success",
+    value: "#fff",
+    cssVariable: "--c-on-success",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Info",
+    value: "#0671d6",
+    cssVariable: "--c-info",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 900",
+    value: "#0f1427",
+    cssVariable: "--c-neutral--900",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 800",
+    value: "#141a32",
+    cssVariable: "--c-neutral--800",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 700",
+    value: "#202b47",
+    cssVariable: "--c-neutral--700",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 600",
+    value: "#2c3a5c",
+    cssVariable: "--c-neutral--600",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 500",
+    value: "#8d9bb5",
+    cssVariable: "--c-neutral--500",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 400",
+    value: "#c3cee2",
+    cssVariable: "--c-neutral--400",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 300",
+    value: "#e3e8f3",
+    cssVariable: "--c-neutral--300",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 200",
+    value: "#ecf1f8",
+    cssVariable: "--c-neutral--200",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 100",
+    value: "#f2f5fa",
+    cssVariable: "--c-neutral--100",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 50",
+    value: "#f7f9fc",
+    cssVariable: "--c-neutral--50",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "Neutral 0",
+    value: "#fff",
+    cssVariable: "--c-neutral--0",
+    type: ElementConfigType.CSS_COLOR_PREVIEW,
+  },
+  {
+    label: "White",
+    value: "#fff",
+    cssVariable: "--c-white",
+    isEditable: false,
+  },
+  {
+    label: "Transparent",
+    value: "transparent",
+    cssVariable: "--c-transparent",
+    isEditable: false,
+  },
+];
+
 export const getDefaultTheme = (): CSSPropertyGroup[] => [
   {
     label: CSSGroups.COLORS,
     types: null,
-    properties: [
-      {
-        label: "Primary",
-        value: "#0039e3",
-        cssVariable: "--c-primary",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Primary Variant",
-        value: "#2a64ff",
-        cssVariable: "--c-primary-variant",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "On Primary",
-        value: "#f7f9fc",
-        cssVariable: "--c-on-primary",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Error",
-        value: "#f42727",
-        cssVariable: "--c-error",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "On Error",
-        value: "#f2f5fa",
-        cssVariable: "--c-on-error",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Success",
-        value: "#409920",
-        cssVariable: "--c-success",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "On Success",
-        value: "#f2f5fa",
-        cssVariable: "--c-on-success",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Info",
-        value: "#0671d6",
-        cssVariable: "--c-info",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 900",
-        value: "#0f1427",
-        cssVariable: "--c-neutral--900",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 800",
-        value: "#141a32",
-        cssVariable: "--c-neutral--800",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 700",
-        value: "#202b47",
-        cssVariable: "--c-neutral--700",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 600",
-        value: "#2c3a5c",
-        cssVariable: "--c-neutral--600",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 500",
-        value: "#8d9bb5",
-        cssVariable: "--c-neutral--500",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 400",
-        value: "#c3cee2",
-        cssVariable: "--c-neutral--400",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 300",
-        value: "#e3e8f3",
-        cssVariable: "--c-neutral--300",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 200",
-        value: "#ecf1f8",
-        cssVariable: "--c-neutral--200",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 100",
-        value: "#f2f5fa",
-        cssVariable: "--c-neutral--100",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "Neutral 50",
-        value: "#f7f9fc",
-        cssVariable: "--c-neutral--50",
-        type: ElementConfigType.CSS_COLOR_PREVIEW,
-      },
-      {
-        label: "White",
-        value: "#fff",
-        cssVariable: "--c-white",
-        isEditable: false,
-      },
-      {
-        label: "Transparent",
-        value: "transparent",
-        cssVariable: "--c-transparent",
-        isEditable: false,
-      },
-    ],
+    properties: getColorProperties(),
   },
   {
     label: CSSGroups.FONTS,
@@ -233,7 +362,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-surface",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -343,7 +472,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Alternative background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-input-background-alt",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -367,7 +496,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-input",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -420,7 +549,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
     properties: [
       {
         label: "Dropdown background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-select-dropdown-background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -660,13 +789,6 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         group: CSSGroups.COLORS,
       },
       {
-        label: "Background color checked",
-        value: "--c-primary",
-        cssVariable: "--c-radiobox-background-checked",
-        type: ElementConfigType.CSS_VARIABLE_SELECT,
-        group: CSSGroups.COLORS,
-      },
-      {
         label: "Background color checked disabled",
         value: "--c-neutral--100",
         cssVariable: "--c-radiobox-background-checked-disabled",
@@ -717,7 +839,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         cssVariable: "--c-radiobox-option",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
-      }
+      },
     ],
   },
   {
@@ -733,7 +855,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-approval-body--background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -750,7 +872,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-approval-surface",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -842,6 +964,69 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
     ],
   },
+  {
+    label: CSSGroups.DOCUMENT_SIGNING,
+    types: [ElementType.DOCUMENT_SIGNING],
+    properties: [
+      {
+        label: "Accent color",
+        value: "--c-primary",
+        cssVariable: "--c-signing-accent",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Button background color",
+        value: "--c-primary",
+        cssVariable: "--c-signing-btn--background",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Button text color",
+        value: "--c-on-primary",
+        cssVariable: "--c-signing-btn--text",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Document background color",
+        value: "--c-transparent",
+        cssVariable: "--c-signing-document--background",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Document padding",
+        value: "0px",
+        cssVariable: "--p-signing-document",
+      },
+      {
+        label: "Page gap",
+        value: "8px",
+        cssVariable: "--gap-signing-pages",
+      },
+      {
+        label: "Signer bar background color",
+        value: "--c-neutral--50",
+        cssVariable: "--c-signing-bar--background",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Signer bar border color",
+        value: "--fb-border-form",
+        cssVariable: "--bc-signing-bar",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Signer bar border radius",
+        value: "8px",
+        cssVariable: "--br-signing-bar",
+      },
+    ],
+  },
 
   {
     label: CSSGroups.SECTION,
@@ -869,6 +1054,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         value: "10px",
         cssVariable: "--gap-section",
       },
+      ...getLayoutProperties("section"),
       {
         label: "Padding vertical",
         value: "16px",
@@ -898,7 +1084,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-section",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -969,7 +1155,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-list-surface--background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -986,7 +1172,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-list-surface",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1006,6 +1192,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         value: "16px",
         cssVariable: "--gap-list-item",
       },
+      ...getLayoutProperties("list-item"),
       {
         label: "Item padding vertical",
         value: "16px",
@@ -1062,7 +1249,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
     properties: [
       {
         label: "Table header background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-table-header-background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1090,7 +1277,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Table background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-table-background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1104,7 +1291,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Table border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-table",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1166,7 +1353,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-columns-background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1183,7 +1370,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-columns",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1240,6 +1427,18 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
     ],
   },
   {
+    label: CSSGroups.COLUMN,
+    types: [ElementType.COLUMN],
+    properties: [
+      {
+        label: "Gap",
+        value: "10px",
+        cssVariable: "--gap-column",
+      },
+      ...getLayoutProperties("column"),
+    ],
+  },
+  {
     label: CSSGroups.STEPPER,
     types: [ElementType.STEPPER],
     properties: [
@@ -1252,11 +1451,6 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         label: "Padding horizontal",
         value: "16px",
         cssVariable: "--ph-stepper",
-      },
-      {
-        label: "Gap",
-        value: "10px",
-        cssVariable: "--gap-stepper",
       },
       {
         label: "Surface background color",
@@ -1277,7 +1471,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-stepper-surface",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1334,14 +1528,21 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
     ],
   },
   {
-    label: CSSGroups.TABS,
-    types: [ElementType.TABS],
+    label: CSSGroups.STEP,
+    types: [ElementType.STEP],
     properties: [
       {
         label: "Gap",
         value: "10px",
-        cssVariable: "--gap-tabs-surface",
+        cssVariable: "--gap-step",
       },
+      ...getLayoutProperties("step"),
+    ],
+  },
+  {
+    label: CSSGroups.TABS,
+    types: [ElementType.TABS],
+    properties: [
       {
         label: "Padding vertical",
         value: "16px",
@@ -1371,7 +1572,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Surface border color",
-        value: "--c-neutral--300",
+        value: "--fb-border-form",
         cssVariable: "--bc-tabs-surface",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1393,6 +1594,18 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
     ],
   },
   {
+    label: CSSGroups.TAB,
+    types: [ElementType.TAB],
+    properties: [
+      {
+        label: "Gap",
+        value: "10px",
+        cssVariable: "--gap-tab",
+      },
+      ...getLayoutProperties("tab"),
+    ],
+  },
+  {
     label: CSSGroups.SIDE_PANEL,
     types: [ElementType.SIDE_PANEL],
     properties: [
@@ -1401,6 +1614,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         value: "16px",
         cssVariable: "--gap-side-panel",
       },
+      ...getLayoutProperties("side-panel"),
       {
         label: "Side panel padding vertical",
         value: "16px",
@@ -1413,14 +1627,14 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Header background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c--side-panel--header-background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
       },
       {
         label: "Background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c--side-panel--background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
@@ -1449,6 +1663,13 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
         label: "Color hover",
         value: "--c-neutral--500",
         cssVariable: "--c-icon-color--hover",
+        type: ElementConfigType.CSS_VARIABLE_SELECT,
+        group: CSSGroups.COLORS,
+      },
+      {
+        label: "Color disabled",
+        value: "--c-neutral--300",
+        cssVariable: "--c-icon-color--disabled",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,
       },
@@ -1526,7 +1747,7 @@ export const getDefaultTheme = (): CSSPropertyGroup[] => [
       },
       {
         label: "Dropdown background color",
-        value: "--c-white",
+        value: "--c-neutral--0",
         cssVariable: "--c-dropdown-background",
         type: ElementConfigType.CSS_VARIABLE_SELECT,
         group: CSSGroups.COLORS,

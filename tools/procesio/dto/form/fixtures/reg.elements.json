@@ -1,6 +1,7 @@
 [
   {
     "id": "00000000-0000-0000-0000-000000000002",
+    "category": "structure",
     "type": "heading",
     "configs": [
       {
@@ -72,19 +73,27 @@
         "subCategory": "general",
         "type": "hidden",
         "value": []
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000009",
+        "key": "class",
+        "label": "CSS Classes",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
       }
     ],
-    "section": "header",
-    "category": "structure",
-    "parentId": null
+    "parentId": null,
+    "section": "header"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000009",
+    "id": "00000000-0000-0000-0000-000000000010",
     "category": "fields",
     "type": "input",
     "configs": [
       {
-        "id": "00000000-0000-0000-0000-000000000010",
+        "id": "00000000-0000-0000-0000-000000000011",
         "key": "label",
         "label": "Label",
         "placeholder": "Add label here",
@@ -95,7 +104,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000011",
+        "id": "00000000-0000-0000-0000-000000000012",
         "key": "placeholder",
         "label": "Placeholder",
         "placeholder": "Add placeholder text here",
@@ -106,7 +115,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000012",
+        "id": "00000000-0000-0000-0000-000000000013",
         "key": "type",
         "label": "Type",
         "tooltip": "Type does not impact the entire input behavior. Default browser's behavior can be changed.",
@@ -117,7 +126,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000013",
+        "id": "00000000-0000-0000-0000-000000000014",
         "key": "tooltip",
         "label": "Tooltip",
         "placeholder": "Add tooltip here",
@@ -129,7 +138,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000014",
+        "id": "00000000-0000-0000-0000-000000000015",
         "key": "info-text",
         "label": "Info text",
         "placeholder": "Add info text here",
@@ -140,7 +149,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000015",
+        "id": "00000000-0000-0000-0000-000000000016",
         "key": "defaultValue",
         "label": "Default value",
         "placeholder": "Add default value here",
@@ -154,7 +163,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000016",
+        "id": "00000000-0000-0000-0000-000000000017",
         "key": "value",
         "label": "Value",
         "category": "content",
@@ -167,7 +176,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000017",
+        "id": "00000000-0000-0000-0000-000000000018",
         "key": "readonly",
         "label": "Readonly",
         "category": "content",
@@ -177,7 +186,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000018",
+        "id": "00000000-0000-0000-0000-000000000019",
         "key": "disabled",
         "label": "Disabled",
         "category": "content",
@@ -187,7 +196,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000019",
+        "id": "00000000-0000-0000-0000-000000000020",
         "key": "visible",
         "label": "Visible",
         "category": "content",
@@ -197,7 +206,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000020",
+        "id": "00000000-0000-0000-0000-000000000021",
         "key": "name",
         "label": "Name",
         "placeholder": "Element name",
@@ -213,7 +222,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000021",
+        "id": "00000000-0000-0000-0000-000000000022",
         "key": "id",
         "label": "ID",
         "placeholder": "Add ID here",
@@ -224,7 +233,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000022",
+        "id": "00000000-0000-0000-0000-000000000023",
         "key": "required",
         "label": "Required",
         "category": "content",
@@ -234,7 +243,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000023",
+        "id": "00000000-0000-0000-0000-000000000024",
         "key": "regex",
         "label": "Regex",
         "placeholder": "Add regex for validation here",
@@ -245,7 +254,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000024",
+        "id": "00000000-0000-0000-0000-000000000025",
         "key": "onInputEvents",
         "label": "onInput",
         "category": "content",
@@ -254,7 +263,7 @@
         "value": null
       },
       {
-        "id": "00000000-0000-0000-0000-000000000025",
+        "id": "00000000-0000-0000-0000-000000000026",
         "key": "onFocusEvents",
         "label": "onFocus",
         "category": "content",
@@ -263,7 +272,7 @@
         "value": null
       },
       {
-        "id": "00000000-0000-0000-0000-000000000026",
+        "id": "00000000-0000-0000-0000-000000000027",
         "key": "onBlurEvents",
         "label": "onBlur",
         "category": "content",
@@ -272,9 +281,18 @@
         "value": null
       },
       {
-        "id": "00000000-0000-0000-0000-000000000027",
+        "id": "00000000-0000-0000-0000-000000000028",
         "key": "style",
         "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000029",
+        "key": "class",
+        "label": "CSS Classes",
         "category": "styling",
         "subCategory": "general",
         "type": "hidden",
@@ -285,12 +303,12 @@
     "section": "body"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000028",
+    "id": "00000000-0000-0000-0000-000000000030",
     "category": "fields",
     "type": "select",
     "configs": [
       {
-        "id": "00000000-0000-0000-0000-000000000029",
+        "id": "00000000-0000-0000-0000-000000000031",
         "key": "label",
         "label": "Label",
         "placeholder": "Add label here",
@@ -301,7 +319,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000030",
+        "id": "00000000-0000-0000-0000-000000000032",
         "key": "placeholder",
         "label": "Placeholder",
         "category": "content",
@@ -311,7 +329,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000031",
+        "id": "00000000-0000-0000-0000-000000000033",
         "key": "tooltip",
         "label": "Tooltip",
         "placeholder": "Add tooltip here",
@@ -323,7 +341,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000032",
+        "id": "00000000-0000-0000-0000-000000000034",
         "key": "info-text",
         "label": "Info text",
         "placeholder": "Add info text here",
@@ -334,7 +352,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000033",
+        "id": "00000000-0000-0000-0000-000000000035",
         "key": "searchable",
         "label": "Searchable",
         "category": "content",
@@ -344,7 +362,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000034",
+        "id": "00000000-0000-0000-0000-000000000036",
         "key": "clearable",
         "label": "Clearable",
         "category": "content",
@@ -354,7 +372,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000035",
+        "id": "00000000-0000-0000-0000-000000000037",
         "key": "multiple",
         "label": "Multiple",
         "category": "content",
@@ -367,7 +385,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000036",
+        "id": "00000000-0000-0000-0000-000000000038",
         "key": "readonly",
         "label": "Readonly",
         "category": "content",
@@ -377,7 +395,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000037",
+        "id": "00000000-0000-0000-0000-000000000039",
         "key": "disabled",
         "label": "Disabled",
         "category": "content",
@@ -387,7 +405,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000038",
+        "id": "00000000-0000-0000-0000-000000000040",
         "key": "visible",
         "label": "Visible",
         "category": "content",
@@ -397,7 +415,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000039",
+        "id": "00000000-0000-0000-0000-000000000041",
         "key": "name",
         "label": "Name",
         "category": "content",
@@ -412,7 +430,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000040",
+        "id": "00000000-0000-0000-0000-000000000042",
         "key": "id",
         "label": "ID",
         "placeholder": "Add ID here",
@@ -423,7 +441,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000041",
+        "id": "00000000-0000-0000-0000-000000000043",
         "key": "sourceType",
         "label": "Source type",
         "category": "content",
@@ -433,7 +451,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000042",
+        "id": "00000000-0000-0000-0000-000000000044",
         "key": "sourceValue",
         "label": "Source value",
         "category": "content",
@@ -452,7 +470,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000043",
+        "id": "00000000-0000-0000-0000-000000000045",
         "key": "defaultValue",
         "label": "Default value",
         "placeholder": "Add default value here",
@@ -466,7 +484,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000044",
+        "id": "00000000-0000-0000-0000-000000000046",
         "key": "value",
         "label": "Value",
         "category": "content",
@@ -479,7 +497,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000045",
+        "id": "00000000-0000-0000-0000-000000000047",
         "key": "required",
         "label": "Required",
         "category": "content",
@@ -489,7 +507,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000046",
+        "id": "00000000-0000-0000-0000-000000000048",
         "key": "onInputEvents",
         "label": "onInput",
         "category": "content",
@@ -498,9 +516,18 @@
         "value": null
       },
       {
-        "id": "00000000-0000-0000-0000-000000000047",
+        "id": "00000000-0000-0000-0000-000000000049",
         "key": "style",
         "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000050",
+        "key": "class",
+        "label": "CSS Classes",
         "category": "styling",
         "subCategory": "general",
         "type": "hidden",
@@ -511,12 +538,12 @@
     "section": "body"
   },
   {
-    "id": "00000000-0000-0000-0000-000000000048",
+    "id": "00000000-0000-0000-0000-000000000051",
     "category": "fields",
     "type": "button",
     "configs": [
       {
-        "id": "00000000-0000-0000-0000-000000000049",
+        "id": "00000000-0000-0000-0000-000000000052",
         "key": "label",
         "label": "Label",
         "placeholder": "Add label here",
@@ -527,7 +554,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000050",
+        "id": "00000000-0000-0000-0000-000000000053",
         "key": "tooltip",
         "label": "Tooltip",
         "placeholder": "Add tooltip here",
@@ -539,7 +566,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000051",
+        "id": "00000000-0000-0000-0000-000000000054",
         "key": "info-text",
         "label": "Info text",
         "placeholder": "Add info text here",
@@ -550,7 +577,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000052",
+        "id": "00000000-0000-0000-0000-000000000055",
         "key": "readonly",
         "label": "Readonly",
         "category": "content",
@@ -560,7 +587,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000053",
+        "id": "00000000-0000-0000-0000-000000000056",
         "key": "visible",
         "label": "Visible",
         "category": "content",
@@ -570,7 +597,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000054",
+        "id": "00000000-0000-0000-0000-000000000057",
         "key": "name",
         "label": "Name",
         "category": "content",
@@ -584,7 +611,7 @@
         ]
       },
       {
-        "id": "00000000-0000-0000-0000-000000000055",
+        "id": "00000000-0000-0000-0000-000000000058",
         "key": "id",
         "label": "ID",
         "placeholder": "Add ID here",
@@ -595,7 +622,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000056",
+        "id": "00000000-0000-0000-0000-000000000059",
         "key": "submit",
         "label": "Submit",
         "category": "content",
@@ -605,7 +632,7 @@
         "exposed": true
       },
       {
-        "id": "00000000-0000-0000-0000-000000000057",
+        "id": "00000000-0000-0000-0000-000000000060",
         "key": "disabledIfFormIsInvalid",
         "label": "Disabled if form is invalid",
         "category": "content",
@@ -614,7 +641,7 @@
         "value": false
       },
       {
-        "id": "00000000-0000-0000-0000-000000000058",
+        "id": "00000000-0000-0000-0000-000000000061",
         "key": "onClickEvents",
         "label": "onClick",
         "category": "content",
@@ -623,9 +650,18 @@
         "value": null
       },
       {
-        "id": "00000000-0000-0000-0000-000000000059",
+        "id": "00000000-0000-0000-0000-000000000062",
         "key": "style",
         "label": "Style",
+        "category": "styling",
+        "subCategory": "general",
+        "type": "hidden",
+        "value": []
+      },
+      {
+        "id": "00000000-0000-0000-0000-000000000063",
+        "key": "class",
+        "label": "CSS Classes",
         "category": "styling",
         "subCategory": "general",
         "type": "hidden",

@@ -153,3 +153,13 @@ and Ruby share one shape: `Timeout` (10-180 s, default 60), `Single Result`, `Li
 `Stdout` and `Error`; Javascript has only `Output` (no Timeout, no Error). See
 `PROCESIO-NODE-MODULE-WHITELIST.md` / `PROCESIO-PYTHON-ACTION-NOTES.md` for the sandbox, and
 the live-behaviour section of the latter for how the four compare when run.
+
+## v3.1.0 (2026-11-02): OAuth2 authorization and custom actions with Azure Storage
+
+- Authorizing an OAuth2 credential (`GET api/Credentials/authorize/{id}`, then the provider's
+  callback) now binds the `state` to the user who started it, for 10 minutes and one use. The
+  callback needs that same user's PROCESIO session in the browser: start and finish the
+  authorization in one signed-in browser. Failures redirect to the app with an `?error=` message.
+- A custom action (.nupkg) that declares an `AZURE_STORAGE` credential receives null, with no error
+  and no log line: Action-Execution has no builder for that credential type. The built-in Azure
+  Storage connector works. Use a REST or custom credential in a custom action instead.

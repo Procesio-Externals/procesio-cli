@@ -235,3 +235,11 @@ process run.
 still being tested; it can be empty), and `To be decommissioned` (older versions such as
 Call API v1/v2/v3, Execute Query V1/V2 and Python (Old), kept for the processes that use them).
 
+
+## A declared Azure Storage credential arrives as null (v3.1.0, 2026-11-02)
+
+Action-Execution has no credential builder for `AZURE_STORAGE` (the root `Azure Storage Account`
+template). A custom action that declares one through `Credentials_Custom` by template GUID gets
+null at run time, with no error and no log line (documented by the platform as a known gap). Only
+the built-in Azure Storage connector, which runs in Process-Execution, reads that credential. In a
+custom action, take the account name and key through a custom or REST credential instead.

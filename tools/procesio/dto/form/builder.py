@@ -216,6 +216,20 @@ def _apply_element_style(spec: dict, el_type: str, configs: list, ctx) -> None:
     _set_config(configs, "style", items, ctx)
 
 
+def _apply_element_classes(spec: dict, configs: list, ctx) -> None:
+    """Set the element's `class` config from spec['classes'] (a list of class names, or one
+    space-separated string). The runtime puts them on the element's WRAPPER div, and the
+    designer offers every class the form's own CSS defines (Styling > Apply CSS classes)."""
+    raw = spec.get("classes")
+    if raw in (None, "", []):
+        return
+    names = raw.split() if isinstance(raw, str) else [str(c).strip() for c in raw]
+    bad = [n for n in names if not re.fullmatch(r"-?[_a-zA-Z][_a-zA-Z0-9-]*", n)]
+    if bad:
+        raise UsageError(f"classes: not a CSS class name: {bad} (no leading dot, no spaces)")
+    _set_config(configs, "class", names, ctx)
+
+
 _FIELDS_NS = fieldpath.FIELDS_NS   # platform "fields" container id (constant across forms)
 
 
@@ -462,6 +476,7 @@ def _build_element(spec: dict, ctx: dict, out: list) -> dict:
         _set_config(configs, "sourceValue", _options(spec["options"]), ctx)
     _apply_events(spec, configs, ctx)
     _apply_element_style(spec, kind, configs, ctx)
+    _apply_element_classes(spec, configs, ctx)
     # array-valued control -> its `value` defaults to an empty array + is typed isList,
     # so the runtime emits/sends an ARRAY (not a single object/null). See _value_is_list.
     if val_cfg is not None and _value_is_list(el):
@@ -626,7 +641,10 @@ _JSON = "0317bfee-b2f5-4bde-bfe8-121212121220"
 _OBJECT = "0317bfee-b2f5-4bde-bfe8-121212121221"
 _BOOL_CFG = {"visible", "readonly", "required", "submit", "multiple", "searchable",
              "clearable", "hasNow", "disabledIfFormIsInvalid", "canAdd", "canRemove",
-             "outlined", "disabled"}
+             "outlined", "disabled",
+             # document-signing toggles (the designer types a config by its value)
+             "allowDecline", "setupEditable", "fieldsEditable"}
+_INT_CFG = {"maxFileSize"}
 _VALUE_TYPE = {"number-input": _INT, "checkbox": _BOOL, "datetime-input": _DT,
                "file-upload": _FILE, "file-viewer": _FILE, "chat": _JSON}
 # Controls whose `value` is a JSON ARRAY -> DM attr isList:true + value config default [].
@@ -652,7 +670,10 @@ def _value_is_list(el: dict) -> bool:
 # FORM-DEV-GUIDE/08, "A script reads a select's options and gets nothing").
 _SKIP_DM_ATTR = {"options", "childrenIdPerColumn",
                  "tableColumnsSourceValue", "tableColumnsSourceType", "rows", "columns",
-                 "tabs", "style"}
+                 "tabs", "style",
+                 # a document-signing element's design (exposed: false): the designer gives
+                 # them no attribute, and the envelope is seeded from the saved form instead
+                 "templateSigners", "templateSpots", "blockFields"}
 
 
 def _attr_name(key: str) -> str:
@@ -685,7 +706,7 @@ def _dm_shape(el: dict, c: dict) -> tuple[str, bool] | None:
     vkey = _value_key(el.get("type"))
     if k == vkey:
         return _VALUE_TYPE.get(el.get("type"), _STR), _value_is_list(el)
-    return (_BOOL if k in _BOOL_CFG else _STR), False
+    return (_BOOL if k in _BOOL_CFG else _INT if k in _INT_CFG else _STR), False
 
 
 def _build_data_model(form_id: str, elements: list, ctx: dict) -> dict:

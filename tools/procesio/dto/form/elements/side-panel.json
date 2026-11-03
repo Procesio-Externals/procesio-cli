@@ -15,6 +15,17 @@
    "exposed": true
   },
   {
+   "id": "628b06f5-f1f4-5109-a9ed-178be8e58378",
+   "key": "buttonTooltip",
+   "label": "Open side panel button tooltip",
+   "placeholder": "Add tooltip here",
+   "category": "content",
+   "subCategory": "general",
+   "type": "input",
+   "value": "",
+   "exposed": true
+  },
+  {
    "id": "8f2dbdb3-3868-5dde-bbaa-069cb4cca527",
    "key": "sidePanelTitle",
    "label": "Side panel title",
@@ -115,6 +126,15 @@
    "id": "a3921595-447f-5b01-bfa3-827a8ea10735",
    "key": "style",
    "label": "Style",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
+   "id": "852e21c7-a420-593c-ba61-8c0ea7c560a1",
+   "key": "class",
+   "label": "CSS Classes",
    "category": "styling",
    "subCategory": "general",
    "type": "hidden",

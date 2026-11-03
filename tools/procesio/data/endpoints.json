@@ -1,8 +1,8 @@
 {
 "source": "webapi.procesio.app/swagger/v1.19",
-"openapi": "3.0.1",
+"openapi": "3.0.4",
 "version": "v1.19",
-"count": 295,
+"count": 296,
 "endpoints": [
 {
 "method": "GET",
@@ -449,7 +449,7 @@
 {
 "method": "POST",
 "path": "/api/CustomUrl/FormTemplate",
-"tag": "CustomUrlForm",
+"tag": "CustomUrl",
 "summary": "Permission required: FormTemplate.Write",
 "params": [],
 "body": true
@@ -457,7 +457,7 @@
 {
 "method": "PUT",
 "path": "/api/CustomUrl/FormTemplate",
-"tag": "CustomUrlForm",
+"tag": "CustomUrl",
 "summary": "Permission required: FormTemplate.Update",
 "params": [],
 "body": true
@@ -465,7 +465,7 @@
 {
 "method": "DELETE",
 "path": "/api/CustomUrl/FormTemplate/{id}",
-"tag": "CustomUrlForm",
+"tag": "CustomUrl",
 "summary": "Permission required: FormTemplate.Delete",
 "params": [
 "id"
@@ -475,7 +475,7 @@
 {
 "method": "GET",
 "path": "/api/CustomUrl/FormTemplate/{id}",
-"tag": "CustomUrlForm",
+"tag": "CustomUrl",
 "summary": "Permission required: FormTemplate.Read",
 "params": [
 "id"
@@ -485,8 +485,8 @@
 {
 "method": "DELETE",
 "path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
-"tag": "CustomUrlLaunch",
-"summary": "",
+"tag": "CustomUrl",
+"summary": "Permission required: None",
 "params": [
 "masterWorkspaceUrl",
 "workspaceUrl",
@@ -499,8 +499,8 @@
 {
 "method": "GET",
 "path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
-"tag": "CustomUrlLaunch",
-"summary": "",
+"tag": "CustomUrl",
+"summary": "Permission required: None",
 "params": [
 "masterWorkspaceUrl",
 "workspaceUrl",
@@ -513,8 +513,8 @@
 {
 "method": "PATCH",
 "path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
-"tag": "CustomUrlLaunch",
-"summary": "",
+"tag": "CustomUrl",
+"summary": "Permission required: None",
 "params": [
 "masterWorkspaceUrl",
 "workspaceUrl",
@@ -527,8 +527,8 @@
 {
 "method": "POST",
 "path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
-"tag": "CustomUrlLaunch",
-"summary": "",
+"tag": "CustomUrl",
+"summary": "Permission required: None",
 "params": [
 "masterWorkspaceUrl",
 "workspaceUrl",
@@ -541,8 +541,8 @@
 {
 "method": "PUT",
 "path": "/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}",
-"tag": "CustomUrlLaunch",
-"summary": "",
+"tag": "CustomUrl",
+"summary": "Permission required: None",
 "params": [
 "masterWorkspaceUrl",
 "workspaceUrl",
@@ -555,7 +555,7 @@
 {
 "method": "GET",
 "path": "/api/CustomUrl/MasterWorkspace",
-"tag": "CustomUrlMaster",
+"tag": "CustomUrl",
 "summary": "Permission required: MasterWorkspace.Read",
 "params": [],
 "body": false
@@ -563,7 +563,7 @@
 {
 "method": "POST",
 "path": "/api/CustomUrl/MasterWorkspace",
-"tag": "CustomUrlMaster",
+"tag": "CustomUrl",
 "summary": "Permission required: MasterWorkspace.Write",
 "params": [],
 "body": true
@@ -571,7 +571,7 @@
 {
 "method": "PUT",
 "path": "/api/CustomUrl/MasterWorkspace",
-"tag": "CustomUrlMaster",
+"tag": "CustomUrl",
 "summary": "Permission required: MasterWorkspace.Update",
 "params": [],
 "body": true
@@ -579,7 +579,7 @@
 {
 "method": "DELETE",
 "path": "/api/CustomUrl/MasterWorkspace/{id}",
-"tag": "CustomUrlMaster",
+"tag": "CustomUrl",
 "summary": "Permission required: MasterWorkspace.Update",
 "params": [
 "id"
@@ -589,7 +589,7 @@
 {
 "method": "POST",
 "path": "/api/CustomUrl/Webhook",
-"tag": "CustomUrlWebhook",
+"tag": "CustomUrl",
 "summary": "Permission required: Webhook.Write",
 "params": [],
 "body": true
@@ -597,7 +597,7 @@
 {
 "method": "PUT",
 "path": "/api/CustomUrl/Webhook",
-"tag": "CustomUrlWebhook",
+"tag": "CustomUrl",
 "summary": "Permission required: Webhook.Update",
 "params": [],
 "body": true
@@ -605,7 +605,7 @@
 {
 "method": "DELETE",
 "path": "/api/CustomUrl/Webhook/{id}",
-"tag": "CustomUrlWebhook",
+"tag": "CustomUrl",
 "summary": "Permission required: Webhook.Delete",
 "params": [
 "id"
@@ -615,7 +615,7 @@
 {
 "method": "GET",
 "path": "/api/CustomUrl/Webhook/{id}",
-"tag": "CustomUrlWebhook",
+"tag": "CustomUrl",
 "summary": "Permission required: Webhook.Read",
 "params": [
 "id"
@@ -625,7 +625,7 @@
 {
 "method": "GET",
 "path": "/api/CustomUrl/Workspace",
-"tag": "CustomUrlWorkspace",
+"tag": "CustomUrl",
 "summary": "Permission required: Workspace.Read",
 "params": [],
 "body": false
@@ -633,7 +633,7 @@
 {
 "method": "POST",
 "path": "/api/CustomUrl/Workspace",
-"tag": "CustomUrlWorkspace",
+"tag": "CustomUrl",
 "summary": "Permission required: Workspace.Write",
 "params": [],
 "body": true
@@ -641,7 +641,7 @@
 {
 "method": "PUT",
 "path": "/api/CustomUrl/Workspace",
-"tag": "CustomUrlWorkspace",
+"tag": "CustomUrl",
 "summary": "Permission required: Workspace.Update",
 "params": [],
 "body": true
@@ -649,7 +649,7 @@
 {
 "method": "GET",
 "path": "/api/CustomUrl/Workspace/master",
-"tag": "CustomUrlWorkspace",
+"tag": "CustomUrl",
 "summary": "Permission required: Workspace.Read",
 "params": [],
 "body": false
@@ -657,7 +657,7 @@
 {
 "method": "DELETE",
 "path": "/api/CustomUrl/Workspace/{id}",
-"tag": "CustomUrlWorkspace",
+"tag": "CustomUrl",
 "summary": "Permission required: Workspace.Delete",
 "params": [
 "id"
@@ -1558,7 +1558,7 @@
 "method": "GET",
 "path": "/api/form/signing/envelope/{id}/document",
 "tag": "FormSigning",
-"summary": "Stream a document rendition: current (default), signed, source, or my-step -\nthe caller's step-scoped view (their order group and earlier; parties only, 404 otherwise).",
+"summary": "Stream a document rendition: current (default), signed, source, or my-step -\nthe caller's step-scoped view (their order group and earlier; parties only, 404 otherwise).\nAny other version is refused (400), never served as current.",
 "params": [
 "id",
 "version"
@@ -1589,7 +1589,7 @@
 "method": "POST",
 "path": "/api/form/signing/envelope/{id}/my-session/sign",
 "tag": "FormSigning",
-"summary": "Sign: applies the adopted signature to every spot assigned to the caller.",
+"summary": "Sign: applies the adopted signature to every spot assigned to the caller. A caller the\npreparer placed no signature spot for places their own (signatureSpot).",
 "params": [
 "id"
 ],
@@ -1599,7 +1599,7 @@
 "method": "POST",
 "path": "/api/form/signing/envelope/{id}/send",
 "tag": "FormSigning",
-"summary": "Send for signing: freezes spots/parties, activates the first order group, dispatches emails.",
+"summary": "Send for signing: freezes spots/parties, activates the first order group, dispatches emails.\nWith no signers the envelope completes at once and the submission goes on.",
 "params": [
 "id",
 "formId",
@@ -1647,7 +1647,7 @@
 "method": "PUT",
 "path": "/api/form/signing/public/envelope/{id}",
 "tag": "FormSigningPublic",
-"summary": "DRAFT-only update of the signer's own spots (parties and order mode in the payload are ignored).",
+"summary": "DRAFT-only update of the signer's own spots (parties in the payload are ignored).",
 "params": [
 "id"
 ],
@@ -1657,7 +1657,7 @@
 "method": "GET",
 "path": "/api/form/signing/public/envelope/{id}/document",
 "tag": "FormSigningPublic",
-"summary": "Stream a rendition: current (default), signed, or source; my-step reads as current.",
+"summary": "Stream a rendition: current (default), signed, or source; my-step reads as current. Any other\nversion is refused (400) - before the token is looked at, so it tells nothing about the envelope.",
 "params": [
 "id",
 "version"
@@ -1678,7 +1678,7 @@
 "method": "POST",
 "path": "/api/form/signing/public/envelope/{id}/my-session/sign",
 "tag": "FormSigningPublic",
-"summary": "Sign: applies the drawn signature to every spot of the signer; a replay returns 200 with current state.",
+"summary": "Sign: applies the drawn signature to every spot of the signer, who places their own when no\nsignature spot was placed for them (signatureSpot); a replay returns 200 with current state.",
 "params": [
 "id"
 ],
@@ -2772,7 +2772,7 @@
 "method": "POST",
 "path": "/api/Workspace",
 "tag": "Workspace",
-"summary": "Permission required: MasterWorkspace.Write",
+"summary": "Permission required: MasterWorkspace.Create",
 "params": [],
 "body": true
 },
@@ -2894,6 +2894,14 @@
 "path": "/api/Workspaces",
 "tag": "Workspace",
 "summary": "Permission required: None",
+"params": [],
+"body": false
+},
+{
+"method": "GET",
+"path": "/api/Features",
+"tag": "Features",
+"summary": "Get which optional features are active",
 "params": [],
 "body": false
 }
