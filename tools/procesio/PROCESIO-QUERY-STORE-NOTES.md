@@ -285,7 +285,7 @@ most one may return rows."
   maximum one table but received N tables!"*, and that check runs AFTER the script: every write
   in it has already happened by the time the step fails.
 - **User variables** (`SET @v = ...`, `SELECT ... INTO @v`, `@v := ...`) are allowed by the
-  Data-Store service's own validator so a value one statement computes can feed the next. **Measured live in prod on 2026-10-22:** user variables work, except where one meets a TEXT column. `SET @q = 1; ... WHERE IntCol = @q` runs, and so do Boolean and Guid comparisons and a plain `SELECT @n`. `SET @n = 'x'; ... WHERE TextCol = @n` fails with the generic *"The query could not be executed."*: the variable and the column carry different collations (`utf8mb4_0900_ai_ci` vs `utf8mb4_general_ci`, a MySQL configuration mismatch on the platform side, with no dedicated error message). Workaround that runs: put an explicit collation on the comparison, `WHERE TextCol = @n COLLATE utf8mb4_0900_ai_ci` (either collation name works). Or avoid the text variable and bind the value as a parameter. **Update 2026-11-03 (Data-Store v3.1.0):** stores created since 2026-11-02 are in `utf8mb4_0900_ai_ci`, where `WHERE TextCol = @n` works without `COLLATE` (measured); stores created earlier were NOT converted on prod and still need it (measured on a store from 2026-09). Check with `SELECT COLLATION(col)`. The new collation is NO PAD: `'abc'` and `'abc '` differ.
+  Data-Store service's own validator so a value one statement computes can feed the next. **Measured live in prod on 2026-10-22:** user variables work, except where one meets a TEXT column. `SET @q = 1; ... WHERE IntCol = @q` runs, and so do Boolean and Guid comparisons and a plain `SELECT @n`. `SET @n = 'x'; ... WHERE TextCol = @n` fails with the generic *"The query could not be executed."*: the variable and the column carry different collations (`utf8mb4_0900_ai_ci` vs `utf8mb4_general_ci`, a MySQL configuration mismatch on the platform side, with no dedicated error message). Workaround that runs: put an explicit collation on the comparison, `WHERE TextCol = @n COLLATE utf8mb4_0900_ai_ci` (either collation name works). Or avoid the text variable and bind the value as a parameter. **Update 2026-11-03 (Data-Store v3.1.0):** stores created since 2026-11-02 are in `utf8mb4_0900_ai_ci`, where `WHERE TextCol = @n` works without `COLLATE` (measured); stores created earlier keep the old collation, and still need it, until the conversion script `9_datastore_v3.1_ConvertDataStoreTablesToUtf8mb40900AiCi.sql` runs on that installation (prod converted them on 2026-11-03; a retest on a store from 2026-09 then matched without `COLLATE`). Check with `SELECT COLLATION(col)`. The new collation is NO PAD: `'abc'` and `'abc '` differ.
 - **Session statements stay refused**: session `SET`, `START`, `BEGIN`, `LOCK`, `PREPARE` and
   similar. When one statement of a script is refused, the message is prefixed `Statement N: `
   so it names the offender.
@@ -313,8 +313,9 @@ Each statement of a script is checked against these lists on its own (changed in
 - **REPLACE INTO** (delete+insert; reports 2 affected on an overwrite).
 - `@parameter` binding - constant and variable, bound as data.
 - **User variables** (v3.0.0, service side): `SET @v = ...`, `SELECT ... INTO @v`, `@v := ...`.
-  A text variable compared with a text column fails unless the comparison carries an explicit
-  `COLLATE` (measured 2026-10-22, see Multi-statement scripts).
+  A text variable compared with a text column failed unless the comparison carried an explicit
+  `COLLATE` (measured 2026-10-22); on Data-Store v3.1.0 stores, and older ones once converted, it
+  compares directly (see Multi-statement scripts).
 - **Several of the above in one `;`-separated script** (v3.0.0), at most one returning rows.
 
 ## Write mechanics
@@ -335,8 +336,8 @@ Each statement of a script is checked against these lists on its own (changed in
 - **Privileges**: `GRANT`.
 - **Session / txn / lock / prepare**: session `SET`, `START TRANSACTION`, `BEGIN`, `COMMIT`,
   `LOCK TABLES`, `HANDLER`, `PREPARE`, `USE`. Still refused in v3.0.0; only a user-variable
-  assignment (`SET @v = ...`) became allowed (a text variable against a text column needs an
-  explicit `COLLATE`, see Multi-statement scripts).
+  assignment (`SET @v = ...`) became allowed (a text variable against a text column of a store
+  still in the old collation needs an explicit `COLLATE`, see Multi-statement scripts).
 - **File / advisory lock / system schema**: `INTO OUTFILE`, `INTO DUMPFILE`, `LOAD_FILE()`,
   `GET_LOCK()`, `information_schema.*`, `mysql.user`, `performance_schema.*` - including
   UPPERCASE / backtick / spaced / comment-split spellings.

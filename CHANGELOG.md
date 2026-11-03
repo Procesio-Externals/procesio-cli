@@ -43,6 +43,8 @@ there, not here.
 - The endpoint index covers 296 operations. The bundled API reference is split by domain.
 - New notes cover the PROCESIO 3.1 and 3.2 production release: the signing contract, Data
   Store collation on new and older stores, workspace refusals and OAuth2 authorization.
+- More notes describe what the web app does on screen: the designer, For Each layouts,
+  approval forms and the task inbox, webhooks, SMTP and Send Email, and plan limits.
 - The plugin runs procesio-cli 0.1.5 (`plugin/pyproject.toml` and `plugin/uv.lock`).
 
 ## [0.1.5] - 2026-10-29
