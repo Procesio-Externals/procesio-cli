@@ -240,3 +240,11 @@ Generalises: **a record that carries an "updated" timestamp and an author is not
 treating it as one turns "what changed?" into an unanswerable question at exactly the moment it is
 asked.** Any workflow whose next step depends on the previous definition must capture that definition
 itself at the time it runs, because the platform will not reconstruct it afterwards.
+
+## Moves to history copy first (Process-History v3.1.0, 2026-10-27)
+
+A move to history now writes everything to history before it deletes the live copy (the variable
+list last). A step that cannot read its data stops the move for a retry instead of archiving the
+instance with missing variables, values or actions, so such an instance stays under `/instances`
+longer; it is still force-moved after 7 days. A failed lookup of the workspace's retention setting
+now stops the move too, instead of being read as "no setting".

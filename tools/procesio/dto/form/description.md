@@ -344,3 +344,18 @@ every config field stays valid; the builder assigns fresh ids, pins a clean
 `section`/`parentId` (golden elements were harvested from arbitrary containers),
 forces `visible:true`, resets `required`/placeholders, and overrides the semantic
 configs. theme/messages/dataModel/variables come from `data_shell.json`.
+
+## Document signing and CSS classes (2026-11)
+
+- `document-signing` (category `fields`) shows a PDF and runs a signing ceremony on it. Its design
+  is configs: `document` (`{fileId, name}` from `form-signing-upload-document`, or a URL),
+  `templateSigners` (`[{id, kind: FILLER|MEMBER, userId?, label?}]`, in order), `templateSpots`
+  (`[{spotId, partyId, page, x, y, w, h, type, required, label?, value?}]`, fractions of the
+  page from the top-left), `setupEditable`, `fieldsEditable`, `allowDecline`, `required`. Set
+  them through `configs` in form-create or with form-set-element-config. The ceremony lives in a
+  server-side envelope; the element's value only references it. Recipe and lifecycle:
+  FORM-DEV-GUIDE/11-DOCUMENT-SIGNING.md. The design configs (`templateSigners`, `templateSpots`,
+  `blockFields`) are not exposed, so they get no data-model attribute.
+- Every control carries a `class` config (a list of class names put on the element's wrapper
+  div). Pass `classes: ["pill", "wide"]` (or `"pill wide"`) on an element; define the classes in
+  the form's CSS with form-set-code.

@@ -27,6 +27,7 @@ day of debugging.
 | [08-PITFALLS.md](08-PITFALLS.md) | anything - read it once, then keep it attached |
 | [09-NAVIGATION-AND-HOSTING.md](09-NAVIGATION-AND-HOSTING.md) | link forms together, reason about public URLs and what the host shell always shows |
 | [10-REDESIGN-METHOD.md](10-REDESIGN-METHOD.md) | redesign a form or a family of forms: the order of work, which pattern for which need, lists, hostile input, shipping, verification, performance |
+| [11-DOCUMENT-SIGNING.md](11-DOCUMENT-SIGNING.md) | collect signatures on a PDF in a form: the document-signing element, signers and spots, the envelope lifecycle, the errors |
 
 **Minimum viable attachment set** for "add an animation / behaviour to an existing
 form": `02` + `03` + `05` + `08`. For a redesign, start with `10`.

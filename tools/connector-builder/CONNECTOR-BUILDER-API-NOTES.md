@@ -109,3 +109,10 @@ PROCESIO prod runs custom actions on Action-Execution v3 (`net10.0`, `Ringhel.Pr
 - Every build starts at `1.0.0.<build>` (`1.0.0.1`), and the model picks the package id (seen for one API: `NagerDate`, `Nager.Date`, `NagerHolidays`, `NagerDateHolidayApi`). PROCESIO refuses a package whose id and version it already holds with different content (207, see the procesio notes), so before uploading a rebuild, raise the version at the Plan stage: `set-version --major/--minor/--patch` (or the version boxes on the Plan screen).
 - **Each part must stay at or below 65535** (the .NET assembly version limit). `PATCH /builds/{id}/version` accepts a bigger number, and then Compile fails all eight attempts with "The specified version string '1.0.88711.1' does not conform to the required format" while the Fix stage burns LLM calls on it. A builder-side check on set-version would catch it.
 - Validation has three outcomes: no findings (the build goes straight on to Compile, no pause), warnings ("Continue" / "Return to Generate"), or errors ("Auto-Fix & Continue" / "Continue Anyway" / "Return to Generate"). For the same requirements the model's code lands in any of the three from one build to the next (a plain `HttpClient` gives the warning; one passed as a parameter gives the error "No HttpClient constructor parameter").
+
+## Generated actions must not declare an Azure Storage credential (2026-11)
+
+On PROCESIO v3.1.0 a custom action that declares an `AZURE_STORAGE` credential receives null at
+run time, with no error (Action-Execution has no builder for that type). When a connector targets
+Azure Storage, generate it with a custom or REST credential carrying the account name and key.
+Detail: tools/procesio/PROCESIO-CUSTOM-ACTION-NOTES.md.

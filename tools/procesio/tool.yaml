@@ -1481,7 +1481,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: delete-by-masterworkspaceurl-by-workspaceurl-by-entityurl
-  description: DELETE /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrlLaunch]
+  description: 'DELETE /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrl] - Permission required: None'
   args:
   - name: profile
     type: string
@@ -1574,7 +1574,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: delete-customurl-formtemplate-by-id
-  description: 'DELETE /api/CustomUrl/FormTemplate/{id}  [CustomUrlForm] - Permission required: FormTemplate.Delete'
+  description: 'DELETE /api/CustomUrl/FormTemplate/{id}  [CustomUrl] - Permission required: FormTemplate.Delete'
   args:
   - name: profile
     type: string
@@ -1597,7 +1597,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: delete-customurl-masterworkspace-by-id
-  description: 'DELETE /api/CustomUrl/MasterWorkspace/{id}  [CustomUrlMaster] - Permission required: MasterWorkspace.Update'
+  description: 'DELETE /api/CustomUrl/MasterWorkspace/{id}  [CustomUrl] - Permission required: MasterWorkspace.Update'
   args:
   - name: profile
     type: string
@@ -1620,7 +1620,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: delete-customurl-webhook-by-id
-  description: 'DELETE /api/CustomUrl/Webhook/{id}  [CustomUrlWebhook] - Permission required: Webhook.Delete'
+  description: 'DELETE /api/CustomUrl/Webhook/{id}  [CustomUrl] - Permission required: Webhook.Delete'
   args:
   - name: profile
     type: string
@@ -1643,7 +1643,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: delete-customurl-workspace-by-id
-  description: 'DELETE /api/CustomUrl/Workspace/{id}  [CustomUrlWorkspace] - Permission required: Workspace.Delete'
+  description: 'DELETE /api/CustomUrl/Workspace/{id}  [CustomUrl] - Permission required: Workspace.Delete'
   args:
   - name: profile
     type: string
@@ -2483,6 +2483,21 @@ actions:
     type: boolean
     required: false
     description: resolve names + build the selection, but do not export or save
+- name: features
+  description: 'Which optional modules this environment has on (GET /api/Features): customActions, dataStore, forms, executionEnvironment. An installation can switch them off; their endpoints then answer 400 code 1013 (error code feature_disabled).'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
 - name: file-download
   description: Download a flow-instance file (Generate-Document output etc.) via the header-based GET /api/File/download.
   args:
@@ -2766,9 +2781,16 @@ actions:
             style:
               type: object
               description: 'per-control style overrides {cssVariable: value}, e.g. {"--h-input":"50px"}. Only vars of the control''s CSS group are valid (input/number/datetime/textarea/select use the Input group). For color vars (type css-variable-select) pass a theme color variable like "--c-neutral--50", NOT a hex.'
+            classes:
+              oneOf:
+              - type: array
+                items:
+                  type: string
+              - type: string
+              description: CSS class names put on the element's WRAPPER div (the `class` config), as a list or one space-separated string, no leading dot. Define them in the form's CSS (form-set-code) and style the inner control, e.g. .pill button {...}.
             configs:
               type: object
-              description: 'advanced: set any element config key by name'
+              description: 'advanced: set any element config key by name (e.g. a document-signing element''s templateSigners / templateSpots / document)'
         event:
           type: object
           required:
@@ -3304,6 +3326,41 @@ actions:
     type: boolean
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
+- name: form-signing-upload-document
+  description: 'Store the PDF a document-signing form element asks people to sign (POST /api/form/signing/template-document, multipart) -> {fileId, name, pageCount}. With --element, also set that element''s `document` config to the stored file, surgically (previous value returned). Signers and signature spots are configs: set templateSigners / templateSpots with form-set-element-config.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: form-id
+    type: string
+    required: true
+    description: the SAVED form template the document belongs to
+  - name: file
+    type: string
+    required: true
+    description: local PDF to store (at most 10 MB)
+  - name: element
+    type: string
+    required: false
+    description: document-signing element id or `name` config; when given, its `document` config is set to the stored file {fileId, name}
+  - name: dry-run
+    type: boolean
+    required: false
+    description: check the PDF and the element, upload nothing
+  - name: force
+    type: boolean
+    required: false
+    description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-update
   description: 'Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data patch into its Data (and/or override --name/--status/--state/--is-private), then PUT the server-accepted PascalCase DTO. Preserves elements/theme/code (never rebuilds like form-edit). Last-write-wins guard (--force); --dry-run previews the DTO.'
   args:
@@ -3702,7 +3759,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-by-masterworkspaceurl-by-workspaceurl-by-entityurl
-  description: GET /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrlLaunch]
+  description: 'GET /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrl] - Permission required: None'
   args:
   - name: profile
     type: string
@@ -4041,7 +4098,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-customurl-formtemplate-by-id
-  description: 'GET /api/CustomUrl/FormTemplate/{id}  [CustomUrlForm] - Permission required: FormTemplate.Read'
+  description: 'GET /api/CustomUrl/FormTemplate/{id}  [CustomUrl] - Permission required: FormTemplate.Read'
   args:
   - name: profile
     type: string
@@ -4064,7 +4121,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-customurl-masterworkspace
-  description: 'GET /api/CustomUrl/MasterWorkspace  [CustomUrlMaster] - Permission required: MasterWorkspace.Read'
+  description: 'GET /api/CustomUrl/MasterWorkspace  [CustomUrl] - Permission required: MasterWorkspace.Read'
   args:
   - name: profile
     type: string
@@ -4083,7 +4140,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-customurl-webhook-by-id
-  description: 'GET /api/CustomUrl/Webhook/{id}  [CustomUrlWebhook] - Permission required: Webhook.Read'
+  description: 'GET /api/CustomUrl/Webhook/{id}  [CustomUrl] - Permission required: Webhook.Read'
   args:
   - name: profile
     type: string
@@ -4106,7 +4163,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-customurl-workspace
-  description: 'GET /api/CustomUrl/Workspace  [CustomUrlWorkspace] - Permission required: Workspace.Read'
+  description: 'GET /api/CustomUrl/Workspace  [CustomUrl] - Permission required: Workspace.Read'
   args:
   - name: profile
     type: string
@@ -4125,7 +4182,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-customurl-workspace-master
-  description: 'GET /api/CustomUrl/Workspace/master  [CustomUrlWorkspace] - Permission required: Workspace.Read'
+  description: 'GET /api/CustomUrl/Workspace/master  [CustomUrl] - Permission required: Workspace.Read'
   args:
   - name: profile
     type: string
@@ -4660,6 +4717,25 @@ actions:
     type: boolean
     required: false
     description: compose and return the request without sending it
+- name: get-features
+  description: GET /api/Features  [Features] - Get which optional features are active
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: compose and return the request without sending it
 - name: get-file-download
   description: 'GET /api/File/download  [File] - Permission required: ProcessInstance.Read'
   args:
@@ -4947,7 +5023,9 @@ actions:
 - name: get-form-signing-envelope-by-id-document
   description: 'GET /api/form/signing/envelope/{id}/document  [FormSigning] - Stream a document rendition: current (default), signed, source, or my-step -
 
-    the caller''s step-scoped view (their order group and earlier; parties only, 404 otherwise).'
+    the caller''s step-scoped view (their order group and earlier; parties only, 404 otherwise).
+
+    Any other'
   args:
   - name: profile
     type: string
@@ -5020,7 +5098,9 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: get-form-signing-public-envelope-by-id-document
-  description: 'GET /api/form/signing/public/envelope/{id}/document  [FormSigningPublic] - Stream a rendition: current (default), signed, or source; my-step reads as current.'
+  description: 'GET /api/form/signing/public/envelope/{id}/document  [FormSigningPublic] - Stream a rendition: current (default), signed, or source; my-step reads as current. Any other
+
+    version is refused (400) - before the token is looked at, so it tells n'
   args:
   - name: profile
     type: string
@@ -7653,7 +7733,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: patch-by-masterworkspaceurl-by-workspaceurl-by-entityurl
-  description: PATCH /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrlLaunch]
+  description: 'PATCH /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrl] - Permission required: None'
   args:
   - name: profile
     type: string
@@ -8146,7 +8226,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-by-masterworkspaceurl-by-workspaceurl-by-entityurl
-  description: POST /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrlLaunch]
+  description: 'POST /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrl] - Permission required: None'
   args:
   - name: profile
     type: string
@@ -8339,7 +8419,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-customurl-formtemplate
-  description: 'POST /api/CustomUrl/FormTemplate  [CustomUrlForm] - Permission required: FormTemplate.Write'
+  description: 'POST /api/CustomUrl/FormTemplate  [CustomUrl] - Permission required: FormTemplate.Write'
   args:
   - name: profile
     type: string
@@ -8362,7 +8442,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-customurl-masterworkspace
-  description: 'POST /api/CustomUrl/MasterWorkspace  [CustomUrlMaster] - Permission required: MasterWorkspace.Write'
+  description: 'POST /api/CustomUrl/MasterWorkspace  [CustomUrl] - Permission required: MasterWorkspace.Write'
   args:
   - name: profile
     type: string
@@ -8385,7 +8465,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-customurl-webhook
-  description: 'POST /api/CustomUrl/Webhook  [CustomUrlWebhook] - Permission required: Webhook.Write'
+  description: 'POST /api/CustomUrl/Webhook  [CustomUrl] - Permission required: Webhook.Write'
   args:
   - name: profile
     type: string
@@ -8408,7 +8488,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-customurl-workspace
-  description: 'POST /api/CustomUrl/Workspace  [CustomUrlWorkspace] - Permission required: Workspace.Write'
+  description: 'POST /api/CustomUrl/Workspace  [CustomUrl] - Permission required: Workspace.Write'
   args:
   - name: profile
     type: string
@@ -9066,7 +9146,9 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-form-signing-envelope-by-id-my-session-sign
-  description: 'POST /api/form/signing/envelope/{id}/my-session/sign  [FormSigning] - Sign: applies the adopted signature to every spot assigned to the caller.'
+  description: 'POST /api/form/signing/envelope/{id}/my-session/sign  [FormSigning] - Sign: applies the adopted signature to every spot assigned to the caller. A caller the
+
+    preparer placed no signature spot for places their own (signatureSpot).'
   args:
   - name: profile
     type: string
@@ -9093,7 +9175,9 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-form-signing-envelope-by-id-send
-  description: 'POST /api/form/signing/envelope/{id}/send  [FormSigning] - Send for signing: freezes spots/parties, activates the first order group, dispatches emails.'
+  description: 'POST /api/form/signing/envelope/{id}/send  [FormSigning] - Send for signing: freezes spots/parties, activates the first order group, dispatches emails.
+
+    With no signers the envelope completes at once and the submission goes on.'
   args:
   - name: profile
     type: string
@@ -9172,7 +9256,9 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-form-signing-public-envelope-by-id-my-session-sign
-  description: 'POST /api/form/signing/public/envelope/{id}/my-session/sign  [FormSigningPublic] - Sign: applies the drawn signature to every spot of the signer; a replay returns 200 with current state.'
+  description: 'POST /api/form/signing/public/envelope/{id}/my-session/sign  [FormSigningPublic] - Sign: applies the drawn signature to every spot of the signer, who places their own when no
+
+    signature spot was placed for them (signatureSpot); a replay retu'
   args:
   - name: profile
     type: string
@@ -10140,7 +10226,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: post-workspace
-  description: 'POST /api/Workspace  [Workspace] - Permission required: MasterWorkspace.Write'
+  description: 'POST /api/Workspace  [Workspace] - Permission required: MasterWorkspace.Create'
   args:
   - name: profile
     type: string
@@ -10869,7 +10955,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: put-by-masterworkspaceurl-by-workspaceurl-by-entityurl
-  description: PUT /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrlLaunch]
+  description: 'PUT /{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}  [CustomUrl] - Permission required: None'
   args:
   - name: profile
     type: string
@@ -10962,7 +11048,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: put-customurl-formtemplate
-  description: 'PUT /api/CustomUrl/FormTemplate  [CustomUrlForm] - Permission required: FormTemplate.Update'
+  description: 'PUT /api/CustomUrl/FormTemplate  [CustomUrl] - Permission required: FormTemplate.Update'
   args:
   - name: profile
     type: string
@@ -10985,7 +11071,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: put-customurl-masterworkspace
-  description: 'PUT /api/CustomUrl/MasterWorkspace  [CustomUrlMaster] - Permission required: MasterWorkspace.Update'
+  description: 'PUT /api/CustomUrl/MasterWorkspace  [CustomUrl] - Permission required: MasterWorkspace.Update'
   args:
   - name: profile
     type: string
@@ -11008,7 +11094,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: put-customurl-webhook
-  description: 'PUT /api/CustomUrl/Webhook  [CustomUrlWebhook] - Permission required: Webhook.Update'
+  description: 'PUT /api/CustomUrl/Webhook  [CustomUrl] - Permission required: Webhook.Update'
   args:
   - name: profile
     type: string
@@ -11031,7 +11117,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: put-customurl-workspace
-  description: 'PUT /api/CustomUrl/Workspace  [CustomUrlWorkspace] - Permission required: Workspace.Update'
+  description: 'PUT /api/CustomUrl/Workspace  [CustomUrl] - Permission required: Workspace.Update'
   args:
   - name: profile
     type: string
@@ -11281,7 +11367,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: put-form-signing-public-envelope-by-id
-  description: PUT /api/form/signing/public/envelope/{id}  [FormSigningPublic] - DRAFT-only update of the signer's own spots (parties and order mode in the payload are ignored).
+  description: PUT /api/form/signing/public/envelope/{id}  [FormSigningPublic] - DRAFT-only update of the signer's own spots (parties in the payload are ignored).
   args:
   - name: profile
     type: string

@@ -42,7 +42,7 @@ ENUMS_TS = DIR.parent.parent / "docs_info" / "form-config-enums.ts"
 ELEMENTS = DIR / "elements"
 ENUM_MAP = DIR / "enum_map.json"
 _CONFIG_ENUMS = ("ElementConfigCategory", "ElementConfigSubCategory",
-                 "ElementConfigType", "ElementConfigEvent")
+                 "ElementConfigType", "ElementConfigEvent", "FormBuilderEvent")
 
 # stable namespace so re-runs produce identical ids (the builder reassigns ids at
 # build time anyway; deterministic ids here only keep git diffs clean).
@@ -52,6 +52,10 @@ _NS = uuid.uuid5(uuid.NAMESPACE_DNS, "procesio.form.goldens")
 # ORDER OF CONFIGS, preserved from the mock -- not the field order inside one).
 _CFG_ORDER = ["id", "key", "label", "placeholder", "tooltip", "category",
               "subCategory", "type", "value", "hasTopDivider", "exposed", "events"]
+# Optional ElementConfig fields (ui-builder model/config/index.ts) copied when the mock sets
+# them. A saved element carries them, and the runtime reads some: a URL_OR_FILE config with
+# no `uploadEvent` keeps its file inline in the form instead of storing it.
+_CFG_EXTRA = ["options", "accept", "maxFileSizeMB", "uploadEvent", "downloadEvent"]
 _TOP_ORDER = ["id", "category", "type", "configs", "parentId", "section"]
 _HEADER = {"heading"}
 _FOOTER = {"button"}
@@ -99,6 +103,18 @@ class _P:
             return False
         if word in ("null", "undefined"):
             return None
+        if word == "JSON.stringify" and self.s[self.i:self.i + 1] == "(":
+            # JSON.stringify(value, null, indent): keep the value so it can be rendered
+            self.i += 1
+            args = []
+            while True:
+                self.ws()
+                if self.s[self.i] == ")":
+                    self.i += 1
+                    break
+                args.append(self.value())
+            indent = args[2] if len(args) > 2 and isinstance(args[2], int) else None
+            return ("@json", args[0] if args else None, indent)
         if self.s[self.i:self.i + 1] == "(":  # function call e.g. guid()
             depth = 0
             while self.i < len(self.s):
@@ -195,6 +211,7 @@ class Resolver:
             self.maps = {k: dict(v) for k, v in m.items()
                          if not k.startswith("_") and isinstance(v, dict)}
         self.from_ts = False
+        self.consts = {}
         if ENUMS_TS.exists():
             txt = ENUMS_TS.read_text(encoding="utf-8")
             for name in _CONFIG_ENUMS:
@@ -202,7 +219,11 @@ class Resolver:
                 if block:
                     self.maps.setdefault(name, {}).update(block)  # the TS file wins
                     self.from_ts = True
+            for m in re.finditer(r"export const (\w+) = (\d+|\"[^\"]*\");", txt):
+                v = m.group(2)
+                self.consts[m.group(1)] = int(v) if v.isdigit() else v[1:-1]
         self.unverified = {}  # "Enum.MEMBER" -> derived value
+        self.unresolved = set()  # bare identifiers a value names that nothing defines
 
     def _rule(self, member):
         return member.lower().replace("_", "-")
@@ -214,6 +235,35 @@ class Resolver:
         val = self._rule(member)
         self.unverified.setdefault(f"{enum_name}.{member}", val)
         return val
+
+    def literal(self, v, path=()):
+        """Resolve what the mock writes inside a config's fields to plain JSON: an enum
+        member (FormBuilderEvent.X), an exported constant (MAX_SIGNING_DOCUMENT_MB), a
+        `${CONST}` inside a template string, JSON.stringify(...) as the text it renders,
+        and guid() as a deterministic id (the builder reassigns ids anyway)."""
+        if isinstance(v, tuple) and v and v[0] == "@json":
+            inner = self.literal(v[1], path)
+            return json.dumps(inner, ensure_ascii=False, indent=v[2]) if v[2] \
+                else json.dumps(inner, ensure_ascii=False, separators=(",", ":"))
+        if isinstance(v, tuple) and v and v[0] == "@bare":
+            word = v[1]
+            if word == "guid()":
+                return _det_id("value", *path)
+            if word in self.consts:
+                return self.consts[word]
+            head, _, mem = word.partition(".")
+            if mem and head in self.maps:
+                return self.resolve(head, mem)
+            self.unresolved.add(word)
+            return word
+        if isinstance(v, str):
+            return re.sub(r"\$\{(\w+)\}",
+                          lambda m: str(self.consts.get(m.group(1), m.group(0))), v)
+        if isinstance(v, list):
+            return [self.literal(x, path + (str(i),)) for i, x in enumerate(v)]
+        if isinstance(v, dict):
+            return {k: self.literal(x, path + (k,)) for k, x in v.items()}
+        return v
 
 
 def _bare_member(v):
@@ -268,12 +318,12 @@ def build_goldens():
             o = {"id": _det_id(etype, key, str(n)), "key": key}
             for f in ("label", "placeholder", "tooltip"):
                 if f in c:
-                    o[f] = c[f]
+                    o[f] = res.literal(c[f], (etype, key, f))
             o["category"] = res.resolve("ElementConfigCategory", _bare_member(c["category"])[1])
             o["subCategory"] = res.resolve("ElementConfigSubCategory", _bare_member(c["subCategory"])[1])
             before = len(res.unverified)
             o["type"] = res.resolve("ElementConfigType", type_member)
-            o["value"] = c.get("value")
+            o["value"] = res.literal(c.get("value"), (etype, key, str(n)))
             if "hasTopDivider" in c:
                 o["hasTopDivider"] = c["hasTopDivider"]
             if "exposed" in c:
@@ -282,9 +332,12 @@ def build_goldens():
                 evs = c["events"]
                 if isinstance(evs, list):
                     o["events"] = [res.resolve("ElementConfigEvent", _bare_member(e)[1]) for e in evs]
+            for f in _CFG_EXTRA:
+                if f in c:
+                    o[f] = res.literal(c[f], (etype, key, f))
             if len(res.unverified) > before:
                 unverified_here += 1
-            configs_out.append({k: o[k] for k in _CFG_ORDER if k in o})
+            configs_out.append({k: o[k] for k in _CFG_ORDER + _CFG_EXTRA if k in o})
 
         section = "header" if etype in _HEADER else "footer" if etype in _FOOTER else "body"
         gold = {"id": _det_id(etype), "category": category, "type": etype,
@@ -363,8 +416,16 @@ def main(argv):
     for k in sorted(res.unverified):
         print(f"  {k:55s} -> {res.unverified[k]!r}")
 
+    print(f"\n## UNRESOLVED identifiers in config fields (must be empty): {len(res.unresolved)}")
+    for w in sorted(res.unresolved):
+        print(f"  !! {w} -- add its enum/const to form-config-enums.ts")
+
     if failures:
         print("\nABORT: soundness check failed -- fix enum_map.json before writing.")
+        return 2
+    if res.unresolved:
+        print("\nABORT: a config field names an identifier nothing defines -- a golden would "
+              "carry the bare name instead of its value.")
         return 2
     if check:
         drift = created + changed
@@ -375,7 +436,7 @@ def main(argv):
         return 0
     if write:
         for t, g in goldens.items():
-            (ELEMENTS / f"{t}.json").write_text(_dump(g), encoding="utf-8")
+            (ELEMENTS / f"{t}.json").write_text(_dump(g), encoding="utf-8", newline="\n")
         print(f"\nWROTE {len(goldens)} goldens to {ELEMENTS}")
     else:
         print("\nDRY-RUN (no files written). Re-run with --write to apply.")

@@ -73,3 +73,10 @@ and `dto/process/description.md` (the builder's `subprocess:` shape).
 - Settings: Form Template (required), outputs Result (Boolean) and Form Id (Guid).
 - Creates a form instance from the template and returns at once: `Result` true and `Form Id` set
   in the same run. Nothing waits for the form to be filled in.
+
+## The parent's child link is cleared when a child ends (Process-Execution v3.1.0, 2026-11-02)
+
+The engine keeps the link from a parent to its current child (and back) in its cache. It is now
+removed when the child finishes, finishes with errors or is stopped by the user; before, the
+parent's entry was never removed. No API reads it, so instance lists, outputs and counts look the
+same; it only decides where a resumed parent waiting on Call Subprocess continues.

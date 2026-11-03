@@ -74,6 +74,36 @@ def check_auth(client, _args) -> dict:
     }
 
 
+# What each flag of GET /api/Features switches off when it is false. An installation (an
+# on-prem or client environment) may turn optional modules off; the API then answers their
+# endpoints with 400 code 1013 FEATURE_DISABLED and refuses to save a process that uses a
+# Data Store / Query Store (dataStore) or Form Trigger (forms) action.
+FEATURE_SCOPE = {
+    "customActions": "custom actions: upload, Action Designer, custom-action toolbox "
+                     "(on when the installation has a NuGet store configured)",
+    "dataStore": "Data Stores: store/row/CSV endpoints, Data Store and Query Store actions, "
+                 "data stores in forms and in import/export",
+    "forms": "Forms: form templates, submissions, chains, assignments, signing, custom URLs "
+             "to forms, the Form Trigger action, forms in import/export",
+    "executionEnvironment": "Execution Environment (Thread) licensing: its analytics, "
+                            "Thread plans, changing a workspace's maxThreads",
+}
+
+
+def features(client, _args) -> dict:
+    """Which optional modules this PROCESIO environment has switched on."""
+    flags = client.get("/api/Features")
+    flags = flags if isinstance(flags, dict) else {}
+    off = sorted(k for k, v in flags.items() if v is False)
+    return {
+        "environment": client.env.get("name"),
+        "features": flags,
+        "disabled": off,
+        "disabled_scope": {k: FEATURE_SCOPE.get(k, "") for k in off},
+        "all_enabled": bool(flags) and not off,
+    }
+
+
 def logout(client, _args) -> dict:
     """Clear the cached session (in-process + persistent), best-effort server logOut."""
     name = client.name
@@ -95,6 +125,13 @@ ACTIONS = {
     "check-auth": ActionDef(
         func=check_auth, add_args=add_profile_arg, needs_client=True,
         description="Hit a live read endpoint to verify the profile authenticates.",
+    ),
+    "features": ActionDef(
+        func=features, add_args=add_profile_arg, needs_client=True,
+        description=("Which optional modules this environment has on (GET /api/Features): "
+                     "customActions, dataStore, forms, executionEnvironment. An installation "
+                     "can switch them off; their endpoints then answer 400 code 1013 "
+                     "(error code feature_disabled)."),
     ),
     "logout": ActionDef(
         func=logout, add_args=add_profile_arg, needs_client=True,

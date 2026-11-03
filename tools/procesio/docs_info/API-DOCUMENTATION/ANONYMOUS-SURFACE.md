@@ -1,10 +1,12 @@
-# PROCESIO — the ANONYMOUS surface, enumerated
+# PROCESIO - the ANONYMOUS surface, enumerated
 
-**Generated** from `API-DOCUMENTATION/endpoints/*.md`. **Do not hand-edit** — regenerate.
+**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready c0648c8 2026-11-02). **Do not hand-edit** - regenerate.
 
-> ⚠ **WHY THIS EXISTS.** Three anonymous endpoints were met one incident at a time: `api/Webhooks/launch/{id}` (a bearer id that travels in packs), `api/FormProcess/.../launch`, and `api/Form/dataStore/{id}/rows` (full CRUD, including DELETE, on any store the path names). **All three were documented and none was read before it mattered.**
+> **Why this exists.** Anonymous endpoints used to be met one incident at a time: a webhook launch id that travels in exported packs, a public form's process launch, and a form data-store route that reads and writes any store its path names. All were documented; none was read before it mattered.
 
-> ⚠ **THE GENERAL FORM: on every endpoint below the access control is AN ID.** An id is a bearer credential — it travels in process definitions, in exported packs, in shared links, in logs and in browser history. **Treat every `{id}` in this table as a secret, or decide deliberately that it is not.**
+> **The general rule: on every endpoint below the access control is AN ID.** An id is a bearer credential - it travels in process definitions, exported packs, shared links, logs and browser history. Treat every `{id}` in this table as a secret, or decide deliberately that it is not.
+
+43 anonymous endpoints.
 
 | verbs | route | operation | the id that IS the control | documented at |
 |---|---|---|---|---|
@@ -16,36 +18,38 @@
 | `POST` | `api/Authentication/refreshToken` | `RefreshToken` | `{(none in route)}` | `03-auth-users-workspaces.md:84` |
 | `POST` | `api/Authentication/logOut` | `Logout` | `{(none in route)}` | `03-auth-users-workspaces.md:96` |
 | `DELETE` | `api/Authentication/logOut` | `DeleteAllSessions` | `{(none in route)}` | `03-auth-users-workspaces.md:105` |
-| `POST` | `api/Users/otp/setup` | `OtpSetup` | `{(none in route)}` | `03-auth-users-workspaces.md:128` |
 | `POST` | `api/Users` | `CreateUser` | `{(none in route)}` | `03-auth-users-workspaces.md:136` |
-| `PUT` | `api/Users/details` | `UpdateUserDetails` | `{(none in route)}` | `03-auth-users-workspaces.md:145` |
 | `POST` | `api/Users/withActivation` | `CreateUserWithActivationResponse` | `{(none in route)}` | `03-auth-users-workspaces.md:154` |
 | `POST` | `api/Users/resendToken` | `RefreshCreateUserToken` | `{(none in route)}` | `03-auth-users-workspaces.md:164` |
 | `POST` | `api/Users/password/change` | `ChangePassword` | `{(none in route)}` | `03-auth-users-workspaces.md:172` |
 | `POST` | `api/Users/password/forgot` | `ForgotPassword` | `{(none in route)}` | `03-auth-users-workspaces.md:181` |
 | `POST` | `api/Users/password/update` | `UpdatePassword` | `{(none in route)}` | `03-auth-users-workspaces.md:190` |
-| `POST` | `api/Form` | `SaveForm` | `{(none in route)}` | `07-forms-documents.md:65` |
-| `POST` | `api/FormTemplate/{id}/duplicate` | `DuplicateForm` | `{id}` | `07-forms-documents.md:183` |
-| `GET` | `api/FormTemplate/{workspaceId}/{id}` | `GetAnonymousForm` | `{workspaceId}` · `{id}` | `07-forms-documents.md:192` |
-| `GET` | `api/FormProcess/{formTemplateId}/{processTemplateId}` | `GetProcessTemplate` | `{formTemplateId}` · `{processTemplateId}` | `07-forms-documents.md:350` |
-| `POST` | `api/FormProcess/{formTemplateId}/{processTemplateId}/publish` | `PublishFlow` | `{formTemplateId}` · `{processTemplateId}` | `07-forms-documents.md:361` |
-| `POST` | `api/FormProcess/{formTemplateId}/{processTemplateId}/launch` | `LaunchFlowInstance` | `{formTemplateId}` · `{processTemplateId}` | `07-forms-documents.md:375` |
-| `GET` | `api/FormProcess/{formTemplateId}/{processTemplateId}/{processInstanceId}/variables` | `GetFlowInstanceVariables` | `{formTemplateId}` · `{processTemplateId}` · `{processInstanceId}` | `07-forms-documents.md:392` |
-| `POST` | `api/Form/upload` | `UploadFormFile` | `{(none in route)}` | `07-forms-documents.md:412` |
-| `POST` | `api/FormProcess/{formTemplateId}/{flowInstanceId}/upload` | `Upload` | `{formTemplateId}` · `{flowInstanceId}` | `07-forms-documents.md:443` |
-| `GET` | `api/FormProcess/download` | `Download` | `{(none in route)}` | `07-forms-documents.md:461` |
-| `GET` | `api/Form/dataStore/{dataStoreId}/rows` | `GetRows` | `{dataStoreId}` | `07-forms-documents.md:484` |
-| `POST` | `api/Form/dataStore/{dataStoreId}/rows` | `AddRows` | `{dataStoreId}` | `07-forms-documents.md:499` |
-| `PUT` | `api/Form/dataStore/{dataStoreId}/rows` | `UpdateRow` | `{dataStoreId}` | `07-forms-documents.md:509` |
-| `DELETE` | `api/Form/dataStore/{dataStoreId}/rows` | `DeleteRows` | `{dataStoreId}` | `07-forms-documents.md:519` |
-| `GET` | `api/DataTypes/primary` | `GetPrimaryTypes` | `{(none in route)}` | `09-datastore-datatypes.md:478` |
-| `GET` | `api/DataTypes/procesio` | `GetProcesioTypes` | `{(none in route)}` | `09-datastore-datatypes.md:490` |
-| `GET` | `api/DataTypes/primary/count` | `CountPrimaryDataTypes` | `{(none in route)}` | `09-datastore-datatypes.md:502` |
-| `GET|POST|PUT|PATCH|DELETE` | `/{masterWorkspaceUrl}/{workspaceUrl}/{entityUrl}` | `Launch` | `{masterWorkspaceUrl}` · `{workspaceUrl}` · `{entityUrl}` | `10-custom-urls.md:218` |
-| `GET|POST|PUT|PATCH|DELETE` | `/{tinyUrl}` | `Launch` | `{tinyUrl}` | `10-custom-urls.md:248` |
-| `GET|POST|PUT|PATCH|DELETE` | `api/Webhooks/launch/{id}` | `LaunchWebhook` | `{id}` | `12-webhooks-notifications-misc.md:155` |
-| `POST` | `api/Webhooks/launch/{id}/verifone` | `LaunchFormData` | `{id}` | `12-webhooks-notifications-misc.md:193` |
-| `GET` | `api/Webhooks/launch/{id}/verifone` | `LaunchGetFormData` | `{id}` | `12-webhooks-notifications-misc.md:208` |
-
-**Total anonymous endpoints: 38**
-
+| `POST` | `api/Form` | `SaveForm` | `{(none in route)}` | `07-forms.md:67` |
+| `GET` | `api/FormTemplate/{workspaceId}/{id}` | `GetAnonymousForm` | `{workspaceId}` · `{id}` | `07-forms.md:194` |
+| `GET` | `api/FormProcess/{formTemplateId}/{processTemplateId}` | `GetProcessTemplate` | `{formTemplateId}` · `{processTemplateId}` | `07-forms.md:352` |
+| `POST` | `api/FormProcess/{formTemplateId}/{processTemplateId}/publish` | `PublishFlow` | `{formTemplateId}` · `{processTemplateId}` | `07-forms.md:363` |
+| `POST` | `api/FormProcess/{formTemplateId}/{processTemplateId}/launch` | `LaunchFlowInstance` | `{formTemplateId}` · `{processTemplateId}` | `07-forms.md:377` |
+| `GET` | `api/FormProcess/{formTemplateId}/{processTemplateId}/{processInstanceId}/variables` | `GetFlowInstanceVariables` | `{formTemplateId}` · `{processTemplateId}` · `{processInstanceId}` | `07-forms.md:394` |
+| `POST` | `api/Form/upload` | `UploadFormFile` | `{(none in route)}` | `07-forms.md:414` |
+| `POST` | `api/FormProcess/{formTemplateId}/{flowInstanceId}/upload` | `Upload` | `{formTemplateId}` · `{flowInstanceId}` | `07-forms.md:445` |
+| `GET` | `api/FormProcess/download` | `Download` | `{(none in route)}` | `07-forms.md:463` |
+| `POST` | `api/Form/dataStore/{dataStoreId}/rows/filter` | `GetRows` | `{dataStoreId}` | `07-forms.md:486` |
+| `POST` | `api/Form/dataStore/{dataStoreId}/rows` | `AddRows` | `{dataStoreId}` | `07-forms.md:504` |
+| `PUT` | `api/Form/dataStore/{dataStoreId}/rows` | `UpdateRows` | `{dataStoreId}` | `07-forms.md:514` |
+| `DELETE` | `api/Form/dataStore/{dataStoreId}/rows` | `DeleteRows` | `{dataStoreId}` | `07-forms.md:524` |
+| `POST` | `api/form/signing/public/envelope` | `CreateEnvelope` | `{(none in route)}` | `07-forms.md:690` |
+| `POST` | `api/form/signing/public/envelope/from-template` | `CreateEnvelopeFromTemplate` | `{(none in route)}` | `07-forms.md:708` |
+| `GET` | `api/form/signing/public/envelope/{id}` | `GetEnvelope` | `{id}` | `07-forms.md:719` |
+| `PUT` | `api/form/signing/public/envelope/{id}` | `UpdateDraft` | `{id}` | `07-forms.md:729` |
+| `POST` | `api/form/signing/public/envelope/{id}/send` | `Send` | `{id}` | `07-forms.md:742` |
+| `DELETE` | `api/form/signing/public/envelope/{id}` | `DiscardDraft` | `{id}` | `07-forms.md:754` |
+| `GET` | `api/form/signing/public/envelope/{id}/document` | `Download` | `{id}` | `07-forms.md:765` |
+| `GET` | `api/form/signing/public/envelope/{id}/my-session` | `GetMySession` | `{id}` | `07-forms.md:777` |
+| `POST` | `api/form/signing/public/envelope/{id}/my-session/sign` | `Sign` | `{id}` | `07-forms.md:787` |
+| `GET` | `api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}` | `DownloadTemplateDocument` | `{workspaceId}` · `{formTemplateId}` · `{fileId}` | `07-forms.md:800` |
+| `GET` | `api/DataStore/restricted` | `GetRestrictedDataStores` | `{(none in route)}` | `10-datastore.md:147` |
+| `GET` | `api/DataTypes/primary` | `GetPrimaryTypes` | `{(none in route)}` | `11-datatypes.md:189` |
+| `GET` | `api/DataTypes/procesio` | `GetProcesioTypes` | `{(none in route)}` | `11-datatypes.md:201` |
+| `GET` | `api/DataTypes/primary/count` | `CountPrimaryDataTypes` | `{(none in route)}` | `11-datatypes.md:213` |
+| `POST` | `api/Webhooks/launch/{id}/verifone` | `LaunchFormData` | `{id}` | `14-webhooks.md:187` |
+| `GET` | `api/Webhooks/launch/{id}/verifone` | `LaunchGetFormData` | `{id}` | `14-webhooks.md:202` |

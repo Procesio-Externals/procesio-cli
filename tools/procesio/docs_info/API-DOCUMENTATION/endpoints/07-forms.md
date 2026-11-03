@@ -1,4 +1,4 @@
-# Forms & Documents endpoints
+# Forms endpoints
 
 > Service: **Web-Api** (public gateway) · Base URL: see [../02-conventions.md](../02-conventions.md) · Auth: see [../01-authentication.md](../01-authentication.md)
 > Source controllers:
@@ -10,11 +10,11 @@
 > - `BE/Web-Api/WebApi/Application/Controllers/Forms/FileFormController.cs`
 > - `BE/Web-Api/WebApi/Application/Controllers/Forms/FileFormProcessController.cs`
 > - `BE/Web-Api/WebApi/Application/Controllers/Forms/FormDataStoreController.cs`
-> - `BE/Web-Api/WebApi/Application/Controllers/Documents/DocumentTemplateController.cs`
-> - `BE/Web-Api/WebApi/Application/Controllers/Documents/ProcessInstanceDocumentsController.cs`
-> - `BE/Web-Api/WebApi/Application/Controllers/Documents/ProcessTemplateDocumentsController.cs`
+> - `BE/Web-Api/WebApi/Application/Controllers/Forms/FormSigningController.cs`
+> - `BE/Web-Api/WebApi/Application/Controllers/Forms/FormSigningPublicController.cs`
+> - `BE/Web-Api/WebApi/Application/Controllers/Forms/FormSigningTemplateController.cs`
 
-This domain covers PROCESIO **forms** and **documents**. A *form template* (`FormTemplate`) defines a form's layout, assignees and status; a *form instance* (`FormInstance`, exposed as "form") is a filled-in copy of a template that lives inside a process/flow run. *Form applications* group form templates into dashboards/menus. *Form chains* link a sequence of form instances that originate from the same template. *Form processes* let a public (anonymous) form front-end fetch/launch the backing flow and read its variables. *File-form* endpoints handle file upload/download tied to form instances and flow instances. *Form data-store* endpoints let a form read/write rows in a backing DataStore. *Document templates* are reusable rich-text/HTML templates with placeholder variables used to render documents in processes.
+This domain covers PROCESIO **forms**. A *form template* (`FormTemplate`) defines a form's layout, assignees and status; a *form instance* (`FormInstance`, exposed as "form") is a filled-in copy of a template that lives inside a process/flow run. *Form applications* group form templates into dashboards/menus. *Form chains* link a sequence of form instances that originate from the same template. *Form processes* let a public (anonymous) form front-end fetch/launch the backing flow and read its variables. *File-form* endpoints handle file upload/download tied to form instances and flow instances. *Form data-store* endpoints let a form read/write rows in a backing DataStore. *Form signing* endpoints let the person filling a form send the PDF in its signing element for signature, let the signers sign or decline, and store the designer's PDF for a signing element — see [Form signing — shared rules](#form-signing--shared-rules).
 
 **Important — anonymous/public surface:** Several endpoints are `[AllowAnonymous]` so that publicly shared forms can be fetched, submitted, and can launch their backing flow without a JWT. These are flagged per-endpoint below and summarized in [Notes on anonymous access](#notes-on-anonymous-access). Anonymous endpoints rely on the `formTemplateWorkspaceId` route/header value to scope the request, and several add a randomized response delay (`TimeDelay.RandomWait`) as a timing-attack mitigation.
 
@@ -57,10 +57,12 @@ Controller route `api/[controller]` → **`api/Form`**. Controller auth entity: 
 - **Query params:**
   - `pageNumber` — `number`, required — 1-based page index.
   - `pageItemCount` — `number`, required — page size.
-  - `awaitingAction` — `boolean`, required — when `true`, only forms awaiting the user's action.
+  - `awaitingAction` — `boolean`, required — selects which link table the query reads. `true` reads the form assignees, so you get the forms that await the user's action. `false` reads the form submitters, so you get the forms the user already submitted. The endpoint doesn't filter on the form's `Stage` field.
+- **Ordering:** The response is ordered by `SubmissionDate` descending, with the form `Id` ascending breaking ties. The query applies that order inside the paged subquery, before `LIMIT` cuts the page. The order therefore holds across pages: page 2 continues where page 1 stopped, and no form repeats or goes missing. `SubmissionDate` maps from the form's `UpdatedOn` column, which is the column the query sorts on.
 - **Responses:**
   - `200 OK` → paginated list of `GetFormDto`
   - `400 Bad Request` → array of `ApiErrorResponse`
+- **Notes:** Both the returned page and `totalItemCount` join the form table and scope it to the caller's workspace, so the two agree. A link row whose form is missing, or whose form belongs to another workspace, counts in neither.
 
 #### `POST api/Form`
 
@@ -481,10 +483,12 @@ Controller route is explicitly **`api/Form/dataStore/{dataStoreId}/rows`**. Cont
 
 > `{dataStoreId}` — `string (uuid)`, required — applies to every endpoint below (path param).
 
-#### `GET api/Form/dataStore/{dataStoreId}/rows`
+#### `POST api/Form/dataStore/{dataStoreId}/rows/filter`
 
-- **Operation:** `GetRows` — Get a paginated set of rows from the data store.
-- **Auth:** Anonymous — **Permission:** None
+> **Replaces the former `GET api/Form/dataStore/{dataStoreId}/rows`.** Filtering now travels in the request body as a recursive tree — the same read capability the Data Store viewer and the Process-Execution Data Store connector have.
+
+- **Operation:** `GetRows` — Read a page of rows, optionally narrowed by a recursive filter tree with AND/OR grouping and sorted by one or more columns.
+- **Auth:** Anonymous — **Permission:** None (access is granted by the form template/instance headers)
 - **Query params:**
   - `pageNumber` — `number`, required — 1-based page index.
   - `pageItemCount` — `number`, required — page size.
@@ -492,6 +496,7 @@ Controller route is explicitly **`api/Form/dataStore/{dataStoreId}/rows`**. Cont
   - `formTemplateWorkspaceId` `[FromHeader]` — `string (uuid)`, required.
   - `formTemplateId` `[FromHeader]` — `string (uuid)`, required.
   - `formInstanceId` `[FromHeader]` — `string (uuid)`, optional.
+- **Request body** (`application/json`): `DataStoreGetRowsRequestDto` — **optional** (`EmptyBodyBehavior.Allow`). Send no body to read every row. Same shape as the viewer read path — see [09 → the filter tree](10-datastore.md#the-filter-tree).
 - **Responses:**
   - `200 OK` → paginated rows (manager-defined shape)
   - error → standardized error response (`this.ErrorResponse(result)`)
@@ -501,116 +506,340 @@ Controller route is explicitly **`api/Form/dataStore/{dataStoreId}/rows`**. Cont
 - **Operation:** `AddRows` — Add one or more rows to the data store.
 - **Auth:** Anonymous — **Permission:** None
 - **Special headers:** `formTemplateWorkspaceId` (req), `formTemplateId` (req), `formInstanceId` (opt) — all `[FromHeader]`, `string (uuid)`.
-- **Request body** (`application/json`): `DataStoreRowsDto`
+- **Request body** (`application/json`): `DataStoreInsertRowsRequestDto`
 - **Responses:**
   - `200 OK` → result value (manager-defined)
   - error → standardized error response
 
 #### `PUT api/Form/dataStore/{dataStoreId}/rows`
 
-- **Operation:** `UpdateRow` — Update a single row.
+- **Operation:** `UpdateRows` — Set the given values on every row the filter matches.
 - **Auth:** Anonymous — **Permission:** None
 - **Special headers:** `formTemplateWorkspaceId` (req), `formTemplateId` (req), `formInstanceId` (opt) — all `[FromHeader]`, `string (uuid)`.
-- **Request body** (`application/json`): `DataStoreUpdateRowRequestDto`
+- **Request body** (`application/json`): `DataStoreUpdateRowsRequestDto` — `Values` (dictionary `displayName → value`) plus a mandatory `Filter`. See [09](10-datastore.md#datastoreupdaterowsrequestdto-request).
 - **Responses:**
   - `200 OK` → result value
   - error → standardized error response
 
 #### `DELETE api/Form/dataStore/{dataStoreId}/rows`
 
-- **Operation:** `DeleteRows` — Delete one or more rows.
+- **Operation:** `DeleteRows` — Remove every row the filter matches.
 - **Auth:** Anonymous — **Permission:** None
 - **Special headers:** `formTemplateWorkspaceId` (req), `formTemplateId` (req), `formInstanceId` (opt) — all `[FromHeader]`, `string (uuid)`.
-- **Request body** (`application/json`): `DataStoreRowsPrimaryKeysDto`
+- **Request body** (`application/json`): `DataStoreDeleteRowsRequestDto` — a mandatory `Filter`. See [09](10-datastore.md#datastoredeleterowsrequestdto-request).
 - **Responses:**
   - `200 OK` → result value
   - error → standardized error response
 
 ---
 
-### DocumentTemplateController — `api/DocumentTemplate`
+### Form signing — shared rules
 
-Controller route `api/[controller]` → **`api/DocumentTemplate`**. Controller auth entity: `DocumentDesigner`. Manages **document templates**.
+A **signing envelope** holds one PDF from a form's signing element, the spots to fill on it and its signers (*parties*). The person filling the form (the *preparer*) creates it as a `DRAFT`, places spots and signers, and sends it once the form is submitted; the send binds it to that form instance. Signers then sign in their order, and the envelope ends `COMPLETED` with a signed PDF. Three controllers serve it: `FormSigningController` (in-app, Bearer JWT), `FormSigningPublicController` (a public form's anonymous filler) and `FormSigningTemplateController` (the designer's PDF for a signing element). Who may prepare, the signing step in `api/Form/assigned`, the audit chain and the safeguards are in the Web-Api [forms technical reference](../../BE/Web-Api/.features/forms/forms.md).
 
-#### `GET api/DocumentTemplate/{id}`
+- **Feature flag.** With the `Forms` flag off, every signing endpoint answers `400` `FEATURE_DISABLED` (1013); see [Forms disabled](../../BE/Web-Api/.features/forms/forms.md#forms-disabled).
+- **Status codes.** The first error code decides the HTTP status:
 
-- **Operation:** `GetTemplate` — Get a full document template (with body) by id.
-- **Auth:** Bearer JWT — **Permission:** `DocumentDesigner:Read`
-- **Path params:** `{id}` — `string (uuid)`, required — document template id.
-- **Responses:**
-  - `200 OK` → `DocumentTemplateDto`
-  - `400 Bad Request` → array of `ApiErrorResponse` (not found)
+  | Error code | HTTP | Body |
+  |---|---|---|
+  | `710` `SIGNING_ENVELOPE_NOT_FOUND`, `1004` `ENTITY_NOT_FOUND` | `404` | array of `ApiErrorResponse` |
+  | `501` `USER_IS_NOT_AUTHORIZED` | `403` | array of `ApiErrorResponse` |
+  | `711` `SIGNING_ENVELOPE_INVALID_STATE`, `712` `SIGNING_CONCURRENT_UPDATE`, `713` `SIGNING_ORDER_VIOLATION` | `409` | `SigningConflictResponse`: the errors plus the current state, so the client reconciles |
+  | any other (`502` `INVALID_REQUEST`, `714` `SIGNING_PARTY_INVALID`, `715` `SIGNING_SPOT_INVALID`, `716` `SIGNING_DOCUMENT_INVALID`, `719` `SIGNING_SIGNATURE_INVALID`, `210` `FILE_UPLOAD_FAILED`) | `400` | array of `ApiErrorResponse` |
 
-#### `GET api/DocumentTemplate`
-
-- **Operation:** `GetTemplates` — Paginated list of document templates (without body), optionally filtered by name.
-- **Auth:** Bearer JWT — **Permission:** `DocumentDesigner:Read`
-- **Query params:**
-  - `pageNumber` — `number`, required — 1-based page index.
-  - `pageItemCount` — `number`, required — page size.
-  - `searchName` — `string`, optional, default `null` — name filter; ignored if trimmed length < 3.
-- **Responses:**
-  - `200 OK` → `PageRequestResult<BaseDocumentTemplateDto>`
-  - `400 Bad Request` → array of `ApiErrorResponse`
-
-#### `POST api/DocumentTemplate`
-
-- **Operation:** `SaveTemplate` — Create a document template.
-- **Auth:** Bearer JWT — **Permission:** `DocumentDesigner:Create` (summary "DocumentDesigner.Write")
-- **Request body** (`application/json`): `DocumentTemplateDto`
-- **Responses:**
-  - `200 OK` → empty
-  - `400 Bad Request` → array of `ApiErrorResponse`
-
-#### `PUT api/DocumentTemplate`
-
-- **Operation:** `UpdateTemplate` — Update a document template.
-- **Auth:** Bearer JWT — **Permission:** `DocumentDesigner:Update`
-- **Request body** (`application/json`): `DocumentTemplateDto`
-- **Responses:**
-  - `200 OK` → empty
-  - `400 Bad Request` → array of `ApiErrorResponse`
-
-#### `DELETE api/DocumentTemplate/{id}`
-
-- **Operation:** `RemoveTemplate` — Delete a document template.
-- **Auth:** Bearer JWT — **Permission:** `DocumentDesigner:Delete`
-- **Path params:** `{id}` — `string (uuid)`, required — document template id.
-- **Responses:**
-  - `200 OK` → empty
-  - `400 Bad Request` → array of `ApiErrorResponse`
+  An empty `package` on an upload answers `400` with `450` `DB_ENTRY_NOT_FOUND`. A body over the request ceiling answers `413`.
+- **Replays.** A send, sign or decline that already succeeded answers `200` with the current state, never an error.
+- **Optimistic concurrency.** Every envelope read carries `RowVersion`. Echo it on the draft save and on the send; a stale one answers `409` `712`.
+- **Refusal delay.** Refusals from `my-session`, `sign`, `decline` and from every public endpoint return after a random 120–400 ms pause, so timing does not tell whether an envelope, party or token exists. Successful answers are not delayed.
+- **Limits.** Request ceilings: upload 16 MB, draft save 1 MB, signature 4 MB, decline 32 KB. The document itself must be a PDF within the configured cap (10 MB by default), not encrypted and without XFA; the signature PNG must be within 1024 KB and 16 megapixels by default. A draft holds at most 50 parties and 1000 spots.
 
 ---
 
-### ProcessInstanceDocumentsController — `api/DocumentTemplate` (restricted, instance scope)
+### FormSigningController — `api/form/signing`
 
-Controller route is explicitly **`api/DocumentTemplate`**. Controller auth entity: `ProcessInstance`. Swagger groups this under the `DocumentTemplate` tag. Exposes a body-free ("restricted") view of a document template for use within a process instance.
+Controller route is explicitly **`api/form/signing`**. Controller auth entity: `FormInstance`. Every endpoint needs a Bearer JWT and declares `AuthorizationAction(None)`: the manager decides access, not an entity permission. A create is open to whoever may fill the form (an enabled, published template; a private one only for a caller in its scope). A `DRAFT` belongs to its creator or a `FormInstance` role holder. A sent envelope is readable by anyone who can see its form instance. The `my-session` endpoints are open to the envelope's parties only.
 
-#### `GET api/DocumentTemplate/{id}/restricted`
+#### `POST api/form/signing/envelope`
 
-- **Operation:** `GetTemplate` — Get a single document template **without its body** (variables/metadata only).
-- **Auth:** Bearer JWT — **Permission:** `ProcessInstance:Read`
-- **Path params:** `{id}` — `string (uuid)`, required — document template id.
+- **Operation:** `CreateEnvelope` — Create a `DRAFT` envelope from a PDF uploaded into a form's signing element.
+- **Auth:** Bearer JWT — **Permission:** None (summary: whoever may fill the form)
+- **Request body** (`multipart/form-data`):
+  - `package` — file, required — the PDF.
+  - `formTemplateId` — `string (uuid)`, required — the form template being filled.
+  - `elementId` — `string`, required, max 64 — the signing element's id.
+  - `name` — `string`, optional, max 256 — document name; defaults to the file name.
 - **Responses:**
-  - `200 OK` → `RestrictedDocumentTemplateDto`
-  - `400 Bad Request` → array of `ApiErrorResponse`
+  - `200 OK` → `GetSigningEnvelopeDto` (status `DRAFT`, `FormId` empty until the send)
+  - `400 Bad Request` → `502` (field too long), `716` (document invalid)
+  - `403 Forbidden` → `501` — the caller may not fill the form, the form has no such signing element, or the element's document is the designer's (use `envelope/from-template`)
+
+#### `POST api/form/signing/envelope/from-template`
+
+- **Operation:** `CreateEnvelopeFromTemplate` — Create the envelope of a signing element whose document the designer attached, seeded with the designer's signers and spots. Such an element takes no upload.
+- **Auth:** Bearer JWT — **Permission:** None (summary: whoever may fill the form)
+- **Request body** (`application/json`): `CreateSigningEnvelopeFromTemplateDto`
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto` (the seeded `DRAFT`)
+  - `400 Bad Request` → `502`, `716` (the element's document cannot be opened), or the draft save's errors (for example `714` when a designer signer is no longer a workspace member); the envelope is then discarded
+  - `403 Forbidden` → `501` — as for the upload
+
+#### `GET api/form/signing/envelope/{id}`
+
+- **Operation:** `GetEnvelope` — Envelope with its document, spots, parties and effective status.
+- **Auth:** Bearer JWT — **Permission:** None (summary: sent — whoever sees its submission; a `DRAFT` — its creator, or `FormInstance.Read`)
+- **Path params:** `{id}` — `string (uuid)`, required — envelope id.
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto`
+  - `403 Forbidden` → `501` — a `DRAFT` that is not the caller's
+  - `404 Not Found` → `710`
+
+#### `PUT api/form/signing/envelope/{id}`
+
+- **Operation:** `UpdateDraft` — Replace the draft's name, order mode, spots and signers. `DRAFT` only.
+- **Auth:** Bearer JWT — **Permission:** None (summary: the envelope's creator, or `FormInstance.Update`)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Request body** (`application/json`): `SetSigningEnvelopeDto`. `Spots` and `Parties` replace the stored ones whole. Every signer is a member of the envelope's workspace given by `UserId` (on a personal workspace, only its owner); a signer by e-mail is refused here.
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto` (with the new `RowVersion`)
+  - `400 Bad Request` → `502` (no body, unknown `OrderMode`, `Name` over 256); `714` (over 50 parties, a party without exactly one of `UserId` / `Email`, a duplicate signer, a negative `OrderIndex`, a non-member); `715` (over 1000 spots, empty or duplicate `SpotId`, empty `PartyId`, `Page` < 1, bounds outside 0..1, unsupported `Type`, `Value` over 256, `Label` over 128)
+  - `403 Forbidden` → `501`
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `711` (not a `DRAFT`, a spot whose party is not in `Parties`, or a page past the document's last), `712` (stale `RowVersion`)
+
+#### `DELETE api/form/signing/envelope/{id}`
+
+- **Operation:** `DiscardDraft` — Delete a `DRAFT` with its document.
+- **Auth:** Bearer JWT — **Permission:** None (summary: the envelope's creator, or `FormInstance.Update`; `DRAFT` only)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Responses:**
+  - `200 OK` → empty
+  - `403 Forbidden` → `501`
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `711` — the envelope was already sent
+
+#### `POST api/form/signing/envelope/{id}/send`
+
+- **Operation:** `Send` — Send for signing: binds the envelope to the submitted form instance, freezes spots and parties, opens the first order group, sets `ExpiresOn` (14 days by default) and e-mails the first group's signers, except the sender.
+- **Auth:** Bearer JWT — **Permission:** None (summary: the envelope's creator, or `FormInstance.Update`)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Query params:**
+  - `formId` — `string (uuid)`, required — the form instance the submit created; its values must name this envelope under its signing element.
+  - `rowVersion` — `number`, required — from the last read.
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto`, also when the envelope is already `SENT` or `IN_PROGRESS`
+  - `403 Forbidden` → `501`
+  - `404 Not Found` → `710` — also when the instance is outside the caller's scope, belongs to another template, or does not name this envelope
+  - `409 Conflict` → `711` (no parties, a party without a required `SIGNATURE` spot, no `formId`, or the envelope has ended), `712` (stale `rowVersion`)
+
+#### `GET api/form/signing/envelope/{id}/document`
+
+- **Operation:** `Download` — Stream a rendition of the document.
+- **Auth:** Bearer JWT — **Permission:** None (summary: as the envelope's read; `my-step`: the envelope's parties)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Query params:** `version` — `string`, optional, default `current`, case-insensitive; an unknown value reads as `current`:
+  - `current` — the document with every signature captured so far.
+  - `signed` — the final signed PDF, once the envelope is `COMPLETED`.
+  - `source` — the original upload.
+  - `my-step` — the caller's step-scoped view: the source plus the fulfilled spots of their order group and earlier ones, rendered on each call. Parties only.
+- **Responses:**
+  - `200 OK` → `application/pdf` stream, named after the document (`-signed` before the extension for `signed`)
+  - `404 Not Found` → the caller may not read it, is not a party (`my-step`), or the rendition does not exist yet
+- **Notes:** Returns a binary file download, not JSON.
+
+#### `GET api/form/signing/envelope/{id}/my-session`
+
+- **Operation:** `GetMySession` — The signer's scoped view: their party, their own spots, progress counts and whether it is their turn. The first open by a notified signer marks them `VIEWED`.
+- **Auth:** Bearer JWT — **Permission:** None (summary: authenticated signers only; party membership enforced)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Responses:**
+  - `200 OK` → `SigningSessionDto`
+  - `403 Forbidden` → `501` — the caller is not a party
+  - `404 Not Found` → `710`
+
+#### `POST api/form/signing/envelope/{id}/my-session/sign`
+
+- **Operation:** `Sign` — Apply the signature image to every spot of the caller; the auto-filled spots (names, date) get their value. The envelope moves to the next order group, or completes, once every party of the group signed.
+- **Auth:** Bearer JWT — **Permission:** None (summary: authenticated signers only)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Request body** (`application/json`): `SubmitSignatureDto`
+- **Responses:**
+  - `200 OK` → `SigningSessionDto`, also when the caller already signed
+  - `400 Bad Request` → `719` — missing, not base64, not a PNG, or over the size or pixel cap
+  - `403 Forbidden` → `501`
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `713` (not the caller's turn), `711` (the caller declined, or the envelope is not `SENT` / `IN_PROGRESS`)
+
+#### `POST api/form/signing/envelope/{id}/my-session/decline`
+
+- **Operation:** `Decline` — Decline to sign, on the caller's turn only. The envelope becomes `DECLINED` and stops circulating; its creator is e-mailed.
+- **Auth:** Bearer JWT — **Permission:** None (summary: authenticated signers only)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Request body** (`application/json`): `SigningDeclineDto`
+- **Responses:**
+  - `200 OK` → `SigningSessionDto` (the party carries `DeclineReason`), also when the caller already declined
+  - `403 Forbidden` → `501`
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `713` (not the caller's turn), `711` (the caller already signed, or the envelope is not `SENT` / `IN_PROGRESS`)
 
 ---
 
-### ProcessTemplateDocumentsController — `api/DocumentTemplate` (restricted, list)
+### FormSigningPublicController — `api/form/signing/public`
 
-Controller route is explicitly **`api/DocumentTemplate`**. Controller auth entity: `ProcessDesigner`. Swagger groups this under the `DocumentTemplate` tag. Exposes a body-free list of document templates for the process designer.
+Controller route is explicitly **`api/form/signing/public`**. Controller auth entity: `FormInstance`. **All endpoints anonymous** — signing on a public form by the anonymous person filling it, who is the envelope's one signer (names and e-mail optional) and cannot add others. A create returns an access token once; every later envelope call sends it in the **`x-signing-token`** header. Every call also needs an anonymous caller (a request carrying a JWT or API key is refused) and a form that is still enabled, published and public. An unknown, expired, revoked or foreign token, a form closed since, or public signing switched off in the deployment, all read as `404` `710`. Decline is not available here.
 
-#### `GET api/DocumentTemplate/restricted`
+#### `POST api/form/signing/public/envelope`
 
-- **Operation:** `GetTemplates` — Paginated list of document templates **without bodies**.
-- **Auth:** Bearer JWT — **Permission:** `ProcessDesigner:Read`
-- **Query params:**
-  - `pageNumber` — `number`, required — 1-based page index.
-  - `pageItemCount` — `number`, required — page size.
+- **Operation:** `CreateEnvelope` — Create a `DRAFT` envelope from the PDF the filler uploads into the form's signing element.
+- **Auth:** Anonymous — **Permission:** None
+- **Request body** (`multipart/form-data`):
+  - `package` — file, required — the PDF.
+  - `formTemplateId` — `string (uuid)`, required.
+  - `workspaceId` — `string (uuid)`, required — the workspace that owns the form template.
+  - `elementId` — `string`, required, max 64.
+  - `name` — `string`, optional, max 256.
+  - `firstName`, `lastName` — `string`, optional, max 128 each — the signer.
+  - `email` — `string`, optional, max 256 — a valid address when given.
 - **Responses:**
-  - `200 OK` → array of `RestrictedDocumentTemplateDto` (paginated result)
-  - `400 Bad Request` → array of `ApiErrorResponse`
+  - `200 OK` → `PublicSigningEnvelopeDto`
+  - `400 Bad Request` → `502`, `714` (signer fields), `716`
+  - `403 Forbidden` → `501` — a signed-in caller, a form that is not enabled, published and public, no such signing element, or an element holding the designer's document
+  - `404 Not Found` → `710` — public signing is off
+
+#### `POST api/form/signing/public/envelope/from-template`
+
+- **Operation:** `CreateEnvelopeFromTemplate` — Create the envelope of a signing element whose document the designer attached, with the spots of the designer's slots the filler takes.
+- **Auth:** Anonymous — **Permission:** None
+- **Request body** (`application/json`): `CreatePublicSigningEnvelopeFromTemplateDto`
+- **Responses:**
+  - `200 OK` → `PublicSigningEnvelopeDto`
+  - `400 Bad Request` → `502`, `714`, `716`, or the draft save's errors (the envelope is then discarded)
+  - `403 Forbidden` → `501` — as for the upload
+  - `404 Not Found` → `710` — public signing is off
+
+#### `GET api/form/signing/public/envelope/{id}`
+
+- **Operation:** `GetEnvelope` — Envelope with its document, spots, its one party and effective status.
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` `[FromHeader]` — `string`, required.
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto`
+  - `404 Not Found` → `710`
+
+#### `PUT api/form/signing/public/envelope/{id}`
+
+- **Operation:** `UpdateDraft` — Replace the draft's name and the signer's spots. `DRAFT` only.
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` — `string`, required.
+- **Request body** (`application/json`): `SetSigningEnvelopeDto`. `Parties` and `OrderMode` are ignored; an `OrderMode` given must still be a valid name.
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto`
+  - `400 Bad Request` → `502`, `715`
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `711`, `712`
+
+#### `POST api/form/signing/public/envelope/{id}/send`
+
+- **Operation:** `Send` — Send after the public submit, bound to the instance it created. No e-mail is sent: the filler signs right away.
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` — `string`, required.
+- **Query params:** `formId` — `string (uuid)`, required — the instance the public submit created; `rowVersion` — `number`, required.
+- **Responses:**
+  - `200 OK` → `GetSigningEnvelopeDto`, also when already sent
+  - `404 Not Found` → `710` — also when the instance belongs to another form or does not name this envelope
+  - `409 Conflict` → `711`, `712`
+
+#### `DELETE api/form/signing/public/envelope/{id}`
+
+- **Operation:** `DiscardDraft` — Delete the `DRAFT` with its document and the signer's details.
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` — `string`, required.
+- **Responses:**
+  - `200 OK` → empty
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `711` — already sent
+
+#### `GET api/form/signing/public/envelope/{id}/document`
+
+- **Operation:** `Download` — Stream a rendition: `current` (default), `signed` or `source`, as in the in-app download; `my-step` reads as `current`.
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` — `string`, required.
+- **Query params:** `version` — `string`, optional, default `current`.
+- **Responses:**
+  - `200 OK` → `application/pdf` stream
+  - `404 Not Found`
+- **Notes:** Returns a binary file download, not JSON.
+
+#### `GET api/form/signing/public/envelope/{id}/my-session`
+
+- **Operation:** `GetMySession` — The signer's session view (their own spots and turn).
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` — `string`, required.
+- **Responses:**
+  - `200 OK` → `SigningSessionDto`
+  - `404 Not Found` → `710`
+
+#### `POST api/form/signing/public/envelope/{id}/my-session/sign`
+
+- **Operation:** `Sign` — Apply the drawn signature to every spot of the signer.
+- **Auth:** Anonymous — **Permission:** None (access token)
+- **Path params:** `{id}` — `string (uuid)`, required.
+- **Special headers:** `x-signing-token` — `string`, required.
+- **Request body** (`application/json`): `SubmitSignatureDto`
+- **Responses:**
+  - `200 OK` → `SigningSessionDto`, also when already signed
+  - `400 Bad Request` → `719`
+  - `404 Not Found` → `710`
+  - `409 Conflict` → `711` — the envelope is not `SENT` / `IN_PROGRESS`
+
+#### `GET api/form/signing/public/template-document/{workspaceId}/{formTemplateId}/{fileId}`
+
+- **Operation:** `DownloadTemplateDocument` — Stream the PDF the designer attached to a public form's signing element: the document the filler starts from. No access token.
+- **Auth:** Anonymous — **Permission:** None
+- **Path params:**
+  - `{workspaceId}` — `string (uuid)`, required — the workspace that owns the form template.
+  - `{formTemplateId}` — `string (uuid)`, required.
+  - `{fileId}` — `string (uuid)`, required — the `fileId` the element's `document` setting keeps.
+- **Responses:**
+  - `200 OK` → `application/pdf` stream named `document.pdf`
+  - `404 Not Found` — public signing is off, the form is not enabled, published and public, or no signing element of the form keeps that file
+- **Notes:** Returns a binary file download, not JSON.
+
+---
+
+### FormSigningTemplateController — `api/form/signing/template-document`
+
+Controller route is explicitly **`api/form/signing/template-document`**. Controller auth entity: `FormTemplate`. Stores the PDF a designer attaches to a signing element; the element's `document` setting then keeps `{ fileId, name }` instead of the file.
+
+#### `POST api/form/signing/template-document`
+
+- **Operation:** `UploadTemplateDocument` — Store the designer's PDF for a signing element of the form template.
+- **Auth:** Bearer JWT — **Permission:** `FormTemplate:Update`
+- **Request body** (`multipart/form-data`):
+  - `package` — file, required — the PDF.
+  - `formTemplateId` — `string (uuid)`, required — a saved template.
+- **Responses:**
+  - `200 OK` → `SigningTemplateDocumentDto`
+  - `400 Bad Request` → `716` (document invalid), `210` (the file could not be stored)
+  - `404 Not Found` → `1004` — the template is not in the caller's workspace, or not the caller's on a personal workspace
+
+#### `GET api/form/signing/template-document/{formTemplateId}/{fileId}`
+
+- **Operation:** `DownloadTemplateDocument` — Stream a template's signing document: one a signing element of the template keeps, or, with `formId`, one that submission keeps (made before the document was replaced).
+- **Auth:** Bearer JWT — **Permission:** None (summary: `FormTemplate.Read`, `FormInstance.Read`, or whoever may fill the form)
+- **Path params:**
+  - `{formTemplateId}` — `string (uuid)`, required.
+  - `{fileId}` — `string (uuid)`, required.
+- **Query params:** `formId` — `string (uuid)`, optional, default `null` — a submission of this template.
+- **Responses:**
+  - `200 OK` → `application/pdf` stream named `document.pdf`
+  - `404 Not Found` — the caller may not see the template, or neither the template nor the submission keeps that file
+- **Notes:** Returns a binary file download, not JSON.
 
 ---
 
@@ -627,7 +856,8 @@ The following endpoints are `[AllowAnonymous]` (no JWT required). They form the 
 - `POST api/Form/upload` (`UploadFormFile`).
 - `POST api/FormProcess/{formTemplateId}/{flowInstanceId}/upload` (`Upload`).
 - `GET api/FormProcess/download` (`Download`).
-- `GET|POST|PUT|DELETE api/Form/dataStore/{dataStoreId}/rows` (all four `FormDataStore` endpoints).
+- `POST api/Form/dataStore/{dataStoreId}/rows/filter` and `POST|PUT|DELETE api/Form/dataStore/{dataStoreId}/rows` (all four `FormDataStore` endpoints).
+- Every `api/form/signing/public/*` endpoint (`FormSigningPublicController`, ten in all) — the envelope calls authenticate by the `x-signing-token` access token the create returns; the template-document download needs none.
 
 All other endpoints in this domain require a Bearer JWT.
 
@@ -645,7 +875,7 @@ All other endpoints in this domain require a Bearer JWT.
 | `ChainId` | `string (uuid)` | optional | chain id, if part of a chain |
 | `Name` | `string` | optional | form name |
 | `StartedOn` | `string (date-time, ISO-8601)` | required | when the form was started |
-| `SubmissionDate` | `string (date-time, ISO-8601)` | required | when the form was submitted |
+| `SubmissionDate` | `string (date-time, ISO-8601)` | required | when the form was submitted — maps from the form's `UpdatedOn` column, which is the key `GET api/Form/assigned` sorts on |
 | `Stage` | `FormStage` (enum) | required | form stage |
 | `Submitters` | array of `FormSubmitterDto` | optional | who submitted and when |
 | `Assignees` | array of `FormAssigneeDto` | optional | assignees/approvers |
@@ -790,77 +1020,173 @@ Inherits `OwnershipAuditDto` (audit fields below).
 
 > Note: wire names are camelCase here (`System.Text.Json` `[JsonPropertyName]` on this DTO).
 
-### `DataStoreRowsDto` (request — add rows)
+### `DataStoreInsertRowsRequestDto` (request — add rows)
 
 | wire field | type | req/opt | description |
 |---|---|---|---|
 | `Rows` | array of `object` (map: `string` → value) | required (defaults to empty) | rows to insert; keys are column display names |
 
-### `DataStoreUpdateRowRequestDto` (request — update one row)
+### `DataStoreUpdateRowsRequestDto` (request — update the rows a filter matches)
 
 | wire field | type | req/opt | description |
 |---|---|---|---|
-| `Keys` | `object` (map: `string` → value) | required (defaults to empty) | PK columns identifying the row (display-name keys) |
-| `Values` | `object` (map: `string` → value) | required (defaults to empty) | columns to update (display-name keys) |
+| `Values` | `object` (map: `string` → value) | required (defaults to empty) | columns to set (display-name keys) |
+| `Filter` | `DataStoreFilterGroupDto` | nullable in the DTO, required in practice | selects the rows to update — see [09 → the filter tree](10-datastore.md#the-filter-tree) |
 
-### `DataStoreRowsPrimaryKeysDto` (request — delete rows)
-
-| wire field | type | req/opt | description |
-|---|---|---|---|
-| `Keys` | array of `object` (map: `string` → value) | required (defaults to empty) | one map of PK columns per row to delete (display-name keys) |
-
-### `DocumentTemplateDto` (request & response — full document template)
-
-Inherits `BaseDocumentTemplateDto` (which inherits `OwnershipAuditDto`). All names below are explicit `[JsonProperty]` wire names.
+### `DataStoreDeleteRowsRequestDto` (request — delete rows)
 
 | wire field | type | req/opt | description |
 |---|---|---|---|
-| `id` | `string (uuid)` | required | template id (from base) |
-| `name` | `string` | optional | template name (from base) |
-| `description` | `string` | optional | description |
-| `body` | `string` | optional | document body (HTML/rich text) |
-| `placeholderDelimiterStart` | `string` | optional | placeholder start delimiter |
-| `placeholderDelimiterStop` | `string` | optional | placeholder end delimiter |
-| `documentPageSize` | `string` | optional | page size (e.g. "A4") |
-| `documentPageOrientation` | `number` | required | page orientation code |
-| `variables` | array of `DocumentVariableDto` | optional | template variables/placeholders |
+| `Filter` | `DataStoreFilterGroupDto` | nullable in the DTO, required in practice | selects the rows to delete — see [09 → the filter tree](10-datastore.md#the-filter-tree) |
+
+### `GetSigningEnvelopeDto` (response — signing envelope)
+
+Inherits `OwnershipAuditDto`; its `firstName`, `lastName`, `createdBy` and `updatedBy` stay empty.
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Id` | `string (uuid)` | required | envelope id |
+| `FormId` | `string (uuid)` | required | form instance the send bound it to; empty uuid while `DRAFT` |
+| `FormTemplateId` | `string (uuid)` | required | form template |
+| `ElementId` | `string` | optional | signing element id |
+| `Name` | `string` | optional | document name |
+| `Status` | `SigningEffectiveStatus` (string) | required | effective status, `EXPIRED` included — read this, never infer it from the dates |
+| `OrderMode` | `SigningOrderMode` (string) | required | how the preparer described the order; round-trips for the setup UI |
+| `CurrentOrderIndex` | `number` | required | the order group whose turn it is |
+| `RowVersion` | `number` | required | echo on the draft save and the send |
+| `Document` | `SigningDocumentDto` | optional | the document |
+| `Spots` | array of `SigningSpotDto` | required (defaults to empty) | every spot |
+| `Parties` | array of `SigningPartyDto` | required (defaults to empty) | every signer |
+| `SentOn` | `string (date-time, ISO-8601)` | optional | send time |
+| `ExpiresOn` | `string (date-time, ISO-8601)` | optional | after it, a live envelope reads `EXPIRED` |
+| `CompletedOn` | `string (date-time, ISO-8601)` | optional | completion time |
 | *(+ `OwnershipAuditDto` fields)* | | | see below |
 
-### `BaseDocumentTemplateDto` (response — document template list item)
-
-Inherits `OwnershipAuditDto`.
+### `SigningDocumentDto`
 
 | wire field | type | req/opt | description |
 |---|---|---|---|
-| `id` | `string (uuid)` | required | template id |
-| `name` | `string` | optional | template name |
-| *(+ `OwnershipAuditDto` fields)* | | | see below |
+| `Id` | `string (uuid)` | required | document id — do not assume it equals the envelope id |
+| `Name` | `string` | optional | document name |
+| `PageCount` | `number` | required | pages in the PDF |
+| `OriginalHash` | `string` | optional | SHA-256, lowercase hex, of the original upload |
+| `CurrentHash` | `string` | optional | SHA-256, lowercase hex, of the current rendition |
+| `SignedFileId` | `string (uuid)` | optional | file id of the signed PDF; `null` until `COMPLETED` |
+| `HasSignedArtifact` | `boolean` | required | whether `version=signed` can be downloaded |
 
-### `RestrictedDocumentTemplateDto` (response — body-free template)
+### `SigningSpotDto`
 
-Inherits `BaseDocumentTemplateDto` → `OwnershipAuditDto`.
-
-| wire field | type | req/opt | description |
-|---|---|---|---|
-| `id` | `string (uuid)` | required | template id |
-| `name` | `string` | optional | template name |
-| `variables` | array of `DocumentVariableDto` | optional | template variables (no body) |
-| *(+ `OwnershipAuditDto` fields)* | | | see below |
-
-### `DocumentVariableDto`
-
-All names are explicit `[JsonProperty]` wire names.
+Coordinates are normalised 0..1 of the displayed page, top-left origin. Clients must ignore unknown `Type` values and unknown extra fields.
 
 | wire field | type | req/opt | description |
 |---|---|---|---|
-| `id` | `string (uuid)` | required | variable id |
-| `dataType` | `string (uuid)` | required | data-type id |
-| `type` | `number` | required | variable type code |
-| `name` | `string` | optional | variable name |
-| `defaultValue` | `object` | optional | default value |
-| `isList` | `boolean` | required | whether the variable is a list |
-| `isInput` | `boolean` | required | input flag |
-| `isOutput` | `boolean` | required | output flag |
+| `SpotId` | `string (uuid)` | required | client-generated, unique in the envelope |
+| `PartyId` | `string (uuid)` | required | the party who fills the spot |
+| `Page` | `number` | required | 1-based page |
+| `X`, `Y` | `number` | required | top-left corner, ≥ 0 |
+| `W`, `H` | `number` | required | size, > 0; `X + W` and `Y + H` at most 1 |
+| `Type` | `SigningSpotType` (string) | optional, default `SIGNATURE` | what the spot collects |
+| `Required` | `boolean` | optional, default `true` | must be filled for the envelope to complete |
+| `Value` | `string` | optional, max 256 | `TEXT`: the preparer's text, kept on a draft save for `TEXT` only; auto-filled types: the value stamped when the party signs |
+| `Label` | `string` | optional, max 128 | the preparer's name for the spot; shown by the setup UI, never stamped |
+| `SignedOn` | `string (date-time, ISO-8601)` | read-only | when the spot was filled |
+
+### `SigningPartyDto`
+
+On an in-app draft save each party carries exactly one of `UserId` / `Email`, and only `UserId` is accepted. A public form's one signer may have an `Email`, or no identity at all.
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Id` | `string (uuid)` | optional on write | the id spots reference in `PartyId`; the server assigns one when empty |
+| `UserId` | `string (uuid)` | optional | the signer's user (a member of the envelope's workspace) |
+| `Email` | `string` | optional, max 256 | a signer by e-mail (public form) |
+| `FirstName`, `LastName` | `string` | optional, max 128 each | the signer's names |
+| `OrderIndex` | `number` | required, ≥ 0 | signing step; equal values sign in parallel, the lowest first |
+| `Status` | `SigningPartyStatus` (string) | read-only | |
+| `SignedOn` | `string (date-time, ISO-8601)` | read-only | |
+| `LastNotifiedOn` | `string (date-time, ISO-8601)` | read-only | last sign-request e-mail |
+| `DeclineReason` | `string` | read-only | the reason the signer gave when declining |
+
+### `SetSigningEnvelopeDto` (request — draft save)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Name` | `string` | optional, max 256 | blank keeps the current name |
+| `OrderMode` | `SigningOrderMode` (string) | optional, default `NONE` | |
+| `RowVersion` | `number` | required | from the last read |
+| `Spots` | array of `SigningSpotDto` | required (defaults to empty), max 1000 | replaces every spot |
+| `Parties` | array of `SigningPartyDto` | required (defaults to empty), max 50 | replaces every party; ignored on a public form |
+
+### `SigningSessionDto` (response — the signer's view)
+
+Carries the caller's own party and spots only, never another signer's.
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `EnvelopeId` | `string (uuid)` | required | |
+| `DocumentName` | `string` | optional | |
+| `PageCount` | `number` | required | |
+| `Status` | `SigningEffectiveStatus` (string) | required | |
+| `Party` | `SigningPartyDto` | required | the caller's party |
+| `OwnSpots` | array of `SigningSpotDto` | required (defaults to empty) | the caller's spots |
+| `SignedPartyCount` | `number` | required | parties that signed |
+| `TotalPartyCount` | `number` | required | all parties |
+| `IsMyTurn` | `boolean` | required | the caller's group is the current one and the envelope is `SENT` or `IN_PROGRESS` |
+
+### `SubmitSignatureDto` (request — sign)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `SignaturePngBase64` | `string` | required | the signature as a base64 PNG, no `data:` prefix; applied to every spot of the caller |
+| `TimeZone` | `string` | optional | the signer's IANA time zone (for example `Europe/Bucharest`) for `DATE_SIGNED` spots; unknown ids fall back to UTC |
+
+### `SigningDeclineDto` (request — decline)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Reason` | `string` | optional | returned as the party's `DeclineReason` |
+
+### `CreateSigningEnvelopeFromTemplateDto` (request — in-app envelope of the designer's document)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `FormTemplateId` | `string (uuid)` | required | form template |
+| `ElementId` | `string` | required, max 64 | signing element id |
+| `FormId` | `string (uuid)` | optional | a submission being shown: its stored element is used instead of the template's |
+
+### `CreatePublicSigningEnvelopeFromTemplateDto` (request — public envelope of the designer's document)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `FormTemplateId` | `string (uuid)` | required | form template |
+| `WorkspaceId` | `string (uuid)` | required | workspace that owns the template |
+| `ElementId` | `string` | required, max 64 | signing element id |
+| `FirstName`, `LastName` | `string` | optional, max 128 each | the signer |
+| `Email` | `string` | optional, max 256 | a valid address when given |
+
+### `PublicSigningEnvelopeDto` (response — public create)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Envelope` | `GetSigningEnvelopeDto` | required | the new `DRAFT` |
+| `AccessToken` | `string` | required | send as `x-signing-token`; returned only here and stored hashed, so a lost token cannot be recovered |
+
+### `SigningTemplateDocumentDto` (response — designer's document upload)
+
+Keep `{ fileId, name }` in the signing element's `document` setting.
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `FileId` | `string (uuid)` | required | stored file id |
+| `Name` | `string` | optional | document name |
+| `PageCount` | `number` | required | pages in the PDF |
+
+### `SigningConflictResponse` (`409` body of the signing endpoints)
+
+| wire field | type | req/opt | description |
+|---|---|---|---|
+| `Errors` | array of `ApiErrorResponse` | required | why the command was refused |
+| `State` | `GetSigningEnvelopeDto` or `SigningSessionDto` | optional | the current state — the session for `my-session` commands, the envelope otherwise |
 
 ### `CustomUrlDto`
 
@@ -983,3 +1309,46 @@ All names are explicit `[JsonProperty]` wire names.
 | `None` | 0 |
 | `Form` | 1 |
 | `Webhook` | 2 |
+
+The signing enums travel as their **names** (strings), not numbers.
+
+### `SigningEffectiveStatus`
+| name | meaning |
+|---|---|
+| `DRAFT` | being prepared; spots and parties editable |
+| `SENT` | sent, nobody has signed yet |
+| `IN_PROGRESS` | at least one party signed |
+| `COMPLETED` | every party signed; the signed PDF exists |
+| `DECLINED` | a signer declined; the envelope stopped circulating |
+| `VOIDED` | withdrawn because its form instance or template was deleted |
+| `EXPIRED` | derived at read time: `ExpiresOn` passed while `SENT` or `IN_PROGRESS` |
+
+### `SigningPartyStatus`
+| name | meaning |
+|---|---|
+| `PENDING` | not asked yet |
+| `NOTIFIED` | sent a sign request |
+| `VIEWED` | opened their session |
+| `SIGNED` | signed |
+| `DECLINED` | declined |
+
+### `SigningOrderMode`
+| name |
+|---|
+| `NONE` |
+| `SEQUENTIAL` |
+| `MIXED` |
+
+The order itself is each party's `OrderIndex`; the mode only restores the editor the preparer used.
+
+### `SigningSpotType` (accepted values)
+| name | filled with |
+|---|---|
+| `SIGNATURE` | the signature image |
+| `PRINTED_NAME` | the signer's full name |
+| `FIRST_NAME` | the signer's first name |
+| `LAST_NAME` | the signer's last name |
+| `DATE_SIGNED` | the signing date, in the signer's `TimeZone` |
+| `TEXT` | the preparer's `Value`, as typed |
+
+A draft save refuses any other name with `715`.

@@ -126,9 +126,38 @@ def map_http_error(status: int, reason: str = "") -> tuple[str, str, int]:
     return code, reason or default_msg, exit_code
 
 
+# PROCESIO's own coded refusals (the Web API's error_config codes) arrive as a JSON LIST,
+# `[{"statusCode": <code>, "value": "<message>", "target": <field or feature>}]`, which the
+# client wraps as {"body": [...]}. 1013 FEATURE_DISABLED is the one a caller can act on
+# without reading the message: the installation switched that optional module off.
+_FEATURE_DISABLED = 1013
+
+
+def procesio_error_items(details: Any) -> list[dict]:
+    """The coded error items of a PROCESIO error body, or [] when it has none."""
+    body = details.get("body") if isinstance(details, dict) else details
+    if not isinstance(body, list):
+        return []
+    return [i for i in body if isinstance(i, dict) and "statusCode" in i]
+
+
+def _reason_from_items(items: list[dict]) -> str:
+    parts = []
+    for i in items:
+        text = str(i.get("value") or "").strip() or "refused"
+        target = i.get("target")
+        where = f" [{target}]" if target not in (None, "", []) else ""
+        parts.append(f"{text} (code {i.get('statusCode')}){where}")
+    return "; ".join(parts)
+
+
 def _reason_from_body(details: Any) -> str:
     """PROCESIO error bodies vary: {"message": ...}, {"error": ...},
-    {"errors": {...}}, or an ASP.NET ProblemDetails {"title": ..., "errors": {...}}."""
+    {"errors": {...}}, an ASP.NET ProblemDetails {"title": ..., "errors": {...}}, or
+    the Web API's coded list [{"statusCode", "value", "target"}] (wrapped as {"body": [...]})."""
+    items = procesio_error_items(details)
+    if items:
+        return _reason_from_items(items)
     if not isinstance(details, dict):
         return ""
     for key in ("message", "error", "error_message", "reason", "title", "detail"):
@@ -177,5 +206,17 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
     if isinstance(exc, ProcesioAPIError):
         reason = _reason_from_body(exc.details) or str(exc)
         code, msg, exit_code = map_http_error(exc.status, reason)
-        return code, msg, {"status": exc.status, "body": exc.details}, exit_code
+        out = {"status": exc.status, "body": exc.details}
+        items = procesio_error_items(exc.details)
+        if items:
+            out["procesio_codes"] = [i.get("statusCode") for i in items]
+        disabled = [i.get("target") for i in items if i.get("statusCode") == _FEATURE_DISABLED]
+        if disabled:
+            # Not a malformed request: this installation has the module switched off, so
+            # retrying with other arguments cannot help. Name it and point at the check.
+            out["features_disabled"] = disabled
+            out["hint"] = ("this PROCESIO environment has that optional feature switched off; "
+                           "`procesio features` shows which modules are on")
+            return "feature_disabled", msg, out, 1
+        return code, msg, out, exit_code
     return "error", str(exc) or exc.__class__.__name__, {}, 1

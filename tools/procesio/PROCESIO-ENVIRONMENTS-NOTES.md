@@ -92,3 +92,15 @@ The suite's autouse `_isolate_userdata` fixture (conftest) pins `AAT_USERDATA_DI
 temp dir, so every test starts from the built-ins with `default = Main-PROD` and no
 test reads or writes the developer's real registry. Userpass login tests must also take
 the `store` fixture (in-memory creds) or a persistent cached token skips the login.
+
+## Optional modules differ per environment (`procesio features`)
+
+Since Web-Api v3.1.0 (2026-11-02) an installation can switch Forms, Data Store and Execution
+Environment off, and custom actions are on only where a NuGet store is configured.
+`procesio features` (GET /api/Features) answers which are on for the environment a call
+targets. A switched-off module answers its endpoints with 400 code 1013 ("This feature is
+disabled on this environment."), which the tool reports as `feature_disabled`; saving a process
+that uses Data Store, Query Store or Form Trigger actions is refused there, and import skips
+such flows. Check `procesio features --environment <Client>-<ENV>` before building forms or data
+stores for an on-prem or client installation. Detail: PROCESIO-API-NOTES.md, the v3.1.0 / v3.2.0
+wave.

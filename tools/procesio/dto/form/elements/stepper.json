@@ -81,6 +81,15 @@
    "value": []
   },
   {
+   "id": "bbc82821-d6b2-55b7-9996-a18e972dad38",
+   "key": "class",
+   "label": "CSS Classes",
+   "category": "styling",
+   "subCategory": "general",
+   "type": "hidden",
+   "value": []
+  },
+  {
    "id": "a2616d8d-6e75-5680-bbe4-86973fb24c94",
    "key": "activeStepIndex",
    "label": "Active step index",
@@ -119,6 +128,26 @@
    "subCategory": "events",
    "type": "field-events",
    "value": null
+  },
+  {
+   "id": "dfaa191f-69e3-5e88-88ba-e3576925ed0f",
+   "key": "goToPreviousStep",
+   "label": "Go to previous step",
+   "category": "content",
+   "subCategory": "general",
+   "type": "function",
+   "value": "",
+   "exposed": true
+  },
+  {
+   "id": "e2e1257c-8dbf-5441-a7db-405ffc5cc3cc",
+   "key": "goToNextStep",
+   "label": "Go to next step",
+   "category": "content",
+   "subCategory": "general",
+   "type": "function",
+   "value": "",
+   "exposed": true
   }
  ],
  "parentId": null,

@@ -9,6 +9,7 @@ Create or change a PROCESIO form and prove the user-visible behavior, process tr
 - Identify workspace, form ID or create intent, public/private access, target URL, user roles, bound variables, triggered processes, and expected behavior per control/event.
 - Ensure the `web` optional dependency/browser is installed and a dedicated saved session exists when authentication is required.
 - Use isolated test data and avoid another person's active browser profile.
+- On an on-prem or client environment, read the optional modules first (`features`): with Forms switched off, every form call is refused with code 1013.
 
 ## Inspect
 
@@ -32,6 +33,7 @@ Create or change a PROCESIO form and prove the user-visible behavior, process tr
 - Test normal, required/empty, invalid, boundary, and role/access paths relevant to the change.
 - For native synchronous result rendering, preserve existing direct process outputs and caller semantics. When the runtime writer consumes a variable-instance collection, use a compatible response envelope rather than replacing the established structured response.
 - Never persist an access token or credential as a form default, in plaintext JavaScript, or in screenshots/logs.
+- For a document-signing element, store the PDF with `form-signing-upload-document`, give every signer a SIGNATURE spot, and send the envelope yourself when the submission is made over the API (the element never sends it). The procesio tool's form development guide (its document-signing chapter) has the lifecycle and error codes.
 
 ## Verify
 
@@ -45,6 +47,7 @@ Pass only when all relevant layers agree:
 6. Reload/back/navigation and repeated submission behavior are understood; duplicate submission is prevented or handled.
 7. Private/public access behaves as designed in an appropriate session.
 8. Screenshots mask secret fields and evidence confirms no secret default or embedded clear token exists.
+9. For a document-signing element, the published form shows the PDF with its placed blocks, an envelope seeds from the saved design, and a real submission leaves the envelope SENT with each signer's session showing their spot.
 
 ## Recovery and cleanup
 

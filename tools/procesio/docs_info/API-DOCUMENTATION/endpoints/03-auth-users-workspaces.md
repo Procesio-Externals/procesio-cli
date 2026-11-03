@@ -289,7 +289,7 @@ Controller entity: `AuthorizationEntityType.None`. Stores an arbitrary JSON blob
 
 Controller entity: `AuthorizationEntityType.Workspace`. Workspace membership: list the caller's workspaces, list/invite/revoke members. Body content type `application/json`.
 
-> Note: this is the workspace-member controller. Sub-workspace hierarchy lives in `WorkspaceMasterController` (also `api/Workspace`, distinguished by route shape) and platform-admin workspace ops live in `ProcesioAdmin/WorkspaceController` (`api/Workspace/all`, `api/Workspace/master`, `api/Workspace/any/...`).
+> Note: this is the workspace-member controller. Sub-workspace hierarchy lives in `WorkspaceMasterController` (also `api/Workspace`, distinguished by route shape) and platform-admin workspace ops live in `ProcesioAdmin/WorkspaceController` (`api/Workspace/all`, `api/Workspace/master`, `api/Workspace/any/...`, `api/Workspace/{masterId}/sync`).
 
 #### `GET api/Workspaces`
 
@@ -343,6 +343,9 @@ Controller entity: `AuthorizationEntityType.MasterWorkspace`. Manage the master-
 - **Query params:** `pageNumber` — `number`, required; `pageItemCount` — `number`, required.
 - **Responses:**
   - `200 OK` → paginated list of sub-workspaces.
+  - `403 Forbidden` → `"Unauthorized"` when `parentId` is out of the caller's scope (see notes).
+- **Notes:**
+  - **Scope.** The permission is evaluated in the active workspace (`workspaceId` header or `?targetWorkspace=`). `parentId` must be the active workspace, or the master of the active sub-workspace. Any other id is refused before Authentication-Proxy is called, with the same `403` body the permission check uses, so the answer does not reveal whether that master exists. A caller without an active workspace is refused the same way.
 
 #### `GET api/Workspace/{parentId}/subworkspaces/{id}`
 
@@ -351,22 +354,51 @@ Controller entity: `AuthorizationEntityType.MasterWorkspace`. Manage the master-
 - **Path params:** `{parentId}` — `string (uuid)`, required — master workspace id. `{id}` — `string (uuid)`, required — sub-workspace id.
 - **Responses:**
   - `200 OK` → the sub-workspace object.
+  - `403 Forbidden` → `"Unauthorized"` when `parentId` is out of the caller's scope.
+- **Notes:**
+  - **Scope.** Same rule as `GET api/Workspace/{parentId}/subworkspaces`: `parentId` must be the active workspace, or the master of the active sub-workspace.
+
+#### `GET api/Workspace/{parentId}/subworkspaces/limit`
+
+- **Operation:** `GetSubWorkspaceLimit` — read the sub-workspace limit of a master workspace and how many sub-workspaces it holds today, so a client can show the limit before a create is refused.
+- **Auth:** Bearer JWT — **Permission:** `MasterWorkspace:Read` (Swagger: "Permission required: MasterWorkspace.Read")
+- **Path params:** `{parentId}` — `string (uuid)`, required — the master workspace id.
+- **Responses:**
+  - `200 OK` → `{ "maximumSubWorkspaces": 22, "subWorkspaceCount": 18 }` (`SubWorkspaceLimitDto`). `maximumSubWorkspaces` is the deployed Authentication-Proxy configuration, not a fixed number; `subWorkspaceCount` is the number the create check compares with it.
+  - `403 Forbidden` → `"Unauthorized"` when `parentId` is out of the caller's scope.
+  - `5xx` → the generic error body (`[{ "statusCode": 100, "value": "An unexpected error occurred.", "target": null }]`) when the limit cannot be read. Authentication-Proxy refuses the read for an id that names no workspace or names a sub-workspace, and when the master's group cannot be retrieved; those refusals do not reach the caller, the reason is in the server log.
+- **Notes:**
+  - **Scope.** Same rule as `GET api/Workspace/{parentId}/subworkspaces`: `parentId` must be the active workspace, or the master of the active sub-workspace.
+  - The count is the number of child groups the master has in Keycloak, read the same way the create check reads it, so a create is refused exactly when `subWorkspaceCount >= maximumSubWorkspaces`. The count can differ from the rows `GET api/Workspace/{parentId}/subworkspaces` lists: a Keycloak child without a stored row counts against the limit, a removed row does not.
 
 #### `POST api/Workspace`
 
-- **Operation:** `CreateSubWorkspace` — create a new sub-workspace under a master workspace.
-- **Auth:** Bearer JWT — **Permission:** `MasterWorkspace:Create` (Swagger: "Permission required: MasterWorkspace.Write")
-- **Request body** (`application/json`): `CreateWorkspaceDto`
+- **Operation:** `CreateSubWorkspace` — create a new sub-workspace under a master workspace. Authentication-Proxy validates the request and creates the Keycloak group; Web-Api relays its verdict.
+- **Auth:** Bearer JWT — **Permission:** `MasterWorkspace:Create` (Swagger: "Permission required: MasterWorkspace.Create")
+- **Request body** (`application/json`): `CreateWorkspaceDto` — `parentId` is the master workspace; `defaultWorkspaceConfiguration` is required.
 - **Responses:**
-  - `200 OK` → created workspace info.
+  - `200 OK` → `{ "workspaceId": "<uuid>", "msg": "The subWorkspace was created." }` (`CreateWorkspaceResponseDto`).
+  - `400 Bad Request` → `"Could not create legacy workspace."` when `parentId` is missing or the empty GUID; `"The default workspace configuration is required."`; `"Invalid default workspace configuration."`; `"Invalid workspace name."` for an empty name or a name containing `/`; `"The workspace name cannot exceed 100 characters."`; `"User doesn't exist as a Procesio user."`; `"User doesn't exist in the keycloak."`; `"The target group cannot be retrieved."`; `"There is already a sub-workspace with this name."`; `"There are too many subworkspaces in the selected master workspace."` when the master is at its sub-workspace limit; `"The group cannot be created."`.
+  - `404 Not Found` / `5xx` → `"Unable to create sub-workspace!"` (string); the status is the upstream one, the reason is in the server log.
+- **Notes:**
+  - Sub-workspace names are unique under one master (case-insensitive). A create refused before the Keycloak group is created (invalid body, duplicate name, limit reached) writes nothing; `"The group cannot be created."` follows an attempted Keycloak write.
+  - The sub-workspace limit is a platform setting of Authentication-Proxy. `GET api/Workspace/{parentId}/subworkspaces/limit` returns it together with the current count, so a client can show the limit before this request is refused.
 
 #### `PUT api/Workspace`
 
-- **Operation:** `UpdateSubWorkspace` — update a sub-workspace (name, limits, license type, default config, settings).
+- **Operation:** `UpdateSubWorkspace` — update a sub-workspace or the master workspace itself (name, limits, default config, settings). The license type is not taken from the body: it is read from the workspace's subscription, `None` when there is no subscription.
 - **Auth:** Bearer JWT — **Permission:** `MasterWorkspace:Update` (Swagger: "Permission required: MasterWorkspace.Update")
-- **Request body** (`application/json`): `UpdateWorkspaceDto`
+- **Request body** (`application/json`): `UpdateWorkspaceDto` — `id` is the workspace to update; `workspace` is its new display name.
 - **Responses:**
-  - `200 OK` → updated workspace info.
+  - `200 OK` → `"The workspace was updated."` (string).
+  - `400 Bad Request` → `"Invalid workspace"` when the target is out of the caller's scope (see notes); `"Invalid workspace name."` for an empty name, a name containing `/`, or a reserved name; `"The workspace name cannot exceed 100 characters."`; `"There is already a sub-workspace with this name."`; `"This workspace cannot be renamed."` for a PROCESIO-internal workspace.
+  - `403 Forbidden` → `"Only the owner or a co-owner can rename the workspace."`
+- **Notes:**
+  - **Scope.** The permission is evaluated in the active workspace (`workspaceId` header or `?targetWorkspace=`). A master workspace can be updated only when it *is* the active workspace. A sub-workspace can be updated when the active workspace is its master, the sub-workspace itself, or a sibling under the same master. The body's `parentId` is ignored for this decision.
+  - **Renaming a master workspace** additionally requires the caller to be its Owner or a Co-Owner. Renaming a sub-workspace needs no further right. A rename of a master workspace also renames its sub-workspaces' stored `master/sub` names; sub-workspace names stay unique under one master (case-insensitive).
+  - **Names are not unique.** Two master workspaces may carry the same display name. The names `Procesio` and `ProcesioInternal` are reserved.
+  - A request whose `workspace` equals the current name is a settings-only update.
+  - A platform admin updates any workspace with `PUT api/Workspace/any/{workspaceId}` instead (below).
 
 #### `DELETE api/Workspace/{workspaceToDelete}`
 
@@ -444,7 +476,7 @@ Controller entity: `AuthorizationEntityType.ProcesioAdmin`. Platform-admin user 
 
 Controller entity: `AuthorizationEntityType.ProcesioAdmin`. Platform-admin workspace operations. Entire controller is `[ApiExplorerSettings(IgnoreApi = true)]` (hidden from Swagger). Body content type `application/json`.
 
-> Disambiguation: shares `[Route("api/Workspace")]` with the member and master workspace controllers; distinguished by the `all` / `master` / `any/{id}` sub-routes and the `ProcesioAdmin` entity.
+> Disambiguation: shares `[Route("api/Workspace")]` with the member and master workspace controllers; distinguished by the `all` / `master` / `any/{id}` / `{masterId}/sync` sub-routes and the `ProcesioAdmin` entity.
 
 #### `GET api/Workspace/all`
 
@@ -456,13 +488,44 @@ Controller entity: `AuthorizationEntityType.ProcesioAdmin`. Platform-admin works
 
 #### `POST api/Workspace/master`
 
-- **Operation:** `CreateMasterWorkspace` — create a new master workspace owned by a given user.
+- **Operation:** `CreateMasterWorkspace` — create a new master workspace owned by a given user. Authentication-Proxy validates the request, creates the Keycloak group and the workspace row, and adds the owner to the group; Web-Api relays its verdict.
 - **Auth:** Bearer JWT — **Permission:** `ProcesioAdmin:Create`
 - **Hidden from Swagger:** yes
-- **Query params:** `newMasterWorkspace` — `string`, required — the new master workspace name.
+- **Query params:** `newMasterWorkspace` — `string`, required — the new master workspace name. Trimmed; must be non-empty, contain no `/`, be at most 100 characters, and not be `Procesio` or `ProcesioInternal`. It does not need to be unique.
 - **Special headers:** `userEmail` `[FromHeader]` — `string`, required — the owner's email.
 - **Responses:**
-  - `200 OK` → created master workspace info.
+  - `200 OK` → `{ "workspaceId": "<uuid>", "msg": "The master workspace was created." }` (`CreateWorkspaceResponseDto`).
+  - `400 Bad Request`, in the order the checks run → `"Invalid workspace name."` for an empty name or a name containing `/`; `"The workspace name cannot exceed 100 characters."`; `"Invalid workspace name."` for a reserved name (`Procesio`, `ProcesioInternal`, case-insensitive); `"User doesn't exist as a Procesio user."` when `userEmail` has no PROCESIO user; `"User doesn't exist in the keycloak."` when the user has no Keycloak account; `"The group cannot be created."` when Keycloak refused the group, the group could not be read back, or the workspace row could not be stored; `"The user cannot be added to the specified group."` when Keycloak refused the owner's membership and the half-created workspace was removed again.
+  - `400 Bad Request` when the membership was refused **and** the clean-up failed, so something is left behind; the message names the repair: `"The user cannot be added to the specified group, and the half-created workspace <workspaceId> could not be removed. Delete it as a platform admin with DELETE api/Workspace/any/<workspaceId>."`; `"The user cannot be added to the specified group, and the Keycloak group <groupId> of the half-created workspace <workspaceId> could not be deleted. Delete the group in the Keycloak console."`; `"The user cannot be added to the specified group, and the half-created workspace <workspaceId> could not be marked as removed. Its Keycloak group is already gone, so set State to 2 (REMOVED) on its workspace row in the database."`.
+  - `404 Not Found` / `5xx` → `"Unable to create master workspace!"` (string); the status is the upstream one, the reason is in the server log.
+- **Notes:**
+  - A refused create writes nothing that survives the refusal. The name and owner checks run before any write. `"The group cannot be created."` follows an attempted Keycloak write: a group that was created but could not be stored as a row is deleted again. A refused owner membership deletes the group and marks the row removed before the `400` is returned; only when that clean-up itself fails does the response name what is left and how to remove it.
+  - A failure after the owner is a member (owner permissions, the creation e-mail, the notification) answers `5xx` and leaves the master in place with its owner; the master is usable.
+
+#### `PUT api/Workspace/any/{workspaceId}`
+
+- **Operation:** `UpdateWorkspace` — update any workspace (master or sub-workspace) by id. A platform admin is not subject to the scope, Owner/Co-Owner or edit-right checks of `PUT api/Workspace`.
+- **Auth:** Bearer JWT — **Permission:** `ProcesioAdmin:Update`
+- **Hidden from Swagger:** yes
+- **Path params:** `{workspaceId}` — `string (uuid)`, required — the workspace to update.
+- **Request body** (`application/json`): `UpdateWorkspaceDto` — `id` may be omitted; if present it must equal the route id.
+- **Responses:**
+  - `200 OK` → `"The workspace was updated."` (string).
+  - `400 Bad Request` → the same name and internal-workspace errors as `PUT api/Workspace`. `Procesio` and `ProcesioInternal` cannot be renamed by anyone.
+- **Notes:** The route id is the authority; a body `id` that differs from it is rejected rather than overridden (it surfaces as the generic `500` error body, like any other thrown exception).
+
+#### `POST api/Workspace/{masterId}/sync`
+
+- **Operation:** `SyncWorkspaceNames` — rebuild the stored names of a master workspace and its sub-workspaces from Keycloak. Keycloak is the source of truth for names; rows are matched to Keycloak groups by group id. Keycloak is never written. Running it twice changes nothing the second time.
+- **Auth:** Bearer JWT — **Permission:** `ProcesioAdmin:Admin`
+- **Hidden from Swagger:** yes
+- **Path params:** `{masterId}` — `string (uuid)`, required — the master workspace to repair.
+- **Responses:**
+  - `200 OK` → `WorkspaceNameSyncReportDto` (see Shared DTOs).
+  - `400 Bad Request` → `"Invalid workspace."`, `"The workspace is not a master workspace."`, `"Inactive workspace."`, `"This workspace cannot be synced."` (PROCESIO-internal workspace), `"The workspace group cannot be retrieved."`, or a message saying the Keycloak master name cannot be stored.
+  - `403 Forbidden` → `"Not allowed."` when the caller is not a member of the platform admin workspace.
+  - `404 Not Found` / `5xx` → `"Unable to sync workspace names!"` (string); the status is the upstream one, the reason is in the server log.
+- **Notes:** Use this after a rename reported that the Keycloak group may be out of sync, or after a group was renamed in the Keycloak console. Rows with no matching Keycloak group and groups with no matching row are reported and left untouched.
 
 #### `DELETE api/Workspace/any/{workspaceToDelete}`
 
@@ -654,9 +717,9 @@ Empty subclass of `BaseUserPermissionsDto` — same fields (`UserTypeId`, `Roles
 ### `SimpleWorkspaceDto` (base of `UpdateWorkspaceDto`)
 | Wire field | Type | Required | Description |
 |---|---|---|---|
-| `workspace` | `string` | optional | Workspace name. |
+| `workspace` | `string` | optional | Workspace display name. On an update: the new name (trimmed; no `/`; at most 100 characters). |
 | `id` | `string (uuid)` | optional | Workspace id (nullable `Guid?`). |
-| `parentId` | `string (uuid)` | optional | Parent (master) workspace id (nullable `Guid?`). |
+| `parentId` | `string (uuid)` | optional | Parent (master) workspace id (nullable `Guid?`). Informational on an update; the server derives the parent from its own records. |
 
 ### `CreateWorkspaceDto`
 | Wire field | Type | Required | Description |
@@ -675,9 +738,34 @@ Inherits `workspace`, `id`, `parentId` plus:
 |---|---|---|---|
 | `canExceedPaidTime` | `boolean` | required | Whether the workspace may exceed paid execution time. |
 | `maxThreads` | `number` | required | Max concurrent execution threads. |
-| `licenseType` | `string|number (enum LicenseType)` | required | License type. See `LicenseType`. |
+| `licenseType` | `string|number (enum LicenseType)` | required | License type. See `LicenseType`. Overwritten server-side from the workspace's subscription on `PUT api/Workspace`. |
 | `defaultWorkspaceConfiguration` | `object (UPDefaultWorkspaceDto)` | optional | Default permission configuration. |
 | `settings` | `array of WorkspaceOptionsSettingDto` | optional | Workspace option settings. |
+
+### `WorkspaceNameSyncReportDto`
+Returned by `POST api/Workspace/{masterId}/sync`. (`[JsonProperty]` wire names.)
+
+| Wire field | Type | Required | Description |
+|---|---|---|---|
+| `masterWorkspaceId` | `string (uuid)` | required | The master workspace that was synced. |
+| `masterName` | `object (WorkspaceNameChangeDto)` | required | The master's stored name before and after. |
+| `subWorkspaces` | `array of SubWorkspaceNameChangeDto` | required | One entry per active sub-workspace matched to a Keycloak group. `before` equals `after` when nothing changed or the row was left untouched. |
+| `dbSubWorkspacesWithoutKeycloakGroup` | `array of string (uuid)` | required | Sub-workspace ids whose Keycloak group id matches no child of the master group. Left untouched. |
+| `keycloakSubGroupsWithoutDbRow` | `array of string (uuid)` | required | Keycloak child group ids that match no active sub-workspace. Left untouched. |
+| `changedCount` | `number` | required | Number of rows written. `0` on a repeated run. |
+
+### `WorkspaceNameChangeDto`
+| Wire field | Type | Required | Description |
+|---|---|---|---|
+| `before` | `string` | required | Stored name before the sync (`master` or `master/sub`). |
+| `after` | `string` | required | Stored name after the sync. |
+
+### `SubWorkspaceNameChangeDto` (extends `WorkspaceNameChangeDto`)
+Inherits `before`, `after` plus:
+
+| Wire field | Type | Required | Description |
+|---|---|---|---|
+| `id` | `string (uuid)` | required | Sub-workspace id. |
 
 ### `WorkspaceOptionsSettingDto`
 No `[JsonProperty]` attributes → Newtonsoft default (PascalCase wire names).

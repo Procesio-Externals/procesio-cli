@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**143 rules across 8 notes.**
+**150 rules across 8 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -147,6 +147,13 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [List, text, number and date actions: measured behaviour (live, 2026-10)](PROCESIO-API-NOTES.md#list-text-number-and-date-actions-measured-behaviour-live-2026-10)
 - [Webhook query parameters, and a webhook as a tracking pixel (2026-10)](PROCESIO-API-NOTES.md#webhook-query-parameters-and-a-webhook-as-a-tracking-pixel-2026-10)
 - [Webhooks in the UI: listen vs manual, answering the caller, filter rules; API keys and the run call](PROCESIO-API-NOTES.md#webhooks-in-the-ui-listen-vs-manual-answering-the-caller-filter-rules-api-keys-and-the-run-call)
+- [What was not announced](PROCESIO-API-NOTES.md#what-was-not-announced)
+- [Two ui-builder lines in prod at once](PROCESIO-API-NOTES.md#two-ui-builder-lines-in-prod-at-once)
+- [Feature flags (GET /api/Features)](PROCESIO-API-NOTES.md#feature-flags-get-apifeatures)
+- [The Web API's coded error list](PROCESIO-API-NOTES.md#the-web-apis-coded-error-list)
+- [Document signing in forms: usable end to end](PROCESIO-API-NOTES.md#document-signing-in-forms-usable-end-to-end)
+- [Data Store collation](PROCESIO-API-NOTES.md#data-store-collation)
+- [Connectors, data types, custom actions, history](PROCESIO-API-NOTES.md#connectors-data-types-custom-actions-history)
 
 ## Procesio Instance History Notes
 

@@ -64,7 +64,8 @@ def collect_actions() -> dict[str, ActionDef]:
     from tools.procesio.handlers import (
         auth_actions, catalog, customaction_ops, datastore_ops, datatype_ops,
         dto_actions, environment_admin, files,
-        flowgraph, form_chains, form_code, form_element, form_events, form_update, formprocess, generic,
+        flowgraph, form_chains, form_code, form_element, form_events, form_signing, form_update,
+        formprocess, generic,
         layout, usageguide,
         process_layout, process_naming, processes, profile_admin,
         flowlint, fevalidate, nodeparams, resource_ops, schedules, sqlactions, transport,
@@ -115,6 +116,7 @@ def collect_actions() -> dict[str, ActionDef]:
     # regex/visible. Content and per-field rules belong in the DTO, not in the
     # form-level JS layer where the designer cannot see them.
     curated.update(form_element.ACTIONS)
+    curated.update(form_signing.ACTIONS)
     # Arbitrary safe save: GET a live form, deep-merge a Data patch (and/or override
     # name/status/state), PUT the accepted DTO — the general form-save form-edit isn't.
     curated.update(form_update.ACTIONS)

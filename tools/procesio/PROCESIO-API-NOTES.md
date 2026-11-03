@@ -7094,9 +7094,9 @@ their summary/description, so do not derive permissions from Swagger text alone.
 - The API is live in prod: 24 routes under `api/form/signing`, a public set under
   `api/form/signing/public/*` authenticated by the `x-signing-token` header, envelope statuses
   DRAFT / SENT / IN_PROGRESS / COMPLETED / DECLINED / VOIDED (+ EXPIRED effective), order modes
-  NONE / SEQUENTIAL / MIXED, errors 710-719, `FormAssigneeType.SIGNER = 3`, signing tasks in
+  NONE / SEQUENTIAL / MIXED (removed in v3.2.0: see the v3.1.0 / v3.2.0 wave), errors 710-719, `FormAssigneeType.SIGNER = 3`, signing tasks in
   `api/Form/assigned`.
-- The form element is NOT usable in prod: the prod ui-builder (0.185.0) hides `document-signing`
+- (Superseded on 2026-11-02, the element is usable since user-playground v1.116.0 and form-runtime v1.32.0: see the v3.1.0 / v3.2.0 wave.) At v3.0.0 the form element was NOT usable in prod: the prod ui-builder (0.185.0) hides `document-signing`
   and the prod playground does not wire its host events to `api/form/signing/*`. The tool covers
   the routes only through generic endpoint actions; no curated support and no form golden.
 
@@ -7849,3 +7849,161 @@ Measured on the live web app and the Web API.
 - **Send Email's Subject picker (the plus) lists a data-model variable's attributes**; picking
   one stores the Subject as `<%N%>` with `variable[N].attribute.attributeId` set, so literal
   text plus a picked attribute is a valid, bound template.
+
+## v3.1.0 / v3.2.0 production wave (2026-11-02): signing in forms, feature flags, the collation fix
+
+Backend services went to v3.1.0 on 2026-11-02 (Web-Api also v3.2.0 the same day, Process-History
+v3.1.0 on 2026-10-27 and v3.2.0 on 2026-11-02); user-playground v1.116.0 (pins ui-builder 0.194.0,
+design-system 0.158.0); form-runtime v1.31.0 (2026-10-28) and v1.32.0 (pins ui-builder 1.46.0,
+design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: the v3.0.0 wave above).
+`procesio-release report --since <date>` reproduces every check below.
+
+### What was not announced
+- ⚠ The Releases PROD posts are not the full list: form-runtime v1.31.0 and v1.32.0 (the public form
+  host, where document signing actually runs for whoever fills a form) and ui-builder v1.43.0 reached
+  prod without a post. Diff the PROCESIO org's stable GitHub releases against the posts
+  (`procesio-release unannounced`) every wave.
+- Pre-releases then pending (not prod): Web-Api v3.3.0-rc.1 (`GET api/Workspace/{parentId}/subworkspaces/limit`
+  -> `{maximumSubWorkspaces, subWorkspaceCount}`; 403 "Unauthorized" on sub-workspace reads for a
+  `parentId` that is neither the active workspace nor its master; master-create refusals forwarded),
+  Authentication-Proxy v3.2.0-rc.1, Test-Action v2.1.0-rc.1 (infra). Re-check at the next wave.
+
+### Two ui-builder lines in prod at once
+- ⚠ Forms are DESIGNED on the legacy line (user-playground pins ui-builder 0.x) and FILLED on the main
+  line (form-runtime pins 1.x): user-playground v1.116.0 redirects every form route (public, private,
+  assignments, submissions) to form-runtime. The FormBuilder mock is the same on 0.194.0 and 1.46.0
+  (only formatting differs), so the goldens fit both; behaviour still differs between them: only the
+  legacy line lets a signer place their own signature spot, only the main line has the dynamic-row
+  fix below, and custom CSS is unscoped in FILL/APPROVE on the legacy line but scoped on the main one.
+  `procesio-release fe-pins` reports both pins and whether the tool's mock still matches them.
+
+### Feature flags (`GET /api/Features`)
+- Answers `{customActions, dataStore, forms, executionEnvironment}` to any signed-in caller (no
+  permission). `customActions` is "a NuGet store is configured"; the other three come from the
+  Web-Api `FeatureFlags` configuration section, and a flag that section leaves out counts as OFF. Prod
+  had all four on (2026-11-03). `procesio features` reads them.
+- ⚠ A switched-off feature answers HTTP 400 `[{"statusCode":1013,"value":"This feature is disabled on
+  this environment.","target":"DataStore"|"Forms"|"ExecutionEnvironment"}]`, never a 404. The tool
+  reports it as error code `feature_disabled` with `features_disabled` and a hint; no argument fixes it.
+- `dataStore` off: every Data Store, row, CSV and form-data-store endpoint (lists too). `forms` off:
+  every form controller, including signing and the anonymous form endpoints, custom URLs that resolve
+  to a form, and the restricted data-store read for a form. `executionEnvironment` off: its analytics,
+  Thread subscription plans, and changing `maxThreads` on a Thread-licensed workspace.
+- ⚠ With `dataStore` off, saving or duplicating a process that holds a Data Store or Query Store action
+  is refused with 1013 (drafts too); with `forms` off, the same for a Form Trigger action. Import skips
+  those flows and export leaves the stores or forms out. Gated operations disappear from Swagger.
+
+### The Web API's coded error list
+- ⚠ The Web API's own refusals are a JSON LIST `[{"statusCode": <code>, "value": "<message>", "target":
+  <field or feature>}]` (codes from its error_config: 502 invalid parameters, 711-716 signing, 1013
+  feature disabled, ...). The tool used to report these as a bare "HTTP 400"; since 2026-11-03 the
+  message is `value (code N) [target]` and `details.procesio_codes` lists the codes. Verified live:
+  `GET api/form/signing/envelope/{id}/document?version=bogus` -> "Invalid request due to missing or
+  incorrect resource parameters. (code 502) [version]".
+
+### Document signing in forms: usable end to end
+- The element is live since user-playground v1.116.0 + form-runtime v1.32.0 (the API since v3.0.0).
+  Golden `dto/form/elements/document-signing.json`, recipe `FORM-DEV-GUIDE/11-DOCUMENT-SIGNING.md`,
+  lint `formlint.lint_document_signing`, upload `form-signing-upload-document`.
+- Contract changes on the envelope: `orderMode` is REMOVED (v3.2.0; ignored if sent, absent from
+  responses); signing order is the parties' `orderIndex` (lowest first, equal values sign in
+  parallel). `SigningPartyDto.declineReason` (read-only) carries a declined signer's reason.
+  `SigningSessionDto.placesOwnSignature` + `SubmitSignatureDto.signatureSpot {page,x,y,w,h}`: a
+  signer the preparer placed no SIGNATURE spot for sends one when signing.
+- New answers: sign without a required `signatureSpot`, or a send that dropped a signer the designer
+  named -> 400 714; `signatureSpot` from a signer who already has a spot, a spot off the page, a draft
+  spot on a missing page or for an unknown party -> 400 715 (was 409 711); `document?version=` outside
+  `current|signed|source|my-step` -> 400 502 (was served as current); a send with NO signers completes
+  at once (SENT, DOCUMENT_STAMPED, COMPLETED; 200) instead of 409; an unrenderable document -> 400 716
+  and the envelope stays DRAFT. Signatures are stamped at their own aspect ratio; a block's rows print
+  as close lines above the signature; signing e-mails come from the platform's system e-mail workspace.
+- ⚠ The element never sends the envelope: the host does it at form submit. A submission made only over
+  the API must call `POST api/form/signing/envelope/{id}/send?formId=<form instance id>&rowVersion=<n>`
+  itself, or the signers are never notified.
+- Public signing uses the `x-signing-token` header returned once by the public envelope create; there
+  is no public decline. `FormAssigneeType.SIGNER = 3` is written only by the Web API (SIGNER assignees
+  sent with a submit are dropped); a submission at its signing step lists as "pending signature".
+- The upstream API reference (`docs_info/API-DOCUMENTATION/endpoints/07-forms.md`, 2026-10-28) still
+  describes `OrderMode` and 409 711 for these spot and send cases: the behaviour above is the code's.
+
+### Data Store collation (measured 2026-11-03)
+- Data-Store v3.1.0 creates databases and tables in `utf8mb4_0900_ai_ci`, the driver's session
+  collation, so `SET @c = 'x'; ... WHERE TextCol = @c` works in a Query Store script on a NEW store
+  (measured: status 50, `COLLATION(col)` = `utf8mb4_0900_ai_ci`).
+- ⚠ Stores created before 2026-11-02 were NOT converted on prod: `COLLATION(col)` still answers
+  `utf8mb4_general_ci` and the same comparison still fails with "The query could not be executed."
+  (measured on a store from 2026-09). Keep `COLLATE utf8mb4_0900_ai_ci` on a text-variable comparison
+  unless `SELECT COLLATION(col)` shows the new collation. A conversion script exists for installations
+  that run it (`9_datastore_v3.1_ConvertDataStoreTablesToUtf8mb40900AiCi.sql` in DataBase-Update; it
+  stops with 1062 on keys that collide under the new collation).
+- ⚠ The new collation is NO PAD: trailing spaces count (`'abc'` and `'abc '` are different keys, and a
+  filter without the space misses a value stored with one). Comparisons stay case- and
+  accent-insensitive, `Æ` equals `AE`, and emoji are distinct.
+
+### Workspaces and accounts
+- `POST api/Workspace` (sub-workspace create; Swagger now says MasterWorkspace.Create, was .Write),
+  `PUT api/Workspace` and `PUT api/Workspace/any/{workspaceId}` return the Authentication-Proxy's
+  refusal with its status and text, e.g. 400 "There is already a sub-workspace with this name.",
+  "There are too many subworkspaces in the selected master workspace.", "Invalid workspace name.",
+  "The default workspace configuration is required.", "Invalid default workspace configuration.". A
+  5xx or bodyless refusal keeps its status with "Unable to create sub-workspace!" / "Unable to update
+  workspace!". Before: a generic 500, and a rename was saved before that 500.
+- A workspace PUT without `defaultWorkspaceConfiguration` keeps the stored defaults (200).
+- Deleting a sub-workspace frees the master's slot at once; before, the master kept counting it for up
+  to 24 h and a master at its limit could not create a new one.
+- Account-activation and complete-account links expire after 48 h (was 72 h).
+
+### Connectors, data types, custom actions, history
+- ⚠ OAuth2 credential authorization: the `state` is bound to the user who started it, valid for 10
+  minutes and usable once, and the callback needs that same user's PROCESIO session in the browser.
+  Start and finish it in one signed-in browser. Failures redirect with `?error=` "Sign in to PROCESIO
+  in this browser, then authorize the credential again." or "Request is not valid. The authorization
+  expired or was started by another user. Please authorize again."
+- `POST api/DataTypes/generate` and `generate/file` (a data model from a JSON sample) no longer type
+  file-shaped objects as File (only webhook payloads get File detection), and an empty array becomes a
+  list of Object instead of being dropped.
+- ⚠ A custom action (.nupkg) that declares an `AZURE_STORAGE` credential (bound through
+  `Credentials_Custom` by template GUID) receives NULL, with no error and no log line: Action-Execution
+  has no builder for it (documented as a known gap in v3.1.0). The built-in Azure Storage connector,
+  which runs in Process-Execution, works.
+- Process-History: a move to history now writes everything to history first and deletes the live copy
+  last; a step that cannot read its data stops for a retry instead of archiving with gaps, so such an
+  instance stays under `/instances` longer (still force-moved after 7 days).
+- Call Subprocess: the parent's child link (a Redis key) is removed when a child ends, also when it is
+  stopped by the user. No API reads it; instance lists, outputs and counts are unchanged.
+- Query Store reference errors, raised before the query runs (chip bindings): "The query references a
+  Data Store that is not available. It may have been deleted, or it may belong to another workspace.",
+  "A column referenced in Data Store '<name>' no longer exists. It may have been deleted or
+  re-created.", "The query contains a reference that is configured more than once. ...", "... that
+  cannot be read. ...", "... that is no longer configured. ...". In a run the action ends in ERROR
+  with "Error while building input model: <message>". Script actions (Node, Python, Ruby, JavaScript)
+  are not affected; the release note "CodeEditorMapper rethrows a binding failure" was a docs fix.
+
+### Form runtime behaviour (form-runtime v1.31-v1.32, ui-builder 1.44-1.46)
+- An unresolved loop or child element value reaches a process data-model value as `null` (was
+  `undefined`).
+- A form script's first data-store operation loads the stores; with none available it throws "Data
+  store operations are not available.".
+- Submit, validation and triggers flush pending debounced inputs instead of waiting fixed delays, and
+  form-level assignee triggers finish before the submit.
+- Dynamic rows (main line only, so filling): the "loop item" / "loop fields" mapping attributes return
+  the correct OUTER row when a trigger fires inside a nested row, and a script in a nested row that
+  writes an outer-row field writes the right row.
+- The signature dialog offers Draw / Upload image / Type; an uploaded image is redrawn as a PNG of at
+  most 500 px. No config key controls it.
+- The instance view no longer loads full action configurations (a UI change; no API parameter).
+
+### Tool changes for this wave
+- `features` action; error code `feature_disabled`; coded error lists parsed for every action.
+- Form goldens regenerated from ui-builder 1.46.0 (mock, enums and theme in `docs_info/`, vendored
+  `docs_info/ui-builder-main` refreshed): +`document-signing`; every control gains a `class` config (CSS
+  classes on the wrapper; the builder takes `classes`); icon +`disabled`, side-panel +`buttonTooltip`,
+  stepper +`goToPreviousStep`/`goToNextStep`; chart select `options` and placeholders as text. The
+  generator now carries `options`/`accept`/`maxFileSizeMB`/`uploadEvent`/`downloadEvent` and resolves
+  `FormBuilderEvent.*`, exported constants and `JSON.stringify(...)`.
+- `form-signing-upload-document`; `lint_document_signing` on every form write.
+- `data/endpoints.json` 296 operations (+`GET /api/Features`; the custom-URL operations now tag
+  `CustomUrl`; signing summaries describe v3.2.0). `docs_info/API-DOCUMENTATION` mirrored from the
+  upstream reference (now split into forms, documents, credentials, data store, data types, custom URLs,
+  subscriptions, webhooks, notifications/API keys/transport, SignalR), with the tool's own measured
+  additions re-applied by `procesio-release api-docs-sync` (overlay) and both indexes regenerated.

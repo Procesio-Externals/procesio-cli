@@ -191,3 +191,9 @@ and `Certificate` - there is **no Bearer**. To send `Authorization: Bearer
 to a header rather than a query parameter). The auth method must be given as the
 option **name** (`"API key authentication"`), not its `be_value`; a raw string
 saves but fails at runtime with `Unrecognized Guid format`.
+
+## OAuth2 authorization is bound to one user (Web-Api v3.1.0, 2026-11-02)
+
+An OAuth2 credential's authorization `state` belongs to the user who started it, lives 10 minutes
+and works once; the callback needs that same user's PROCESIO session in the browser. Start and
+finish the authorization in one signed-in browser.
