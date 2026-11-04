@@ -100,13 +100,14 @@ def build_edit_dto(component: Component, client, resource_id, config: dict, ctx:
     by name) and the canvas positions: a variable is referenced by GUID from outside the process, so
     "do the ids survive?" is the question a dry-run exists to answer, and building the preview from
     the config alone answers it wrongly. A live resource that cannot be read falls back to a plain
-    build rather than refusing to preview at all.
+    build rather than refusing to preview at all, and leaves the failure in `ctx["_live_read_error"]`
+    so the preview can say that its ids are not the ones an edit would keep.
     """
     if component.edit_ctx:
         try:
             ctx = component.edit_ctx(client, resource_id, config, ctx)
-        except Exception:  # noqa: BLE001 - unreadable live resource -> preview what we can
-            pass
+        except Exception as exc:  # noqa: BLE001 - unreadable live resource -> preview what we can
+            ctx["_live_read_error"] = str(exc) or exc.__class__.__name__
     return build_dto(component, config, ctx)
 
 

@@ -127,6 +127,10 @@ def _make_edit(component):
             dto = framework.build_edit_dto(component, client, args.id, config, ctx)
             out = {"dry_run": True, "edit": True, "component": component.name,
                    "id": args.id, "dto": dto}
+            if ctx.get("_live_read_error"):
+                out["live_read_failed"] = (
+                    f"{ctx['_live_read_error']}. This preview carries nothing over from the live "
+                    f"resource, so its ids are new ones, and a real edit stops on the same failure.")
             warnings = component.lint(dto) if component.lint else []
             if warnings:
                 out["warnings"] = warnings
@@ -248,6 +252,9 @@ def build_actions() -> dict[str, ActionDef]:
                    f"{comp.patch_action} instead - it deep-merges a patch."
                    if getattr(comp, "patch_action", "") else "")
                 + " --dry-run previews the DTO."
+                + (" If the live resource cannot be read, the edit stops before writing; --dry-run "
+                   "still previews and names the failure in `live_read_failed`."
+                   if comp.edit_ctx else "")
                 + (" Non-blocking lint findings come back as `warnings`." if comp.lint else "")
             ),
             arg_schemas=arg_schemas, examples=examples,

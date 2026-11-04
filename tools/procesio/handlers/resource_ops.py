@@ -11,6 +11,7 @@ JSON in / JSON out; impure (live client). Thin wrappers over documented endpoint
   form      -duplicate
   webhook   -launch
   credential-test        POST /api/Credentials/test  (builds the DTO, returns the probe)
+  credential-copy        GET + test + POST /api/Credentials  (secrets stay in memory)
   customaction-test      POST /api/Actions/test
   import                 POST /api/Transport/import  (multipart .procesio, mirrors `export`)
 """
@@ -96,6 +97,37 @@ def credential_test(client, args) -> dict:
     res = client.post("/api/Credentials/test", dto)
     ok = isinstance(res, dict) and res.get("isSuccess") is True
     return {"tested": True, "isSuccess": ok, "result": res}
+
+
+def credential_copy(client, args) -> dict:
+    """Copy a credential into the --workspace-id workspace: test it there, then save it.
+
+    GET /api/Credentials/{id} answers with every property in clear, so the values stay inside
+    this call. They never reach a file, argv or the result, which is why the copy is an action
+    and not a credential-get piped into a credential-create."""
+    target = client.workspace_id
+    if not target:
+        raise UsageError("provide --workspace-id: the workspace that receives the copy")
+    client.workspace_id = args.from_workspace_id
+    src = client.get(f"/api/Credentials/{args.id}")
+    client.workspace_id = target
+    name = args.name or src.get("name")
+    taken = client.get("/api/Credentials", query={"searchName": name, "pageNumber": 1, "pageItemCount": 50})
+    for item in (taken.get("pageItems") or []) if isinstance(taken, dict) else []:
+        if item.get("name") == name:
+            raise UsageError(f"the target workspace already has a credential named {name!r} "
+                             f"(id {item.get('gid') or item.get('id')}); pass --name to copy it under another one")
+    dto = {key: src.get(key) for key in ("properties", "gtid", "gtpid", "type", "status")}
+    dto.update(name=name, workspaceId=target)
+    verdict = client.post("/api/Credentials/test", dto)
+    if not (isinstance(verdict, dict) and verdict.get("isSuccess") is True):
+        safe = verdict if isinstance(verdict, dict) else {}
+        raise ProcesioAPIError(422, "the copy failed its connection test, nothing was saved",
+                               {"state": safe.get("state"), "message": safe.get("message")})
+    saved = client.post("/api/Credentials", dto)
+    new_id = (saved.get("gid") or saved.get("id")) if isinstance(saved, dict) else None
+    return {"copied": True, "id": new_id, "name": name, "from_workspace_id": args.from_workspace_id,
+            "workspace_id": target, "tested": True}
 
 
 def customaction_test(client, args) -> dict:
@@ -316,6 +348,14 @@ def _cred_test_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--config-file", dest="config_file", help="path to a credential JSON config file")
 
 
+def _cred_copy_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="credential id in the source workspace")
+    p.add_argument("--from-workspace-id", dest="from_workspace_id", required=True,
+                   help="workspace that holds the credential (--workspace-id receives the copy)")
+    p.add_argument("--name", help="name of the copy (default: the source credential's name)")
+
+
 def _ca_test_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--action",
@@ -437,6 +477,11 @@ ACTIONS = {
     "credential-test": ActionDef(
         func=credential_test, add_args=_cred_test_args, needs_client=True,
         description="Live-test a credential config without saving it (POST /api/Credentials/test)."),
+    "credential-copy": ActionDef(
+        func=credential_copy, add_args=_cred_copy_args, needs_client=True,
+        description="Copy a credential from another workspace into --workspace-id. The copy must pass "
+                    "its connection test before it is saved, and a name already taken in the target is "
+                    "refused. Property values stay in memory: they reach no file, argument or output."),
     "customaction-test": ActionDef(
         func=customaction_test, add_args=_ca_test_args, needs_client=True,
         description="Run a single action in TEST mode and return its resolved result (--action + "

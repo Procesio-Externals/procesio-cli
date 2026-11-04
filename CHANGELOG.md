@@ -13,6 +13,9 @@ there, not here.
 - `form-set-element-event --on signed | declined | completed` wires the document-signing
   triggers, and `form-get-element-events` lists them. An event slot saved as a bare list
   no longer makes `form-get-element-events` fail.
+- `credential-copy` copies a credential from another workspace into `--workspace-id`. It
+  tests the connection there and saves only if that passes, and it refuses a name the target
+  already uses. Property values stay in memory: no file, argument or output holds them.
 
 ### Changed
 - The plugin runs procesio-cli 0.1.6 (`plugin/pyproject.toml` and `plugin/uv.lock`).
@@ -28,7 +31,17 @@ there, not here.
   of the Completed tab under Assigned to me, and Form Trigger and approval tasks raised by
   a process. `PROCESIO-PYTHON-ACTION-NOTES.md` covers building a PDF/A-3 with an embedded
   file.
-- The bundled API reference adds `credentialDefaults` and the credential `label` filter.
+- The bundled API reference adds `credentialDefaults`, the credential `label` filter and the
+  read-only `be_id` / `be_value` keys, each marked as not on prod yet. Web-Api v3.2.0 ignores
+  `label` with no error and returns every row, so don't rely on that filter yet.
+- `PROCESIO-CUSTOM-ACTION-NOTES.md` covers Action-Core 2.2: what it adds, and why a package built
+  against a newer Action-Core than the host doesn't load.
+
+### Fixed
+- `process-edit` stops without writing when the live process can't be read. A failed read used
+  to give every variable a new id and left the removal check nothing to compare against, which
+  broke every form map with no error. `--dry-run` still previews and names the failure in
+  `live_read_failed`.
 
 ## [0.1.6] - 2026-11-03
 

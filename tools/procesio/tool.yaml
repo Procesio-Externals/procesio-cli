@@ -380,6 +380,33 @@ actions:
     type: string
     required: true
     description: credential id
+- name: credential-copy
+  description: 'Copy a credential from another workspace into --workspace-id. The copy must pass its connection test before it is saved, and a name already taken in the target is refused. Property values stay in memory: they reach no file, argument or output.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: credential id in the source workspace
+  - name: from-workspace-id
+    type: string
+    required: true
+    description: workspace that holds the credential (--workspace-id receives the copy)
+  - name: name
+    type: string
+    required: false
+    description: "name of the copy (default: the source credential's name)"
 - name: credential-test
   description: Live-test a credential config without saving it (POST /api/Credentials/test).
   args:
@@ -10763,7 +10790,7 @@ actions:
     required: true
     description: process (project) id
 - name: process-edit
-  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
+  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`.'
   args:
   - name: profile
     type: string

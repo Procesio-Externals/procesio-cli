@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**150 rules across 8 notes.**
+**152 rules across 9 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -154,6 +154,7 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [Document signing in forms: usable end to end](PROCESIO-API-NOTES.md#document-signing-in-forms-usable-end-to-end)
 - [Data Store collation](PROCESIO-API-NOTES.md#data-store-collation)
 - [Connectors, data types, custom actions, history](PROCESIO-API-NOTES.md#connectors-data-types-custom-actions-history)
+- [Action-Core v2.2.0 (tagged 2026-11-03, not announced): a library prod can't use yet](PROCESIO-API-NOTES.md#action-core-v220-tagged-2026-11-03-not-announced-a-library-prod-cant-use-yet)
 
 ## Procesio Instance History Notes
 
@@ -202,6 +203,12 @@ Source: [`PROCESIO-CARD-BUILD-NOTES.md`](PROCESIO-CARD-BUILD-NOTES.md)
 
 - [9. Assembling a file-in / file-out card through the builder (the renderer wiring)](PROCESIO-CARD-BUILD-NOTES.md#9-assembling-a-file-in-file-out-card-through-the-builder-the-renderer-wiring)
 
+## Custom actions
+
+Source: [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md)
+
+- [Action-Core 2.2 and the host version (2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#action-core-22-and-the-host-version-2026-11)
+
 ## Procesio Query Store Notes
 
 Source: [`PROCESIO-QUERY-STORE-NOTES.md`](PROCESIO-QUERY-STORE-NOTES.md)
@@ -219,7 +226,6 @@ one of them adds it here on the next build; read them directly meanwhile.
 - [`PROCESIO-AI-EXTRACTION-NOTES.md`](PROCESIO-AI-EXTRACTION-NOTES.md)
 - [`PROCESIO-AUTH-NOTES.md`](PROCESIO-AUTH-NOTES.md)
 - [`PROCESIO-CONNECTORS-NOTES.md`](PROCESIO-CONNECTORS-NOTES.md)
-- [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md)
 - [`PROCESIO-DATA-CONVERSION-NOTES.md`](PROCESIO-DATA-CONVERSION-NOTES.md)
 - [`PROCESIO-DOCS-FIX-REPORT.md`](PROCESIO-DOCS-FIX-REPORT.md)
 - [`PROCESIO-ENVIRONMENTS-NOTES.md`](PROCESIO-ENVIRONMENTS-NOTES.md)

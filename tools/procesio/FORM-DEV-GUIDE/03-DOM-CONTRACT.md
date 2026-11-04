@@ -244,6 +244,37 @@ scrolled:
 - **A paragraph's HTML is rendered through DOMPurify into the live page, next to Bootstrap.**
   Generic class names in authored markup collide with Bootstrap rules: an SVG `<circle
   class="badge">` vanished because `.badge:empty { display: none }`. Prefix every class.
+- **`.form-builder-view--content` has a percentage side padding** (measured 203 px on a 1018 px page,
+  about 20%). A wide or two-column layout gets squeezed into a strip, whatever `max-width` the form
+  has. Reset it in the critical import (`padding: 0 !important`) and put the gutters on the form body.
+- **A top-level button renders in `.form-builder--form-footer`, not in the form body.** The footer is
+  a 64 px strip with a 1 px top border, so hidden helper buttons leave an empty ruled band under the
+  page. Collapse it (`height: 0; padding: 0; border: 0; overflow: hidden`); `.click()` on a button in
+  there still runs its chain.
+- **A clipped `position: absolute` control needs a positioned ancestor inside the scroller.** Without
+  one it enlarges the scrollable area of the outer `.form-builder` (also `overflow: auto`). Symptoms:
+  two scrollbars, and `scrollIntoView` moving the whole view up, with a blank strip under the branding.
+  Put `position: relative` on `.form-builder--form-body` and on the footer, then check that
+  `scrollHeight - clientHeight` of `.form-builder` is 0.
+- **An input's focused colour comes from a different, stronger rule.** A dark restyle that overrides
+  `.pds-c-input-group--wrapper` with `!important` looks right until the field gets focus: the wrapper
+  turns near-white under your light text, so what the person types disappears. Measured 2026-11: the
+  override held only when prefixed `:root .form-builder` and listed for `:hover` and
+  `.pds-c-input-group--wrapper--focused` too. A screenshot at rest shows nothing wrong, so test by
+  focusing a field and typing.
+- **Accepting a browser suggestion paints over a dark input.** An autofilled field matches `:-webkit-autofill`,
+  and the browser's own `background-color: ... !important` (measured `rgb(232, 240, 254)` in Chrome) beats every
+  `!important` in the form CSS, because user-agent important rules outrank author important ones. A light
+  `-webkit-text-fill-color` still applies, so the value ends up near-white on near-white. Cover it instead:
+  `box-shadow: inset 0 0 0 1000px <opaque field colour> !important`, with the colour read from a screenshot of a
+  normal field when the wrapper is translucent, a `border-radius` that matches the wrapper's inner radius (the
+  input is square and its corners would stick out), and `caret-color`, since the browser also forces `color`.
+  The selector survives the platform's CSS scoping. Typing never shows this, so test with real autofill: in Chrome
+  driven by Playwright (`channel="chrome"`), the CDP call `Autofill.trigger` with an `address` fills a field
+  without saving anything.
+- **The branding band is an `<img>` in flow after the scroller** (`.form-builder-view > img`, 38 px).
+  A `position: fixed; bottom: 0` bar covers it: read its height at runtime and set `bottom` from it.
+  CSS cannot hide it (the class is filtered); the `hideBranding` config can.
 
 ### Theme surfaces, tabs and buttons (read from the renderer's stylesheet and bundle, 2026-10-23)
 

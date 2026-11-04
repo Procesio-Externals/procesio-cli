@@ -275,6 +275,26 @@ the function is idempotent, so it can run on every keystroke.
 }
 ```
 
+### A field that accepts only one format: mask it in the capture phase
+
+A field limited to one shape (a phone number, an IBAN) is easier to keep clean than to reject after the
+fact. Rewrite the value on `input`, in the capture phase of the document, with the native setter and NO
+new event:
+
+```js
+D.addEventListener('input', function (e) {
+  var f = field('telefon');
+  if (f && e.target === f && !e.isComposing) { applyMask(f); }   // keep the caret by counting digits
+}, true);
+```
+
+Capture on the document runs before the platform's own listener on the element, and that listener reads
+`e.target.value` from the same event, so the platform stores the masked value. Dispatching a second event
+would only re-enter the handler. Autofill and composing keyboards skip this path, so also compare value and
+mask in the refresh loop and write through the normal setter-plus-event when they differ. Checked live
+(2026-11) with real keystrokes: the process received the masked value. A mask is convenience and can be
+bypassed from the browser, so the process that writes has to refuse any other shape too.
+
 ## 8. Localize the platform's validation copy
 
 The control library emits English. Rewrite the messages in place:

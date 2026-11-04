@@ -854,3 +854,41 @@ run rather than assuming it, and set it explicitly. It costs one field and remov
 class of intermittent "the button shows stale data" reports. The same check is worth
 running across every chain at once: a list of each run with its flag takes seconds to
 produce and the odd one out is usually the one nobody set.
+
+### A reconciler that watches a REMOTE system cannot be bounded by a local marker
+
+The obvious way to stop a sweep re-doing its work is to mark each row when it is handled and
+skip the marked ones until something changes. That is right for a pass that PUSHES local
+state outwards, and it silently destroys a pass that PULLS.
+
+Read what the pass does with the response before optimising it. Two passes can look
+identical in a flow - read rows, call the remote system, update the rows - and be opposites:
+
+- **Push**: the call carries local data outwards. The trigger is a local edit, so
+  "changed since last sync" is exactly the right bound.
+- **Poll**: the call reads the remote record back to notice something only the remote side
+  knows - a declined invitation, a record deleted over there, a status moved by someone
+  else. **Nothing local changes when that happens.** A "has it been edited here" condition
+  therefore never fires, the pass goes quiet, and the silence looks like a successful
+  optimisation. The tell is in the statement AFTER the call: if it writes the remote
+  answer INTO the local row, the pass is a poll.
+
+Bound a poll by **time**, which cannot go quiet, and shape the interval to how much the
+answer matters: frequently while the record is near its deadline, rarely while it is far
+off, and at least once per day for everything so a missed change is still corrected without
+anyone watching. Three clauses, no marker to get wrong:
+
+```sql
+AND (last_checked IS NULL
+  OR (<record is near> AND last_checked < now - <short interval>)
+  OR last_checked < now - <long interval>)
+```
+
+**The stamp must be written on every pass, not only when the poll finds something.** Writing
+it only on a change leaves every quiet record permanently due and the interval never applies
+- which is the same bug the window was meant to fix, hidden one level deeper. Put the stamp
+in the unconditional part of the update and make the real change conditional beside it.
+
+Cost, for scale: a poll of N future records on an M-minute timer is N × 1440/M remote calls
+a day whatever happens. Windowed as above it is a couple of hundred, and the detection it
+provides is unchanged.

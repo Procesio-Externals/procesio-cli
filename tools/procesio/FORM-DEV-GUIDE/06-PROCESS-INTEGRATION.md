@@ -339,6 +339,43 @@ completed when a model cooperates is not a form.
 window.UXToast('This is taking longer than usual. You can fill the fields in manually.', 'err');
 ```
 
+## A public form that writes: visitor text never enters a Node
+
+A string variable spliced into a Node is code injection ([PROCESIO-NODE-CODE-NOTES](../PROCESIO-NODE-CODE-NOTES.md)),
+and on a public form anyone supplies that string. A booking-shaped write does not need a Node for the
+visitor's text at all. One Query Store script does the work, with every value bound as a parameter:
+
+1. `SET @x = ...` for what the checks need: a digits-only phone, a list guarded with
+   `CAST(IF(JSON_VALID(@l), @l, '[]') AS JSON)`, settings read from their store.
+2. `INSERT ... SELECT` from a derived table that aggregates the priced rows (`SUM`, `COUNT`,
+   `GROUP_CONCAT`, filtered by `JSON_CONTAINS`), with all the rules in the `WHERE`, including
+   `NOT EXISTS` on the target for a taken slot. The total comes from the store, so a tampered browser
+   cannot change a price, and a disabled or unknown code simply drops out.
+3. A final `SELECT` that reports the outcome: was the new key saved, is anything on that slot.
+
+The Node then sees only that row, as serialized JSON, and turns it into one string output mapped to a
+hidden field. Keep the slot check in the same statement as the insert. Verified on a live form
+(2026-11): a taken slot, a bad phone, a closed day, a past date, an hour outside the schedule, a disabled
+service and a list that was not JSON were all refused, and text holding quotes, `${...}` and HTML was
+stored verbatim. Timing for one read of three Query Stores plus a Node: publish 76 ms, launch 271 ms.
+
+A list loaded by the runtime goes stale while the tab stays open, so read it again when the visitor
+comes back to the tab and after a "slot taken" answer.
+
+**Whatever a public form's process returns is public, including a settings table.** A process output mapped
+to a hidden field is readable in the browser, so a store that mixes display settings with private ones
+(a notification address) needs a filter in the read, not a promise. Reserve a key prefix for private rows
+and exclude it in the query; a new private setting is then safe by naming alone.
+
+**Send side effects from a child, after the answer is composed.** A write followed by an email in the same
+process makes the visitor wait for SMTP, and a failed send fails the run they are waiting on. Compose the
+output first, gate on a value only a saved row produces (a Decisional routes the unsaved answer past it, so
+a refused attempt starts nothing and a visitor cannot trigger mail without taking a slot), then
+`Trigger Subprocess` with the output string as its one input; the child reads what it needs by key. Measured
+live (2026-11): with an address the mail action rejects, the child ended in status 40 while the parent ended
+in 50 with its output intact, and the visitor saw the normal confirmation. That failure is silent, so it shows
+only in the child's run list.
+
 ## Data store from a form (not an element - an event action)
 
 A form talks to a data store through an **event action**, not a dedicated element. On any

@@ -83,7 +83,7 @@ Permission strings below are `Credentials:{Action}`. (The Swagger summaries say 
 - **Query params:**
   - `pageNumber` — `number`, optional — 1-based page index.
   - `pageItemCount` — `number`, optional — page size.
-  - `label` — `string`, optional — when set, only instances whose `label` equals it are returned and counted (trimmed; a blank value means no filter).
+  - `label` — `string`, optional — when set, only instances whose `label` equals it are returned and counted (trimmed; a blank value means no filter). ⚠ Not on prod yet: Web-Api v3.2.0 ignores this filter with no error and returns every row (measured 2026-11-04).
 - **Responses:**
   - `200 OK` → array of `BaseCredentialsDto` (base view of matching instances)
   - `400 Bad Request` → error payload when null.
@@ -96,7 +96,7 @@ Permission strings below are `Credentials:{Action}`. (The Swagger summaries say 
 - **Auth:** Bearer JWT — **Permission:** `Credentials:Read`
 - **SwaggerOperation Summary:** "Permission required: Credentials.Read"
 - **Path params:** `{typeId}` — `string (uuid)`, required — the credentials template id.
-- **Query params:** `label` — `string`, optional — when set, only instances whose `label` equals it are counted (trimmed; a blank value means no filter).
+- **Query params:** `label` — `string`, optional — when set, only instances whose `label` equals it are counted (trimmed; a blank value means no filter). ⚠ Not on prod yet: Web-Api v3.2.0 ignores this filter with no error and counts every row (measured 2026-11-04).
 - **Responses:**
   - `200 OK` → `number` (count)
   - `400 Bad Request` → error payload when count < 0.
@@ -253,7 +253,7 @@ Read-only access to credentials templates (the connection-type definitions) and 
 - **SwaggerOperation Summary:** "Permission required: Credentials.Read"
 - **Path params:** `{id}` — `string (uuid)`, required — credentials template id.
 - **Responses:**
-  - `200 OK` → `CredentialsTemplateDto` for normal users; `ExtendedCredentialsTemplateDto` (the template-authoring shape) for admins. Both carry the read-only `be_id` / `be_value` keys.
+  - `200 OK` → `CredentialsTemplateDto` for normal users; `ExtendedCredentialsTemplateDto` (the template-authoring shape) for admins. Both carry the read-only `be_id` / `be_value` keys. ⚠ Not on prod yet: on Web-Api v3.2.0 only nested fields have `be_id`, and options have `name` and `value` with no `be_value` (measured 2026-11-04).
 - **Notes:** The response variant depends on the caller's admin status (decided server-side); both shapes are documented in Shared DTOs.
 
 ---
@@ -337,7 +337,7 @@ A single restricted listing used by the Process Designer when the user picks a c
 - **Query params:**
   - `pageNumber` — `number`, optional — 1-based page index.
   - `pageItemCount` — `number`, optional — page size.
-  - `label` — `string`, optional — when set, only instances whose `label` equals it are returned (trimmed; a blank value means no filter). The Designer passes the connector type an action declares in its credential defaults.
+  - `label` — `string`, optional — when set, only instances whose `label` equals it are returned (trimmed; a blank value means no filter). The Designer passes the connector type an action declares in its credential defaults. ⚠ Not on prod yet: Web-Api v3.2.0 ignores this filter with no error and returns every row (measured 2026-11-04).
 - **Responses:**
   - `200 OK` → array of `BaseCredentialsDto`
   - `400 Bad Request` → error payload when null.
@@ -371,7 +371,7 @@ A single restricted listing used by the Process Designer when the user picks a c
 - `type` — `string`, optional — template type.
 - `status` — `boolean`, optional, default `false` — instance status flag.
 - `description` — `string`, optional — free-text description.
-- `label` — `string`, optional (nullable) — the connector type the credential was created for; at most 50 characters, trimmed on save, an empty value is stored as `null`. Filter key of the by-type list endpoints.
+- `label` — `string`, optional (nullable) — the connector type the credential was created for; at most 50 characters, trimmed on save, an empty value is stored as `null`. Filter key of the by-type list endpoints. ⚠ Not on prod yet: Web-Api v3.2.0 rows carry no `label` (measured 2026-11-04).
 - *(plus all `OwnershipAuditDto` fields)*
 
 ### `CredentialsDto` (extends `BaseCredentialsDto`) — full credentials instance (request body for create/update/test; response for GET by id)
@@ -412,7 +412,7 @@ A single restricted listing used by the Process Designer when the user picks a c
 ### `CredentialsPropertyDto` (extends `BaseCredentialsPropertyDetailsDto`)
 
 - *(all `BaseCredentialsPropertyDetailsDto` fields)*
-- `be_id` — `string`, optional — the template key of the field; the key a credential default declared on an action is matched on. Read-only: ignored on input.
+- `be_id` — `string`, optional — the template key of the field; the key a credential default declared on an action is matched on. Read-only: ignored on input. ⚠ Not on prod yet for top-level fields (measured 2026-11-04).
 - `options` — array of `CredentialsPropertyOptionDto`, optional — selectable options for dropdown-type properties.
 
 ### `ExtendedCredentialsPropertyDto` (extends `BaseCredentialsPropertyDetailsDto`) — admin/template-authoring property
@@ -425,7 +425,7 @@ A single restricted listing used by the Process Designer when the user picks a c
 
 - `name` — `string`, optional — option display name.
 - `value` — `string (uuid)`, required — option value.
-- `be_value` — `string`, optional — the template value of the option; the value a credential default names for a radio or select. Read-only: ignored on input.
+- `be_value` — `string`, optional — the template value of the option; the value a credential default names for a radio or select. Read-only: ignored on input. ⚠ Not on prod yet (measured 2026-11-04).
 
 ### `ExtendedCredentialsPropertyOptionDto` (extends `CredentialsPropertyOptionDto`)
 
