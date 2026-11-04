@@ -44,9 +44,10 @@ ADVISORIES = {
         "does NOT run it — publish and launch are a pair (run-process does both). A "
         "WEBHOOK-triggered process needs no publish at all: the webhook launch "
         "publishes+launches itself. Calling publish 'to activate' just accumulates "
-        "instances stuck at 'starting' (they cannot be stopped via the API — only in "
-        "the UI). Launch it with post-projects-instances-by-id-launch, or use "
-        "run-process, or simply don't publish."
+        "instances stuck at 'starting' (clear them with stop-instance --id <instance> "
+        "--flow-template-id <process>). Launch it with "
+        "post-projects-instances-by-id-launch, or use run-process, or simply don't "
+        "publish."
     ),
 }
 

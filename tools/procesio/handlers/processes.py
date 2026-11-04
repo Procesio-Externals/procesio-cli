@@ -286,11 +286,17 @@ def list_instances(client, args) -> dict:
     return {"result": client.get(f"/api/Projects/{args.id}/instances", q)}
 
 
+def _add_flow_template_arg(p: argparse.ArgumentParser) -> None:
+    # Required although the API spec marks it optional: see autogen.REQUIRED_QUERY.
+    p.add_argument("--flow-template-id", dest="flow_template_id", required=True,
+                   help="flowTemplateId, the id of the process this instance belongs to "
+                        "(the call fails without it)")
+
+
 def _instance_status_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="instance id")
-    p.add_argument("--flow-template-id", dest="flow_template_id",
-                   help="flowTemplateId (the process id)")
+    _add_flow_template_arg(p)
     p.add_argument("--variables", action="store_true",
                    help="include variables (getVariables=true)")
     p.add_argument("--actions", action="store_true",
@@ -307,8 +313,7 @@ def get_instance_status(client, args) -> dict:
 def _instance_id_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="instance id")
-    p.add_argument("--flow-template-id", dest="flow_template_id",
-                   help="flowTemplateId (the process id)")
+    _add_flow_template_arg(p)
 
 
 def get_instance_output(client, args) -> dict:
@@ -318,7 +323,17 @@ def get_instance_output(client, args) -> dict:
 
 def stop_instance(client, args) -> dict:
     q = {"flowTemplateId": args.flow_template_id}
-    return {"result": client.post(f"/api/Projects/instances/{args.id}/stop", None, q)}
+    try:
+        return {"result": client.post(f"/api/Projects/instances/{args.id}/stop", None, q)}
+    except ProcesioAPIError as e:
+        # Measured: a process id that is not this instance's gets this same bare 400, which
+        # reads as a fault of the run. A run that has already ended answers success.
+        if e.status == 400 and "Stopping process failed" in str(e.details):
+            raise ProcesioAPIError(
+                400, "Stopping process failed. PROCESIO also answers this when "
+                     "--flow-template-id is not the process this instance belongs to, "
+                     "so check that id first.", e.details) from e
+        raise
 
 
 # -- put-projects (curated: empty-body echo hardening) ----------------------

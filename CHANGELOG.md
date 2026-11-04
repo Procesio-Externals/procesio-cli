@@ -42,6 +42,13 @@ there, not here.
   to give every variable a new id and left the removal check nothing to compare against, which
   broke every form map with no error. `--dry-run` still previews and names the failure in
   `live_read_failed`.
+- `stop-instance`, `get-instance-status` and `get-instance-output` now require
+  `--flow-template-id`, and their generated wrappers (plus the data retention delete) require
+  `--flowTemplateId`. The API spec marks it optional, but these calls fail without it and the
+  errors never name it. A refused stop now says to check that id, and the notes no longer claim
+  the API can't stop a run.
+- `procesio_get_run_status` and `procesio_get_run_output` take a required `process_id`. Without
+  it they could never read a run.
 
 ## [0.1.6] - 2026-11-03
 

@@ -133,7 +133,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `delete-formapplication-by-id` | `--id` | DELETE /api/FormApplication/{id} [FormApplication] - Permission required: FormTemplate.Delete |
 | `delete-formtemplate-by-id` | `--id` | DELETE /api/FormTemplate/{id} [FormTemplate] - Permission required: FormTemplate.Delete |
 | `delete-projects-by-id` | `--id` | DELETE /api/Projects/{id} [ProcessTemplate] - Permission required: ProcessDesigner.Delete |
-| `delete-projects-instances-by-id-dataretention` | `--id` | DELETE /api/Projects/instances/{id}/dataRetention [ProcessInstance] - Permission required: ProcessInstance.Delete |
+| `delete-projects-instances-by-id-dataretention` | `--id`, `--flowTemplateId` | DELETE /api/Projects/instances/{id}/dataRetention [ProcessInstance] - Permission required: ProcessInstance.Delete |
 | `delete-schedule` | `--id` | Delete a schedule (DELETE /api/Schedules/{id}). |
 | `delete-schedules-by-scheduleid` | `--scheduleId` | DELETE /api/Schedules/{scheduleId} [Schedules] - Permission required: Schedule.Delete |
 | `delete-userpreferences` | — | DELETE /api/UserPreferences [UserPreferences] - Permission required: None |
@@ -295,8 +295,8 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `get-formtemplate-by-workspaceid-by-id` | `--workspaceId`, `--id` | GET /api/FormTemplate/{workspaceId}/{id} [FormTemplate] - Permission required: None |
 | `get-formtemplate-processtemplate-by-id` | `--id` | GET /api/FormTemplate/processTemplate/{id} [FormTemplate] - Permission required: FormTemplate.Read |
 | `get-formtemplate-processtemplate-list` | — | GET /api/FormTemplate/processTemplate/list [FormTemplate] - Permission required: FormTemplate.Read |
-| `get-instance-output` | `--id` | Get an instance's output (GET /api/Projects/instances/{id}/output). |
-| `get-instance-status` | `--id` | Get an instance's status/variables (GET /api/Projects/instances/{id}/status). |
+| `get-instance-output` | `--id`, `--flow-template-id` | Get an instance's output (GET /api/Projects/instances/{id}/output). |
+| `get-instance-status` | `--id`, `--flow-template-id` | Get an instance's status/variables (GET /api/Projects/instances/{id}/status). |
 | `get-notifications` | — | GET /api/Notifications [Notifications] - Permission required: None |
 | `get-process` | `--id` | Get one process by id (GET /api/Projects/{id}). |
 | `get-process-payload` | `--id` | Get a process's input-variable payload shape for run-process. |
@@ -311,8 +311,8 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `get-projects-by-id-restricted-schedules` | `--id` | GET /api/Projects/{id}/restricted/schedules [ProcessTemplate] - Permission required: Schedule.Read |
 | `get-projects-by-id-used` | `--id` | GET /api/Projects/{id}/used [ProcessTemplate] - Permission required: ProcessDesigner.Read |
 | `get-projects-count` | — | GET /api/Projects/count [ProcessTemplate] - Permission required: ProcessDesigner.Read |
-| `get-projects-instances-by-id-output` | `--id` | GET /api/Projects/instances/{id}/output [ProcessInstance] - Permission required: ProcessInstance.Read |
-| `get-projects-instances-by-id-status` | `--id` | GET /api/Projects/instances/{id}/status [ProcessInstance] - Permission required: ProcessInstance.Read |
+| `get-projects-instances-by-id-output` | `--id`, `--flowTemplateId` | GET /api/Projects/instances/{id}/output [ProcessInstance] - Permission required: ProcessInstance.Read |
+| `get-projects-instances-by-id-status` | `--id`, `--flowTemplateId` | GET /api/Projects/instances/{id}/status [ProcessInstance] - Permission required: ProcessInstance.Read |
 | `get-projects-notifications-by-flowid` | `--flowId` | GET /api/Projects/notifications/{flowId} [ProcessTemplate] - Permission required: ProcessDesigner.Read |
 | `get-projects-restricted-schedules` | — | GET /api/Projects/restricted/schedules [ProcessTemplate] - Permission required: Schedule.Read |
 | `get-resources-analytics-instances-by-id-details` | `--id` | GET /api/Resources/analytics/instances/{id}/details [Resources] - Permission required: ProcessInstance.Read |
@@ -501,7 +501,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `post-projects-by-id-instances-publish` | `--id` | POST /api/Projects/{id}/instances/publish [ProcessInstance] - Permission required: ProcessInstance.Write |
 | `post-projects-by-id-run` | `--id` | POST /api/Projects/{id}/run [ProcessInstance] - Permission required: ProcessInstance.Write |
 | `post-projects-instances-by-id-launch` | `--id` | POST /api/Projects/instances/{id}/launch [ProcessInstance] - Permission required: ProcessInstance.Write |
-| `post-projects-instances-by-id-stop` | `--id` | POST /api/Projects/instances/{id}/stop [ProcessInstance] - Permission required: ProcessInstance.Update |
+| `post-projects-instances-by-id-stop` | `--id`, `--flowTemplateId` | POST /api/Projects/instances/{id}/stop [ProcessInstance] - Permission required: ProcessInstance.Update |
 | `post-projects-notifications` | — | POST /api/Projects/notifications [ProcessTemplate] - Permission required: ProcessDesigner.Update |
 | `post-projects-validate` | — | POST /api/Projects/validate [ProcessTemplate] - Permission required: ProcessDesigner.Update |
 | `post-schedules` | — | POST /api/Schedules [Schedules] - Permission required: Schedule.Write |
@@ -648,7 +648,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `stop-instance` | `--id` | Stop a running instance (POST /api/Projects/instances/{id}/stop). |
+| `stop-instance` | `--id`, `--flow-template-id` | Stop a running instance (POST /api/Projects/instances/{id}/stop). |
 
 ### strip
 
