@@ -1,6 +1,6 @@
 # PROCESIO - the ANONYMOUS surface, enumerated
 
-**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready 3b58134 2026-11-03). **Do not hand-edit** - regenerate.
+**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready d2554c3 2026-11-04). **Do not hand-edit** - regenerate.
 
 > **Why this exists.** Anonymous endpoints used to be met one incident at a time: a webhook launch id that travels in exported packs, a public form's process launch, and a form data-store route that reads and writes any store its path names. All were documented; none was read before it mattered.
 

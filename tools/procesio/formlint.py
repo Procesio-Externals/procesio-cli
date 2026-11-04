@@ -30,9 +30,9 @@ a debugging session to find (see PROCESIO-API-NOTES.md and FORM-DEV-GUIDE/08):
   the name under "1"). A form at "1" keeps its names through a designer save (measured
   2026-09-25 and 2026-10-05), so it draws no warning; form-create writes "1" since 2026-10-05.
 
-* **Document-signing design** — a spot whose party is not a signer, a signer with no
-  SIGNATURE spot, a MEMBER with no user, two FILLERs, a spot off the page, a PDF kept
-  inline. The server stores all of these; they only fail when someone tries to sign.
+* **Document-signing design** — a spot whose party is not a signer, a FILLER with no
+  SIGNATURE spot on a locked setup, a MEMBER with no user, two FILLERs, a spot off the page,
+  a PDF kept inline. The server stores all of these; they only fail when someone tries to sign.
 
 Pure and side-effect-free: each returns a list of human-readable warning strings.
 Warnings, never blockers — the caller attaches them to its result JSON.
@@ -311,9 +311,10 @@ def _spot_geometry_problem(s: dict) -> str | None:
 def lint_document_signing(data: Any) -> list[str]:
     """Traps in a document-signing element's design that the server stores without a word
     and that only show when someone tries to sign: a spot whose party is not a signer, a
-    signer with no SIGNATURE spot (the prod runtime refuses that submit and cannot let such a
-    signer place their own; only the retired 0.x fill line could), a MEMBER with no
-    user, more than one FILLER, geometry off the page, and a PDF stored inline."""
+    FILLER with no SIGNATURE spot while setupEditable is off (a signer without a spot may
+    place their own since form-runtime v1.33.0, but on a public form this filler gets no way
+    to, and the submit stays blocked), a MEMBER with no user, more than one FILLER, geometry
+    off the page, and a PDF stored inline."""
     out = []
     for el in _elements(data):
         if not isinstance(el, dict) or el.get("type") != "document-signing":
@@ -366,12 +367,13 @@ def lint_document_signing(data: Any) -> list[str]:
             problem = _spot_geometry_problem(sp)
             if problem:
                 out.append(f"document-signing {who}: spot {sid!r} {problem}")
-        missing = [i for i in ids if i and i not in signed]
-        if missing:
-            out.append(f"document-signing {who}: signers {missing} have no SIGNATURE spot; the "
-                       f"form runtime refuses that submit ('Every signer needs a signature') "
-                       f"and has no way for such a signer to place their own, so place one per "
-                       f"signer")
+        stuck = [s.get("id") for s in signers if isinstance(s, dict)
+                 and str(s.get("kind") or "MEMBER").upper() == "FILLER"
+                 and s.get("id") and s.get("id") not in signed]
+        if stuck and _cfg_value(el, "setupEditable") in (False, "false"):
+            out.append(f"document-signing {who}: FILLER signer {stuck} has no SIGNATURE spot and "
+                       f"setupEditable is off; on a public form that filler gets no way to sign "
+                       f"and the submit stays blocked, so place a spot or turn setupEditable on")
         doc = _cfg_value(el, "document")
         if isinstance(doc, dict) and str(doc.get("src") or "").startswith("data:"):
             out.append(f"document-signing {who}: the PDF is inline in the form (a data: URL); "

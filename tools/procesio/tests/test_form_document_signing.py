@@ -52,12 +52,34 @@ def test_a_clean_filler_design_has_no_warnings():
     assert _lint(el) == []
 
 
-def test_a_spot_for_an_unknown_party_and_a_signer_without_signature():
+def _locked(el):
+    for c in el["configs"]:
+        if c["key"] == "setupEditable":
+            c["value"] = False
+    return el
+
+
+def test_a_spot_for_an_unknown_party():
     el = _element([{"id": "f", "kind": "FILLER"}],
-                  [_spot("s1", "ghost"), _spot("s2", "f", "PRINTED_NAME", h=0.03)])
+                  [_spot("s1", "ghost"), _spot("s2", "f")])
+    assert "spot 's1' names party 'ghost'" in " | ".join(_lint(el))
+
+
+def test_a_signer_without_a_spot_places_their_own_when_the_setup_is_editable():
+    el = _element([{"id": "f", "kind": "FILLER"}], [_spot("s2", "f", "PRINTED_NAME", h=0.03)])
+    assert not any("no SIGNATURE spot" in w for w in _lint(el))
+
+
+def test_a_filler_without_a_spot_on_a_locked_setup_is_stuck():
+    el = _locked(_element([{"id": "f", "kind": "FILLER"}], []))
     out = " | ".join(_lint(el))
-    assert "spot 's1' names party 'ghost'" in out
-    assert "signers ['f'] have no SIGNATURE spot" in out
+    assert "FILLER signer ['f'] has no SIGNATURE spot" in out
+    assert "setupEditable" in out
+
+
+def test_a_member_without_a_spot_on_a_locked_setup_is_not_stuck():
+    el = _locked(_element([{"id": "m", "kind": "MEMBER", "userId": "u"}], []))
+    assert not any("no SIGNATURE spot" in w for w in _lint(el))
 
 
 def test_member_needs_user_two_fillers_and_private_form():
@@ -86,7 +108,7 @@ def test_inline_pdf_is_flagged():
 
 
 def test_lint_runs_inside_lint_form_data():
-    el = _element([{"id": "f", "kind": "FILLER"}], [])
+    el = _locked(_element([{"id": "f", "kind": "FILLER"}], []))
     assert any("no SIGNATURE spot" in w for w in formlint.lint_form_data({"elements": [el]}))
 
 

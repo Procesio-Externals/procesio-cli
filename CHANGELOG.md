@@ -20,10 +20,15 @@ there, not here.
   signer can send their own signature spot, and 409 712 now means "try again".
 - `FORM-DEV-GUIDE/11-DOCUMENT-SIGNING.md` says what the designer and the fill page do.
   It also covers what a process can't do (choose the signers), the statuses, limits and
-  error codes. The signing lint now explains why every signer needs a signature spot: the
-  form runtime gives a signer no way to place their own.
-- `PROCESIO-API-NOTES.md` covers custom and tiny URLs in the web app, and the slow first
-  load of the Completed tab under Assigned to me.
+  error codes.
+- A signature spot per signer is optional since form-runtime v1.33.0, so the signing lint
+  no longer warns about a signer without one. It warns only about the design that gets
+  stuck on a public form: a FILLER with no spot while `setupEditable` is off.
+- `PROCESIO-API-NOTES.md` covers custom and tiny URLs in the web app, the slow first load
+  of the Completed tab under Assigned to me, and Form Trigger and approval tasks raised by
+  a process. `PROCESIO-PYTHON-ACTION-NOTES.md` covers building a PDF/A-3 with an embedded
+  file.
+- The bundled API reference adds `credentialDefaults` and the credential `label` filter.
 
 ## [0.1.6] - 2026-11-03
 

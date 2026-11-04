@@ -543,7 +543,7 @@ Operator shape:
 - **List** (`Value` is an array): `In`, `NotIn`.
 - **Range** (`Value` = lower bound, `AuxValue` = upper bound): `Between`, `NotBetween`.
 
-On text columns, matching, sorting **and primary keys** ignore **letter case and accents** but not trailing spaces: `Equals "alpha"` matches a stored `"Alpha"`, `"cafe"` matches `"café"` and `"s"` matches `"ș"`, while `"abc"` does not match `"abc "`. Ligatures and `ß` compare with their spelled-out forms (`ß` equals `ss`, `Æ` equals `AE`), and every emoji is a distinct character. An ascending sort interleaves cases rather than grouping them (`aardvark, Alpha, beta, Charlie`) and places emoji first. Inserting `"Alpha"` into a store that already holds the key `"alpha"` answers `409`.
+On text columns (the `utf8mb4_0900_ai_ci` collation of every Data Store table), matching, sorting **and primary keys** ignore **letter case and accents** but not trailing spaces: `Equals "alpha"` matches a stored `"Alpha"`, `"cafe"` matches `"café"` and `"s"` matches `"ș"`, while `"abc"` does not match `"abc "`. Ligatures and `ß` compare with their spelled-out forms (`ß` equals `ss`, `Æ` equals `AE`), and every emoji is a distinct character. An ascending sort interleaves cases rather than grouping them (`aardvark, Alpha, beta, Charlie`) and places emoji first. Inserting `"Alpha"` into a store that already holds the key `"alpha"` answers `409`.
 
 `Json`, `Object`, Data Model and list columns are compared differently, and letter case counts there (see below).
 

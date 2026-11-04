@@ -217,3 +217,38 @@ same actions driven in the designer. Everything below was observed, not read in 
 - **Test Action** (the vertical tab beside the panel) runs one script action on its own,
   with test values prefilled from the variables' defaults, and it uses the panel's current,
   unsaved code. The result shows as "Test status: Finished" plus one field per bound output.
+
+## Building a PDF/A-3 with an embedded file in the Python action (measured on PROD, 2026-11)
+
+A hybrid invoice (ZUGFeRD / Factur-X) can be built inside this action, no connector needed. Mustang's
+embedded veraPDF reported the result as valid PDF/A-3b with 0 failed assertions.
+
+**Probe set, so a gap is not read as a negative.** Python 3.14.6. Imported fine: `PyPDF2` 3.0.1,
+`pdfplumber` 0.11.10, `PIL` 12.3.0, `matplotlib` 3.11.1, `bs4` 4.15.0, `pandas` 3.0.5, `scipy` 1.18.1,
+`numpy` 2.5.2, `zlib`, `hashlib`, `tempfile`, `base64`, `io`, `json`, `re`, `decimal`, `datetime`,
+`xml.etree.ElementTree`. Refused with `import of 'X' is not allowed in this sandbox`: `os`, `subprocess`,
+`socket`, `pypdf`, `pdfminer`, `lxml`, `reportlab`, `fpdf`, `pikepdf`, `fontTools`, `saxonche`, `xmlschema`.
+So there is no XSLT 2 engine here and an official Schematron cannot run inside the action. Rules have to
+be ported, or called as a service.
+
+**Recipe.** Draw the page on a matplotlib `Figure` with `pdf.fonttype = 42` and save to `BytesIO`, which
+embeds the shipped DejaVu fonts. Copy the pages to a `PdfWriter`. Add to the catalog: `/Metadata` (an XMP
+stream with `pdfaid:part`, `pdfaid:conformance` and the extension schema), `/OutputIntents` with an sRGB
+profile from `ImageCms.ImageCmsProfile(ImageCms.createProfile('sRGB')).tobytes()` (588 bytes, accepted),
+`/AF` and `/Names /EmbeddedFiles` pointing at a `/Filespec` with `/AFRelationship`. Set `/Info` to the same
+values as the XMP. Hand text in as base64 of a String variable and return the PDF as base64 to
+`Base64 To File`. `String To Base64` encodes UTF-8: German umlauts survived the round trip into a file that
+passed the official validator.
+
+**Traps, each one found by the PDF/A check, not by the process status.**
+
+| Symptom | Cause | Do this |
+|---|---|---|
+| veraPDF clause 6.2.11.8, `.notdef` glyph referenced | matplotlib 3.11 forms a ligature ("fi" in DejaVu), which lands in a separate subset as CID 0 under Type 42 | pass `fontfeatures=['-liga', '-clig']` to every text call |
+| veraPDF clause 6.8, MIME type missing on the embedded file | `DecodedStreamObject.flate_encode()` in PyPDF2 3.0.1 lost the stream's dictionary entries | add the `DecodedStreamObject` directly, uncompressed |
+| same clause 6.8 after that fix | `NameObject('/text#2Fxml')` is escaped again on write and becomes `#232F` | write `NameObject('/text/xml')`, the writer emits `#2F` itself |
+| `AttributeError: 'PdfReader' object has no attribute 'attachments'` | not in 3.0.1 | walk `/Root /Names /EmbeddedFiles /Names` to read the file back |
+| PDF header is 1.3, no binary marker, no file id | writer defaults | set `writer._header = b'%PDF-1.7\n%\xe2\xe3\xcf\xd3'` and `writer._ID` to a two-item array |
+
+Top-level names are locals of the action's function body, so helpers should return values rather than use
+`global`.
