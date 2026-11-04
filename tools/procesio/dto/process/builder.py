@@ -29,7 +29,7 @@ from tools.procesio.dto import refdata
 from tools.procesio.dto.framework import Component
 from tools.procesio.dto.process import naming
 from tools.procesio.sqlformat import format_sql, is_unreadable
-from tools.procesio.errors import RemovalBlocked, UsageError
+from tools.procesio.errors import ProcesioAPIError, RemovalBlocked, UsageError
 
 DIR = Path(__file__).resolve().parent
 _CATALOG = DIR.parent / "data" / "action_catalog.json"
@@ -1945,21 +1945,38 @@ def _save_gate(client, dto, ctx):
     return report
 
 
+def _read_live_flow(client, resource_id) -> dict:
+    """The live flow an edit builds on. An edit must not go on without it: every variable would get
+    a new id, which breaks the form maps and subprocess calls bound to them by GUID, and the removal
+    gate would have nothing to compare against, so a save that still went through would do that
+    damage with no error. A failed read surfaces as its own error, and a reply that is not a flow is
+    refused here, because an empty body reads as success at the HTTP layer."""
+    needs_ids = "an edit needs its live variable ids, so nothing was written"
+    try:
+        cur = client.get(f"/api/Projects/{resource_id}")
+    except ProcesioAPIError as exc:
+        # An id it does not know gets a 400 saying the user is not authorized, not a 404, so the reply
+        # alone would not say what failed. Same status and body: the error code callers branch on stays.
+        raise ProcesioAPIError(
+            exc.status, f"could not read process {resource_id} ({exc}); {needs_ids}", exc.details) from exc
+    if isinstance(cur, dict) and "flow" not in cur and isinstance(cur.get("result"), dict):
+        cur = cur["result"]
+    flow = cur.get("flow", cur) if isinstance(cur, dict) else None
+    if not isinstance(flow, dict) or not ("variables" in flow or "actions" in flow):
+        raise ProcesioAPIError(502, f"reading process {resource_id} returned no flow; {needs_ids}")
+    return flow
+
+
 def _edit_ctx(client, resource_id, config, ctx):
     """Everything an edit carries over from the LIVE flow. Shared with the dry-run preview, so
     `--dry-run` shows the ids and positions the edit would actually write rather than a create's."""
     ctx = dict(ctx)
     ctx["flow_id"] = resource_id
-    flow: dict = {}
-    try:                                  # preserve variable ids across edits
-        cur = client.get(f"/api/Projects/{resource_id}")
-        flow = cur.get("flow", cur) if isinstance(cur, dict) else {}
-        ctx["existing_var_ids"] = {
-            (v.get("name") or "").strip().lower(): v.get("id")
-            for v in (flow.get("variables") or [])
-            if v.get("name") and not v.get("isError")}
-    except Exception:  # noqa: BLE001
-        pass
+    flow = _read_live_flow(client, resource_id)
+    ctx["existing_var_ids"] = {           # preserve variable ids across edits
+        (v.get("name") or "").strip().lower(): v.get("id")
+        for v in (flow.get("variables") or [])
+        if v.get("name") and not v.get("isError")}
     try:                                  # preserve canvas positions across edits
         from collections import defaultdict, deque
         live = flow.get("actions") or flow.get("Actions") or []

@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from tools.procesio import main
 from tools.procesio.client import ProcesioClient
+from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.tests.conftest import FakeResp, FakeSession
 
 APIKEY = {"type": "apikey", "key": "N", "value": "V"}
@@ -171,3 +174,56 @@ def test_credential_test_builds_dto_and_probes():
                                                              "properties": {"URL": "https://a"}})], s)
     assert any(c["url"].endswith("/api/Credentials/test") for c in s.calls)
     assert out == {"tested": True, "isSuccess": True, "result": {"isSuccess": True}}
+
+
+def _copy_session(test_verdict, existing=()):
+    src = {"gid": "C1", "name": "Mail", "gtid": "G", "gtpid": "P", "type": 1, "status": 1,
+           "workspaceId": "SRC", "properties": [{"id": "p", "label": "Password", "value": "s3cret-value"}]}
+    def responder(method, url, kw):
+        if method == "GET" and url.endswith("/api/Credentials/C1"):
+            return FakeResp(200, src)
+        if method == "GET" and url.endswith("/api/Credentials"):
+            return FakeResp(200, {"pageItems": list(existing)})
+        if url.endswith("/api/Credentials/test"):
+            return FakeResp(200, test_verdict)
+        if method == "POST" and url.endswith("/api/Credentials"):
+            return FakeResp(200, {"gid": "NEW", "name": "Mail", "properties": src["properties"]})
+        return FakeResp(404, {})
+    return FakeSession(responder=responder)
+
+
+def test_credential_copy_tests_then_saves_and_never_returns_a_secret():
+    s = _copy_session({"isSuccess": True})
+    out = _call("credential-copy", ["--id", "C1", "--from-workspace-id", "SRC", "--workspace-id", "DST"], s)
+    assert out == {"copied": True, "id": "NEW", "name": "Mail", "from_workspace_id": "SRC",
+                   "workspace_id": "DST", "tested": True}
+    assert "s3cret-value" not in json.dumps(out)
+    read = next(c for c in s.calls if c["url"].endswith("/api/Credentials/C1"))
+    assert read["headers"]["workspaceid"] == "SRC"
+    saved = next(c for c in s.calls if c["method"] == "POST" and c["url"].endswith("/api/Credentials"))
+    assert saved["headers"]["workspaceid"] == "DST"
+    assert saved["json"]["workspaceId"] == "DST" and saved["json"]["properties"][0]["value"] == "s3cret-value"
+    methods = [c["url"].rsplit("/", 1)[-1] for c in s.calls if c["method"] == "POST"]
+    assert methods == ["test", "Credentials"], "the copy must pass its test before it is saved"
+
+
+def test_credential_copy_saves_nothing_when_the_test_fails():
+    s = _copy_session({"isSuccess": False, "state": 125, "message": "Couldn't connect to SMTP."})
+    with pytest.raises(ProcesioAPIError) as err:
+        _call("credential-copy", ["--id", "C1", "--from-workspace-id", "SRC", "--workspace-id", "DST"], s)
+    assert err.value.details == {"state": 125, "message": "Couldn't connect to SMTP."}
+    assert not [c for c in s.calls if c["method"] == "POST" and c["url"].endswith("/api/Credentials")]
+
+
+def test_credential_copy_refuses_a_name_already_taken_in_the_target():
+    s = _copy_session({"isSuccess": True}, existing=[{"gid": "OLD", "name": "Mail"}])
+    with pytest.raises(UsageError, match="OLD"):
+        _call("credential-copy", ["--id", "C1", "--from-workspace-id", "SRC", "--workspace-id", "DST"], s)
+    assert not [c for c in s.calls if c["method"] == "POST"]
+
+
+def test_credential_copy_needs_a_target_workspace():
+    s = _copy_session({"isSuccess": True})
+    with pytest.raises(UsageError, match="--workspace-id"):
+        _call("credential-copy", ["--id", "C1", "--from-workspace-id", "SRC"], s)
+    assert s.calls == []

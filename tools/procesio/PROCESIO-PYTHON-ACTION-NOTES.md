@@ -84,6 +84,34 @@ or quote-bearing text is unsafe through a raw scalar substitution.** A stray quo
 the script; a crafted string executes. **Pass untrusted text through a JSON or object
 channel** so it arrives escaped, and treat even that as unverified until measured.
 
+> ## ⚠ `<%N%>` runs over text it already substituted, which opens a script injection path
+>
+> Measured on a `Node` action with two Json inputs, 2026-11, by echoing both values.
+>
+> | variable 0 | variable 1 | what the script saw |
+> |---|---|---|
+> | `{"text": "x<%1%>y"}` | `1` | `{"text": "x1y"}` |
+> | `{"text": "before <%1%> after"}` | `{"marker": 42}` | `Invalid or unexpected token`: the object's quotes ended the string |
+> | `{"text": "plain"}` | `{"text": "before <%0%> after"}` | unchanged |
+>
+> So the placeholders are replaced in index order, and a value holding `<%M%>` with a higher index receives
+> variable M at that spot. A value in one variable can therefore close a string and turn the text of another
+> variable into code. It needs a script with two or more variables, and text from outside in the earlier one: an
+> uploaded file, a form field, a mail, a webhook. A one-variable script is not affected.
+>
+> **What held up against a test file with this text in its fields:**
+> - Neutralise the marker where outside text enters: replace `<%` with `< %` in everything read from the file.
+>   Do it in a Python or one-variable Node step, and for every other outside value a later script reads, the file
+>   name included.
+> - Hand outside text to a script as base64 or inside a Json variable. `String.raw` around `<%N%>` breaks on a
+>   backtick in the text, and then every step after it fails too.
+> - For several form fields, one `String To Base64` with a template (`<%0%>|~|<%1%>|~|<%2%>`) gives a single safe
+>   value for a Node to decode and split. A null variable comes through as an empty string. Put free text last and
+>   rejoin it, in case it holds the separator.
+> - Because a script error does not fail the run, gate before any write: one step reads the expected output, and a
+>   Decisional refuses the write when it is missing. Without this gate a broken check still inserted a row with an
+>   empty status and raised a task, and the instance ended at status 50.
+
 ## Working with files - the base64 bridge
 
 A Python script cannot open a file. The documented mechanism is a bridge through process

@@ -514,6 +514,13 @@ Shipped as `customaction-upload` / `customaction-delete` / `customaction-list`
 - **An HTTP error answer is still a finished Call API** (also in the error-path notes): with a revoked key, a
   transcription call answered 401 and the action turned green, its error JSON landed in the output, and the run only
   failed at the next AI step. Check `Response Status` when the answer matters.
+- **A non-JSON request body: RAW with `format: "xml"`** (verified 2026-11-04 against an echo service). No JSON check
+  runs, a string variable used as the whole RAW value goes out unescaped, and the bytes are UTF-8 (umlauts and the euro
+  sign intact, `Content-Length` equals the UTF-8 byte count). With no `Content-Type` row it sends `application/xml`.
+  `BINARY` bound to a File variable sends the same bytes.
+- **Text replies land as they are in a string target**: an `application/xml` reply, a 406 with its body (the action
+  stays green), and a chunked text reply with no `Content-Length`. The empty-body case further down is about chunked
+  BINARY replies. `Time Out` accepts 60 to 3600; a lower value fails FE and BE validation.
 
 ### The DB credential is multi-engine - SQL Server AND MySQL, chosen by a Server Type option (2026-08, PRC-3696)
 
@@ -2644,8 +2651,8 @@ but every one of them uses a mechanism that works; the direct routes silently se
 
 ## Processes: adding a variable or a node to a LIVE process without regenerating its ids
 
-`process-edit` rebuilds a process from a config and mints new ids for everything, which breaks every
-form map that references a variable. For a surgical change, GET the flow, mutate, PUT `/api/Projects`
+`process-edit` rebuilds a process from a config: variables keep their ids by name, but every node gets a
+new one (see "Which ids `process-edit` keeps"). For a surgical change, GET the flow, mutate, PUT `/api/Projects`
 - the process twin of the form patcher. Two things learned doing it:
 
 * **A node stores only the port LEAVING it.** Start additionally carries an entry stub with
@@ -5506,14 +5513,16 @@ for a plus address: a `Call API` POST to SendGrid's REST `/v3/mail/send` with a 
 SendGrid answers 202 and the mail arrives. Wrap it in a small sub-process (to, subject, html) and
 call it with `Trigger Subprocess` so the caller does not wait for delivery.
 
-**Copying a credential between workspaces.** `GET /api/Credentials/{id}` (tool:
-`credential-get`) returns every stored property value in clear for a user who can read it,
-including API-key values and SMTP passwords, so treat its output as a secret and never print it.
-`POST /api/Credentials` with `{properties, gtid, gtpid, type, status, name, workspaceId}` taken
-from that GET recreates the credential in another workspace (measured 2026-10-17 for a REST
-API-key credential and an SMTP one). Test a copied API key before relying on it: several old
-copies of the same provider key in different workspaces had been revoked (401) while one still
-worked.
+**Copying a credential between workspaces.** Use `credential-copy --id <id> --from-workspace-id <src>
+--workspace-id <dst>`: it keeps the values in memory, runs the connection test in the target and saves only
+if that passes, because several old copies of the same provider key in different workspaces had been revoked
+(401) while one still worked. Underneath, `GET /api/Credentials/{id}` (tool: `credential-get`) returns every
+stored property value in clear for a user who can read it, including API-key values and SMTP passwords, so
+never print it, and `POST /api/Credentials` with `{properties, gtid, gtpid, type, status, name, workspaceId}`
+taken from that GET recreates the credential (measured 2026-10-17 for a REST API-key credential and an SMTP
+one; 2026-11 for an SMTP one through the action). The same clear read means every user who can read
+credentials in the target workspace can read the copied secret, so weigh who is in that workspace. In a list
+answer the credential's id is the field `gid`, not `id`.
 
 
 ## `datatype-add-attribute` on a store-backing model: reported destructive, NOT reproduced (B-048 cluster 4a)
@@ -7478,6 +7487,14 @@ in the tree) checks a list of plain values. Both take `List to process`, the cod
   the `X-Authorization` header, form fields `to`, `sender`, `body`; `GET /credit-check` is a free smoke test).
 - The docs.procesio.com integration pages still name the credential types "Rest API Configuration" and
   "SMTP Server Configuration"; the type list now says "REST API" and "Outbound e-mail (SMTP)".
+- **A Node that feeds several Send Email fields needs a data-model result variable.** `Single Result` writes one
+  variable, and an attribute path on a `json` variable is refused on save: `Error converting value "corp" to type
+  'System.Guid'` at `Variable[0].attribute.attributeId`, because the attribute must be a real model attribute.
+  Declare the variable with `"model": "<data model name>"`, return an object from the Node and bind
+  `{"var": "mesaj", "path": ["corp"]}` on To, Subject and Body. Measured on a sent mail (2026-11). This keeps one
+  Node instead of one per field. Use a plain-text body when the values come from a visitor, so they cannot become
+  HTML, and read the delivery in SendGrid's `GET /v3/messages?query=to_email="<address>"`: a child run's status 50
+  only says the relay accepted the mail.
 
 ## Get File Data and row-by-row criteria loops
 
@@ -8108,6 +8125,48 @@ design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: t
   subscriptions, webhooks, notifications/API keys/transport, SignalR), with the tool's own measured
   additions re-applied by `procesio-release api-docs-sync` (overlay) and both indexes regenerated.
 
+### Action-Core v2.2.0 (tagged 2026-11-03, not announced): a library prod can't use yet
+
+Analysed on 2026-11-04, after this wave's alignment. Every service's latest stable tag still
+references 2.1.0, so connectors stay on 2.1.0 with Newtonsoft.Json 13.0.4. ⚠ A package compiled
+against 2.2.0 doesn't load on a 2.1.0 host, even if it uses nothing new: the rule and the
+measurements are in `PROCESIO-CUSTOM-ACTION-NOTES.md`. The internal `procesio-release core-pins`
+reads the versions and says when that changes.
+
+| Service | Latest stable | Action-Core there | Where the 2.2.0 work is |
+|---|---|---|---|
+| Action-Execution (loads custom packages) | v3.1.0 | 2.1.0 | `main`, no tag |
+| Process-Execution | v3.1.0 | 2.1.0 | `main`, no tag |
+| Web-Api | v3.2.0 | 2.1.0 | v3.3.0-rc.2 |
+| Test-Action (does not load custom packages) | v2.1.0 | 2.1.0 | `main`, no tag |
+| user-playground (designer) | v1.116.0 | n/a | v1.117.0-rc.2 |
+
+Measured on prod, read-only:
+
+- ⚠ **The credential `label` filter is ignored with no error.** `GET /api/Credentials/list/{templateId}/count`
+  gave the same count with and without a label no credential has, and `/list/{templateId}` and
+  `/list/{templateId}/restricted` returned the same rows both ways. A caller trusting the filter gets
+  every credential of that type. Rows have no `label` key either.
+- The live Swagger (v1.19) has no `label` parameter on those routes, no `label` on `BaseCredentialsDto`
+  and no schema with `credentialDefaults`. The live action catalog has no credential control with
+  `credentialDefaults`, though Swagger is the stronger evidence because that key is left out when null.
+- `URL` on the REST API credential template is still `isRequired: true`.
+- `GET /api/Credentials/types/{id}` gives `be_id` only on nested children, and options have `name` and
+  `value` with no `be_value`. The bundled API reference describes the next Web-Api, so these points carry
+  a "not on prod yet" mark there.
+
+Read in the source, or not measured:
+
+- The next Action-Execution release moves to Process-Execution's HTTP client. Its known-issues entry
+  says date-like strings in a custom action's request body will be sent as written instead of being
+  reinterpreted as dates. Re-test a generated connector at that wave.
+- Upload codes 270 to 273 for `CredentialDefaults` start at v3.3.0-rc.2. `errors.py` already prints
+  coded lists, so they need no code.
+- Main-QA could not be measured: the tool has no working login there, so v3.3.0-rc.2 is unverified live.
+
+What moves when the hosts do, including the `label` gaps in `credential-create`, `credential-edit` and
+`credential-copy`, is parked in the internal spec `todo/procesio-action-core-2-2-adoption.md`.
+
 ## Form Trigger and approval tasks raised by a process (live, 2026-11)
 
 Measured on a process that holds an invoice and asks a person, driven through the real form runtime.
@@ -8119,6 +8178,12 @@ Measured on a process that holds an invoice and asks a person, driven through th
   load it with a form-level `FORM_LOAD` `RUN_PROCESS`. Pass the field's current value as an input, so that
   reopening the task keeps showing the same record instead of the next open one. Several open tasks are
   therefore not tied one to one to records unless the record is stored per instance.
+- **Tying a task to its record, one to one (measured with two open tasks, the newer opened first).** `Form Id`
+  is the same GUID the review page holds as `instance.id`. Store `Form Id` on the record, and give the `FORM_LOAD`
+  process an input mapped to the data-model path `<root>.<instance attr id>.<id attr id>` (read the ids from
+  `Data.dataModel` of the form, under `instance` > `id`). The loader then finds the record by task id, and each
+  task shows its own record whichever is opened first. Raise the task after the checks have finished, and write
+  the record right after it, so a failed check leaves no task behind.
 - **A task is a snapshot.** A template edit, events included, does not reach an instance raised earlier.
   When testing, delete the pending task (`delete-form-by-id`) and raise a new one.
 - **`FORM_LOAD` with `RUN_PROCESS` runs on the review page** (`forms/assignments/<instanceId>`) and its output
@@ -8138,7 +8203,43 @@ Measured on a process that holds an invoice and asks a person, driven through th
 - **To widen a form:** `.form-builder-view--content` carries the side padding (20 percent of the viewport), so
   overriding only the form's width pushes it off the right edge. Override that padding too, then set
   `.form-builder-view--content--form` and `--image` to `width: 100%` with a `max-width`.
+- **Never `justify-content: center` on `.form-builder-view--content`.** It is a flex **column** with
+  `overflow-y: auto`, so that centres vertically. Once the content is taller than the viewport, its top sits above
+  the scroll origin and cannot be scrolled to: at a 900 px viewport the first controls of a long form were simply
+  unreachable, with no error. It looks fine until a form's content grows, for instance a process-rendered table. To
+  centre the form use `justify-content: flex-start; align-items: center`. A click from the `web` tool then times
+  out on the hidden control, which is how this shows up in a test.
+- **A top-level `button` renders after everything else in the form**, below any `columns`, whatever its place in
+  `elements`. To keep a button beside the field it belongs to, put both in a `columns` row.
+- **A `file-upload` has no `input[type=file]` until the chooser opens.** `web` `upload` times out on it; use
+  `upload_via_chooser` with `button:has-text('Select file')`. To map the file into a process, bind the input
+  variable of model `FileDataModel` to the upload's field name in `form-set-element-event`.
+- **`goto` to the same URL with only a hash does not reload**, so a filled form stays filled between runs of a
+  `web` step list. Go to `about:blank` first.
+- **Which ids `process-edit` keeps (measured live, 2026-11).** Variables keep their id by name, ignoring case,
+  through the same config, an added variable, and a change of type, `isList` or direction, so a form's
+  `RUN_PROCESS` maps stay valid and need no rewiring. A new id goes to a variable that is really renamed, or removed
+  and added back, to the generated `<actionId>_error` variable of each `onError`, and to every node, on every edit.
+  A case-only rename keeps the id but needs `--allow-remove`, because the removal check compares names exactly.
+  `node-replace-text` and the other `node-*` edits keep the ids. To check this yourself, compare variable by
+  variable: an `all(...)` over the list fails on the error variable alone and reads as if every id changed. An edit
+  that removes an action or variable also needs `--allow-remove`, otherwise nothing is saved and the old process
+  keeps running.
+- **A failed read of the live process stops `process-edit`.** The edit needs the live variable ids, so without
+  them it writes nothing and reports the read's own status: going on would give every variable a new id and leave
+  the removal check nothing to compare against. `--dry-run` still previews, with new ids, and names the failure in
+  `live_read_failed`, so check that key before trusting the ids in a preview.
+- **`User is not authorized for the requested resource.` can just mean a wrong id.** `GET /api/Projects/{id}` answers
+  a process id it does not know with HTTP 400 and that text (`statusCode` 501, `target` `flow`), not 404. Check the
+  id and the workspace before looking at permissions.
 - **Verifying a private form when the saved browser session expired:** the runtime authenticates with the
   `__Host-procesio.access` cookie on the Web-API host, so a `web` storageState holding the CLI's cookie for that
   host opens private forms and the task inbox as the same user. The access cookie lives about 30 minutes. Never
   print it, and delete the temporary session afterwards.
+
+## A process title comes back with Latin-1 letters as HTML entities (measured 2026-11)
+
+A process saved with a title containing `Î` came back from `GET /api/Projects` with the letter as
+`&#206;`. `ă`, `ș` and `ț` (outside Latin-1) stayed as written, and `î` in the process description was
+not touched. Other Latin-1 letters in a title were not tested, so assume they behave the same. Choose a
+title without one, or decode it before comparing names.

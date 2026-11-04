@@ -74,6 +74,28 @@ empty-shape section there) and `PROCESIO-GET-FILE-DATA-NOTES.md`.
   (they returned words from neighbouring rows), so prefer boxes.
 - **Extract Embedded Files** returns the attached files with their names; **Acroform Insert Image**
   finds the field by name and reports it in `Debug` (`Found on page 1 and updated successfully.`).
+- **Extract Embedded Files, measured on real files (2026-11).** Each list item is a `FileDataModel`:
+  `id`, `name`, `mimeType`, `size`, `path`, `hash` (the embedded file of a ZUGFeRD PDF comes back as
+  `factur-x.xml`, `text/xml`). Behaviour by input:
+
+  | Input | Result |
+  |---|---|
+  | PDF with attachments | list filled, status 50 |
+  | valid PDF with no attachment | action succeeds, the list variable stays **null**, not `[]` |
+  | any other extension | action fails: `Pdf file extension should be '.pdf', found => .xml` |
+  | damaged PDF | action fails: `Could not find the startxref within the last N characters.` |
+
+  So give the action an `onError` branch (the run then ends at status 50), and read the list in a Node as
+  `[<%0%>].flat().filter(Boolean)`: a null variable then gives an empty array instead of the syntax error
+  `const e = ;`. Binding a list in a Node's Code raises the designer's data type warning and still runs.
+- **To take one file from such a list**, use **Get Element** with its `Result` bound to a File variable. The
+  index must be an `integer` variable (a `number` one is refused with statusCode 142). `File To Base64` then
+  reads it. On an empty list Get Element fails with `Index exceeds the list's size.`, so find the index first.
+- **Is Valid (PDF) checks the extension first**: `Input file extension should be '.pdf', found => .xml`.
+- **Hash takes a File directly** (`Input File`, `Hash`: `SHA256`) and returns lowercase hex, equal to
+  `sha256sum` of the bytes. Prefer it to hashing base64 in a script, which puts the whole file into the source.
+- **Reading the file name in a script:** a File variable arrives in a Node as an object, so `f.name` works.
+  Decide by extension from there; the action failures above are then only the unexpected cases.
 
 ## Cloud storage
 

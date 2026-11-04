@@ -34,7 +34,8 @@ from the public docs.
   to the host at or below net10.0, so net8, net6 and netstandard packages still load. (Before, it
   probed only netcoreapp3.1 / net6 / net8 and loaded nothing from a net10-only package.)
   Assemblies the host already holds (Action-Core, Newtonsoft.Json) are skipped, so a package
-  built against Action-Core 1.x binds to the host's 2.1 at run time.
+  built against an OLDER Action-Core (1.x, say) binds to the host's 2.1 at run time. One built
+  against a NEWER Action-Core does not load at all: see "Action-Core 2.2 and the host version".
 - **Multi-targeting passes upload.** The validator reads only the lib folder the host would
   load, so a `net8.0;net10.0` package no longer fails with `MULTIPLE_ACTIONS`. The whitelist,
   the blacklist and the codes are unchanged: `MULTIPLE_ACTIONS`, `FORBIDDEN_NAMESPACE`,
@@ -61,6 +62,56 @@ from the public docs.
   `Credentials_Rest` property fail with `TEMPLATE_ERROR`.
 - **Test-Action v2** is .NET 10 only, with no API change: `/api/Actions/test` and
   `/api/Credentials/test` are unchanged.
+
+## Action-Core 2.2 and the host version (2026-11)
+
+⚠ **Never compile against a newer Action-Core than the host holds.** The package fails to load
+even if it uses nothing new. The loader skips the package's own copy because the host already
+holds an assembly of that name, and .NET won't bind a request for a higher version to a lower
+one. You get `FileNotFoundException: Could not load file or assembly
+'Ringhel.Procesio.Action.Core, Version=2.2.0.0'` when the action's types are read.
+
+Measured locally against a copy of the Action-Execution v3.1.0 loader, not on prod (.NET 8 SDK,
+both Action-Core tags built from source, a stub HTTP client):
+
+| Package compiled against | Uses | Host on 2.1.0 | Host on 2.2.0 |
+|---|---|---|---|
+| 2.1.0 | nothing new | loads | loads |
+| 2.2.0 | nothing new | `FileNotFoundException` | loads |
+| 2.2.0 | `CredentialDefaults` | `FileNotFoundException` | loads |
+| 2.2.0 | `SetBaseUrl` | `FileNotFoundException` | loads |
+
+- **Upload probably won't catch it.** Web-Api v3.2.0 checks the Action-Core reference by name and
+  reads decorators by name, and `ActionFactory.Create` logs the exception and returns null. So
+  expect a green upload, then a run-time failure that explains little. That comes from reading
+  the source. Nobody uploaded such a package to prod to confirm it, because the store keeps an
+  id and version for good.
+- **Which version to use:** the lowest one that has the members the connector needs. On
+  2026-11-04 that is 2.1.0 with Newtonsoft.Json 13.0.4, since every stable service tag still
+  references 2.1.0. A host's version is the `Ringhel.Procesio.Action.Core` reference in its
+  `Domain.csproj` at its latest stable tag. On-prem and client installations have their own
+  hosts and move on their own schedule.
+
+Action-Core 2.2.0 (tagged 2026-11-03) only adds members, and a 2.1.0 package keeps working on a
+2.2.0 host:
+
+- **`APICredentialsManager.SetBaseUrl(url)`** points a REST credential at another host before
+  requests go out, updating `CredentialConfig` and `Client` together. The URL must be absolute
+  http or https (otherwise `ArgumentException`), a trailing slash is dropped, and the stored
+  credential doesn't change. ⚠ The credential's token, API key or basic authentication goes to
+  whatever host you set. `IHttpClient.SetBaseUrl` has a default body that throws
+  `NotSupportedException`, so a custom client must implement it.
+- **`FEDecorator.CredentialDefaults`** prefills the New Credential form opened from a credential
+  property. It is a JSON literal or the `nameof` of a const string on the action, 4096 characters
+  at most. `properties` is keyed by the template's `be_id`, and a radio or select takes the
+  option's `be_value`. `connectorType` (1 to 50 characters) becomes the credential's `label`, and
+  the dropdown then lists only credentials with that label. Never put a secret here: the value is
+  stored and served unencrypted.
+
+None of this works on prod yet. Action-Execution and Process-Execution have 2.2.0 on `main` with
+no tag, Web-Api has it in v3.3.0-rc.2 (upload codes 270 to 273 start there), and the designer
+change is in user-playground v1.117.0-rc.2. What prod does today is measured in the Action-Core v2.2.0 part
+of the v3.1.0 / v3.2.0 wave section in `PROCESIO-API-NOTES.md`.
 
 ## Lifecycle - plan for it, it is unusually rigid
 

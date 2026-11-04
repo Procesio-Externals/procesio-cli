@@ -399,7 +399,7 @@ Audit/ownership base for list responses.
 - `type` — `string`, optional — property type.
 - `language` — `string`, optional — text format (JSON/SQL/PLAINTEXT/etc.) — wire name `language`, C# `TextFormat`.
 - `credentialsTemplateId` — `string (uuid)`, optional — credential template id.
-- `credentialDefaults` — `object` (JSON), optional — on a credential property only: `{ connectorType?, properties? }`, the non-secret values keyed by the credential template's `be_id` that prefill the New Credential form, and the connector type that labels and filters the credentials. Omitted when the action declares none.
+- `credentialDefaults` — `object` (JSON), optional — on a credential property only: `{ connectorType?, properties? }`, the non-secret values keyed by the credential template's `be_id` that prefill the New Credential form, and the connector type that labels and filters the credentials. Omitted when the action declares none. ⚠ Not on prod yet: absent from the Web-Api v3.2.0 Swagger and from the live action catalog (measured 2026-11-04).
 - `value` — `object` (string or JSON), optional — constant value or nested sub-properties.
 - `options` — `object` (JSON), optional — options for the property.
 - `isRequired` — `boolean`, optional — required by the normal action flow.

@@ -50,6 +50,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
+| `credential-copy` | `--id`, `--from-workspace-id` | Copy a credential from another workspace into --workspace-id. The copy must pass its connection test before it is saved, and a name already taken in the target… |
 | `credential-create` | — | Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to… |
 | `credential-delete` | `--id` | Delete a resource by id (DELETE /api/Credentials/{id}). |
 | `credential-edit` | `--id` | Edit a PROCESIO credential (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only… |
