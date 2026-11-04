@@ -12,7 +12,7 @@
   "_meta": {
     "io.modelcontextprotocol.registry/publisher-provided": {
       "com.procesio/toolsDigest": {
-        "procesio-mcp-chat": "sha256:06c9decb20c56e9e823597e587d1b168ab14eebc84b37911244dac874ab97d8c"
+        "procesio-mcp-chat": "sha256:805f389890e2ebb920e99d21f20178b403af5bcd705121bf0e52c3156ecc260c"
       }
     }
   },

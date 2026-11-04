@@ -192,13 +192,17 @@
   {
     "name": "procesio_get_run_status",
     "title": "Check a PROCESIO run",
-    "description": "Report whether a run is still going, finished or failed, and which step it reached. Takes the run id returned by procesio_run_process.",
+    "description": "Report whether a run is still going, finished or failed, and which step it reached. Takes the run id returned by procesio_run_process and the id of the process that was run.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
           "description": "The run id."
+        },
+        "process_id": {
+          "type": "string",
+          "description": "The id of the process this run belongs to."
         },
         "actions": {
           "type": "boolean",
@@ -214,7 +218,8 @@
         }
       },
       "required": [
-        "id"
+        "id",
+        "process_id"
       ]
     },
     "annotations": {
@@ -236,6 +241,10 @@
           "type": "string",
           "description": "The run id."
         },
+        "process_id": {
+          "type": "string",
+          "description": "The id of the process this run belongs to."
+        },
         "workspace_id": {
           "type": "string",
           "description": "Workspace to act in. Omit to use the default workspace."
@@ -246,7 +255,8 @@
         }
       },
       "required": [
-        "id"
+        "id",
+        "process_id"
       ]
     },
     "annotations": {

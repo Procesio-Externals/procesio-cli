@@ -220,6 +220,33 @@ actions:
     type: string
     required: false
     description: human-readable recurrence label (optional)
+- name: credential-copy
+  description: 'Copy a credential from another workspace into --workspace-id. The copy must pass its connection test before it is saved, and a name already taken in the target is refused. Property values stay in memory: they reach no file, argument or output.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: credential id in the source workspace
+  - name: from-workspace-id
+    type: string
+    required: true
+    description: workspace that holds the credential (--workspace-id receives the copy)
+  - name: name
+    type: string
+    required: false
+    description: 'name of the copy (default: the source credential''s name)'
 - name: credential-create
   description: Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.
   args:
@@ -380,33 +407,6 @@ actions:
     type: string
     required: true
     description: credential id
-- name: credential-copy
-  description: 'Copy a credential from another workspace into --workspace-id. The copy must pass its connection test before it is saved, and a name already taken in the target is refused. Property values stay in memory: they reach no file, argument or output.'
-  args:
-  - name: profile
-    type: string
-    required: false
-    description: credential profile name (defaults to the stored default profile)
-  - name: workspace-id
-    type: string
-    required: false
-    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
-  - name: environment
-    type: string
-    required: false
-    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
-  - name: id
-    type: string
-    required: true
-    description: credential id in the source workspace
-  - name: from-workspace-id
-    type: string
-    required: true
-    description: workspace that holds the credential (--workspace-id receives the copy)
-  - name: name
-    type: string
-    required: false
-    description: "name of the copy (default: the source credential's name)"
 - name: credential-test
   description: Live-test a credential config without saving it (POST /api/Credentials/test).
   args:
@@ -2024,8 +2024,8 @@ actions:
     description: path segment {id}
   - name: flowTemplateId
     type: string
-    required: false
-    description: query parameter
+    required: true
+    description: query parameter (the spec says optional; the call fails without it)
   - name: dry-run
     type: boolean
     required: false
@@ -5585,8 +5585,8 @@ actions:
     description: instance id
   - name: flow-template-id
     type: string
-    required: false
-    description: flowTemplateId (the process id)
+    required: true
+    description: flowTemplateId, the id of the process this instance belongs to (the call fails without it)
 - name: get-instance-status
   description: Get an instance's status/variables (GET /api/Projects/instances/{id}/status).
   args:
@@ -5608,8 +5608,8 @@ actions:
     description: instance id
   - name: flow-template-id
     type: string
-    required: false
-    description: flowTemplateId (the process id)
+    required: true
+    description: flowTemplateId, the id of the process this instance belongs to (the call fails without it)
   - name: variables
     type: boolean
     required: false
@@ -5997,8 +5997,8 @@ actions:
     description: path segment {id}
   - name: flowTemplateId
     type: string
-    required: false
-    description: query parameter
+    required: true
+    description: query parameter (the spec says optional; the call fails without it)
   - name: dry-run
     type: boolean
     required: false
@@ -6024,8 +6024,8 @@ actions:
     description: path segment {id}
   - name: flowTemplateId
     type: string
-    required: false
-    description: query parameter
+    required: true
+    description: query parameter (the spec says optional; the call fails without it)
   - name: isArchived
     type: string
     required: false
@@ -9754,8 +9754,8 @@ actions:
     description: path segment {id}
   - name: flowTemplateId
     type: string
-    required: false
-    description: query parameter
+    required: true
+    description: query parameter (the spec says optional; the call fails without it)
   - name: dry-run
     type: boolean
     required: false
@@ -12169,8 +12169,8 @@ actions:
     description: instance id
   - name: flow-template-id
     type: string
-    required: false
-    description: flowTemplateId (the process id)
+    required: true
+    description: flowTemplateId, the id of the process this instance belongs to (the call fails without it)
 - name: strip-webhook-bindings
   description: Strip webhook bindings from a .procesio pack (offline). A binding lives in the process definition, so it TRAVELS - and the launch endpoint is anonymous, so the id it carries is a live capability for the SOURCE installation. Removes the per-flow bindings and any top-level webhook entities, counted separately, and reports any id still present elsewhere. Idempotent.
   args:

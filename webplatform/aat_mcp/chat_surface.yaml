@@ -142,12 +142,14 @@ tools:
     title: Check a PROCESIO run
     description: >
       Report whether a run is still going, finished or failed, and which step it
-      reached. Takes the run id returned by procesio_run_process.
+      reached. Takes the run id returned by procesio_run_process and the id of the
+      process that was run.
     target: {tool: procesio, action: get-instance-status}
     read_only: true
     common: [workspace_id, environment]
     args:
       - {flag: id, type: string, required: true, description: "The run id."}
+      - {flag: flow-template-id, type: string, required: true, expose: process_id, description: "The id of the process this run belongs to."}
       - {flag: actions, type: boolean, description: "Include per-step detail."}
 
   - name: procesio_get_run_output
@@ -161,6 +163,7 @@ tools:
     common: [workspace_id, environment]
     args:
       - {flag: id, type: string, required: true, description: "The run id."}
+      - {flag: flow-template-id, type: string, required: true, expose: process_id, description: "The id of the process this run belongs to."}
 
   - name: procesio_tidy_process_layout
     pillar: process

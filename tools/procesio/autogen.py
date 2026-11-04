@@ -12,8 +12,9 @@ curated shortcuts. Generation rules:
     method+path) and predictable.
 
   * **args**: `--profile` + one required `--<name>` per PATH param + one optional
-    `--<name>` per QUERY param + `--body` (JSON) when the operation takes a
-    request body + `--dry-run` (compose & return the request without sending).
+    `--<name>` per QUERY param (required for the few in REQUIRED_QUERY) + `--body`
+    (JSON) when the operation takes a request body + `--dry-run` (compose & return
+    the request without sending).
 
 Path params are taken from the `{...}` in the path itself; query params are the
 rest of the recorded parameter list. Complex request bodies are passed through
@@ -37,6 +38,18 @@ _RESERVED_ARGS = {"profile", "body", "dry-run", "help"}
 
 _PATH_PARAM = re.compile(r"\{([^}]+)\}")
 
+# Query params the spec marks optional but the server cannot do without. These live here
+# and not in data/endpoints.json because refreshing that snapshot from Swagger would undo
+# them. Measured on prod: without flowTemplateId the instance endpoints fail in every run
+# state, with messages that never name it ("Stopping process failed." on stop), which reads
+# as a fault of the run rather than of the request. A guard test keeps each key in the spec.
+REQUIRED_QUERY = {
+    ("POST", "/api/Projects/instances/{id}/stop"): {"flowTemplateId"},
+    ("GET", "/api/Projects/instances/{id}/status"): {"flowTemplateId"},
+    ("GET", "/api/Projects/instances/{id}/output"): {"flowTemplateId"},
+    ("DELETE", "/api/Projects/instances/{id}/dataRetention"): {"flowTemplateId"},
+}
+
 
 def action_name(method: str, path: str) -> str:
     p = path[5:] if path.startswith("/api/") else path.lstrip("/")
@@ -59,12 +72,18 @@ def _path_params(path: str) -> list[str]:
 
 def _make(method: str, path: str, path_params: list[str],
           query_params: list[str], has_body: bool):
+    required_query = REQUIRED_QUERY.get((method, path), set())
+
     def add_args(p):
         add_profile_arg(p)
         for pp in path_params:
             p.add_argument(f"--{pp}", required=True, help=f"path segment {{{pp}}}")
         for qp in query_params:
-            p.add_argument(f"--{qp}", help="query parameter")
+            if qp in required_query:
+                p.add_argument(f"--{qp}", required=True,
+                               help="query parameter (the spec says optional; the call fails without it)")
+            else:
+                p.add_argument(f"--{qp}", help="query parameter")
         if has_body:
             p.add_argument("--body", help="request body as JSON (object or array)")
         p.add_argument("--dry-run", dest="dry_run", action="store_true",

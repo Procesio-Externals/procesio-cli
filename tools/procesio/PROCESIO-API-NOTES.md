@@ -1291,9 +1291,8 @@ NOT execute it. The pair is publish -> **launch**
 launch publishes + launches on its own (verified: webhook-launched instances land in
 status 50 with 7 action runs, `Submitted by: Webhook: <name>`). Calling publish
 "to activate it" is a mistake: it just accumulates instances stuck at "starting"
-attributed to the API user. They have to be stopped from the UI
-(`post-projects-instances-by-id-stop` returned 400 "Stopping process failed" for a
-0-action-run starting instance).
+attributed to the API user. Clear them with `stop-instance --id <instance>
+--flow-template-id <process>`.
 
 Also: publish requires a body (`--body '{}'`) or it 415s; `...instances-by-id-stop`
 takes NO `--body`.
@@ -7155,10 +7154,19 @@ Reported to engineering as product and docs findings; until they change, plan ar
   item", continue = "Run"): select them by position or icon, not by label.
 - **Debugger API** exists: `POST /api/Debugger/instances/{id}/operation` and
   `PUT /api/Debugger/instances/{id}/variables`. Their body shapes are not mapped yet.
-- **`POST /api/Projects/instances/{id}/stop` answers 400 "Stopping process failed."** for a run
-  paused in the debugger (as it does for an instance left in "starting"). The UI's Stop instance
-  button stops the same run. Which request the UI sends was not captured: capture it (HAR) before
-  concluding the endpoint is broken, see the `toggle-activation` lesson above.
+- **The instance endpoints need `flowTemplateId`, although the spec marks it optional** (measured on
+  prod). Without it `POST /api/Projects/instances/{id}/stop` answers 400 "Stopping process failed." and
+  leaves the run as it was, in every state tried: running (30), published and never launched (1),
+  paused in the debugger (45). `GET .../status` answers 400 code 450, `GET .../output` 500, and
+  `DELETE .../dataRetention` 400 code 113. None of these names the parameter. With it all four work
+  and stop takes the run to status 6, which is why the UI's Stop instance button always worked: it
+  sends the parameter. The curated actions and the generated wrappers now refuse the call without it
+  (`autogen.REQUIRED_QUERY`). A process id that is not this instance's gets the same 400 on stop, and
+  stopping a run that has already ended answers success. The status and output errors also come from
+  a run whose data is gone, so on their own they do not prove the parameter is missing.
+- **A debug run pauses with no debug client attached:** `POST .../instances/{id}/launch?debugMode=true`
+  with `connectionId: null` reaches status 45 once the marked action has ended, so a breakpoint on a
+  long Delay pauses only after the wait. On the action, `breakPoint` is the object `{"enabled": true}`.
 - **Test Action results arrive over the push channel** (`notifications.procesio.app`), as do live
   status updates in the instance view. With that host blocked (a browser `block_urls` rule, or a
   corporate proxy) Test Action shows "We are sending the request" forever, with no time-out.
@@ -7282,10 +7290,9 @@ below comes from a real run.
   and Node execution add almost nothing to it, so if the timeout is measured against processing
   time it is practically unreachable. Open question for Engineering; do not promise in docs or
   videos that it stops a run.
-- **A runaway loop cannot be stopped over the API:** `POST /api/Projects/instances/{id}/stop`
-  answered 400 "Stopping process failed." for a RUNNING instance too (not only starting/debug
-  ones). The instance view's **Stop instance** button stopped it (status 6, "stopped"). Keep a
-  retry counter in every loop.
+- **Stop a runaway run with `stop-instance --id <instance> --flow-template-id <process>`**, or with
+  the instance view's **Stop instance** button (status 6, "stopped"). Keep a retry counter in every
+  loop.
 
 ### SaaS apps (HubSpot, Airtable, Smartsheet, Jira, Typeform...) are REST API credential + Call API (2026-10)
 - **There are no dedicated actions** for these apps in the catalog (`GET /api/Actions`, 238 actions, none
