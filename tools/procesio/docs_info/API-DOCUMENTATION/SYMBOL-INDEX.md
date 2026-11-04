@@ -1,6 +1,6 @@
 # PROCESIO API reference - symbol index
 
-**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready 3b58134 2026-11-03). **Do not hand-edit** - regenerate.
+**Generated** from `endpoints/*.md` by `procesio-release api-docs-sync` (ai-ready d2554c3 2026-11-04). **Do not hand-edit** - regenerate.
 
 > **Why this exists.** This directory documents 301 endpoints and was written for an agent to read, yet behaviour defined here has been re-measured with live probes more than once. A definition is cheaper than a probe and leaves no residue.
 
@@ -22,11 +22,11 @@
 
 | DTO | defined at |
 |---|---|
-| **`AccessTokenErrorResponse`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:498` |
-| **`AccessTokenRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:479` |
-| **`AccessTokenResponse`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:489` |
+| **`AccessTokenErrorResponse`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:504` |
+| **`AccessTokenRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:485` |
+| **`AccessTokenResponse`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:495` |
 | **`AcknowledgeUserNotificationDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/15-notifications-apikeys-transport.md:196` |
-| **`ActionAttributeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:515` |
+| **`ActionAttributeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:516` |
 | **`ActionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:684` |
 | **`ActionNodeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:330` |
 | **`ActionPrototypeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:336` |
@@ -35,31 +35,31 @@
 | **`ApiKeyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/15-notifications-apikeys-transport.md:204` |
 | **`AuthenticateUserDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:622` |
 | **`AuthenticationTokenResponseDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:639` |
-| **`AuthorizationConnection`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:484` |
-| **`BaseActionGroupingDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:432` |
+| **`AuthorizationConnection`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:490` |
+| **`BaseActionGroupingDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:433` |
 | **`BaseActionNodeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:319` |
 | **`BaseDataTypeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/10-datastore.md:482` |
 | **`BaseDocumentTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/08-documents.md:122` |
 | **`BaseFlowDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:634` |
 | **`BaseScheduleDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:862` |
 | **`BaseSubscriptionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/13-subscriptions-resources-analytics.md:398` |
-| **`BaseTestActionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:481` |
+| **`BaseTestActionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:482` |
 | **`BaseUserPermissionsDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:703` |
 | **`BaseWebhookDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/14-webhooks.md:272` |
 | **`BasicFormTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:929` |
 | **`BreakPointDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:750` |
-| **`ConnectorActionRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:444` |
-| **`ConnectorActionResponseDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:454` |
-| **`ConnectorControlValueDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:469` |
+| **`ConnectorActionRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:445` |
+| **`ConnectorActionResponseDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:455` |
+| **`ConnectorControlValueDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:470` |
 | **`CreateDataTypeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/11-datatypes.md:285` |
 | **`CreatePublicSigningEnvelopeFromTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1174` |
 | **`CreateSigningEnvelopeFromTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1166` |
 | **`CreateWorkspaceDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:724` |
-| **`CredentialsPropertyConditionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:439` |
-| **`CredentialsPropertyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:408` |
-| **`CredentialsPropertyOptionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:419` |
-| **`CredentialsTableDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:504` |
-| **`CredentialsVerbDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:473` |
+| **`CredentialsPropertyConditionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:445` |
+| **`CredentialsPropertyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:412` |
+| **`CredentialsPropertyOptionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:424` |
+| **`CredentialsTableDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:510` |
+| **`CredentialsVerbDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:479` |
 | **`CustomResponseDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:793` |
 | **`CustomUrlDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1208` |
 | **`CustomUrlEntityType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1326` |
@@ -84,18 +84,18 @@
 | **`DataTypeTransferDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/11-datatypes.md:299` |
 | **`DataTypeUpdateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/11-datatypes.md:304` |
 | **`DebuggerOperationDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:840` |
-| **`DecisionDataType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:566` |
-| **`DecisionMatrixRule`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:557` |
-| **`DetailedActionGroupingDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:440` |
+| **`DecisionDataType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:567` |
+| **`DecisionMatrixRule`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:558` |
+| **`DetailedActionGroupingDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:441` |
 | **`DetailedActionTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:361` |
 | **`DetailedScheduleDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:849` |
-| **`DetailedTestActionRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:474` |
+| **`DetailedTestActionRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:475` |
 | **`DocumentTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/08-documents.md:105` |
 | **`DocumentVariableDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/08-documents.md:143` |
 | **`EEAnalyticsStatsType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/13-subscriptions-resources-analytics.md:445` |
-| **`ErrorPayload`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:527` |
+| **`ErrorPayload`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:533` |
 | **`ExportEntitiesDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/15-notifications-apikeys-transport.md:219` |
-| **`ExtendedCredentialsPropertyOptionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:424` |
+| **`ExtendedCredentialsPropertyOptionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:430` |
 | **`FlowRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:606` |
 | **`FlowResponseDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:619` |
 | **`FormApplicationDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:940` |
@@ -123,11 +123,11 @@
 | **`ICustomUrlModel`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/12-custom-urls.md:317` |
 | **`IdentifyRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:678` |
 | **`LaunchFlowPayload`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:588` |
-| **`LayoutDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:435` |
-| **`LimitsDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:416` |
+| **`LayoutDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:441` |
+| **`LimitsDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:417` |
 | **`NotificationDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:818` |
 | **`OwnershipAuditDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:652` |
-| **`Pagination`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:520` |
+| **`Pagination`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:526` |
 | **`ParametersDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:723` |
 | **`ParameterVariableDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:731` |
 | **`ParentFlowDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:800` |
@@ -135,7 +135,7 @@
 | **`PermissionsDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:379` |
 | **`PortDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:709` |
 | **`PrivateDataTypeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/11-datatypes.md:292` |
-| **`PropertyDependencyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:420` |
+| **`PropertyDependencyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:421` |
 | **`PropertyEventDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:756` |
 | **`PublicSigningEnvelopeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1184` |
 | **`RefreshTokenRequestDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:631` |
@@ -157,7 +157,7 @@
 | **`SigningSpotPlacementDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1150` |
 | **`SigningSpotType`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1355` |
 | **`SigningTemplateDocumentDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/07-forms.md:1191` |
-| **`SimpleActionGroupingDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:436` |
+| **`SimpleActionGroupingDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:437` |
 | **`SimpleActionNodeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:323` |
 | **`SimpleActionTemplateDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:344` |
 | **`SimpleEmailDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:698` |
@@ -166,9 +166,9 @@
 | **`SubscriptionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/13-subscriptions-resources-analytics.md:421` |
 | **`SubscriptionOptions`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/13-subscriptions-resources-analytics.md:430` |
 | **`SubWorkspaceNameChangeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:763` |
-| **`TableHeaderDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:509` |
+| **`TableHeaderDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:515` |
 | **`TabPropertyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:395` |
-| **`TestActionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:484` |
+| **`TestActionDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/05-actions.md:485` |
 | **`UpdatePasswordDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:692` |
 | **`UpdateUserDetailsDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:672` |
 | **`UpdateWorkspaceDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:734` |
@@ -179,7 +179,7 @@
 | **`UserPasswordDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:684` |
 | **`UserPermissionsDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:711` |
 | **`UserPropertyDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/03-auth-users-workspaces.md:778` |
-| **`ValidationDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:430` |
+| **`ValidationDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/09-credentials.md:436` |
 | **`VariableAttributeDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:741` |
 | **`VariableDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/04-processes.md:668` |
 | **`WebhookCustomResponseDto`** | `tools/procesio/docs_info/API-DOCUMENTATION/endpoints/14-webhooks.md:275` |

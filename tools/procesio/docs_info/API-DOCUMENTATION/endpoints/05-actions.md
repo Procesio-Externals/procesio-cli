@@ -272,7 +272,7 @@ Entity: `CustomActions`. Lets users upload a custom action as a NuGet package, w
 - **Responses:**
   - `200 OK` → the new action template id (`string (uuid)`) on success.
   - `400 Bad Request` → `ErrorResponse` when the package is empty (`UPLOAD_ACTION_NOT_FOUND`) or when the upload finishes with errors.
-- **Notes:** `Consumes("multipart/form-data")` overrides the controller's JSON default. `name`/`path` travel as HTTP headers, not form fields. The manager returns `object` — a Guid template id on success or a `List<ErrorPayload>` on failure.
+- **Notes:** `Consumes("multipart/form-data")` overrides the controller's JSON default. `name`/`path` travel as HTTP headers, not form fields. The manager returns `object` — a Guid template id on success or a `List<ErrorPayload>` on failure. An invalid `FEDecorator.CredentialDefaults` is refused with codes 270 to 273 (not a credential component; malformed or oversized JSON; a key that is not a field of the credential template; a protected secret field) — see `BE/CUSTOM-ACTIONS.md` §5.3.
 
 #### `DELETE api/Actions/{id}`
 
@@ -399,6 +399,7 @@ Audit/ownership base for list responses.
 - `type` — `string`, optional — property type.
 - `language` — `string`, optional — text format (JSON/SQL/PLAINTEXT/etc.) — wire name `language`, C# `TextFormat`.
 - `credentialsTemplateId` — `string (uuid)`, optional — credential template id.
+- `credentialDefaults` — `object` (JSON), optional — on a credential property only: `{ connectorType?, properties? }`, the non-secret values keyed by the credential template's `be_id` that prefill the New Credential form, and the connector type that labels and filters the credentials. Omitted when the action declares none.
 - `value` — `object` (string or JSON), optional — constant value or nested sub-properties.
 - `options` — `object` (JSON), optional — options for the property.
 - `isRequired` — `boolean`, optional — required by the normal action flow.

@@ -7958,8 +7958,9 @@ design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: t
   line (form-runtime pins 1.x): user-playground v1.116.0 redirects every form route (public, private,
   assignments, submissions) to form-runtime. The FormBuilder mock is the same on 0.194.0 and 1.46.0
   (only formatting differs), so the goldens fit both; behaviour still differs between them: only the
-  legacy line lets a signer place their own signature spot, only the main line has the dynamic-row
-  fix below, and custom CSS is unscoped in FILL/APPROVE on the legacy line but scoped on the main one.
+  main line has the dynamic-row fix below, and custom CSS is unscoped in FILL/APPROVE on the legacy
+  line but scoped on the main one. A signer placing their own signature spot was legacy-only until
+  ui-builder 1.47.0 (form-runtime v1.33.0).
   `procesio-release fe-pins` reports both pins and whether the tool's mock still matches them.
 
 ### Feature flags (`GET /api/Features`)
@@ -8011,12 +8012,16 @@ design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: t
 - The upstream API reference (`docs_info/API-DOCUMENTATION/endpoints/07-forms.md`) was corrected on
   2026-11-03 (no `OrderMode`, the 400 714/715 answers above, 409 712 as "try again", 204 on a draft
   discard) and re-synced with `procesio-release api-docs-sync --write`.
-- ⚠ Upstream's element reference (ai-ready `FE/.features/forms/document-signing.md`, 2026-11-03) says a
-  signer without a placed signature clicks where to sign on their turn. Only the ui-builder 0.x line
-  does that, and prod no longer fills forms on it: form-runtime's 1.x line (1.46.0, same on its main)
-  has no own-signature placement, refuses the preparer's submit ("Every signer needs a signature on
-  the document"), and leaves a signer sent without a spot over the API unable to sign in the form.
-  Its other facts (settings, mapping limits, statuses, limits) match the code and are in the recipe.
+- Own-signature placement reached the prod form runtime on 2026-11-04, unannounced: form-runtime
+  v1.33.0 pins ui-builder 1.47.0, which also drops the "Every signer needs a signature on the document"
+  block, so a SIGNATURE spot per signer is optional. Measured: over the API a signer seeded with no
+  spot gets `placesOwnSignature: true`; their sign answers 400 714 without `signatureSpot`, 400 715 past
+  the last page, and COMPLETED with a signed PDF once placed. In the runtime: click to place, then the
+  Sign dialog. Upstream's element reference (ai-ready `FE/.features/forms/document-signing.md`)
+  describes this, and its other facts are in the recipe.
+- ⚠ A FILLER with no spot and `setupEditable: false` on a public form is stuck (measured on v1.33.0): no
+  Sign button, a click on the PDF does nothing, and the submit stays blocked. The designer's warning for
+  an incomplete locked setup went with 1.47.0; `formlint.lint_document_signing` reports it.
 
 ### Data Store collation (measured 2026-11-03)
 - Data-Store v3.1.0 creates databases and tables in `utf8mb4_0900_ai_ci`, the driver's session
@@ -8102,3 +8107,38 @@ design-system 1.37.0). The tool was aligned on 2026-11-03 (previous alignment: t
   upstream reference (now split into forms, documents, credentials, data store, data types, custom URLs,
   subscriptions, webhooks, notifications/API keys/transport, SignalR), with the tool's own measured
   additions re-applied by `procesio-release api-docs-sync` (overlay) and both indexes regenerated.
+
+## Form Trigger and approval tasks raised by a process (live, 2026-11)
+
+Measured on a process that holds an invoice and asks a person, driven through the real form runtime.
+
+- **Binding.** `"Form Template": "<form template id>"` as a literal. `Form Id` needs a **guid**-typed
+  variable (a string one fails validation with statusCode 142), `Result` a boolean.
+- **It carries no data.** `TriggerFormAction` creates the instance from the template's own `Data`, and the
+  action has no field mapping, so a process cannot prefill the task. Keep the held record in a Data Store and
+  load it with a form-level `FORM_LOAD` `RUN_PROCESS`. Pass the field's current value as an input, so that
+  reopening the task keeps showing the same record instead of the next open one. Several open tasks are
+  therefore not tied one to one to records unless the record is stored per instance.
+- **A task is a snapshot.** A template edit, events included, does not reach an instance raised earlier.
+  When testing, delete the pending task (`delete-form-by-id`) and raise a new one.
+- **`FORM_LOAD` with `RUN_PROCESS` runs on the review page** (`forms/assignments/<instanceId>`) and its output
+  map fills read-only fields. Write it with `form-update --data-file '{"events": [...]}'`, map rows as in
+  FORM-DEV-GUIDE 06 (variable GUID left, value path right). `form-set-element-event` covers element triggers
+  only.
+- **On the review page every field outside a section assigned to the viewer is read only**, whatever its own
+  `readonly` says, and nothing marks why. For corrections the approver makes, put those fields in a `section`
+  with `assignee` set to the approver. Approve still submits fields and decision together, with no extra step.
+- **Names that resolve in `form-set-element-event`:** `decision.response`, `decision.comment` (approval element
+  named `decision`), `instance.currentUser.email`, `someParagraph.label`, `someViewer.src`.
+- **A process can render a table in a form:** return an HTML string and map it to a paragraph's `.label`.
+- **A File output mapped to both a `file-upload` value and a `file-viewer.src`** gives a download row and an
+  inline PDF. Before the first run the upload shows its normal drop zone.
+- **Two `heading` elements merge** into one line in the form header. Use one, and an `h3` in a paragraph for the
+  rest.
+- **To widen a form:** `.form-builder-view--content` carries the side padding (20 percent of the viewport), so
+  overriding only the form's width pushes it off the right edge. Override that padding too, then set
+  `.form-builder-view--content--form` and `--image` to `width: 100%` with a `max-width`.
+- **Verifying a private form when the saved browser session expired:** the runtime authenticates with the
+  `__Host-procesio.access` cookie on the Web-API host, so a `web` storageState holding the CLI's cookie for that
+  host opens private forms and the task inbox as the same user. The access cookie lives about 30 minutes. Never
+  print it, and delete the temporary session afterwards.

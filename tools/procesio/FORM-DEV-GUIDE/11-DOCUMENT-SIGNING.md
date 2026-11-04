@@ -3,8 +3,9 @@
 The `document-signing` element shows a PDF inside a form and runs a signing ceremony on it:
 each signer places (or finds) their signature spot, signs by drawing, uploading an image or
 typing, and the platform stamps the PDF and keeps an audit trail. Live in prod since
-user-playground v1.116.0 and form-runtime v1.32.0 (2026-11-02). Every step below was run
-against prod with this tool on 2026-11-03.
+user-playground v1.116.0 and form-runtime v1.32.0 (2026-11-02); a signer placing their own
+signature arrived with form-runtime v1.33.0 (ui-builder 1.47.0, 2026-11-04). Every step below
+was run against prod with this tool.
 
 ## How it fits together
 
@@ -55,11 +56,11 @@ export shape; the lint flags it).
 
 `[{id, kind, userId?, label?}]`, one step each, in list order.
 
-- `FILLER` - whoever fills the form (the signed-in user, or the public signer, who types a
-  first name, last name and e-mail). At most one.
+- `FILLER` - whoever fills the form (the signed-in user, or the public signer, whose first
+  name, last name and e-mail are optional). At most one.
 - `MEMBER` - a workspace member, by `userId`. A MEMBER signer keeps the form private (the
   designer refuses "Make form public" while one is set); on a public form the slot is
-  skipped.
+  skipped. The preparer cannot remove a signer the design names.
 - An entry without `kind` reads as MEMBER; an unknown kind is dropped by the designer.
 - Order is the list order (each signer's `orderIndex` in the envelope; equal values would
   sign in parallel). There is no order-mode setting since v3.2.0. The design is always one
@@ -83,20 +84,23 @@ export shape; the lint flags it).
 - A **block** is rows stacked exactly above a SIGNATURE of the same party: same page, `x`
   and `w`, and `row.y + row.h == next.y`. Default geometry: width 0.22, row height 0.03,
   signature height 0.08. `blockFields` sets the rows a newly placed block starts with.
-- ⚠ Give every signer a SIGNATURE spot. The Web API accepts a signer without one (their
-  session's `placesOwnSignature`; their sign then carries `signatureSpot`), and upstream's
-  element reference says such a signer clicks where to sign on their turn. That is the
-  ui-builder 0.x line, which no longer fills forms in prod: user-playground v1.116.0 sends every
-  fill route (public, assignments, submissions) to form-runtime, whose 1.x line (1.46.0 in
-  prod and on its main as of 2026-11-03) has no own-signature placement. There the preparer's
-  submit is refused with "Every signer needs a signature on the document", and a signer sent
-  without a spot over the API has no way to sign in the form.
+- A SIGNATURE spot per signer is optional since form-runtime v1.33.0. A signer without one
+  clicks the document where to sign on their turn (their session's `placesOwnSignature`; their
+  sign carries `signatureSpot`, which becomes a required SIGNATURE spot of theirs). Until they
+  add a signature they can move or resize it, and **Place again** removes it. Still place a
+  spot when the position on the page matters: otherwise the signer picks it.
+- ⚠ The exception: a FILLER with no spot and `setupEditable: false` on a public form is stuck
+  (measured). There is no Sign button, a click on the PDF does nothing, and the submit stays
+  blocked on "Sign the document before submitting - it is sent with your signature". The
+  designer no longer warns about this; the form lint does. With `setupEditable` on, the same
+  design works. On a private form that block does not apply: by the source, the signer signs
+  on their turn after the submit (not measured).
 - Limits per envelope: 50 signers, 1000 spots, 10 rows per block, a draft of at most 1 MB.
 
 ## 5. Toggles
 
 `setupEditable` (default on): off sends the document exactly as designed, and the filler only
-signs. `fieldsEditable`: whether the preparer may rename, add or remove block rows.
+signs (mind the exception in step 4). `fieldsEditable`: whether the preparer may rename, add or remove block rows.
 `allowDecline` (default on) only hides **Decline**: the Web API does not check it, so an API
 caller can still decline. `required`: a document must be attached before submit.
 `maxHeight` (e.g. `600px`) scrolls the PDF inside the element instead of showing it whole.
@@ -133,7 +137,8 @@ writes those).
 - Element events `onSignedEvents`, `onDeclinedEvents`, `onCompletedEvents`, with `$event =
   {envelopeId, status, party, signedPartyCount, totalPartyCount, completed, reason?}`.
   `onCompleted` fires right after the `onSigned` that completed the document, and also when a
-  document with no signers is sent. Only the current user's own act fires a trigger: another
+  document with no signers is sent (`party` is null then and both counts are 0). Only the
+  current user's own act fires a trigger: another
   signer's signature or decline fires nothing in this form and shows as a status the next
   time it loads.
 - Wire them with `form-set-element-event --on signed | declined | completed` (event types
@@ -171,6 +176,11 @@ writes those).
   offers Draw / Upload image / Type; after it the element shows "Signed - sent with the form"
   and the signature on its block. The calls run in this order: from-template (at Sign), form
   submit, envelope PUT, send, my-session/sign, then the element's triggers.
+- **Fill page, no placed spot (`setupEditable` on, public form, measured 2026-11-04):** **Sign**
+  shows "Click the document where you sign - or Tab to it and place your signature with the
+  arrow keys and Enter. Esc cancels."; a click places the block (rows from "Signature block
+  fields configuration") and opens the Sign dialog. **Show signatures** reads "No signature
+  placed - they choose where to sign".
 - **No e-mail** reaches a public filler who signs on the spot.
 
 ## 8. Errors you will meet
@@ -194,7 +204,7 @@ The Web API answers with its coded list; the tool shows `message (code N) [targe
 
 `form-get-element --element ContractSigning --key document --key templateSigners` shows the
 design; the form lint (run on every form write) reports a spot for an unknown signer, a
-signer without a SIGNATURE spot (the prod form runtime refuses it, see step 4), a MEMBER without a user, two FILLERs, geometry off the page
+FILLER without a SIGNATURE spot on a locked setup (see step 4), a MEMBER without a user, two FILLERs, geometry off the page
 and an inline PDF. To see it rendered, publish (`form-update --is-private false --status 1`,
 FILLER-only designs) and open `https://forms.procesio.app/forms/<form id>#<workspace id>`: the
 PDF shows with the placed blocks and a Sign button.
