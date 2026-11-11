@@ -116,16 +116,27 @@ The actions that carry most real systems, and the shapes they form:
   form just needs to read or write a tenant table without authoring a process. See the
   `datastore` topic.
 
-## 6. Shapes in the Process Designer (decorative, execution-irrelevant)
+## 6. Shapes in the Process Designer: AREAS that name groups of actions
 
 The designer's **Shapes** (rectangle / ellipse / diamond) are annotation objects on
-the canvas - they group and label a region and never affect execution. They persist
-under the flow's opaque `canvasData.shapes` blob (not a top-level field) and sit in a
-z-order band **below** the connectors. Two rules for the agent: **never reason about a
-shape as a node** (it has no ports, no config, no run behavior), and **never let an edit
-or a re-layout drop `canvasData`** - the tool's `process-edit` carries the live canvas
-through, and the layout engine leaves `canvasData` byte-identical; preserve that when
-touching a flow by hand.
+the canvas - they never affect execution. They persist under the flow's opaque
+`canvasData.shapes` blob (not a top-level field) and sit in a z-order band **below** the
+connectors and nodes. **Never reason about a shape as a node** (it has no ports, no
+config, no run behaviour).
+
+The agent uses rectangles as **areas**: on any process with more than 3 actions besides
+Start/Stop, every top-level action sits inside one titled rectangle whose text says, in
+one sentence, what that group of actions does together. The `groups` key of a
+`process-create` / `process-edit` config produces them; the tool sizes each rectangle
+around its members' final positions so it never covers an action of another area, splits
+a group into "(cont.)" rectangles when its members are not side by side, and re-fits them
+whenever the layout moves the actions. Membership is geometric (the rectangle that holds
+an action's centre), because the designer keeps nothing else about a shape. Shapes that
+hold no action are a person's notes and are kept where they are.
+
+Good areas follow the story of the process: read the input, look up, decide, write,
+answer. Keep each area's actions consecutive in the flow and its text to one sentence;
+a long text wraps over the row above and the tool warns (`AREA_TEXT_LONG`).
 
 ## 7. When you build or re-organize a process
 

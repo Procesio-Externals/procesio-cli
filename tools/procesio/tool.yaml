@@ -32,6 +32,8 @@ routing:
   - upload / install / delete / list a custom action (.nupkg connector)
   - download a flow-instance file (Generate-Document output)
   - layout / re-lay-out a process canvas; read or inspect a flow graph
+  - what is this process for / read a process's documented purpose, action purposes and canvas areas
+  - which processes in this workspace are undocumented / map a workspace I do not know
   - list forms / list documents; get or toggle a process; AI Decisional
   - switch procesio environment / work on PROCESIO Main-QA / Main-DEV / a client env
   - list / add / set the default procesio environment (<Client>-<ENV>); bind a credential to an environment
@@ -2588,7 +2590,7 @@ actions:
     required: false
     description: 'optional JSON file {guid: display name} for ids outside the flows (credentials, forms, data models)'
 - name: flow-lint
-  description: 'Designer-layer ''Process Errors'' lint on a live flow (the check that blocks designer SAVE, which POST /Projects/validate does NOT catch): stale subprocess side-pannel ids, unmapped/dead required subprocess inputs, subprocess outputs mapped to non-output (non-type-30) vars, Execute Query with null Output, and Node code binding error-scope/undeclared vars. clean=true when none.'
+  description: 'Designer-layer ''Process Errors'' lint on a live flow (the check that blocks designer SAVE, which POST /Projects/validate does NOT catch): stale subprocess side-pannel ids, unmapped/dead required subprocess inputs, subprocess outputs mapped to non-output (non-type-30) vars, Execute Query with null Output, and Node code binding error-scope/undeclared vars. clean=true when none. Also reports `documentation`: whether the process documents itself (process purpose, a purpose per action that is not the stock caption, areas on the canvas when there are more than 3 actions besides Start/Stop), separate from `clean`.'
   args:
   - name: profile
     type: string
@@ -10329,7 +10331,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: process-create
-  description: 'Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables, actions, edges, webhooks in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
+  description: 'Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables, actions, groups, edges, webhooks in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
   args:
   - name: profile
     type: string
@@ -10361,6 +10363,7 @@ actions:
           minLength: 1
         description:
           type: string
+          description: 'The process''s PURPOSE: what it is for, what starts it (form, webhook, schedule, parent process) and what it produces. Required on create; on edit, omitted keeps the live one. Stored as the flow''s description.'
         timeout:
           type: integer
           minimum: 0
@@ -10373,6 +10376,31 @@ actions:
           type: array
           items:
             $ref: '#/$defs/action'
+        groups:
+          type: array
+          description: 'AREAS on the canvas: each a rectangle drawn behind the actions it groups, with a title and one sentence on what those actions do together. Required when the process has more than 3 actions besides Start and Stop; every top-level action then belongs to exactly one area (a For Each''s children go with their container). On edit, omitted keeps the live areas and re-fits them to the new layout.'
+          items:
+            type: object
+            additionalProperties: false
+            required:
+            - title
+            - text
+            - actions
+            properties:
+              title:
+                type: string
+                minLength: 1
+                description: area name shown on the canvas, e.g. 'Read the order'
+              text:
+                type: string
+                minLength: 1
+                description: one sentence on what the area's actions do together in this process
+              actions:
+                type: array
+                minItems: 1
+                items:
+                  type: string
+                description: ids of the config actions in this area (not start/stop)
         edges:
           type: array
           description: Explicit wiring between action ids ('start'/'stop' reserved). Omit for a linear chain.
@@ -10484,6 +10512,9 @@ actions:
             name:
               type: string
               description: display name; if omitted it is auto-derived from what the action does (e.g. 'GET /users', 'For each items', a Node's leading comment) and falls back to the template name. Re-evaluated on every build/edit.
+            description:
+              type: string
+              description: 'The action''s PURPOSE in this process: what it does here and why, not the template''s generic caption. Required for every action except Start/Stop; on edit, omitted keeps the live one only while the action still does the same thing. Stored as customData.description (the designer''s Description field and node tooltip).'
             params:
               type: object
               description: property label/id -> binding (literal, {value}, {var[,path]}, or {template,vars})
@@ -10750,6 +10781,10 @@ actions:
     type: boolean
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the process does not document itself (no process purpose, an action without its own description, or no areas on a process with more than 3 actions besides Start/Stop); the gaps come back under `documentation`
   examples: &id010
   - title: Greet
     description: demo
@@ -10789,8 +10824,27 @@ actions:
     type: string
     required: true
     description: process (project) id
+- name: process-docs
+  description: 'Read a process''s DOCUMENTED INTENT: its purpose (description), each action''s purpose in it (customData.description; a template''s stock caption counts as undocumented), the titled areas on the canvas and which actions they group, free canvas notes, and the documentation gaps (`findings`, `documented`). Read this first when analysing a process.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
 - name: process-edit
-  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`.'
+  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, groups, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`.'
   args:
   - name: profile
     type: string
@@ -10837,6 +10891,10 @@ actions:
     type: boolean
     required: false
     description: 'keep the current canvas positions and place only new actions (default: re-arrange the whole canvas, classic engine + clustering, exactly as process-create does)'
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the process does not document itself (no process purpose, an action without its own description, or no areas on a process with more than 3 actions besides Start/Stop); the gaps come back under `documentation`; also lets an action that changed keep its old description
   examples: *id010
 - name: process-fe-validate
   description: 'Front-end (designer-layer) ''Process Errors'' validation on a live process — the client-side check that BLOCKS designer Save but which POST /api/Projects/validate does NOT catch: unconnected actions, missing Start/Stop, empty node names, required-empty fields, leftover placeholders, bad number/integer values, out-of-range limits, duplicate/primitive-named variables, and unmapped required subprocess inputs. clean=true when no blocking errors. Data-type mismatches are reported as (non-blocking) warnings. This same check auto-runs before every process-create / process-edit. Add --include-be for the BE layer.'
@@ -12310,6 +12368,37 @@ actions:
     type: boolean
     required: false
     description: add + validate but do not PUT
+- name: variable-delete
+  description: 'Remove ONE variable from a live process -> validate + flow-lint -> PUT. REFUSES while anything still references it - a node parameter bind, a source inside a Query Store Parameters map, an error-port variableErrorId, a subprocess input/output map - and NAMES every reference, because ''it is used somewhere'' is not actionable. Refuses an input/output without --allow-contract-change. Renumbers nothing: a node''s <%N%> indices address that node''s own variable[] list, not the flow''s. --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: variable
+    type: string
+    required: true
+    description: variable name or id
+  - name: allow-contract-change
+    type: boolean
+    required: false
+    description: permit deleting an input (10) / output (30) variable - changes the public contract
+  - name: dry-run
+    type: boolean
+    required: false
+    description: delete + validate but do not PUT
 - name: variable-set-default
   description: 'Set (or --clear) one variable''s defaultValue on a live process -> validate + flow-lint -> PUT. This is how an input stops being something the caller must supply: a File default is honoured on a run that omits it, and the platform re-stages the file into that run''s own instance. Needs --allow-contract-change on an input/output. --json parses the value first (use for a File object).'
   args:
@@ -12637,3 +12726,34 @@ actions:
     type: string
     required: false
     description: JSON payload to send to the webhook
+- name: workspace-docs
+  description: 'Documented intent across a WORKSPACE: every process with its purpose, areas, documentation coverage and gaps (--details adds every action''s purpose; --purpose-only is one list call). The starting map for a workspace you do not know, and the list of processes still undocumented. Workspace-scoped: pass --workspace-id.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: search
+    type: string
+    required: false
+    description: only processes whose name contains this text
+  - name: limit
+    type: integer
+    required: false
+    description: read at most this many processes (default 300)
+  - name: purpose-only
+    type: boolean
+    required: false
+    description: 'one list call: title + purpose only, no per-process read (fast)'
+  - name: details
+    type: boolean
+    required: false
+    description: include every action's purpose and area per process

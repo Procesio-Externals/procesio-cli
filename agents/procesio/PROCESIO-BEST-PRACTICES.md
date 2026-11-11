@@ -77,7 +77,14 @@ Global try/catch via Error Port + Decisional action. Classify and handle:
 
 ## 7. Document & handover
 
-- Document each process. Map the order processes trigger in (visual map if needed).
+- Document each process IN the process: its purpose (`description`), each action's
+  purpose in it (`actions[].description`, never the template's stock caption) and, past
+  3 actions besides Start/Stop, titled areas on the canvas (`groups`). The tool refuses a
+  create or edit without them and keeps them true across edits; see the playbook section
+  "Self-documenting processes".
+- Start any analysis from what is documented: `process-docs` for one process,
+  `workspace-docs` for a workspace.
+- Map the order processes trigger in (visual map if needed).
 - Write SOPs so someone without prior context can debug or follow the logic.
 
 ## 8. DB actions (SQL Server / MySQL) + Data Store

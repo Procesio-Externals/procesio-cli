@@ -104,13 +104,20 @@ channel** so it arrives escaped, and treat even that as unverified until measure
 >   Do it in a Python or one-variable Node step, and for every other outside value a later script reads, the file
 >   name included.
 > - Hand outside text to a script as base64 or inside a Json variable. `String.raw` around `<%N%>` breaks on a
->   backtick in the text, and then every step after it fails too.
-> - For several form fields, one `String To Base64` with a template (`<%0%>|~|<%1%>|~|<%2%>`) gives a single safe
->   value for a Node to decode and split. A null variable comes through as an empty string. Put free text last and
->   rejoin it, in case it holds the separator.
+>   backtick or a trailing backslash in the text and runs `${...}` as code, and then every step after it fails too.
+> - For several form fields with at most one free-text field, one `String To Base64` with a template
+>   (`<%0%>|~|<%1%>|~|<%2%>`) gives a single safe value for a Node to decode and split. A null variable comes through
+>   as an empty string. Put the free text last and rejoin it, in case it holds the separator.
+> - With two or more free-text fields, use one `String To Base64` per field. In a shared template a `<%2%>` typed
+>   into field 1 receives field 2, and a separator typed into a field moves the ones after it. A template such as
+>   `v:<%0%>` means the action never receives an empty input; slice the prefix off after decoding. Base64 cannot
+>   hold a placeholder, so the Node that decodes the values can safely take several variables.
 > - Because a script error does not fail the run, gate before any write: one step reads the expected output, and a
 >   Decisional refuses the write when it is missing. Without this gate a broken check still inserted a row with an
 >   empty status and raised a task, and the instance ended at status 50.
+> - Give every real answer its own Decisional branch, and make the default branch a refusal that writes nothing. A
+>   default that is itself a business outcome turns a failed script into that outcome: with "anything but approve is
+>   a rejection", an approver's approval was recorded as a rejection, with no error and an empty comment.
 
 ## Working with files - the base64 bridge
 

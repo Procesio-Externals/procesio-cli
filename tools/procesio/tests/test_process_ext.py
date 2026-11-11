@@ -321,14 +321,16 @@ def test_edit_preserves_canvas_shapes(monkeypatch):
     shapes = [{"id": "s1", "kind": "rectangle", "title": "Zone A"}]
     canvas = {"shapes": shapes, "viewport": {"x": 5, "y": 9, "zoom": 1.2}}
     c = _CanvasClient(canvas)
-    pb._edit(c, "P1", {"title": "t", "actions": []}, {**_ctx(), "_force": True})
+    pb._edit(c, "P1", {"title": "t", "actions": []},
+             {**_ctx(), "_force": True, "_allow_undocumented": True})
     assert c.put_dto["CanvasData"] == canvas          # shapes + viewport survive the edit
 
 
 def test_edit_without_canvas_leaves_canvasdata_none(monkeypatch):
     monkeypatch.setattr(pb, "_save_gate", lambda *a, **k: None)
     c = _CanvasClient(None)                             # live flow has no canvasData
-    pb._edit(c, "P1", {"title": "t", "actions": []}, {**_ctx(), "_force": True})
+    pb._edit(c, "P1", {"title": "t", "actions": []},
+             {**_ctx(), "_force": True, "_allow_undocumented": True})
     assert c.put_dto["CanvasData"] is None             # nothing to preserve, no crash
 
 

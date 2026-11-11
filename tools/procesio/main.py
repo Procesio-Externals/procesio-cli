@@ -68,7 +68,7 @@ def collect_actions() -> dict[str, ActionDef]:
         flowgraph, form_chains, form_code, form_element, form_events, form_signing, form_update,
         formprocess, generic,
         layout, usageguide,
-        process_layout, process_naming, processes, profile_admin,
+        process_docs, process_layout, process_naming, processes, profile_admin,
         flowlint, fevalidate, nodeparams, resource_ops, schedules, sqlactions, transport,
     )
     # Curated / management actions: ergonomic, hand-written, well-tested.
@@ -101,6 +101,8 @@ def collect_actions() -> dict[str, ActionDef]:
     curated.update(layout.ACTIONS)
     # Live process ops that pair with layout: duplicate a process; re-lay-out in place.
     curated.update(process_layout.ACTIONS)
+    # Documented intent of a process / a whole workspace (purpose, action purposes, areas).
+    curated.update(process_docs.ACTIONS)
     # Bulk-rename a live process's canvas actions (default "Node"/"Call API" labels).
     curated.update(process_naming.ACTIONS)
     # CRUD-parity + verification oracles: get/delete/list, validate, credential/action test, import.

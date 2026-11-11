@@ -411,6 +411,88 @@ def add_variable(flow: dict, name: str, data_type: str, direction: str, *,
     return var
 
 
+def variable_references(flow: dict, var_id: str) -> list[dict]:
+    """Every place in a flow, outside the variables list itself, that names this variable id.
+
+    A variable is reachable through more shapes than are obvious: a node parameter's
+    `variable[]` bind, a source nested inside a Query Store Parameters map, a node's
+    `variableErrorId`, a subprocess input/output map. So this walks the whole action tree
+    looking for the id rather than enumerating the shapes - the shape nobody thought to list
+    is exactly the one that would let a delete break a flow without any error.
+    """
+    hits: list[dict] = []
+
+    def walk(obj, path, where):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if v == var_id and isinstance(v, str):
+                    hits.append({"action": where, "path": f"{path}.{k}"})
+                else:
+                    walk(v, f"{path}.{k}", where)
+        elif isinstance(obj, list):
+            for i, v in enumerate(obj):
+                if v == var_id and isinstance(v, str):
+                    hits.append({"action": where, "path": f"{path}[{i}]"})
+                else:
+                    walk(v, f"{path}[{i}]", where)
+
+    for a in flow.get("actions") or []:
+        name = (a.get("customData") or {}).get("name") or a.get("actionName") or a.get("name")
+        walk(a, "action", name)
+    # Everything else the flow carries, named or not - webhooks, edges, settings, whatever a
+    # later release adds. Only the declaration list itself is skipped, because that is the one
+    # mention the delete is removing. Enumerating the known keys instead would quietly stop
+    # covering the key that appears next.
+    for key, value in flow.items():
+        if key in ("actions", "variables"):
+            continue
+        walk(value, key, None)
+    return hits
+
+
+def delete_variable(flow: dict, var: dict, *, allow_contract_change: bool = False) -> dict:
+    """Remove one variable from a flow in place. Returns {removed, references, remaining}.
+
+    A dead variable is not cosmetic. It still appears in the run payload shape an agent reads
+    to learn how to call the process, and it still looks like the natural thing to map a field
+    onto - so the next person wires to the input that nothing reads and reproduces whatever
+    silent failure it was left behind by.
+
+    Refused rather than guessed:
+    * a variable anything still references, with every reference NAMED, because "it is used
+      somewhere" is not actionable.
+    * an input or output without `allow_contract_change`, matching `set_variable_type`: those
+      are the run payload and the response shape a caller depends on.
+    * a system or auto variable always - the engine owns those.
+
+    Nothing is renumbered. A node's `<%N%>` indices address that node's own `variable[]` list,
+    not the flow's, so removing an unreferenced flow variable cannot disturb any sequence.
+    """
+    _refuse_engine_owned(var, "existence")
+    direction = var.get("type")
+    name = var.get("name")
+    if direction in (10, 30) and not allow_contract_change:
+        raise ValueError(
+            f"'{name}' is an {VAR_DIRECTION.get(direction)} variable - deleting it changes the "
+            f"process's public contract (run payload / webhook response). Pass "
+            f"--allow-contract-change if that is intended")
+    refs = variable_references(flow, var.get("id"))
+    if refs:
+        shown = "; ".join(f"{r['action'] or 'flow'} at {r['path']}" for r in refs[:8])
+        more = f" (and {len(refs) - 8} more)" if len(refs) > 8 else ""
+        raise ValueError(
+            f"'{name}' is still referenced {len(refs)} time(s) and cannot be deleted: "
+            f"{shown}{more}. Rebind or remove those first")
+    before = list(flow.get("variables") or [])
+    flow["variables"] = [v for v in before if v.get("id") != var.get("id")]
+    return {"removed": name,
+            "removed_id": var.get("id"),
+            "direction": VAR_DIRECTION.get(direction, direction),
+            "references": [],
+            "variables_before": len(before),
+            "variables_after": len(flow["variables"])}
+
+
 
 def set_variable_default(flow: dict, var: dict, default_value, *,
                          allow_contract_change: bool = False) -> dict:

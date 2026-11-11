@@ -41,6 +41,7 @@ import re
 
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import VARIABLES_ONLY
+from tools.procesio.flowmodel import docs
 from tools.procesio.handlers.common import add_profile_arg
 from tools.procesio.sqlformat import is_unreadable
 
@@ -220,11 +221,15 @@ def _args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--id", required=True, help="flow (process) id to lint")
 
 
-def _template_sidepanel_ids(client) -> dict:
+def _template_sidepanel_ids(client, captions: dict | None = None) -> dict:
     acts = client.get("/api/Actions?getFullAction=true")
     if isinstance(acts, dict):
         acts = acts.get("result", acts)
         acts = acts.get("actions", acts) if isinstance(acts, dict) else acts
+    if captions is not None:              # the same read carries every template's stock caption
+        for a in acts or []:
+            if isinstance(a, dict) and a.get("name") and a.get("description"):
+                captions[a["name"].strip().lower()] = a["description"]
     out = {}
     for tn in _SUB_TEMPLATES:
         t = next((a for a in acts if a.get("name") == tn), None)
@@ -240,7 +245,8 @@ def _template_sidepanel_ids(client) -> dict:
 def flow_lint(client, args) -> dict:
     resp = client.get(f"/api/Projects/{args.id}")
     flow = resp.get("flow", resp) if isinstance(resp, dict) else resp
-    tmpl_sp = _template_sidepanel_ids(client)
+    captions: dict = {}
+    tmpl_sp = _template_sidepanel_ids(client, captions)
     cache: dict = {}
 
     def target_vars_of(fid: str) -> dict:
@@ -254,8 +260,13 @@ def flow_lint(client, args) -> dict:
         return cache[fid]
 
     problems = lint_flow_dto(flow, tmpl_sp, target_vars_of)
+    # Self-documentation is reported beside the designer check, not inside it: `clean` keeps
+    # meaning "the designer will save this", which other gates depend on.
+    doc = docs.read(flow, captions)
     return {"id": args.id, "title": flow.get("title"), "clean": not problems,
-            "problem_count": len(problems), "problems": problems}
+            "problem_count": len(problems), "problems": problems,
+            "documentation": {"documented": doc["documented"], "purpose": doc["purpose"],
+                              "coverage": doc["coverage"], "findings": doc["findings"]}}
 
 
 ACTIONS = {
@@ -265,5 +276,8 @@ ACTIONS = {
                     "designer SAVE, which POST /Projects/validate does NOT catch): stale subprocess "
                     "side-pannel ids, unmapped/dead required subprocess inputs, subprocess outputs "
                     "mapped to non-output (non-type-30) vars, Execute Query with null Output, and Node "
-                    "code binding error-scope/undeclared vars. clean=true when none."),
+                    "code binding error-scope/undeclared vars. clean=true when none. Also reports "
+                    "`documentation`: whether the process documents itself (process purpose, a "
+                    "purpose per action that is not the stock caption, areas on the canvas when "
+                    "there are more than 3 actions besides Start/Stop), separate from `clean`."),
 }

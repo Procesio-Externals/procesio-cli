@@ -292,6 +292,21 @@ def variable_add(client, args) -> dict:
     return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
+def variable_delete(client, args) -> dict:
+    flow = _fetch_flow(client, args.id)
+    var = nodeparam.find_variable(flow, args.variable)
+    if not var:
+        raise UsageError(f"variable not found in process {args.id}: {args.variable}")
+    try:
+        change = nodeparam.delete_variable(
+            flow, var, allow_contract_change=args.allow_contract_change)
+    except ValueError as e:
+        raise UsageError(str(e)) from e
+
+    result = {"id": args.id, "title": flow.get("title"), "variable": var.get("name"), **change}
+    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+
+
 def variable_set_default(client, args) -> dict:
     import io as _io, json as _json
     flow = _fetch_flow(client, args.id)
@@ -531,6 +546,16 @@ def _vartype_args(p: argparse.ArgumentParser) -> None:
                    help="permit retyping an input (10) / output (30) variable - changes the public contract")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="retype + validate but do not PUT")
+
+
+def _vardelete_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--variable", required=True, help="variable name or id")
+    p.add_argument("--allow-contract-change", dest="allow_contract_change", action="store_true",
+                   help="permit deleting an input (10) / output (30) variable - changes the public contract")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="delete + validate but do not PUT")
 
 
 def _varrequired_args(p: argparse.ArgumentParser) -> None:
@@ -978,6 +1003,15 @@ ACTIONS = {
                     "by id, and nothing can already point at an id that did not exist. Refuses a "
                     "duplicate NAME (the form-event tooling resolves names to ids) and an unknown "
                     "direction. --dry-run previews."),
+    "variable-delete": ActionDef(
+        func=variable_delete, add_args=_vardelete_args, needs_client=True,
+        description="Remove ONE variable from a live process -> validate + flow-lint -> PUT. "
+                    "REFUSES while anything still references it - a node parameter bind, a "
+                    "source inside a Query Store Parameters map, an error-port variableErrorId, "
+                    "a subprocess input/output map - and NAMES every reference, because 'it is "
+                    "used somewhere' is not actionable. Refuses an input/output without "
+                    "--allow-contract-change. Renumbers nothing: a node's <%N%> indices address "
+                    "that node's own variable[] list, not the flow's. --dry-run previews."),
     "variable-set-default": ActionDef(
         func=variable_set_default, add_args=_vardefault_args, needs_client=True,
         description="Set (or --clear) one variable's defaultValue on a live process -> validate + "

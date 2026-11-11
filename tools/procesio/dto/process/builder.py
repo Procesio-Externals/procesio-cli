@@ -27,7 +27,7 @@ from pathlib import Path
 
 from tools.procesio.dto import refdata
 from tools.procesio.dto.framework import Component
-from tools.procesio.dto.process import naming
+from tools.procesio.dto.process import naming, selfdoc
 from tools.procesio.sqlformat import format_sql, is_unreadable
 from tools.procesio.errors import ProcesioAPIError, RemovalBlocked, UsageError
 
@@ -1478,18 +1478,28 @@ def build(config: dict, ctx: dict) -> dict:
             nodes[cid]["CustomData"]["name"] = nm
     actions = [nodes[cid] for cid in seq]
     _audit_config(actions)
-    _engine_layout(actions, {cid: node_id[cid] for cid in seq if node_id.get(cid)},
-                   ctx, config)           # final tidy layout (create) / scoped (edit)
+    # self-documentation: each action's purpose onto customData.description (config, or carried
+    # over from the live action while it still does the same thing); see selfdoc.py
+    doc_state = selfdoc.apply(config, ctx, nodes, seq, variables + error_vars)
+    id_of = {cid: node_id[cid] for cid in seq if node_id.get(cid)}
+    _engine_layout(actions, id_of, ctx, config)   # final tidy layout (create) / scoped (edit)
+    # areas (canvas shapes) fitted around their members' FINAL positions
+    canvas = selfdoc.canvas(config, ctx, doc_state, actions, id_of, lambda: _new_id(ctx))
+    holder = ctx.get("_doc")
+    if isinstance(holder, dict):          # read by the create/edit layer's documentation gate
+        holder.clear()
+        holder.update(doc_state)
     webhooks = _build_webhooks(config.get("webhooks", []), var_ids, ctx) + config.get("_webhooks", [])
     return {
         "Id": ctx["flow_id"], "ParentId": None, "Status": 1,
-        "Title": config["title"], "Description": config.get("description", ""),
+        "Title": config["title"],
+        "Description": doc_state["process"]["description"] or config.get("description", ""),
         "IsValid": True, "Active": True, "Timeout": int(config.get("timeout", 0)),
         "CurrentActionId": None, "DebugMode": False, "IsNotification": False,
         "Variables": variables + error_vars, "Actions": actions, "Webhooks": webhooks,
         "CustomResponse": (_custom_response(config.get("customResponse"), var_ids, ctx)
                            or config.get("_customResponse")),
-        "DataRetention": None, "CanvasData": None,
+        "DataRetention": None, "CanvasData": canvas,
     }
 
 
@@ -1984,17 +1994,20 @@ def _edit_ctx(client, resource_id, config, ctx):
         for la in live:
             cd = la.get("customData") or la.get("CustomData") or {}
             byname[(la.get("actionName") or la.get("name")
-                    or la.get("ActionName") or "")].append(cd.get("position"))
-        existing = {}
+                    or la.get("ActionName") or "")].append((cd.get("position"), la))
+        existing, matched = {}, {}
         for ca in config.get("actions", []):
             _tnm = _resolve_template(ca["action"], ctx).get("name")
             nm = ca.get("name") or naming.derive_action_name(ca, _tnm) or _tnm
             if byname[nm] and ca.get("id"):
-                existing[ca["id"]] = byname[nm].popleft()
+                existing[ca["id"]], matched[ca["id"]] = byname[nm].popleft()
         for auto, nm in (("start", "Start"), ("stop", "Stop")):
             if byname[nm]:
-                existing[auto] = byname[nm].popleft()
+                existing[auto], matched[auto] = byname[nm].popleft()
         ctx["existing_positions"] = {k: v for k, v in existing.items() if v}
+        # the live action each config id continues: its description is carried over while it
+        # still does the same thing, and the live areas' members map onto config ids through it
+        ctx["existing_actions"] = matched
     except Exception:  # noqa: BLE001
         pass
     ctx["_live_flow"] = flow          # the edit still needs the live CanvasData blob
@@ -2003,6 +2016,8 @@ def _edit_ctx(client, resource_id, config, ctx):
 
 def _edit(client, resource_id, config, ctx):
     ctx = _edit_ctx(client, resource_id, config, ctx)
+    if not isinstance(ctx.get("_doc"), dict):
+        ctx["_doc"] = {}
     dto = build(config, ctx)
     # Preserve the designer canvas blob across a desired-state edit. build() resets
     # CanvasData to None (a fresh process has none), but an edit must NOT drop the live
@@ -2013,9 +2028,10 @@ def _edit(client, resource_id, config, ctx):
     live_canvas = flow.get("canvasData")
     if live_canvas is None:
         live_canvas = flow.get("CanvasData")
-    if live_canvas is not None:
-        dto["CanvasData"] = live_canvas
+    if live_canvas is not None and dto.get("CanvasData") is None:
+        dto["CanvasData"] = live_canvas   # build() re-fits the areas and keeps the rest
     _removal_gate(dto, ctx)
+    ctx["_doc_report"] = selfdoc.gate(ctx)  # refuse an undocumented / stale save
     _save_gate(client, dto, ctx)
     client.put("/api/Projects", dto)
     return client.get(f"/api/Projects/{resource_id}")
@@ -2034,4 +2050,5 @@ COMPONENT = Component(
     edit=_edit,
     edit_ctx=_edit_ctx,
     save_gate=_save_gate,
+    doc_gate=selfdoc.gate,
 )

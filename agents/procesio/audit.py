@@ -166,10 +166,18 @@ def _practice_findings(flow: dict) -> tuple[list[dict], dict]:
                            "best-practices 10"))
 
     has_desc = bool(str(ci(flow, "description") or "").strip())
-    if not has_desc:
-        findings.append(_f("practice", "info", "missing-description",
-                           "process has no description; document it and the trigger order (SOP)",
-                           "best-practices 7"))
+    doc = documented_intent(flow)
+    if doc is None:                       # reader unavailable: keep the old minimal check
+        if not has_desc:
+            findings.append(_f("practice", "warn", "missing-description",
+                               "process has no description; document it and the trigger order (SOP)",
+                               "best-practices 7"))
+    else:
+        for d in doc["findings"]:
+            findings.append(_f("practice", "warn" if d["severity"] == "error" else "info",
+                               "doc-" + d["code"].lower().replace("_", "-"),
+                               d["detail"], "best-practices 7 (self-documenting processes)",
+                               action=d.get("action")))
 
     blob = json.dumps(flow, default=str).lower()
     error_handling = any(t in blob for t in
@@ -189,6 +197,9 @@ def _practice_findings(flow: dict) -> tuple[list[dict], dict]:
         "has_description": has_desc,
         "error_handling_detected": error_handling,
     }
+    if doc is not None:
+        summary["documented"] = doc["documented"]
+        summary["documentation_coverage"] = doc["coverage"]
     return findings, summary
 
 
@@ -213,8 +224,22 @@ def _secret_smells(actions: list[dict]) -> list[dict]:
     return out
 
 
+def documented_intent(flow: dict) -> dict | None:
+    """The process's documented intent (purpose, each action's purpose, areas) and its gaps,
+    from the procesio tool's reader. None when that reader cannot be imported - the auditor
+    stays usable on its own."""
+    try:
+        from tools.procesio.flowmodel import docs
+    except Exception:  # noqa: BLE001 - tool package absent: degrade, never crash the audit
+        return None
+    try:
+        return docs.read(flow)
+    except Exception:  # noqa: BLE001 - unknown shape: skip rather than invent a finding
+        return None
+
+
 def audit_process(flow: dict) -> dict:
-    """Full audit: correctness + practice findings + a summary."""
+    """Full audit: correctness + practice findings + a summary + the documented intent."""
     correctness = correctness_findings(flow)
     practice, summary = _practice_findings(flow)
     findings = correctness + practice
@@ -223,4 +248,11 @@ def audit_process(flow: dict) -> dict:
         counts[f["severity"]] = counts.get(f["severity"], 0) + 1
     summary["findings_by_severity"] = counts
     summary["title"] = ci(flow, "title") or ci(flow, "name")
-    return {"findings": findings, "summary": summary}
+    out = {"findings": findings, "summary": summary}
+    doc = documented_intent(flow)
+    if doc is not None:                   # what the process says it is for: read this first
+        out["intent"] = {"purpose": doc["purpose"], "areas": doc["areas"],
+                         "actions": [{"name": a["name"], "purpose": a["purpose"], "area": a["area"]}
+                                     for a in doc["actions"]],
+                         "notes": doc["notes"]}
+    return out

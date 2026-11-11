@@ -31,6 +31,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 BUNDLE = HERE / "action_catalog.json"
+CAPTIONS = HERE / "action_captions.json"
 AAT = HERE.parents[3]
 
 
@@ -139,6 +140,22 @@ def main() -> int:
                           encoding="utf-8", newline="\n")
         report["written"] = True
         report["bundled_after"] = len(bundle["actions"])
+    # Stock captions (the live `description` the designer pre-fills into an action's
+    # customData.description): an action still carrying one is undocumented. Built-in
+    # actions only, and only those in the bundle, so no workspace's connector names leak.
+    names = {x.get("name") for x in bundle["actions"]}
+    caps = {x["name"]: x["description"].strip() for x in live
+            if x.get("isProcesioAction") and x.get("name") in names
+            and isinstance(x.get("description"), str) and x["description"].strip()}
+    old_caps = (json.loads(CAPTIONS.read_text(encoding="utf-8")).get("captions", {})
+                if CAPTIONS.exists() else {})
+    merged = {**old_caps, **caps}
+    report["captions_changed"] = sorted(k for k in merged if old_caps.get(k) != merged[k])
+    if a.write and report["captions_changed"]:
+        doc = json.loads(CAPTIONS.read_text(encoding="utf-8")) if CAPTIONS.exists() else {}
+        doc["captions"] = dict(sorted(merged.items()))
+        CAPTIONS.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n",
+                            encoding="utf-8", newline="\n")
     print(json.dumps(report, indent=2))
     return 0
 

@@ -47,6 +47,10 @@ class Component:
     # Non-blocking warnings for a built DTO or a fetched resource, attached to
     # <name>-create / <name>-edit output as `warnings`. Never raises, never blocks.
     lint: Callable[[Any], list] | None = None
+    # Self-documentation gate (process): reads the report build() left in ctx["_doc"],
+    # raises errors.DocumentationMissing when the resource does not document itself
+    # (unless ctx["_allow_undocumented"]), and returns the report for the result.
+    doc_gate: Callable[[dict], Any] | None = None
 
     @property
     def schema_path(self) -> Path:

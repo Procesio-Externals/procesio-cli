@@ -320,3 +320,16 @@ caller. The value never reached the document, and every individual step looked c
 explicitly: the row's value when it has one, else the value passed in (or the reverse), and never
 let a read of a not-yet-written row overwrite an input. When tracing a value that "is not taken from
 the form", list every node that WRITES the variable, not only the ones that read it.
+
+## How much data a Node can take in, and what a Data Store read returns (measured 2026-11)
+
+- **A Data Store `SelectRows` with no `Page Item Count` returns EVERY row**, not a first page. A 33,720-row
+  store came back whole.
+- **The Node engine has a request-size ceiling, not a row limit.** Injecting that whole store into a Node
+  (`[<%0%>][0]`) failed the action with `Node engine returned HTTP 413.` (about 8 MB of rows). A generated
+  list of 3,000 rows (4.4 MB as JSON) passed through `<%0%>` into a second Node intact. So the ceiling sits
+  between those two sizes; plan for about 4 MB per Node input.
+- **Size the rows, not just the count.** A matching or digest Node that reads a whole store grows with every
+  row; keep per-row JSON compact (round vectors, cap free text) and page the read, or pre-aggregate in a
+  schedule, before a store approaches a few MB. A 413 is a hard action failure (instance status 40), unlike a
+  JS error, which only sets the Node's Error output.

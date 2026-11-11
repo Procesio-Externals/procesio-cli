@@ -3467,7 +3467,10 @@ one object, the best configuration that works.
 
 **Reading them:** `datastore-get-rows` returns `result.columns` plus a paged
 envelope at **`result.rows.pageItems`** with its own `totalItemCount` - not the
-top-level `pageItems` that processes and credentials use.
+top-level `pageItems` that processes and credentials use. It returns 50 rows unless
+you pass `--page-size`, and new rows don't come first, so a check that reads one page
+passes until the store outgrows it, then stops seeing the rows it just wrote. The
+Data Store action's `SelectRows` inside a process had no such cut-off at 92 rows.
 
 ## Data Stores in an export pack: measured, after the tool was fixed
 
@@ -6548,8 +6551,12 @@ as UNCONNECTED) can be re-stamped valid after the edit rather than left marked b
 ## ⚠ Surgical live edits, part 2: single-inbound decisionals, error ports, failure-path defaults (measured 2026-09-20)
 
 - **A Decisional accepts ONE inbound edge.** Adding a second path into an existing decisional fails FE
-  validation with `Action has too many input ports`; route both paths through a Join first. A Call
-  Subprocess / Node target has no such limit, but a Join before it costs nothing and keeps the layout readable.
+  validation with `Action has too many input ports`; route both paths through a Join first. A Node
+  takes ONE inbound too (BE 383 `Action has too many input ports.`, measured 2026-11), and an action's normal and
+  error ports cannot both go to the same action (`Duplicate connection port!`). So when an action and its error path
+  must meet at a script: normal port to a Join, error port to a second Join, second Join to the first, first Join to
+  the script. Another action's error port can go straight to the first Join. A Call Subprocess target was seen
+  without this limit, but a Join before it costs nothing and keeps the layout readable.
 - **An error port is three things, not one:** the port (`type: 1`, `data: {"isDefault": "error"}`), the node's
   `variableErrorId`, and that variable being `isError: true` of the error datatype
   (`10c6ac59-3929-49e6-99dc-121212121220`). A plain string variable there validates and never fires. A Node
@@ -7167,6 +7174,14 @@ Reported to engineering as product and docs findings; until they change, plan ar
 - **A debug run pauses with no debug client attached:** `POST .../instances/{id}/launch?debugMode=true`
   with `connectionId: null` reaches status 45 once the marked action has ended, so a breakpoint on a
   long Delay pauses only after the wait. On the action, `breakPoint` is the object `{"enabled": true}`.
+- **An instance stuck in "starting" (status 1) CAN be stopped over the API** (measured 2026-11, a
+  backlog of them with 0 actions, every call answered 200): `stop-instance --id <iid>
+  --flow-template-id <pid> --workspace-id <ws>`. Find them with
+  `list-instances --id <pid> --status 1`. Status becomes 6 and the instance drops out of the
+  `/instances` list shortly after, so that list shrinks while you page it: re-read it right before
+  acting. `updatedOn` does not move on a stop, so it cannot date one. A process queried in the wrong
+  workspace answers an EMPTY page, not an error, so an empty list does not prove there are no runs.
+  Status 6 is not proof of a stop call either: a run can reach it by itself within milliseconds.
 - **Test Action results arrive over the push channel** (`notifications.procesio.app`), as do live
   status updates in the instance view. With that host blocked (a browser `block_urls` rule, or a
   corporate proxy) Test Action shows "We are sending the request" forever, with no time-out.
@@ -8193,6 +8208,10 @@ Measured on a process that holds an invoice and asks a person, driven through th
   the record right after it, so a failed check leaves no task behind.
 - **A task is a snapshot.** A template edit, events included, does not reach an instance raised earlier.
   When testing, delete the pending task (`delete-form-by-id`) and raise a new one.
+- **Check that the record is still open before applying a decision (measured).** A decision can arrive for a record
+  that stopped waiting for one: a task left open across a reset, a second tab, a repeated call. Without a check, a
+  repeated approve produced the same document again, and a late reject marked an already issued record as rejected.
+  Read the record first, and let a Decisional refuse anything not in the waiting status, with no write.
 - **`FORM_LOAD` with `RUN_PROCESS` runs on the review page** (`forms/assignments/<instanceId>`) and its output
   map fills read-only fields. Write it with `form-update --data-file '{"events": [...]}'`, map rows as in
   FORM-DEV-GUIDE 06 (variable GUID left, value path right). `form-set-element-event` covers element triggers
@@ -8231,7 +8250,7 @@ Measured on a process that holds an invoice and asks a person, driven through th
   `node-replace-text` and the other `node-*` edits keep the ids. To check this yourself, compare variable by
   variable: an `all(...)` over the list fails on the error variable alone and reads as if every id changed. An edit
   that removes an action or variable also needs `--allow-remove`, otherwise nothing is saved and the old process
-  keeps running.
+  keeps running. Actions are matched by name too, so renaming one counts as removing it.
 - **A failed read of the live process stops `process-edit`.** The edit needs the live variable ids, so without
   them it writes nothing and reports the read's own status: going on would give every variable a new id and leave
   the removal check nothing to compare against. `--dry-run` still previews, with new ids, and names the failure in
@@ -8250,3 +8269,76 @@ A process saved with a title containing `Î` came back from `GET /api/Projects` 
 `&#206;`. `ă`, `ș` and `ț` (outside Latin-1) stayed as written, and `î` in the process description was
 not touched. Other Latin-1 letters in a title were not tested, so assume they behave the same. Choose a
 title without one, or decode it before comparing names.
+
+### Retry a Call API once inside a process (measured 2026-11)
+
+- **`Time Out` on `Call API` accepts 60-3600 only.** A smaller value is refused by the designer
+  validation (`LIMIT_RANGE`, "Please make sure that the value is between 60 and 3600"), so a
+  "give up after 10 s" retry cannot be expressed with it; leave it at the default and retry on the
+  status instead.
+- **Pattern that saves and runs:** `Call API` (status -> integer var) -> rule `Decisional`
+  (`EQUALS` 200 -> continue; default -> a `Join`) -> `Delay` (`{"Delay Type": "1", "Delay value":
+  {"value": {"value": "3", "interval": 1}}}`) -> second `Call API` into the SAME body variable and a
+  second status variable -> `Join` -> the parser, which takes `[retry][0] || [first][0]`. Give the
+  first call `onError` -> the retry `Join`, so a connection failure or time-out also retries.
+- **Never point an action's normal edge and its `onError` at the same node.** The back end rejects
+  the save with `Duplicate connection port! SourceId:<action>, DestinationId:<node>`. Route the error
+  edge into a `Join` of its own, then that `Join` into the shared one.
+- **`Call API` follows redirects.** A URL the server answers with 302 comes back as the 200 of the
+  page it redirects to, so do not read "not found" from the status alone; check the body too.
+
+### One email per person from a list, inside a process (measured 2026-11)
+
+- **Shape that saves and runs:** a `Node` returns an array of plain objects through **`List Result`**
+  into a list variable typed with a data model (create the model first with `datatype-create`, all
+  string attributes) -> `For Each` (`For Each Item` = a NON-list variable of the same model, `In List`
+  = the list, `Action timeout` set: the designer refuses an empty one) -> `Send Email` with `To`,
+  `Subject` and `Body` bound to the item's attributes by path (`{"var": "item", "path": ["<attribute
+  id>"]}`), `Body is Html` = true -> a `Data Store` InsertRows bound the same way -> back to the loop.
+  Verified end to end: one real email out, one log row in.
+- **Keep one bad address from stopping the batch:** give `Send Email` an `onError` edge into its own
+  `Join`, and its normal edge into a second `Join`; the second `Join` leads to the log insert. A
+  failed send then still writes its log row, so the next run does not retry it forever and the rest of
+  the list still goes out. (A normal edge and an `onError` edge into the SAME node fail the save with
+  "Duplicate connection port".)
+- **`create-schedule` answered HTTP 500 (code 100)** for a cron schedule whose `recurrence` carried
+  `isEndDate: true` plus an `endDate`. The same call with `isEndDate: false` and a `notification`
+  block shaped like an existing schedule's (`emailList`, `isEnabled`, `onSuccess`, `onFail`) saved.
+  Copy the shape of a schedule that `get-schedule` returns, and stop or delete a time-boxed
+  schedule yourself when its window ends.
+
+## Self-documentation fields: process purpose, action purpose, canvas shapes (measured 2026-11-11)
+
+Measured with a PUT/GET round trip on a test workspace and read from the canvas-engine and
+user-playground source. The tool writes all three on every `process-create` / `process-edit`
+(`dto/process/selfdoc.py`, `layout/areas.py`); this section is the wire contract.
+
+- **Process purpose** = the flow's `description` (top level, beside `title`). Persists on POST
+  and PUT, as sent. The builder used to send `""` when an edit config omitted it, which
+  overwrote the live purpose; it now carries the live value over.
+- **Action purpose** = `actions[].customData.description`. `ActionDto` has no description field;
+  the designer keeps it in `customData`, edits it in the Properties panel "Description" field and
+  shows it as the node's hover tooltip. When an action is dropped on the canvas the designer fills
+  it with the template's catalog caption (`GET /api/Actions` -> `description`, e.g. "Generates a
+  GUID value."), so a description equal to that caption documents nothing. The builder never wrote
+  this field before; it persists exactly as sent.
+- **Canvas shapes** = `canvasData.shapes[]`, each exactly `{id, kind, position {x, y},
+  dimension {width, height}, title, text, zIndex, style}`. `kind`: 0 rectangle, 1 ellipse,
+  2 diamond. `position` is the TOP-LEFT. `zIndex` is clamped into the shape band [-1000, -1]
+  (connectors are 0), so shapes always draw behind lines and nodes. `style` keys: `fillColor` /
+  `borderColor` / `titleColor` / `textColor` (PIXI numeric colours), `fillAlpha` 0..1,
+  `borderWidth`, `radius`, `titleAlign` (0 left, 1 centre, 2 right), `titleFontSize`,
+  `textFontSize`. The title is drawn at the top, the text wrapped under it at 12px.
+  `canvasData` also carries the viewport `{x, y, zoom}`.
+- **The designer rebuilds both blobs from fixed keys on every save**: `customData` from the node
+  (`type, name, description, icon, position, configuration, inputPorts, outputPorts, wasDropped,
+  areaSize`) and `canvasData` from the viewport plus each shape's `toModel()`. Any extra key placed
+  in either is lost on the next designer save, so nothing (a group id, a fingerprint) can be hidden
+  there. Which actions an area holds has to be read geometrically: the rectangle that contains the
+  action's centre (a square node's position is its centre; a For Each frame's position is its
+  top-left plus `areaSize`).
+- The designer does NOT move shapes when a user drags actions; a re-layout through the tool does
+  (`adapter.layout_flow` re-fits them).
+- The platform rewrites some stored settings: a For Each `Action start time` sent as
+  `2010-01-01T00:00:00Z` comes back `2010-01-01T00:00:00.0000000Z`. Any comparison of "did this
+  action change" across a save has to normalise timestamps (and number vs string) first.

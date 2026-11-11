@@ -113,6 +113,51 @@ no tag, Web-Api has it in v3.3.0-rc.2 (upload codes 270 to 273 start there), and
 change is in user-playground v1.117.0-rc.2. What prod does today is measured in the Action-Core v2.2.0 part
 of the v3.1.0 / v3.2.0 wave section in `PROCESIO-API-NOTES.md`.
 
+## What upload refuses (measured on prod, 2026-11)
+
+⚠ **A clean build can be refused at upload.** Upload reads the assembly names the action's own DLL
+references, following type forwarders, and answers `214` "Forbidden namespaces" with one entry per
+name: "The namespace X is forbidden." for a blacklist prefix, "The namespace X is not allowed." for
+a miss on the whitelist. The compiler picks those names, not the `using` lines. The lists are
+`WebApi/Application/configs/packages.json`, and three probe uploads matched the Web-Api v3.2.0 copy
+name for name.
+
+| Code | Refused assembly |
+|---|---|
+| `array.Contains(x)`, `text.Split(",").Contains(x)`, `array.SequenceEqual(y)` (C# 14 binds them to `MemoryExtensions`), `.AsSpan()` | `System.Memory` |
+| `List<T> x = ["a", "b"];` | `System.Runtime.InteropServices` |
+| `lock` on a plain object, `Monitor`, `Interlocked`, `Volatile`, `SemaphoreSlim`, `ManualResetEventSlim`, `ReaderWriterLockSlim`, `ThreadLocal<T>` | `System.Threading` |
+| `dynamic` | `Microsoft.CSharp`, `System.Linq.Expressions` |
+| `ExpandoObject`, `Expression<...>` | `System.Linq.Expressions` |
+| `SmtpClient`, `MailAddress`, `System.Net.Mail.MailMessage` | `System.Net.Mail` |
+| `XDocument`, `XElement` | `System.Xml.XDocument` |
+| `XPathDocument`, `XmlSerializer` | `System.Xml.XPath`, `System.Xml.XmlSerializer` |
+| `DataContractSerializer` | `System.Private.DataContractSerialization`, through a forwarder |
+| `ZipArchive`, `GZipStream`, `DeflateStream` | `System.IO.Compression` |
+| `ObservableCollection<T>` | `System.ObjectModel` |
+| `Dns`, `TcpClient`, `SslStream` | `System.Net.NameResolution`, `System.Net.Sockets`, `System.Net.Security` |
+| `ClaimsPrincipal` | `System.Security.Claims` |
+| `Process` | `System.Diagnostics.Process` |
+
+- **The replacements** are in the AI Connector Builder's `knowledge/spec-modules/nuget-packages.md`,
+  "Code the Upload Refuses". `lock` on a `System.Threading.Lock` field passes, and sending mail
+  through `SMTPCredentialsManager.Client.SendEmail` with the SDK's own `MailMessage` passes.
+- **Bundled DLLs aren't screened this way.** The check runs only on DLLs that reference Action-Core.
+  The bundled Newtonsoft.Json references refused names the upload never reported.
+- **Passed in the same uploads:** `File`, `Stream`, `Regex`, `HttpClient`, `XmlDocument`, `SHA256`,
+  `HMACSHA256`, `RSA`, `JsonSerializer`, `DataTable`, `ConcurrentDictionary`, `Thread`, `Timer`, LINQ.
+
+**How to probe this without leaving anything behind.** Upload runs the `.nuspec` check, then this
+screening, then decorator validation, and only then the store push. So leave
+`ClassDecorator.Description` empty and one property without `[Validator]`, and nothing can reach the
+store whatever the screening answers. All the refused names come back in one answer, so one package
+can test many references. Reference something blacklisted as a control (`Process.GetCurrentProcess()`):
+if it isn't reported, the screening didn't run, because PROCESIO admin uploads skip it. A machine with
+only the .NET 8 SDK can still build a faithful package: fetch `Microsoft.NETCore.App.Ref` 10.x and
+`Microsoft.Net.Compilers.Toolset` 5.x with `PackageDownload`, compile with its `tasks/net472/csc.exe`
+at `/langversion:14`, and zip `lib/net10.0` beside the `.nuspec`. Measured on a package built this way,
+not on one built by the .NET 10 SDK.
+
 ## Lifecycle - plan for it, it is unusually rigid
 
 - **A Custom Action cannot be updated in place.** The only route is a new package version
@@ -132,7 +177,9 @@ of the v3.1.0 / v3.2.0 wave section in `PROCESIO-API-NOTES.md`.
 ## The dependency whitelist - two lists, and the second is the sharp one
 
 "Other libraries that are not offered by Microsoft need to be whitelisted with us." The
-docs publish both lists as a JSON configuration block.
+docs publish both lists as a JSON configuration block. **This section reads the public docs, whose
+lists are an older subset.** What prod enforces is in "What upload refuses" above: `System.Net.Http`,
+`System.Security.Cryptography` and `System.Text.Json`, for example, do pass.
 
 **Packages:** `Ringhel.Procesio.Action.Core`, `Newtonsoft.Json`, `JetBrains.Annotations`,
 `SimMetrics.Net`, `CsvHelper`, `DocumentFormat`, `DocumentFormat.OpenXml`,

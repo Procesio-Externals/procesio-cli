@@ -215,3 +215,23 @@ iteration** binding the loop ITEM's data-model attributes. Concretely:
   list before using it. With Ignore case off, capitalised addresses are skipped.
 - **Designer save adds a `ProcessInfo` internal variable** to an API-built process; it shows in the instance
   Variables list of every later run.
+
+## One model call per row, no data model needed (live, 2026-11)
+
+- **A Text list drives a For Each with a Call API inside, no custom data model.** A Node with `List Result`
+  bound to a `string` list variable returns one complete request body per item (an array of JSON strings);
+  the For Each item variable is a plain `string`, and the Call API `Request Parameters` template binds it as
+  the RAW JSON body (`'value': '<%0%>'`, `vars: [<item var>]`). Verified with an OpenAI chat-completions REST
+  credential, ten calls per run.
+- **Carry the row's identity inside the request, then read it back.** The step after the call needs to know
+  which row the answer belongs to. Put the row key and a content hash in the user message JSON (tell the
+  model to ignore them), then `String To Base64` the item and let a Node decode it and parse
+  `messages[1].content`. A second small Node returns just the key for the Data Store Where/Set Values, since a
+  Node has one result.
+- **Make the call idempotent with a content hash.** Store the hash with the result and skip rows whose current
+  hash matches, so a schedule can run every few minutes and the model reads each version of a row once.
+  Bump a version prefix inside the hash when the prompt changes, so every row is re-read once.
+- **Write a failure as a row too.** On an unparseable answer, store `{err: true, t: tries}` under the same
+  hash and retry only while `t < 3`; otherwise one bad row is re-sent on every run.
+- **The For Each `Action timeout` caps at 600** (designer `LIMIT_RANGE` error above that); keep the batch
+  small enough to finish inside it.

@@ -126,6 +126,11 @@ _PERSISTENT_STORAGE_JS = r"""
 """
 
 
+def _profile_marked_headed(user_data_dir: str) -> bool:
+    import os
+    return os.path.exists(os.path.normpath(user_data_dir).rstrip("\\/") + ".headed")
+
+
 class PlaywrightDriver:
     """Production ``BrowserDriver`` backed by Playwright's sync API.
 
@@ -170,6 +175,14 @@ class PlaywrightDriver:
         # (a 400 launch, a JS exception) instead of only guessing from a screenshot.
         self._diag = {"console": [], "page_errors": [], "failed_requests": [], "bad_responses": []}
         self._cdp = None  # DevTools session on the page, opened by the first cdp() call
+        self._profile_lock = None  # held while a persistent profile is open
+        # A ``<profile>.headed`` marker beside a persistent profile forces a real
+        # (non-headless) browser, parked off-screen, for every opener of that
+        # profile. For sites that drop a session when the client that was linked
+        # headed reconnects headless (suspected for WhatsApp Web, 2026-11-08).
+        if user_data_dir is not None and headless and _profile_marked_headed(user_data_dir):
+            self._headless = False
+            self._extra_args.append("--window-position=-32000,-32000")
 
     # --- lifecycle --------------------------------------------------------
     def start(self) -> "PlaywrightDriver":
@@ -182,6 +195,11 @@ class PlaywrightDriver:
         try:
             self._pw = sync_playwright().start()
             if self._user_data_dir is not None:
+                # One browser per profile: a second Chromium on the same
+                # user-data-dir resets the quota database and wipes the stored
+                # login (see profilelock.py). Held until close().
+                from tools.web.profilelock import ProfileLock
+                self._profile_lock = ProfileLock(self._user_data_dir).acquire()
                 # Persistent profile: one call returns a context (no separate
                 # browser object). The native on-disk profile carries the login.
                 ctx_kwargs: dict[str, Any] = {"headless": self._headless,
@@ -320,6 +338,11 @@ class PlaywrightDriver:
             except Exception:  # noqa: BLE001 - best-effort teardown
                 pass
         self._page = self._context = self._browser = self._pw = self._cdp = None
+        # Release only after the browser is closed, so the next opener never
+        # overlaps a still-running Chromium on this profile.
+        if self._profile_lock is not None:
+            self._profile_lock.release()
+            self._profile_lock = None
 
     # --- helpers ----------------------------------------------------------
     @property

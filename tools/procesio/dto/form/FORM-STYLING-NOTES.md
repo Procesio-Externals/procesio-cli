@@ -140,3 +140,27 @@ side-panel (element types section, list, columns, stepper, tabs, side-panel). Th
 accepts them additively today (`_alignment_props`); when the golden `data_shell.json` is
 refreshed from the launched `form-theme.ts` the golden's native definition (proper dropdown
 type + option list) wins.
+
+## Buttons render LAST inside a section (2026-11)
+
+The runtime moves a section's `button` controls to the end of the section's container, whatever
+their position in `Data.elements` (measured on a public form: input, button, paragraph rendered as
+input, paragraph, button). The container `.form-builder--section--container` is a flex column, so
+put the order back with CSS `order` on its children, using `:has()` for wrappers you cannot class
+directly:
+
+```css
+.form-builder--section--container > :has(.my-button-class) { order: 3; }
+.form-builder--section--container > .my-paragraph-class { order: 4; }
+```
+
+`classes` on a paragraph land on its wrapper div (the container's direct child); on a button they
+land on the button element, hence `:has()`.
+
+## Readable form URL: the workspace slug (2026-11)
+
+`forms.procesio.app/{masterSlug}/{workspaceSlug}/{formSlug}` needs all three. A workspace with no
+slug gets one with `post-customurl-workspace --workspace-id <ws> --body '"<slug>"'`: the body is a
+bare JSON string. An object body (`{"Type":2,"Url":...}`) answers 400 "Unexpected character
+encountered while parsing value". The form slug is `post-customurl-formtemplate` with
+`{"Type":3,"EntityType":1,"EntityId":<formId>,"Url":<slug>}`.

@@ -889,6 +889,95 @@ it only on a change leaves every quiet record permanently due and the interval n
 - which is the same bug the window was meant to fix, hidden one level deeper. Put the stamp
 in the unconditional part of the update and make the real change conditional beside it.
 
+**Size the near interval BELOW the timer's period.** The interval is how long a record is
+left alone, so a window equal to the tick catches a near record only on the runs where the
+clock happens to have passed it - in practice every second run, and never predictably. The
+pass still looks correct in a log and the gap only shows up as a late detection. Keep the
+window comfortably shorter than the tick (measured: a 10-minute window against a 15-minute
+schedule re-reads every near record on every run; checked at 5 and 9 minutes it is skipped,
+at 11 it is read).
+
 Cost, for scale: a poll of N future records on an M-minute timer is N × 1440/M remote calls
 a day whatever happens. Windowed as above it is a couple of hundred, and the detection it
 provides is unchanged.
+
+## A per-record setting must travel WITH the record, not be read once from the request
+
+A rule like "leave N minutes of air around this kind of booking" is stored on the kind, so the
+natural way to apply it is to read N for the kind being booked and pad every existing record by
+it. That is wrong in one direction only, which is why it survives review: as long as the request
+asks for the LARGER buffer the answer is right, and the case where it is wrong is the one nobody
+writes a test for - the short, buffer-less kind walking straight up to the record that asked for
+half an hour of air. The person configured the rule on the kind that needs it and gets
+back-to-back bookings anyway.
+
+The fix is mechanical: make the busy list carry each record's OWN value as a column, and let the
+generator keep `max(requested, stored)` per entry. Two details that are easy to miss:
+
+- **LEFT JOIN to the kind, never INNER.** A record whose kind was deleted still occupies its
+  hour. An inner join drops it out of the busy list entirely, which does not merely get the
+  padding wrong, it frees a slot that is taken.
+- **Entries with no kind** (an external calendar, an imported block) have nothing to read, so
+  they keep the requested value. Say so in a comment or the next reader will call it a bug.
+
+**Fix it in the READ and the WRITE in the same change.** A booking system has two places that
+answer the same question: the one that offers the times, and the one that accepts a chosen time.
+They are usually written at different moments and drift apart silently, because nothing compares
+them. Whatever padding the offer applies, the acceptance check applies the same, down to
+`GREATEST(@requested, COALESCE(stored, 0))` in the overlap test - otherwise a stale page, or
+anyone posting directly, books the slot the page correctly refused.
+
+## Testing the not-found branch: never overwrite a live remote id with a fake one
+
+The obvious way to see what a reconciler does when the remote record is gone is to put a
+made-up id in the row and run the pass. It works, and it **orphans the real record**: that
+column was the system's only handle on it, so once it is overwritten nothing will ever delete
+the thing it pointed at, and no error is raised anywhere because from the system's side the
+work is done.
+
+The symptom surfaces far from the cause. Here it was a booking slot that stayed busy with no
+meeting behind it, because the availability engine asks the calendar directly while the rest of
+the system reads its own store - two sources that only disagree once a remote record has no
+local owner.
+
+Do it in two steps instead: let the system **delete its own remote record first**, through the
+ordinary cancel or retire path, and only then write an id the remote side has never heard of.
+The branch under test is reached either way and nothing is left behind.
+
+To clear an orphan that already exists, do not reach for the remote API by hand. Write a row
+whose id field holds the orphan and whose status is the one the retire path acts on, run the
+pass, and delete the row: the system removes its own record through the code that is supposed
+to, which also proves that path still works.
+
+## Dropping a column from a statement renumbers the WHOLE node, map and outputs included
+
+One `<%N%>` sequence runs across everything a Query Store node holds, in this order: the
+statement's data store chips, then each source in the **Parameters map**, then the output
+bindings. So a statement that names one chip fewer does not just shift its own indices - the
+map's sources and the outputs all move down one, and a save that rewrites the statement alone
+leaves the node reading the wrong variables with no error anywhere.
+
+`node-set-query` refuses that case rather than guessing: *"this node's Parameters map is not
+empty, and its sources share one index sequence with the statement's chips"*. Restate the map
+with `--params` and `{"keep": true}` per entry (the destination names, not the sources) and the
+whole node is renumbered together. The map's destinations are the `@name` tokens the statement
+already uses, so they can be read straight off the node rather than invented.
+
+**Removing a column that every read filters on and no write ever sets is free.** A condition
+over a column whose every row holds one value is always true, so dropping it cannot change a
+result set. Check the WRITE side before assuming a flag is live: a column three queries filter
+on and nothing populates is a feature that was never finished, not a mechanism, and the filter
+is what makes the next reader believe otherwise.
+
+## Data store API: three refusals and one response shape (measured 2026-11)
+
+- **`description` over 255 characters:** `datastore-create` answers HTTP 500 `The data store could not be saved.
+  (code 1001)`, naming nothing. 255 passes, 300 fails. Say the rest elsewhere.
+- **Rows with different keys in one call:** `datastore-add-rows` answers HTTP 400 `All rows in a batch must have the
+  same set of column aliases. (code 502)` and stores none of them. Give every row the same keys, or send one call
+  per shape.
+- **`datastore-get-rows` nests its rows** at `result.rows.pageItems`, beside `result.columns`, with the count at
+  `result.rows.totalItemCount`. A check that reads `result.pageItems` gets nothing and looks like an empty store, so
+  a "nothing left behind" check written that way proves nothing.
+- **A primary key does not stop two spellings of one value.** Text dates `2026-12-26` and `26.12.2026` are different
+  keys, so a rule that accepts both has to look for both.

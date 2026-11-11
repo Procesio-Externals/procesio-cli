@@ -533,6 +533,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 |---|---|---|
 | `process-create` | — | Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill… |
 | `process-delete` | `--id` | Delete a resource by id (DELETE /api/Projects/{id}). |
+| `process-docs` | `--id` | Read a process's DOCUMENTED INTENT: its purpose (description), each action's purpose in it (customData.description; a template's stock caption counts as… |
 | `process-edit` | `--id` | Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no… |
 | `process-fe-validate` | `--id` | Front-end (designer-layer) 'Process Errors' validation on a live process — the client-side check that BLOCKS designer Save but which POST… |
 | `process-rename` | `--id`, `--title` | Rename a live process (its title) -> validate + flow-lint -> PUT. The title is cosmetic (wiring is by id), so this is the safe way to give a '... (Copy)' from… |
@@ -679,6 +680,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | action | required args | what it does |
 |---|---|---|
 | `variable-add` | `--id`, `--name`, `--data-type`, `--direction` | Add ONE variable to a live process (name, data type, direction) -> validate + flow-lint -> PUT. Safe for existing wiring: everything else addresses variables… |
+| `variable-delete` | `--id`, `--variable` | Remove ONE variable from a live process -> validate + flow-lint -> PUT. REFUSES while anything still references it - a node parameter bind, a source inside a… |
 | `variable-set-default` | `--id`, `--variable` | Set (or --clear) one variable's defaultValue on a live process -> validate + flow-lint -> PUT. This is how an input stops being something the caller must… |
 | `variable-set-required` | `--id`, `--variable`, `--required` | Set or clear one INPUT variable's isRequired flag on a live process -> validate + flow-lint -> PUT. Clearing it is allowed outright (no existing caller… |
 | `variable-set-type` | `--id`, `--variable`, `--data-type` | Retype one variable of a live process (dataType, optionally isList) -> validate + flow-lint -> PUT. Refuses an input/output variable without… |
@@ -698,6 +700,12 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `webhook-edit` | `--id` | Edit a PROCESIO webhook (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the… |
 | `webhook-get` | `--id` | Get one resource by id (GET /api/Webhooks/{id}). |
 | `webhook-launch` | `--id` | Fire a webhook-triggered process with a payload (POST /api/Webhooks/launch/{id}). |
+
+### workspace
+
+| action | required args | what it does |
+|---|---|---|
+| `workspace-docs` | — | Documented intent across a WORKSPACE: every process with its purpose, areas, documentation coverage and gaps (--details adds every action's purpose;… |
 
 ---
 
