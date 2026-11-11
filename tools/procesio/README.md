@@ -170,6 +170,7 @@ Config shapes (full schemas in `dto/<component>/config.schema.json`):
 procesio list-processes        --profile personal [--search inv] [--page 1 --page-size 20]
 procesio process-docs          --profile personal --id <pid>     # documented intent: purpose, action purposes, areas, gaps
 procesio workspace-docs        --profile personal [--details | --purpose-only]   # the same for every process
+procesio process-screenshot    --profile personal --id <pid> --out canvas.png   # the Process Designer view (headless, framed)
 procesio get-process           --profile personal --id <pid>
 procesio get-process-payload   --profile personal --id <pid>   # input shape for run
 procesio run-process           --profile personal --id <pid> --payload '{"x":1}' [--dry-run]

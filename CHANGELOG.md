@@ -19,6 +19,10 @@ there, not here.
   action, or an area that lost one.
 - `process-docs` reads one process's documented intent and gaps; `workspace-docs` does it for
   every process in a workspace.
+- `process-screenshot` saves the Process Designer view of a process as a PNG: headless, signed
+  in with the profile's own session, every action and area framed at real scale. Areas are
+  fitted to where the designer draws an action (its stored position is the icon's top-left),
+  so they sit evenly around their actions with every label inside.
 - Area shapes follow their actions through `relayout-process`, `layout-flow` and every save
   that arranges the canvas. `flow-lint` reports a `documentation` block, `flow-digest` opens
   with the purpose and the areas, and the agent's `audit` and `verify` report the documented

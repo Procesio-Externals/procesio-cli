@@ -34,6 +34,7 @@ routing:
   - layout / re-lay-out a process canvas; read or inspect a flow graph
   - what is this process for / read a process's documented purpose, action purposes and canvas areas
   - which processes in this workspace are undocumented / map a workspace I do not know
+  - see a process in the designer / screenshot a process canvas / check how the areas and actions look
   - list forms / list documents; get or toggle a process; AI Decisional
   - switch procesio environment / work on PROCESIO Main-QA / Main-DEV / a client env
   - list / add / set the default procesio environment (<Client>-<ENV>); bind a credential to an environment
@@ -80,6 +81,14 @@ requires:
       That silence is the reason it must be declared here.
     check: npm ls elkjs --prefix tools/procesio/layout/elk
     install: npm install --prefix tools/procesio/layout/elk
+  - name: playwright-chromium
+    kind: browser
+    why: >
+      process-screenshot opens the Process Designer in a headless Chromium. `uv sync`
+      installs the Playwright package, not the browser binary, and Playwright is imported
+      lazily, so every other procesio action works and only that one fails without it.
+    check: '{python} -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); p.chromium.executable_path; p.stop()"'
+    install: uv run playwright install chromium
 
 actions:
 - name: add-credential
@@ -10950,6 +10959,41 @@ actions:
     type: boolean
     required: false
     description: patch + validate but do not PUT
+- name: process-screenshot
+  description: 'Screenshot a live process in the Process Designer, as a person sees it: opens the designer headless with the profile''s own sign-in (a userpass profile; no saved browser login), pans every action and canvas area into view at real scale and writes a PNG. Read-only: nothing is clicked or saved. Use it to check what the API cannot show - areas around their actions, labels clear of borders, connector routing. Needs the Playwright Chromium browser. Workspace-scoped: pass --workspace-id.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: out
+    type: string
+    required: true
+    description: PNG file to write
+  - name: no-fit
+    type: boolean
+    required: false
+    description: keep the stored viewport instead of panning the content into view
+  - name: settle-ms
+    type: integer
+    required: false
+    description: wait after the canvas appears, for the designer to draw (default 2500)
+  - name: headed
+    type: boolean
+    required: false
+    description: show the browser window
 - name: process-toggle-activation
   description: 'Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). --state true|false is REQUIRED: despite its name the endpoint is a setter, and it reads the target from a `state` request header - called without it, it deactivates every time while reporting success. The response says nothing either way, so this reads `active` before and after from the list-processes projection and warns when the result is not what was asked for.'
   args:
