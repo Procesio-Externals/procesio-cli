@@ -13,14 +13,16 @@ Create or change one PROCESIO process and prove both its saved design and repres
 ## Inspect
 
 1. Read agent guidance for the current build/test doctrine.
-2. Fetch the existing process and input payload shape when editing or running.
-3. Inspect dependencies: data models, credentials, child processes, documents, webhooks, schedules, forms, and custom actions.
-4. Record activation state and a compact before-state.
-5. Before editing a process used by a form, webhook, schedule, or child process, snapshot its public variable IDs, types/directions, custom-response contract, and every dependent mapping. A seemingly additive output or response change can orphan callers.
+2. Read the documented intent before the parameters: the process purpose, each action's purpose and the areas on the canvas (`process-docs`; for a workspace, `workspace-docs`). Treat a gap there as part of the work, not as noise. To see the canvas as a person does (areas, labels, connectors), `process-screenshot --id <pid> --out <png>` saves the Process Designer view as a PNG.
+3. Fetch the existing process and input payload shape when editing or running.
+4. Inspect dependencies: data models, credentials, child processes, documents, webhooks, schedules, forms, and custom actions.
+5. Record activation state and a compact before-state.
+6. Before editing a process used by a form, webhook, schedule, or child process, snapshot its public variable IDs, types/directions, custom-response contract, and every dependent mapping. A seemingly additive output or response change can orphan callers.
 
 ## Preview and approval
 
 - Build or edit through the structured process DTO path; use dry-run/validation before save when available.
+- Every saved process documents itself: its purpose, each action's purpose in this process (not the action type's generic caption), and, past 3 actions besides Start/Stop, titled areas on the canvas that group the actions by what they do together. The tool refuses a save without them. On an edit, restate the purpose of every action whose behaviour changes, give new actions a purpose and an area, and restate the areas when an action leaves one.
 - Inspect the generated action graph, mappings, branches, error ports, and output variables.
 - Treat create, edit, activation, run, duplicate, import, and delete as mutations. Cross the MCP confirmation boundary only after the target and blast radius are explicit.
 - If the create DTO is active by default, state that explicitly. Confirm whether any attached webhook, schedule, form event, or other trigger could launch it autonomously. An active process with no trigger still requires approval to run, but it has no autonomous launch path.
@@ -70,6 +72,7 @@ Minimum proof:
 6. When the process calls subprocesses, capture the complete parent/child tree needed for the claim. Distinguish one external submit/run from the number of process instances it created.
 7. Verify external effects at their boundary: database row, generated file, API result, email sink, or child instance.
 8. Run the static audit for secrets, missing error handling, inefficient patterns, and designer/runtime mismatch.
+9. Re-read the documented intent and confirm it still describes the saved process: the purpose, every action's purpose, and each area holding the actions its text names.
 
 Validation alone does not pass this playbook. Two successful executions are not stronger evidence when one representative execution and direct output inspection prove the same claim.
 

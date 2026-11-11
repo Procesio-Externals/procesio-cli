@@ -109,6 +109,32 @@ def test_build_put_body_transform_contract():
         build_put_body({"id": "X", "name": "Y"})   # no 'data'
 
 
+# --------------------------------------------------------------- Queries (saved Data Store queries)
+
+def test_saved_queries_survive_a_surgical_save():
+    """PUT /api/FormTemplate replaces the whole template: a save that leaves out the
+    form's saved Data Store queries deletes them. When the GET returns them, every
+    surgical save must echo them back unchanged."""
+    queries = [{"id": "q1", "name": "Lookup", "value": "SELECT <%0%>", "variable": [],
+                "parameters": ["@p"], "timeoutSeconds": 30}]
+    form = {**_form(), "queries": queries}
+    body = build_put_body(form, data={"k": 1}, name="Renamed")
+    assert body["Queries"] == queries
+    assert set(body) == ENVELOPE | {"Queries"}
+
+
+def test_no_queries_key_is_sent_to_a_build_that_does_not_return_one():
+    """An older PROCESIO build has no `queries` on the GET; the PUT must not invent one."""
+    body = build_put_body(_form())
+    assert "Queries" not in body
+    assert set(body) == ENVELOPE
+
+
+def test_an_empty_queries_list_is_echoed_as_empty():
+    body = build_put_body({**_form(), "queries": []})
+    assert body["Queries"] == []
+
+
 # --------------------------------------------------------------- IsPrivate (publishing switch)
 
 def test_is_private_is_echoed_untouched_when_not_asked_for():

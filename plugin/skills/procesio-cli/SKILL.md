@@ -89,6 +89,8 @@ python scripts/run-agent.py procesio audit --process-id <id>
 
 Validation is a prerequisite, not proof of runtime behavior. For a change, verify against the target workspace and a representative input.
 
+Every process created or changed documents itself: its purpose, each action's purpose in it, and titled areas on the canvas once it has more than 3 actions besides Start/Stop. Start any analysis of a process or workspace from that documented intent.
+
 ### Connector lifecycle
 
 Use the `connector-builder` agent for the complete docs → plan → generate → compile → upload → live-test loop:

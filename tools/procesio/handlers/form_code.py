@@ -47,6 +47,15 @@ _PUT_KEYS = {
     "CustomUrl": "customUrl",
 }
 
+# Top-level keys echoed back ONLY when the GET returns them. PUT /api/FormTemplate
+# replaces the whole template, so a field the GET returns but the PUT leaves out is
+# cleared. `queries` (the form's saved Data Store queries) exists only on newer
+# PROCESIO builds: echoing it keeps them through every surgical save, and skipping it
+# when absent sends older builds nothing they do not know.
+_OPTIONAL_PUT_KEYS = {
+    "Queries": "queries",
+}
+
 
 def build_put_body(form: dict, *, data: dict | None = None, name: str | None = None,
                    status: int | None = None, state: bool | None = None,
@@ -71,6 +80,7 @@ def build_put_body(form: dict, *, data: dict | None = None, name: str | None = N
         if not form.get(k):
             raise UsageError(f"GET /api/FormTemplate echo is missing {k!r}; refusing to PUT")
     dto = {k: form.get(src) for k, src in _PUT_KEYS.items()}   # PascalCase echo incl. CustomUrl
+    dto.update({k: form[src] for k, src in _OPTIONAL_PUT_KEYS.items() if src in form})
     dto["Data"] = form.get("data") or {} if data is None else data
     if name is not None:
         dto["Name"] = name
