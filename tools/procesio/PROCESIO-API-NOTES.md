@@ -8360,3 +8360,17 @@ user-playground source. The tool writes all three on every `process-create` / `p
 - The platform rewrites some stored settings: a For Each `Action start time` sent as
   `2010-01-01T00:00:00Z` comes back `2010-01-01T00:00:00.0000000Z`. Any comparison of "did this
   action change" across a save has to normalise timestamps (and number vs string) first.
+
+## Forms: `PUT /api/FormTemplate` replaces the whole template - a field left out is cleared
+
+Measured on a QA build that has form queries: a PUT that omits a top-level field the GET
+returned does not keep it, it clears it, and still answers 200. `Data` omitted -> the design
+is gone (`null`); `Assignees` omitted -> no assignees; `IsPrivate` omitted -> the form becomes
+public; `queries` omitted or `null` -> every saved form query is deleted, and form events that
+run one then fail with `404`, code `1004`, "Query not found for this form template.".
+`PUT /api/DataStore` behaves the same way for `columns` and `description`.
+
+So a client that builds its PUT from a fixed key list silently drops every field it does not
+list. The surgical form saves echo `queries` through `_OPTIONAL_PUT_KEYS` in
+`handlers/form_code.py`, only when the GET returns it (older builds have no such field).
+When the platform adds a new top-level template field, add it there too.

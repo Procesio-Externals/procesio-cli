@@ -23,6 +23,13 @@ Map explicitly - echoing back an unexpected extra field from the GET is how a PU
 starts failing for reasons nobody can see. The canonical map lives in
 `handlers/form_code.py::_PUT_KEYS`.
 
+**The PUT replaces the whole template.** A top-level field the PUT leaves out is
+cleared, not kept: omitting `Data` empties the design, `Assignees` drops the
+assignees, `IsPrivate` makes a private form public. Newer builds also return
+`queries` (the form's saved Data Store queries, run by id from form events); they
+are echoed through `_OPTIONAL_PUT_KEYS` only when the GET returns them, so a
+surgical save keeps them and an older build receives nothing new.
+
 `Status = 1` (PUBLISHED) + `State = true` publishes. A `CustomUrl` gives the form
 its public short link (`forms.<host>/{tinyUrl}`).
 
