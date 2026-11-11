@@ -206,6 +206,17 @@ paragraph, only `!important` can override it:
 The `[style*="…"]` attribute selector is how you target "whatever element carries
 that inline rule" without knowing its structure.
 
+### A picture with nowhere to live can travel in the page
+
+A paragraph's HTML goes through `DOMPurify`, which keeps `data:` URLs on `<img>`, so a picture you made yourself
+needs no public host: `<img src="data:image/webp;base64,...">` set through `form-set-element-config`. Measured
+2026-11 with a 1000 px WebP of 68 KB (91 KB as base64) in one element: saved, rendered, and the page still drew
+its calendar 1.6 s after the request. It is part of the form's own payload, so keep it to one or two pictures.
+Keep the base64 out of the source file too: a placeholder there, filled in by the build step.
+
+For a before/after slider the two pictures need the same pixel size, or `object-fit: cover` crops them
+differently and the car jumps as the handle moves.
+
 ### An `<img>` icon cannot be recoloured with `color`
 
 Icon-font-as-image services (iconify and similar) bake the colour into the URL. A

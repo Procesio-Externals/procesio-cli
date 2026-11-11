@@ -20,6 +20,11 @@ points at them, it does not duplicate them.
 3. **Build programmatically** - via the `procesio` tool DTO sub-tools. Create data
    models complete with all attributes up front (the runtime compiled-model cache
    will not see attributes added by a later edit - PHASE4-E2E learning 12).
+   **Every process documents itself, on every create AND every edit** (section
+   "Self-documenting processes" below): the process purpose, each action's purpose in
+   it, and named areas on the canvas once it has more than 3 actions besides Start/Stop.
+   When you analyse a process or a workspace, read what is already documented first
+   (`process-docs`, `workspace-docs`).
 4. **Self-test rigorously** - the checklist below. Non-negotiable.
 5. **Capture learnings** - write every discovery to the right durable note (routing
    below). Compounding, not chat-only.
@@ -63,12 +68,52 @@ Do not repeat it.
   emits the correct `Ports[].Config` (the default branch is the string `"default"`, not a
   boolean `isDefault`, which the BE rejects with `unexpected character 't'`). Guessing a
   port/edge DTO is the same trap as guessing a node DTO.
+- **A process that does not document itself is not done.** `process-create` and
+  `process-edit` refuse it (`documentation_missing`) and `verify` reports a
+  `documentation` check; `--allow-undocumented` exists for an emergency save, not as a
+  way of working. See "Self-documenting processes".
 - **Fix the cause in the generic tool, never patch the use case in the repo.** If a
   capability is missing (e.g. the builder could not author a Data Store node), EXTEND
   the builder with tests - the way `process-create` gained native Data Store authoring -
   never drop a `patch_<usecase>.py` into `scripts/`. Use-case artefacts live in a
   scratch dir; the guard `tests/test_no_usecase_scripts.py` fails the build otherwise
   (CLAUDE.md Hard rules 5 + 10).
+
+## Self-documenting processes (the default on every build and edit)
+
+A process is read far more often than it is built. Each one carries what it is for, so
+the next person (or agent) starts from intent instead of reverse-engineering parameters,
+and the documentation piles up as knowledge of the workspace.
+
+What every `process-create` / `process-edit` config carries:
+
+1. **`description`** - the process purpose: what it is for, what starts it (a form, a
+   webhook, a schedule, a parent process) and what it produces.
+2. **`actions[].description`** - each action's purpose IN THIS PROCESS ("Reads the
+   customer's open invoices from the ERP"), never the action type's generic caption
+   ("Call API action enables you to..."). Start and Stop are exempt.
+3. **`groups`** when there are more than 3 actions besides Start and Stop - areas drawn
+   on the canvas behind the actions: `{title, text, actions: [ids]}`. A title of a few
+   words, a text of ONE sentence on what those actions do together. Group by what the
+   actions achieve together (read the input, decide, write, answer), consecutive in the
+   flow. Every top-level action belongs to one area; a For Each's body goes with the loop.
+
+How an edit keeps it true (the tool enforces each rule):
+
+- An action whose parameters or type changed must have its description restated - repeat
+  it word for word if the purpose did not change. An unchanged action keeps its description.
+- A new action needs a description and a place in an area.
+- Deleting an action from an area means restating `groups`, because the area's text may
+  still describe it.
+- A changed process purpose goes in `description`; omitting it keeps the current one.
+- Areas move with the layout (create, edit, `relayout-process`). A person's free notes on
+  the canvas (shapes that hold no action) are left alone.
+
+Reading it back: `process-docs --id` (one process), `workspace-docs` (every process in a
+workspace with its purpose and gaps; the first read on a workspace you do not know),
+`flow-digest` (purpose, areas and a purpose line per node), `flow-lint` (`documentation`
+block), the agent's `audit` (`intent` + `doc-*` findings) and `verify` (`documentation`
+check). A legacy process gets documented the first time it is edited.
 
 ## Self-test checklist - what "tested" actually means
 

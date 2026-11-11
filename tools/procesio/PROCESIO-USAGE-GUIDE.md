@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**152 rules across 9 notes.**
+**153 rules across 9 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -191,6 +191,13 @@ Source: [`PROCESIO-PYTHON-ACTION-NOTES.md`](PROCESIO-PYTHON-ACTION-NOTES.md)
 - [spacy is on the list; a spacy MODEL is not](PROCESIO-PYTHON-ACTION-NOTES.md#spacy-is-on-the-list-a-spacy-model-is-not)
 - [Where the compute runs, and why it matters for sizing](PROCESIO-PYTHON-ACTION-NOTES.md#where-the-compute-runs-and-why-it-matters-for-sizing)
 
+## Custom actions
+
+Source: [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md)
+
+- [Action-Core 2.2 and the host version (2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#action-core-22-and-the-host-version-2026-11)
+- [What upload refuses (measured on prod, 2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#what-upload-refuses-measured-on-prod-2026-11)
+
 ## Readings that turned out to be wrong
 
 Source: [`PROCESIO-API-CORRECTIONS.md`](PROCESIO-API-CORRECTIONS.md)
@@ -202,12 +209,6 @@ Source: [`PROCESIO-API-CORRECTIONS.md`](PROCESIO-API-CORRECTIONS.md)
 Source: [`PROCESIO-CARD-BUILD-NOTES.md`](PROCESIO-CARD-BUILD-NOTES.md)
 
 - [9. Assembling a file-in / file-out card through the builder (the renderer wiring)](PROCESIO-CARD-BUILD-NOTES.md#9-assembling-a-file-in-file-out-card-through-the-builder-the-renderer-wiring)
-
-## Custom actions
-
-Source: [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md)
-
-- [Action-Core 2.2 and the host version (2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#action-core-22-and-the-host-version-2026-11)
 
 ## Procesio Query Store Notes
 

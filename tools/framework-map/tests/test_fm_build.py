@@ -115,6 +115,20 @@ def test_narrative_references_resolve():
     assert not unknown, f"data-ujump references a non-existent capability: {unknown}"
 
 
+def test_schedule_note_skips_a_machine_sync_conflict_copy(tmp_path, monkeypatch):
+    monkeypatch.setenv("AAT_USERDATA_DIR", str(tmp_path))
+    sdir = tmp_path / "schedule"
+    sdir.mkdir()
+    (sdir / "schedule.yaml").write_text(
+        "entries:\n  - {id: a, schedule: {every: 1h}, target: {type: agent, name: kept-agent}}\n",
+        encoding="utf-8")
+    (sdir / "schedule.conflict-desk-20260102T030405.yaml").write_text(
+        "entries:\n  - {id: b, schedule: {every: 1h}, target: {type: agent, name: lost-agent}}\n",
+        encoding="utf-8")
+    note = fm_builder._schedule_note("en")
+    assert "kept-agent" in note and "lost-agent" not in note
+
+
 def test_schedule_note_generated_from_yaml():
     # the 'Live today' note is derived from schedule.yaml, not hardcoded. When a
     # schedule exists it names the real target agents; the fallback is generic.

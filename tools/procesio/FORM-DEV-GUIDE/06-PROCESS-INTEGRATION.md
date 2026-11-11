@@ -376,6 +376,28 @@ live (2026-11): with an address the mail action rejects, the child ended in stat
 in 50 with its output intact, and the visitor saw the normal confirmation. That failure is silent, so it shows
 only in the child's run list.
 
+### Availability a person can maintain: one table of weekdays, two of dates
+
+When a business opens on some weekdays with exceptions both ways, keep three stores: weekdays with an active tick
+and their hours, dates that are closed, and dates that are open anyway with optional hours of their own. A day
+ticked off keeps its hours, so an open date on it has something to fall back on. Settle the order once and write
+it in both places: a closed date beats everything, then an open date, then the weekday tick.
+
+- **The same rule runs twice.** The process that loads the form sends the three lists and the form draws from them;
+  the process that saves decides again from the stores, in the `WHERE` of its write. A date tampered with in the
+  browser gets refused by the second one.
+- **Read the stores into `SET @...` variables first**, then build one `@program`, so the `WHERE` stays a single
+  comparison. `LPAD(..., 5, '0')` on each end of the hours makes `9:00` compare correctly with `09:00` as text.
+- **People type dates their own way**, and a date that fails to match closes nothing and says nothing. Accept the
+  local form as well: normalise in the load process, and look up every spelling in the save process with
+  `TRIM(col) IN (@iso, @local, @local_short)`.
+- **Select only what the browser needs.** A reason column is for the owner; anything a public form's process
+  returns is public.
+- **Do not draw the closed days.** With two open days a week, sixty days of mostly greyed-out chips hide the few
+  that matter. Keep a fully booked day visible and disabled, because that one is information.
+- **Test with the email switched off.** Every accepted test booking fires the side effect. Blank the recipient
+  setting for the run, restore it in a `finally`, and read it back.
+
 ## Data store from a form (not an element - an event action)
 
 A form talks to a data store through an **event action**, not a dedicated element. On any

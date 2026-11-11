@@ -6,6 +6,8 @@ set binds `variable[]` positionally, so it may not drift without an explicit opt
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from tools.procesio.flowmodel import nodeparam
@@ -272,6 +274,110 @@ def test_add_variable_refuses_an_unknown_direction_or_type():
         nodeparam.add_variable(f, "x", "string", "sideways")
     with pytest.raises(ValueError, match="unknown data type"):
         nodeparam.add_variable(f, "y", "stringy", "output")
+
+
+def _referenced_flow():
+    """One internal variable bound by a node parameter, one reached only through a nested map.
+
+    The nested one is the point: a Query Store Parameters map holds its sources inside the
+    parameter's VALUE, not in the parameter's own variable[] list, so a scan that only reads
+    variable[] reports it as unreferenced and the delete silently breaks the node.
+    """
+    return {"id": "f", "title": "T", "variables": [
+        {"id": "v-bound", "name": "bound", "type": 20, "dataType": OBJECT, "isList": False},
+        {"id": "v-mapped", "name": "mapped", "type": 20, "dataType": OBJECT, "isList": False},
+        {"id": "v-err", "name": "fault", "type": 20, "dataType": OBJECT, "isList": False},
+        {"id": "v-free", "name": "unused", "type": 20, "dataType": OBJECT, "isList": False},
+        {"id": "v-in", "name": "payload", "type": 10, "dataType": OBJECT, "isList": False},
+    ], "actions": [
+        {"id": "a", "actionName": "reader", "variableErrorId": "v-err", "parameters": [
+            {"tabPropertyId": "t1", "value": "SELECT <%0%>",
+             "variable": [{"id": 0, "variableId": "v-bound", "attribute": None}]},
+            {"tabPropertyId": "t2", "variable": [], "value": [
+                {"id": 0,
+                 "source": {"value": "<%1%>",
+                            "variable": [{"id": 1, "variableId": "v-mapped", "attribute": None}]},
+                 "destination": {"value": "mt", "variable": []}}]},
+        ]},
+    ]}
+
+
+def test_delete_variable_removes_an_unreferenced_one():
+    f = _referenced_flow()
+    v = nodeparam.find_variable(f, "unused")
+    r = nodeparam.delete_variable(f, v)
+    assert r["removed"] == "unused" and r["direction"] == "process"
+    assert r["variables_before"] == 5 and r["variables_after"] == 4
+    assert nodeparam.find_variable(f, "unused") is None
+    assert nodeparam.find_variable(f, "bound") is not None
+
+
+def test_delete_variable_leaves_every_placeholder_sequence_untouched():
+    """<%N%> addresses a NODE's own variable[] list, so deleting a flow variable renumbers nothing."""
+    f = _referenced_flow()
+    before = json.dumps(f["actions"])
+    nodeparam.delete_variable(f, nodeparam.find_variable(f, "unused"))
+    assert json.dumps(f["actions"]) == before
+
+
+def test_delete_variable_refuses_one_bound_by_a_node_parameter():
+    f = _referenced_flow()
+    with pytest.raises(ValueError, match="still referenced"):
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "bound"))
+    assert len(f["variables"]) == 5
+
+
+def test_delete_variable_refuses_one_reached_only_through_a_nested_map():
+    f = _referenced_flow()
+    with pytest.raises(ValueError, match="still referenced"):
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "mapped"))
+
+
+def test_delete_variable_refuses_an_error_port_binding():
+    f = _referenced_flow()
+    with pytest.raises(ValueError, match="still referenced"):
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "fault"))
+
+
+def test_delete_variable_names_the_reference_it_refuses_on():
+    """"It is used somewhere" is not actionable; the message has to say where."""
+    f = _referenced_flow()
+    with pytest.raises(ValueError) as e:
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "bound"))
+    assert "reader" in str(e.value)
+
+
+def test_delete_variable_refuses_an_input_without_allow_contract_change():
+    f = _referenced_flow()
+    with pytest.raises(ValueError, match="public contract"):
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "payload"))
+    r = nodeparam.delete_variable(f, nodeparam.find_variable(f, "payload"),
+                                  allow_contract_change=True)
+    assert r["removed"] == "payload" and r["direction"] == "input"
+
+
+def test_delete_variable_refuses_an_engine_owned_variable():
+    f = _referenced_flow()
+    f["variables"].append({"id": "v-sys", "name": "sys", "type": 40,
+                           "dataType": OBJECT, "isList": False})
+    with pytest.raises(ValueError, match="engine writes it"):
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "sys"),
+                                  allow_contract_change=True)
+
+
+def test_variable_references_covers_flow_keys_the_scan_was_never_told_about():
+    """A later release can carry a variable id under a key nobody listed, so nothing is enumerated."""
+    f = _referenced_flow()
+    f["somethingNew"] = {"nested": [{"variableId": "v-free"}]}
+    with pytest.raises(ValueError, match="still referenced"):
+        nodeparam.delete_variable(f, nodeparam.find_variable(f, "unused"))
+
+
+def test_variable_references_reports_every_place_the_id_appears():
+    f = _referenced_flow()
+    assert nodeparam.variable_references(f, "v-free") == []
+    assert len(nodeparam.variable_references(f, "v-bound")) == 1
+    assert nodeparam.variable_references(f, "v-err")[0]["path"].endswith("variableErrorId")
 
 
 def _chain_flow():

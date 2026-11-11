@@ -140,7 +140,7 @@ procesio process-create --workspace-id <ws> --dry-run --config '{...}'
 # data model
 procesio datatype-create  --workspace-id <ws> --config '{"name":"Order","attributes":[{"name":"id","type":"guid"},{"name":"total","type":"double"}]}'
 # process (any catalog action; runs to STATUS_FINISH)
-procesio process-create   --workspace-id <ws> --config '{"title":"P","variables":[{"name":"r","type":"guid","direction":"output"}],"actions":[{"id":"g","action":"Generate GUID","params":{"Guid":{"var":"r"}}}]}'
+procesio process-create   --workspace-id <ws> --config '{"title":"P","description":"Mints the id a new order is filed under.","variables":[{"name":"r","type":"guid","direction":"output"}],"actions":[{"id":"g","action":"Generate GUID","description":"Creates the order id returned to the caller.","params":{"Guid":{"var":"r"}}}]}'
 # credential (validated by POST /api/Credentials/test)
 procesio credential-create --workspace-id <ws> --config '{"template":"REST API","name":"GH","properties":{"URL":"https://api.github.com","Authentication method":"No authentication","Method":"GET","Test endpoint":"/zen"}}'
 # document, webhook, form
@@ -153,7 +153,12 @@ Config shapes (full schemas in `dto/<component>/config.schema.json`):
 - **process** - `variables` (input/process/output, primitive or `model`), `actions`
   (`action` = catalog name; `params` bind by property label: literal / `{var}` /
   `{var,path}` / `{template,vars}`), `edges` (linear by default), `branches`
-  (Decisional), `webhooks` (attach a trigger).
+  (Decisional), `webhooks` (attach a trigger). **Self-documenting, enforced:**
+  `description` (process purpose), `actions[].description` (each action's purpose in
+  this process) and `groups` (titled areas on the canvas, required past 3 actions besides
+  Start/Stop). Create refuses without them and edit keeps them true
+  (`documentation_missing`; `--allow-undocumented` saves anyway); see
+  `dto/process/description.md` and `dto/process/selfdoc.py`.
 - **form** - `elements[]` of `{type,label,name,required,options,children,...}`;
   renders at `forms.procesio.app/{tinyUrl}` after a CustomUrl is created.
 - After changing any handler/builder, regenerate the manifest:
@@ -163,6 +168,8 @@ Config shapes (full schemas in `dto/<component>/config.schema.json`):
 
 ```powershell
 procesio list-processes        --profile personal [--search inv] [--page 1 --page-size 20]
+procesio process-docs          --profile personal --id <pid>     # documented intent: purpose, action purposes, areas, gaps
+procesio workspace-docs        --profile personal [--details | --purpose-only]   # the same for every process
 procesio get-process           --profile personal --id <pid>
 procesio get-process-payload   --profile personal --id <pid>   # input shape for run
 procesio run-process           --profile personal --id <pid> --payload '{"x":1}' [--dry-run]

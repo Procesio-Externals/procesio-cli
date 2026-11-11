@@ -173,9 +173,11 @@ def render(flow: dict, names: dict[str, str] | None = None) -> str:
         names.setdefault(a.get("id"), f"#{num[a.get('id')]} {a.get('actionName') or ''}".strip())
     r = _Resolver(flow, names)
 
-    lines = [f"# {_title(flow)}", "", f"- id: `{flow.get('id')}`"]
-    if flow.get("description"):
-        lines.append(f"- description: {flow['description']}")
+    from tools.procesio.flowmodel import docs   # documented intent first: purpose, areas
+    doc = docs.read(flow)
+    area_of = {r["id"]: r["area"] for r in doc["actions"]}
+    purpose_of = {r["id"]: r["purpose"] for r in doc["actions"]}
+    lines = [f"# {_title(flow)}", "", docs.render_markdown(doc), "", f"- id: `{flow.get('id')}`"]
     lines.append(f"- nodes: {len(ordered)}")
     lines += ["", "## Variables", "", "| name | direction | type | list | default |", "|---|---|---|---|---|"]
     for v in flow.get("variables") or []:
@@ -193,6 +195,10 @@ def render(flow: dict, names: dict[str, str] | None = None) -> str:
         label = a.get("actionName") or ""
         flag = " — DISABLED" if a.get("isDisabled") else ""
         lines.append(f"### {n}. {tpl}: {label}{flag}")
+        if purpose_of.get(a.get("id")):
+            lines.append(f"purpose: {purpose_of[a.get('id')]}")
+        if area_of.get(a.get("id")):
+            lines.append(f"area: {area_of[a.get('id')]}")
         nxt = [f"{k} → {num.get(d, '?')}" for k, d in edges.get(a.get("id"), [])]
         if nxt:
             lines.append("next: " + ", ".join(nxt))

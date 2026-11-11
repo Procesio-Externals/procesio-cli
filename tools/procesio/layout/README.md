@@ -176,6 +176,17 @@ positions that the engine then overwrote, so deleting it left the built DTOs byt
 (the `greet.dto.json` golden and the full layout suite pass unchanged). The engine is now the
 sole source of canvas positions at build time.
 
+## Area shapes move with the layout
+
+`areas.py` fits the canvas rectangles that group actions (`canvasData.shapes`, written from a
+process config's `groups`) around their members: one rectangle per group when the members sit
+together, several ("<title> (cont.)") when a single one would cover an action of another group,
+header height sized from the title and text. `adapter.layout_flow` re-fits them after every
+re-layout (membership read on the old positions, rectangles fitted to the new), so
+`relayout-process`, `layout-flow` and every `save_flow` arrangement keep each area around its
+actions. The viewport (`canvasData` x/y/zoom) is still never touched, and shapes holding no
+action (free notes) stay put.
+
 ## Default arrangement on every save
 
 Every process the tool writes is arranged with the classic engine and clustering, the same

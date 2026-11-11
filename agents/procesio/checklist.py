@@ -42,6 +42,12 @@ STEPS: list[dict] = [
             "POST /api/Credentials/test — it opens a real connection",
      "tool": "procesio credential-test", "citation": "datastore/best-practices; PRC-3696"},
     # B. run + instance --------------------------------------------------------
+    {"id": "documentation", "phase": "validate", "automatable": True,
+     "title": "The process documents itself",
+     "how": "process purpose (description), each action's purpose in it "
+            "(customData.description, not the stock caption), titled areas on the canvas "
+            "past 3 actions besides Start/Stop; on an edit, changed and new actions restated",
+     "tool": "procesio process-docs / agent verify", "citation": "playbook: Self-documenting processes"},
     {"id": "run-instance", "phase": "run", "automatable": True,
      "title": "Run the process and read the real instance status",
      "how": "run-process --synchronous, then status 50 = finished, 40 = ran-with-errors",

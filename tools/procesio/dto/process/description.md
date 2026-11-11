@@ -10,12 +10,13 @@ per-action code.
 ```json
 {
   "title": "Greet",
+  "description": "Builds the greeting the welcome form shows after sign-up.",
   "variables": [
     {"name": "name", "type": "string", "direction": "input", "required": true},
     {"name": "greeting", "type": "string", "direction": "output"}
   ],
   "actions": [
-    {"id": "concat", "action": "Concatenate", "params": {
+    {"id": "concat", "action": "Concatenate", "description": "Puts the visitor's name into the greeting.", "params": {
         "List of strings to concatenate": {"template": "Hello <%0%>", "vars": ["name"]},
         "Result": {"var": "greeting"}
     }}
@@ -44,6 +45,43 @@ per-action code.
 - **edges** - `["fromId", "toId"]` (or `{from, to, Type, Config}` for branch ports).
   `start`/`stop` are reserved ids (auto-injected). Omit `edges` for a linear chain.
 
+## Self-documentation (enforced on create and edit)
+
+A process says what it is for, in the process itself:
+
+- **`description`** - the process purpose (what it is for, what starts it, what it
+  produces). Stored as the flow's `description`.
+- **`actions[].description`** - each action's purpose in THIS process, stored as
+  `customData.description` (the designer's Properties panel "Description", shown as the
+  node's tooltip). The designer pre-fills that field with the action type's stock caption
+  (`dto/data/action_captions.json`, from the live catalog's `description`); a stock
+  caption, an empty text or the action's own name counts as undocumented.
+- **`groups`** - `[{"title", "text", "actions": [ids]}]`, required when the process has
+  more than 3 actions besides Start and Stop. Each becomes a rectangle in
+  `canvasData.shapes` (`kind` 0, `zIndex` in the shape band below connectors and nodes,
+  a soft per-group fill), fitted around its members after layout; a group whose members
+  are not side by side gets extra "(cont.)" rectangles so no rectangle covers another
+  group's action. Every top-level action belongs to one group; For Each children go with
+  their loop. Membership is geometric (layout/areas.py), because the designer rebuilds
+  `canvasData` and `customData` from fixed keys on every save and keeps nothing else.
+
+Create refuses an undocumented config with `documentation_missing` (exit 2, the gaps in
+`details.findings`); `--dry-run` reports them under `documentation`; `--allow-undocumented`
+saves anyway. Edit resolves what the config omits against the live flow:
+
+| config omits... | the edit... |
+|---|---|
+| `description` | keeps the live process purpose |
+| an action's `description`, action unchanged | keeps the live text |
+| an action's `description`, action CHANGED (type or parameters, compared GUID-free, timestamps and number formatting normalised) | refuses: `ACTION_DESCRIPTION_STALE` - restate it, word for word if the purpose is the same |
+| a NEW action's `description` | refuses: `ACTION_DESCRIPTION_MISSING` |
+| `groups` | reads the areas off the live shapes and re-fits them; refuses `ACTION_UNGROUPED` for a new action outside every area and `AREA_MEMBERS_CHANGED` when an area lost an action (restate `groups`) |
+
+Every result carries a `documentation` block (`documented`, per-action `status`
+set/kept/stale/missing/generic, `areas`, `findings`). Read it back with `process-docs`,
+`workspace-docs`, `flow-digest`, `flow-lint` (`documentation`) and the agent's `audit` /
+`verify`.
+
 ## API contract (verified live 2026-06-24)
 
 - **Validate@source:** `POST /api/Projects/validate` - empty body = valid (the oracle).
@@ -67,10 +105,16 @@ per-action code.
   injects as a BARE token, not a quoted literal - wrap it yourself: `const s='<%0%>';`.
   Without quotes you get `const s=SDSDX0GM6L;` → ReferenceError → the Node returns null
   silently (verified 2026-07-22 on a client process).**
-  **For arbitrary text (quotes, apostrophes, newlines, JSON, HTML) read it as a raw template
-  literal: `` const s = String.raw`<%0%>`; ``.** Single quotes break on the first apostrophe and
-  on any newline; `String.raw` keeps everything verbatim and only breaks on a backtick or `${`
-  in the value, so keep those out of strings you generate yourself. A string variable that holds
+  **For text you generate yourself (quotes, apostrophes, newlines, JSON, HTML) read it as a raw
+  template literal: `` const s = String.raw`<%0%>`; ``.** Single quotes break on the first
+  apostrophe and on any newline; `String.raw` keeps everything verbatim and only breaks on a
+  backtick, a trailing backslash or `${` in the value, so keep those out of what you generate.
+  **Never use it for text from outside (a form field, a mail, a file, a webhook):** a backtick
+  or trailing backslash ends the script with a syntax error, `${...}` runs as code, and a failed
+  script does not fail the run, so the flow carries on with an empty result. Encode the value with
+  `String To Base64` first and decode it in the script:
+  `` Buffer.from('<%0%>', 'base64').toString('utf8') ``. Recipes for several fields and the
+  `<%N%>` injection path are in `PROCESIO-PYTHON-ACTION-NOTES.md`. A string variable that holds
   JSON text can be injected bare (`const o = <%0%>;`) and lands as an object literal (measured
   2026-10-17 building a multi-process demo: event batches, AI responses and email HTML).
   **ALWAYS bind the scripting action's `Error` OUTPUT property to a (string) variable**

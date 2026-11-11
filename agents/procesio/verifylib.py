@@ -165,6 +165,17 @@ def verify_process(invoke: Callable, process_id: str, *, profile: str | None = N
         checks.append(_check("config-parity-audit", "validate", "pass",
                              {"findings": cf}))
 
+    # 3b. self-documentation (non-blocking for the run, but part of "done") ---------
+    doc = audit.documented_intent(flow)
+    if doc is None:
+        checks.append(_check("documentation", "validate", "skip",
+                             {"reason": "documentation reader unavailable"}))
+    else:
+        gaps = [f for f in doc["findings"] if f["severity"] == "error"]
+        checks.append(_check("documentation", "validate", "warn" if gaps else "pass",
+                             {"purpose": doc["purpose"], "coverage": doc["coverage"],
+                              **({"gaps": gaps} if gaps else {})}))
+
     # 4. run + instance status -------------------------------------------------
     if run:
         try:
@@ -219,4 +230,5 @@ def verify_process(invoke: Callable, process_id: str, *, profile: str | None = N
         "practice_findings": practice,
         "manual_checks": checklist.manual_steps(),
         "summary": full["summary"],
+        **({"intent": full["intent"]} if full.get("intent") else {}),
     }

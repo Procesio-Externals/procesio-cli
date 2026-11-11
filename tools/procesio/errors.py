@@ -51,6 +51,20 @@ class RemovalBlocked(Exception):
         self.removed = removed or {}
 
 
+class DocumentationMissing(Exception):
+    """A process save was refused because the process does not document itself: no process
+    purpose (`description`), an action with no purpose of its own (`description` on the action,
+    stored as customData.description) or one still carrying the template's stock caption, or,
+    on a process with more than 3 actions besides Start and Stop, actions that sit in no area
+    (`groups`, drawn as canvas shapes). An edit also stops here when an action changed what it
+    does and its description was not restated. Maps to 'documentation_missing', exit 2.
+    `--allow-undocumented` saves anyway and reports the gaps."""
+
+    def __init__(self, message: str, report: dict | None = None):
+        super().__init__(message)
+        self.report = report or {}
+
+
 class DesignerUnrenderable(Exception):
     """A process save was refused because the designer could not draw the result: a node
     without a `customData.configuration` key, or with a canvas shape the engine does not know.
@@ -191,6 +205,8 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
         return "not_persisted", str(exc), exc.details, 1
     if isinstance(exc, RemovalBlocked):
         return "removal_blocked", str(exc), exc.removed, 2
+    if isinstance(exc, DocumentationMissing):
+        return "documentation_missing", str(exc), exc.report, 2
     if isinstance(exc, DesignerUnrenderable):
         return "designer_unrenderable", str(exc), {
             "nodes": exc.nodes, "fix": "procesio node-repair-designer --id <process id>"}, 2

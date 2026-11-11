@@ -31,7 +31,9 @@ CONFIG = {"title": "t", "actions": [],
 
 def _ctx():
     counter = itertools.count(1)
-    return {"new_id": lambda: f"00000000-0000-0000-0000-{next(counter):012d}", "_force": True}
+    # These tests are about the live read; the self-documentation gate has its own tests.
+    return {"new_id": lambda: f"00000000-0000-0000-0000-{next(counter):012d}", "_force": True,
+            "_allow_undocumented": True}
 
 
 class _Client:

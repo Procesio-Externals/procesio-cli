@@ -542,7 +542,9 @@ def layout_flow(obj: dict, flow_id: str | None = None,
 
     `only` = a list of action ids to reposition WITHOUT reshuffling the rest (the
     "re-tidy just this action" mode). In that mode only those actions' positions are
-    written; every other action, the area frames, and CanvasData are left byte-identical."""
+    written; every other action and the area frames are left byte-identical. The viewport in
+    CanvasData is never touched; area shapes (CanvasData.shapes) are re-fitted around their
+    members in both modes, because their meaning is which actions they hold."""
     import os
     if (os.environ.get("LAYOUT_ENGINE") or "").strip().lower() == "auto":
         return _best_of_engines(obj, flow_id=flow_id, only=only)
@@ -632,6 +634,7 @@ def layout_flow(obj: dict, flow_id: str | None = None,
                  if _get(a, "ParentId") in areas}
     writes = engine.designer_writes(positions, areas, parent_of)
 
+    old_actions = copy.deepcopy(actions)   # area membership is read on the positions BEFORE the move
     moved = resized = 0
     for a in actions:
         aid = _get(a, "Id")
@@ -651,9 +654,19 @@ def layout_flow(obj: dict, flow_id: str | None = None,
             asz_key = _key(cd, "areaSize") or "areaSize"
             cd[asz_key] = dict(w["areaSize"])
             resized += 1
-    # NEVER touch CanvasData (the designer viewport pan/zoom). Resetting it jumps the
+    # NEVER touch the designer viewport (CanvasData x/y/zoom). Resetting it jumps the
     # user's view away from the content — leave it exactly as the flow had it; the user
-    # can fit-to-screen in the designer to frame a re-laid-out process.
+    # can fit-to-screen in the designer to frame a re-laid-out process. The AREA SHAPES in
+    # CanvasData.shapes are the exception: they group actions by geometry, so they follow
+    # their members (membership read on the old positions, rectangles fitted to the new).
+    # Free notes (shapes holding no action) stay where they are.
+    cv_key = _key(flow, "CanvasData")
+    canvas = flow.get(cv_key) if cv_key else None
+    if isinstance(canvas, dict) and canvas.get("shapes"):
+        import uuid
+        from tools.procesio.layout import areas as area_shapes
+        canvas["shapes"] = area_shapes.refit(old_actions, actions, canvas["shapes"],
+                                             lambda: str(uuid.uuid4()))
     return {"flow_id": _get(flow, "Id"), "nodes_moved": moved,
             "areas_resized": resized, "bbox": result["bbox"],
             "positions": {k: _round(v) for k, v in positions.items()},

@@ -68,13 +68,37 @@ def _edit_args(p: argparse.ArgumentParser) -> None:
     _add_gate_args(p)
 
 
+_UNDOC_HELP = ("save even when the process does not document itself (no process purpose, an "
+               "action without its own description, or no areas on a process with more than 3 "
+               "actions besides Start/Stop); the gaps come back under `documentation`")
+
+
+def _process_create_args(p: argparse.ArgumentParser) -> None:
+    _create_args(p)
+    p.add_argument("--allow-undocumented", dest="allow_undocumented", action="store_true",
+                   help=_UNDOC_HELP)
+
+
+def _doc_report(component, ctx, *, enforce: bool):
+    """The self-documentation report for the result; with `enforce`, the gate itself (raises
+    DocumentationMissing unless --allow-undocumented). None for components without one."""
+    if not component.doc_gate:
+        return None
+    return component.doc_gate(ctx if enforce else {**ctx, "_allow_undocumented": True})
+
+
 def _make_create(component):
     def func(client, args):
         config = _load_config(args)
         ctx = framework.prepare(component, client, config)
         ctx["_force"] = getattr(args, "force", False)
         ctx["_no_types"] = getattr(args, "no_types", False)
+        ctx["_allow_undocumented"] = getattr(args, "allow_undocumented", False)
+        ctx["_doc"] = {}
         dto = framework.build_dto(component, config, ctx)
+        # Self-documentation first: it is cheap, and an undocumented process is not worth a
+        # validation round trip. A dry-run reports the gaps instead of stopping on them.
+        documentation = _doc_report(component, ctx, enforce=not args.dry_run)
         # Pre-save gate (process): FE designer + BE validation. Raises ValidationBlocked
         # on blocking errors unless --force. For --dry-run we force it open so the report
         # is shown without aborting. Components without a save_gate fall back to the oracle.
@@ -89,6 +113,8 @@ def _make_create(component):
         if args.dry_run:
             out = {"dry_run": True, "component": component.name, "dto": dto,
                    "validation": oracle}
+            if documentation is not None:
+                out["documentation"] = documentation
             if warnings:
                 out["warnings"] = warnings
             return out
@@ -99,6 +125,8 @@ def _make_create(component):
                "validation": oracle, "result": verified if verified is not None else resp}
         if isinstance(resp, dict) and resp.get("_capture"):   # AUTO webhook listen+capture log
             out["capture"] = resp["_capture"]
+        if documentation is not None:
+            out["documentation"] = documentation
         if warnings:
             out["warnings"] = warnings
         return out
@@ -111,6 +139,8 @@ def _process_edit_args(p: argparse.ArgumentParser) -> None:
                    help="keep the current canvas positions and place only new actions "
                         "(default: re-arrange the whole canvas, classic engine + clustering, "
                         "exactly as process-create does)")
+    p.add_argument("--allow-undocumented", dest="allow_undocumented", action="store_true",
+                   help=_UNDOC_HELP + "; also lets an action that changed keep its old description")
 
 
 def _make_edit(component):
@@ -122,11 +152,16 @@ def _make_edit(component):
         ctx["_force"] = getattr(args, "force", False)
         ctx["_no_types"] = getattr(args, "no_types", False)
         ctx["_allow_remove"] = getattr(args, "allow_remove", False)
+        ctx["_allow_undocumented"] = getattr(args, "allow_undocumented", False)
+        ctx["_doc"] = {}
         if args.dry_run:
             # Build it the way the EDIT would, so the preview shows the ids the edit would keep.
             dto = framework.build_edit_dto(component, client, args.id, config, ctx)
             out = {"dry_run": True, "edit": True, "component": component.name,
                    "id": args.id, "dto": dto}
+            documentation = _doc_report(component, ctx, enforce=False)
+            if documentation is not None:
+                out["documentation"] = documentation
             if ctx.get("_live_read_error"):
                 out["live_read_failed"] = (
                     f"{ctx['_live_read_error']}. This preview carries nothing over from the live "
@@ -140,6 +175,9 @@ def _make_edit(component):
         framework.validate_config(component, config)
         resp = component.edit(client, args.id, config, ctx)
         out = {"edited": True, "component": component.name, "id": args.id, "result": resp}
+        documentation = _doc_report(component, ctx, enforce=False)
+        if documentation is not None:
+            out["documentation"] = documentation
         warnings = component.lint(resp) if component.lint else []
         if warnings:
             out["warnings"] = warnings
@@ -209,7 +247,9 @@ def build_actions() -> dict[str, ActionDef]:
         adder = getattr(comp, "add_action", "")
 
         out[f"{name}-create"] = ActionDef(
-            func=_make_create(comp), add_args=_create_args, needs_client=True,
+            func=_make_create(comp),
+            add_args=_process_create_args if name == "process" else _create_args,
+            needs_client=True,
             description=(
                 f"Create a PROCESIO {name} from a validated config "
                 f"(build->validate->POST->re-GET). --config carries the WHOLE definition "

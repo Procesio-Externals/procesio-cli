@@ -10,6 +10,27 @@ there, not here.
 ## [Unreleased]
 
 ### Added
+- Self-documenting processes. `process-create` and `process-edit` write the process purpose
+  (`description`), each action's purpose in the process (`actions[].description`, stored as the
+  designer's Description field) and, past 3 actions besides Start and Stop, titled areas on the
+  canvas (`groups`, drawn as rectangles behind the actions they group). A save without them is
+  refused with `documentation_missing`; `--allow-undocumented` saves anyway. An edit keeps what
+  it does not restate while it is still true, and asks again for an action that changed, a new
+  action, or an area that lost one.
+- `process-docs` reads one process's documented intent and gaps; `workspace-docs` does it for
+  every process in a workspace.
+- Area shapes follow their actions through `relayout-process`, `layout-flow` and every save
+  that arranges the canvas. `flow-lint` reports a `documentation` block, `flow-digest` opens
+  with the purpose and the areas, and the agent's `audit` and `verify` report the documented
+  intent.
+- `variable-delete` removes an unused variable from a live process.
+- The web driver opens one browser per persistent profile (a second Chromium on the same
+  profile reset its storage), and a `<profile>.headed` marker makes every opener of that
+  profile run headed and off-screen.
+- Notes: For Each one-call-per-row pattern, a Node without outbound DNS fetching through Call
+  API, per-record settings that travel with the record, what custom-action upload refuses,
+  poll windows below the schedule tick, reading outside text without `String.raw`, a form
+  input's autofill background, and the Node engine's input-size limit (about 8 MB refused).
 - `form-set-element-event --on signed | declined | completed` wires the document-signing
   triggers, and `form-get-element-events` lists them. An event slot saved as a bare list
   no longer makes `form-get-element-events` fail.

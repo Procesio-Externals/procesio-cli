@@ -286,7 +286,7 @@ def _schedule_note(lang):
     """Build the 'Live today' note from the live schedule.yaml (user data). None
     on a fresh/wiped install (no schedule) -> the caller uses _SCHED_FALLBACK."""
     try:
-        from tools._lib import userdata
+        from tools._lib import conflictcopy, userdata
         sdir = Path(userdata.schedule_dir())
     except Exception:
         return None
@@ -294,6 +294,8 @@ def _schedule_note(lang):
     try:
         if sdir.exists():
             for yf in sorted(sdir.glob("*.yaml")):
+                if conflictcopy.is_conflict_copy(yf.name):
+                    continue
                 doc = yaml.safe_load(yf.read_text(encoding="utf-8")) or {}
                 for e in (doc.get("entries") or []):
                     if e.get("enabled", True):
