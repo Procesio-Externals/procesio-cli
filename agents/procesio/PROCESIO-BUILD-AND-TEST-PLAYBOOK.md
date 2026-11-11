@@ -115,6 +115,12 @@ workspace with its purpose and gaps; the first read on a workspace you do not kn
 block), the agent's `audit` (`intent` + `doc-*` findings) and `verify` (`documentation`
 check). A legacy process gets documented the first time it is edited.
 
+Look at it as a person will: `process-screenshot --id <pid> --out <png>` opens the Process
+Designer headless with the profile's own sign-in, frames every action and area at real scale
+and saves a PNG. It is the only check of what the stored data cannot show: an area that
+covers the wrong actions or cuts a label, an unreadable header, connector routing. Use it
+after creating a process with areas and after an edit that moved or regrouped actions.
+
 ## Self-test checklist - what "tested" actually means
 
 Each item names the tool and the verified mechanic. Do not skip a layer because the

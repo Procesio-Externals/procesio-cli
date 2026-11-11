@@ -20,9 +20,11 @@ This module is pure (no I/O, no PROCESIO imports) and deterministic:
     shapes = to_shapes(groups, rects, ids)            # canvasData.shapes entries
     members = membership(actions, shapes)             # shape index -> action ids (reading)
 
-Geometry, in designer coordinates: a square/circle/diamond node's position is its CENTRE and
-it is 48x48 with its name drawn underneath; a For Each (`area`) node's position is its frame's
-TOP-LEFT and `areaSize` is the frame; a container child's position is relative to its frame.
+Geometry, in designer coordinates (checked on screenshots of the designer): a square/circle/
+diamond node's position is the TOP-LEFT of its 48x48 icon, with its name drawn underneath and
+centred on the icon; a For Each (`area`) node's position is its frame's TOP-LEFT, `areaSize` is
+the frame and its name is drawn under the frame; a container child's position is relative to its
+frame. Shape positions are top-left too, so all of these share one coordinate space.
 """
 from __future__ import annotations
 
@@ -30,7 +32,8 @@ import math
 
 NODE = 48.0
 HALF_W = 60.0          # half-width reserved around a node centre: the label is wider than the icon
-LABEL_H = 36.0         # the node name drawn under the icon
+LABEL_H = 36.0         # the node name drawn under the icon (or under a For Each frame)
+PORT_PAD = 10.0        # room above a node for the incoming connector's arrow and port
 SIDE_PAD = 12.0        # breathing room between the outermost member and the rectangle edge
 FRAME_PAD = 14.0       # same, around a For Each frame
 TITLE_PAD = 6.0        # canvas-engine TITLE_PADDING
@@ -109,10 +112,12 @@ def node_boxes(actions: list[dict]) -> dict:
             continue                      # inside a For Each: covered by its frame
         x, y = _pos(a)
         if _is_area(a):
+            # the loop's name is drawn under the frame: the area must hold it too
             w, h = _size(a)
-            out[_g(a, "id")] = (x - FRAME_PAD, y - FRAME_PAD, x + w + FRAME_PAD, y + h + FRAME_PAD)
+            out[_g(a, "id")] = (x - FRAME_PAD, y - FRAME_PAD, x + w + FRAME_PAD, y + h + LABEL_H)
         else:
-            out[_g(a, "id")] = (x - HALF_W, y - NODE / 2, x + HALF_W, y + NODE / 2 + LABEL_H)
+            cx = x + NODE / 2             # position is the icon's top-left; the label is centred
+            out[_g(a, "id")] = (cx - HALF_W, y - PORT_PAD, cx + HALF_W, y + NODE + LABEL_H)
     return out
 
 
@@ -126,8 +131,8 @@ def centre(a: dict, by_id: dict) -> tuple[float, float]:
         return bx + x + w / 2, by + y + h / 2
     if par is not None:
         bx, by = centre_origin(par, by_id)
-        return bx + x, by + y
-    return x, y
+        return bx + x + NODE / 2, by + y + NODE / 2
+    return x + NODE / 2, y + NODE / 2
 
 
 def centre_origin(frame: dict, by_id: dict) -> tuple[float, float]:

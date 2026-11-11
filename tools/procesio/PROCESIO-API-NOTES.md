@@ -8335,8 +8335,26 @@ user-playground source. The tool writes all three on every `process-create` / `p
   areaSize`) and `canvasData` from the viewport plus each shape's `toModel()`. Any extra key placed
   in either is lost on the next designer save, so nothing (a group id, a fingerprint) can be hidden
   there. Which actions an area holds has to be read geometrically: the rectangle that contains the
-  action's centre (a square node's position is its centre; a For Each frame's position is its
-  top-left plus `areaSize`).
+  action's centre.
+- **Where things are drawn (measured on designer screenshots, 2026-11-11).** Every stored position
+  is a TOP-LEFT in one coordinate space: a square / circle / diamond action's `position` is the
+  top-left of its 48 px icon, with the name centred under the icon; a For Each's `position` is its
+  frame's top-left, `areaSize` the frame, and its name sits about 26 px under the frame; a shape's
+  `position` is its top-left. So an action's centre is `position + 24`. (An earlier reading of the
+  canvas-engine source took an action's position for its centre; fitted that way, every area sat
+  24 px up and left of its actions with their labels on its bottom border.)
+- **Designer view = `canvas * zoom + (viewport.x, viewport.y)`**, with the stored `canvasData`
+  viewport (a process the tool saved opens at 0, 0, zoom 1, so canvas (0, 0) is the window's
+  top-left, under the 64 px header and the 80 px left toolbar). Dragging on EMPTY canvas pans it
+  1:1 in screen pixels; Ctrl + wheel zooms. The pan stops as soon as the pointer leaves the canvas,
+  so a scripted drag must keep both ends over the canvas. There is no fit-to-screen control.
+  `process-screenshot` uses exactly this to frame a process.
+- **The auto-layout engine writes an action's CENTRE into `position`.** The designer draws that
+  point as the icon's top-left, so every top-level square action lands 24 px right and down of
+  where the engine meant it. Between two square actions this cancels out. Next to a For Each
+  (whose frame the engine does write as a top-left) it does not: the connector into and out of the
+  loop has a visible 24 px jog. The For Each children's offsets (`FE_TOP`, `FE_START_PAD`) were
+  calibrated on stored values from real processes, so a fix has to convert top-level actions only.
 - The designer does NOT move shapes when a user drags actions; a re-layout through the tool does
   (`adapter.layout_flow` re-fits them).
 - The platform rewrites some stored settings: a For Each `Action start time` sent as

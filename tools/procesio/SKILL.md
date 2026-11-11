@@ -537,6 +537,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `process-edit` | `--id` | Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no… |
 | `process-fe-validate` | `--id` | Front-end (designer-layer) 'Process Errors' validation on a live process — the client-side check that BLOCKS designer Save but which POST… |
 | `process-rename` | `--id`, `--title` | Rename a live process (its title) -> validate + flow-lint -> PUT. The title is cosmetic (wiring is by id), so this is the safe way to give a '... (Copy)' from… |
+| `process-screenshot` | `--id`, `--out` | Screenshot a live process in the Process Designer, as a person sees it: opens the designer headless with the profile's own sign-in (a userpass profile; no… |
 | `process-toggle-activation` | `--id`, `--state` | Activate or deactivate a process (PATCH /api/Projects/{id}/toggle-activation). --state true|false is REQUIRED: despite its name the endpoint is a setter, and… |
 | `process-validate` | `--id` | Validate a process with PROCESIO's own validator (POST /api/Projects/validate). |
 

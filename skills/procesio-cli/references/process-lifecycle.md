@@ -13,7 +13,7 @@ Create or change one PROCESIO process and prove both its saved design and repres
 ## Inspect
 
 1. Read agent guidance for the current build/test doctrine.
-2. Read the documented intent before the parameters: the process purpose, each action's purpose and the areas on the canvas (`process-docs`; for a workspace, `workspace-docs`). Treat a gap there as part of the work, not as noise.
+2. Read the documented intent before the parameters: the process purpose, each action's purpose and the areas on the canvas (`process-docs`; for a workspace, `workspace-docs`). Treat a gap there as part of the work, not as noise. To see the canvas as a person does (areas, labels, connectors), `process-screenshot --id <pid> --out <png>` saves the Process Designer view as a PNG.
 3. Fetch the existing process and input payload shape when editing or running.
 4. Inspect dependencies: data models, credentials, child processes, documents, webhooks, schedules, forms, and custom actions.
 5. Record activation state and a compact before-state.

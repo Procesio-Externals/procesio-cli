@@ -41,6 +41,7 @@ SKILL_DESC = {
 TRIG = {
     "what is this process for / read a process's documented purpose, action purposes and canvas areas": "la ce folosește acest proces / citește scopul documentat al unui proces, scopul acțiunilor și zonele de pe canvas",
     "which processes in this workspace are undocumented / map a workspace I do not know": "ce procese din acest workspace nu sunt documentate / harta unui workspace pe care nu-l cunosc",
+    "see a process in the designer / screenshot a process canvas / check how the areas and actions look": "vezi un proces în designer / captură de ecran a canvas-ului unui proces / verifică cum arată zonele și acțiunile",
     "approve / revise the plan / regenerate files / download the connector artifact": "aprobă / revizuiește planul / regenerează fișiere / descarcă artefactul connectorului",
     "audit a procesio process for best practices": "auditează un proces procesio pentru best practices",
     "build a PROCESIO custom action / connector from API docs": "construiește un custom action / connector PROCESIO din documentația API",
