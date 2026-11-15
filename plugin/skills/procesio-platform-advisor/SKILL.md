@@ -1,26 +1,6 @@
 ---
 name: procesio-platform-advisor
-description: >-
-  Assess whether PROCESIO can support a workflow and which architecture fits. Use for
-  product capability, feasibility, use-case evaluation, integration limits, PROCESIO
-  pricing, cost calculation, how many EEs are needed for a daily volume, execution
-  environment capacity sizing, comparisons
-  with Zapier, Make, MuleSoft, or Workato, on-prem versus cloud, compliance evidence,
-  RPA strategy, and deciding which business processes to automate before implementation.
-version: 1.0.2
-compatibility: Python 3.11+ for the optional offline capacity calculator.
-owner: PROCESIO product and solution architecture
-last_verified: 2026-09-05
-baseline_version: da12de643c8a2355d019f40515766abf80a819df
-eval_suite: evals/evals.json
-source_policy: timestamped
-routing:
-  triggers:
-    - assess PROCESIO product fit, feasibility, architecture, pricing, sizing, or compliance
-    - compare PROCESIO with another automation or integration platform
-    - decide which processes to automate without changing a workspace
-  primary_action: advise
-  example: get-skill.py procesio-platform-advisor --content
+description: Assess whether PROCESIO can support a workflow and which architecture fits. Use for product capability, feasibility, use-case evaluation, integration limits, PROCESIO pricing, cost calculation, how many EEs are needed for a daily volume, execution environment capacity sizing, comparisons with Zapier, Make, MuleSoft, or Workato, on-prem versus cloud, compliance evidence, RPA strategy, and deciding which business processes to automate before implementation.
 ---
 
 # Advise on PROCESIO
@@ -47,7 +27,7 @@ Read:
 - `references/capability-map.md` for stable product areas and CLI-verifiable surfaces.
 - `references/fit-framework.md` for feasibility and prioritization.
 - `references/sizing-method.md` for capacity estimates without inventing prices.
-- `scripts/estimate_capacity.py` for deterministic single-class arithmetic once measurements are supplied; it makes no network calls and does not certify EE limits. Read the sizing reference for its JSON input contract.
+- The single-class capacity arithmetic in the sizing reference, once measurements are supplied; it does not certify EE limits.
 - `references/freshness-policy.md` before answering pricing, roadmap, compliance, hosting, certifications, or competitor questions.
 
 

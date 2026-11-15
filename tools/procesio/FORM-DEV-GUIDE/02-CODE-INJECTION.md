@@ -307,3 +307,22 @@ updating the form's value, so the field looks filled and submits empty. See
 The rule: **JS only ever toggles classes; CSS decides what a class looks like.**
 This keeps the form presentable if the runtime fails to install (cross-origin
 parent, script error) and makes every visual change reviewable in one file.
+
+
+## 9. `deserialze(...)` and `$event` in element scripts (changed 2026-10)
+
+An element event's JavaScript can name a variable as `deserialze(name)` and the event payload as
+`$event`; the runtime replaces both in the script text before it runs it (form-runtime 1.30,
+designer 1.115, read in the source).
+
+- **`deserialze(name)` becomes the value as JSON.** A string variable that holds JSON goes in
+  parsed (`{"a":1}` becomes an object literal); any other string goes in as a quoted string
+  literal. Before, the raw text was pasted, so scripts wrapped the call in quotes.
+  ⚠ Wrapped in quotes now, the call yields text that carries the literal's own quotes
+  (`'"apple"'`). Write `const v = deserialze(product);`, never `'deserialze(product)'`.
+- **`$event` becomes the payload as inline JSON**, with `<` and `>` escaped so a value can never
+  close the script tag. The values themselves are unchanged.
+- **Both are replaced in one pass**, so text inserted for one is never scanned for the other.
+
+`form-create`, `form-edit`, `form-set-code` and every form write's lint flag a quoted
+`deserialze(` (formlint `lint_form_code_runtime`).

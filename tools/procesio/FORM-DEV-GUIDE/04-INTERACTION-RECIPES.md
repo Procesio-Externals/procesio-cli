@@ -482,6 +482,9 @@ decide the design:
    write** (`Element.component.vue`, `onInputDebounced`). A MAP condition later in
    the same chain reads the value from before the JS ran, so the first click never
    passes. That is why these forms end up with "validate twice, then confirm".
+   Since ui-builder 1.45 the runtime writes pending TYPED values before a chain
+   starts, but not between its steps, so a value the chain's own JS writes is still
+   late ([08](08-PITFALLS.md), "clicked twice").
 2. **A field's own `onInputEvents` chain fires when that value lands**, including
    a value written by JS through the native setter, and its conditions see the
    new value. This is the hand-off point.

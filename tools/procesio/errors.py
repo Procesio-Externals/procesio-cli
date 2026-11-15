@@ -122,11 +122,19 @@ _HTTP_CODES = {
     403: ("permission_denied", "not permitted in this workspace"),
     404: ("not_found", "not found (or Kong route not matched)"),
     405: ("invalid_argument", "method not allowed for this path"),
+    # The workspace (or its master) requires two-factor authentication and this account has
+    # not set it up. The token itself is valid (Web-Api v3.x Authentication middleware); since
+    # 2026-10-22 this also covers sub-workspaces that existed before their master enabled it.
+    406: ("otp_setup_required",
+          "this workspace requires two-factor authentication, which this account has not set up"),
     407: ("proxy_auth_failed",
           "the Web API could not authenticate against the Proxy API "
           "(check the auth_base host and credentials)"),
     409: ("conflict", "conflict"),
     422: ("invalid_argument", "unprocessable - validation failed"),
+    # Sign-in refusals, Web-Api v2.80+ / Authentication-Proxy v2.38+ (POST api/Authentication).
+    423: ("account_locked", "the account is temporarily locked after failed sign-ins"),
+    428: ("otp_required", "the account has two-factor authentication on and the sign-in sent no code"),
     429: ("rate_limited", "rate limit exceeded - back off and retry"),
     500: ("server_error", "PROCESIO server error"),
     502: ("server_error", "bad gateway"),
@@ -194,6 +202,30 @@ def _reason_from_body(details: Any) -> str:
     return ""
 
 
+_SIGN_IN_HINTS = {
+    406: ("set up two-factor authentication for this account in the PROCESIO app, or use an "
+          "account or API key of a workspace that does not require it"),
+    423: "wait for the lock to end; signing in again meanwhile keeps the account locked",
+    428: ("the tool's username/password sign-in sends no one-time code: use an API key profile "
+          "(`procesio add-credential --type apikey`) for an account with two-factor authentication"),
+}
+
+
+def _sign_in_refusal(exc: "ProcesioAPIError") -> tuple[str, str, dict, int]:
+    """406 / 423 / 428 are not malformed requests: name what blocks the account and what to
+    do. A 423 body is {error: account_locked, error_description, retryAfterSeconds}, where
+    retryAfterSeconds counts from receipt and 0 means unknown, not "retry now"."""
+    code, default_msg = _HTTP_CODES[exc.status]
+    inner = exc.details.get("body") if isinstance(exc.details, dict) else None
+    inner = inner if isinstance(inner, dict) else (exc.details if isinstance(exc.details, dict) else {})
+    text = inner.get("error_description") if isinstance(inner.get("error_description"), str) else ""
+    out = {"status": exc.status, "body": exc.details, "hint": _SIGN_IN_HINTS[exc.status]}
+    retry = inner.get("retryAfterSeconds")
+    if exc.status == 423 and isinstance(retry, (int, float)) and not isinstance(retry, bool):
+        out["retry_after_s"] = int(retry) if retry > 0 else None
+    return code, text or default_msg, out, 1
+
+
 def classify(exc: Exception) -> tuple[str, str, dict, int]:
     if isinstance(exc, AuthError):
         return "auth_required", str(exc), {}, 1
@@ -220,6 +252,8 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
             "outcome": "unknown",
         }, 1
     if isinstance(exc, ProcesioAPIError):
+        if exc.status in _SIGN_IN_HINTS:
+            return _sign_in_refusal(exc)
         reason = _reason_from_body(exc.details) or str(exc)
         code, msg, exit_code = map_http_error(exc.status, reason)
         out = {"status": exc.status, "body": exc.details}

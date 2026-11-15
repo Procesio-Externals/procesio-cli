@@ -1,24 +1,6 @@
 ---
 name: sql-server-optimizer
-description: >-
-  Analyze and optimize SQL Server T-SQL, including SQL executed by PROCESIO. Use when
-  reviewing a query, procedure, function, execution plan, index strategy, sargability,
-  parameter sniffing, implicit conversions, logical reads, blocking, reporting-query
-  performance, result semantics, isolation safety, or PROCESIO inline/native SQL
-  parameters; do not use for PostgreSQL, MySQL, or repository maintenance.
-version: 1.0.1
-owner: database engineering
-last_verified: 2026-09-05
-baseline_version: da12de643c8a2355d019f40515766abf80a819df
-eval_suite: evals/evals.json
-source_policy: static
-routing:
-  triggers:
-    - analyze or optimize SQL Server T-SQL, execution plans, indexes, logical reads, blocking, or parameter sniffing
-    - review SQL used in a PROCESIO Execute Query or Execute Command action
-    - replace unsafe PROCESIO inline SQL variables with native typed parameters
-  primary_action: analyze
-  example: get-skill.py sql-server-optimizer --content
+description: Analyze and optimize SQL Server T-SQL, including SQL executed by PROCESIO. Use when reviewing a query, procedure, function, execution plan, index strategy, sargability, parameter sniffing, implicit conversions, logical reads, blocking, reporting-query performance, result semantics, isolation safety, or PROCESIO inline/native SQL parameters; do not use for PostgreSQL, MySQL, or repository maintenance.
 ---
 
 # Optimize SQL Server with evidence
@@ -49,7 +31,7 @@ Read `references/db-context.md`, then the relevant mode:
 - `references/generic-mode.md` for standalone queries, procedures, and functions.
 - `references/sql-rules.md` for evidence-driven rewrite and index checks.
 
-When metadata cannot be queried through the registered tool, request an approved, bounded safe projection. The legacy inspection-only helpers `scripts/export-tables.sql`, `scripts/export-indexes.sql`, and `scripts/export-procs-and-functions.sql` require pre-acquisition scope/confidentiality approval for whole-database extraction; post-read redaction is not that gate. Table export includes trigger definitions, with server-wide triggers disabled unless separately approved and explicitly opted in. The index helper does not correctly serialize all index types: do not automatically run it on mixed/unsupported types or execute its generated DDL. Review the qualification blockers in `references/db-context.md` before using any exporter; inspect protected output for sensitive literals before sharing.
+When metadata cannot be queried through the registered tool, request an approved, bounded safe projection. The legacy inspection-only helpers `scripts/export-tables.sql.md`, `scripts/export-indexes.sql.md`, and `scripts/export-procs-and-functions.sql.md` require pre-acquisition scope/confidentiality approval for whole-database extraction; post-read redaction is not that gate. Table export includes trigger definitions, with server-wide triggers disabled unless separately approved and explicitly opted in. The index helper does not correctly serialize all index types: do not automatically run it on mixed/unsupported types or execute its generated DDL. Review the qualification blockers in `references/db-context.md` before using any exporter; inspect protected output for sensitive literals before sharing.
 
 ## Isolation and correctness rule
 

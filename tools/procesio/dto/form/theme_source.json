@@ -1,0 +1,31 @@
+{
+  "ui_builder": "v0.194.0",
+  "file": "src/js/model/config/theme.ts",
+  "sha256": "1b4afd216c94beaf3dc1d57b1d2efda07e418dd6d644753dd5cb1bb424cf5e54",
+  "groups": [
+    "Colors",
+    "Fonts",
+    "Form",
+    "Input",
+    "Select",
+    "Button",
+    "Checkbox",
+    "Radiobox",
+    "Approval",
+    "File Upload",
+    "Document Signing",
+    "Section",
+    "List",
+    "Table",
+    "Columns",
+    "Column",
+    "Stepper",
+    "Step",
+    "Tabs",
+    "Tab",
+    "Side Panel",
+    "Icon",
+    "Dropdown"
+  ],
+  "variables": 269
+}

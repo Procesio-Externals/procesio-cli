@@ -1,14 +1,6 @@
 ---
 name: procesio-setup
-description: >-
-  Connect this installation to a PROCESIO workspace, so the MCP server and the CLI can
-  reach it. Use on first run, after installing the plugin, when a call fails with
-  auth_required, missing_secrets or no stored credential, when someone asks how to add
-  an API key or a second environment, when switching between PROCESIO environments, or
-  when a tool reports a missing machine prerequisite.
-version: 1.0.0
-owner: procesio-cli maintainers
-last_verified: 2026-09-23
+description: Connect this installation to a PROCESIO workspace, so the MCP server and the CLI can reach it. Use on first run, after installing the plugin, when a call fails with auth_required, missing_secrets or no stored credential, when someone asks how to add an API key or a second environment, when switching between PROCESIO environments, or when a tool reports a missing machine prerequisite.
 ---
 
 # Connecting to PROCESIO

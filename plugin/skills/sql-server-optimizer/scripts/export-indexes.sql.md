@@ -1,3 +1,8 @@
+# export-indexes.sql
+
+Copy the script below and run it yourself; it is reference material, nothing in this plugin runs it.
+
+```sql
 /*Optimized SQL:*/
 -- Legacy inspection-only exporter over all user-table indexes in the current DB.
 -- Obtain whole-database scope/confidentiality approval BEFORE acquisition; filter
@@ -176,3 +181,4 @@ Notes:
 - Output is printed in 3,800-char chunks to avoid SSMS PRINT truncation.
 - Read output from the Messages tab in SSMS, not the Results tab.
 */
+```

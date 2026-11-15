@@ -81,7 +81,7 @@ def _read_sql(args):
 def _json_list(raw, what: str):
     if raw is None:
         return None
-    value = parse_json_arg(raw, what)
+    value = parse_json_arg(raw, what.lstrip("-"))   # parse_json_arg adds the dashes
     if not isinstance(value, list):
         raise UsageError(f"{what} must be a JSON array")
     return value
@@ -191,7 +191,7 @@ def client_timeout(query: dict) -> int:
 
 
 def run_saved_statement(client, args) -> dict:
-    params = parse_json_arg(args.params, "--params") if args.params else {}
+    params = parse_json_arg(args.params, "params") if args.params else {}
     if not isinstance(params, dict):
         raise UsageError("--params must be a JSON object of {parameter name: value}")
     form_ws = args.form_workspace_id or client.workspace_id \

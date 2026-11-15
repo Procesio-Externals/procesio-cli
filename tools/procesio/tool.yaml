@@ -2718,10 +2718,10 @@ actions:
           description: 'form-wide theme {cssVariable: value} overrides, e.g. {"--c-primary":"#0039e3","--p-form":"24px"}. Container elements also accept alignment vars in their per-control style: --fd/--jc/--ai-<section|list-item|column|step|tab|side-panel>'
         dark:
           type: boolean
-          description: 'enable dark mode: adds a {light,dark} ModeProperties palette (the 16-var DARK_PALETTE) to the Colors theme group, the shape the form runtime reads'
+          description: 'kept for older configs: the default theme (the designer''s own) already gives the Colors group a {light,dark} palette on every form'
         themeDark:
           type: object
-          description: 'dark-palette {cssVariable: value} overrides on top of the 16-var DARK_PALETTE default (implies dark)'
+          description: 'dark-palette {cssVariable: value} overrides on the Colors group''s dark side; `theme` sets the light side. A variable the theme does not define comes back as a warning'
         css:
           type: string
           description: form-level CSS (designer 'Switch to code' CSS tab); AES-encrypted into Data.code
@@ -10861,6 +10861,7 @@ actions:
               enum:
               - and
               - or
+              description: 'how this condition joins the NEXT one (default and). The case is an OR of AND-groups: ''or'' closes the current group. Ignored on the last condition.'
         operand:
           anyOf:
           - type:
@@ -12290,6 +12291,21 @@ actions:
     type: boolean
     required: false
     description: launch and return the instance id without polling
+- name: server-build
+  description: 'Which Web-Api build this environment runs (GET /health, anonymous): the version and the commit, which is the release tag''s commit in the Web-Api repository. Read-only.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
 - name: set-default
   description: Set the default profile used when --profile is omitted.
   args:

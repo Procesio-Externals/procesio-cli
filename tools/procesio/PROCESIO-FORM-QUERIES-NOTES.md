@@ -6,7 +6,17 @@ runs one by id. The browser never sends SQL: the runtime sends the query id and 
 values, and the server runs the stored text. Data Stores are MySQL-backed, so the dialect is
 MySQL (the statement rules are those of the Query Store action, `PROCESIO-QUERY-STORE-NOTES.md`).
 
-Verified against a live environment, 2026-11. Three different things, do not confuse them:
+Verified against a live environment, 2026-11.
+
+**Not every environment has it yet.** Check before relying on it: on a build without saved
+form queries, `GET api/FormTemplate/{id}` has no `queries` key at all, there is no
+`api/Form/dataStore/query/{id}` route, and a save that carries `Queries` answers 200 and stores
+none. The form and its QUERY events are kept, pointing at a query that does not exist.
+`form-create` and `form-edit` compare the read-back with what they sent and warn ("did not
+keep its saved queries"); `form-set-saved-statement` fails with `not_persisted`. (Seen on
+Main-PROD on 2026-11-15; the feature was built and checked against DEV.)
+
+Three different things, do not confuse them:
 
 - **Data Store event, READ/ADD/UPDATE/DELETE** - point-and-click row operations on ONE store
   from a form event (`FORM-DEV-GUIDE/06-PROCESS-INTEGRATION.md`, "Data store from a form").

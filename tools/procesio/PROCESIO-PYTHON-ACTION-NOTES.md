@@ -9,6 +9,14 @@ none of it has been executed against a live instance from this framework. Compan
 > **Superseded in part by live runs (2026-10).** The section "Live behaviour of the four
 > script actions" at the end of this file was measured on PROD, and it overrides the
 > documented I/O below where they differ: Python no longer wraps its output in `{"result"}`.
+>
+> ⚠ **Two Python actions exist (Process-Execution v0.25.0, 2026-09-21, read in the source).**
+> "Python" is a NEW action (`PythonActionV2`, on the python-engine) with the Single Result /
+> List Result / Stdout / Error outputs and a Timeout of 10..180 s; everything measured below is
+> about it. "Python (Old)" in the palette is the legacy action, unchanged: one `Output`, the old
+> engine, no Timeout, and the documented `{"result": ...}` wrapping still applies to it. A
+> process exported before 2026-09-21 keeps the old one; check the template before trusting
+> either half of this file.
 
 > ## ⚠ A scripting action that returns an ARRAY must bind "List Result"
 >
@@ -240,6 +248,12 @@ same actions driven in the designer. Everything below was observed, not read in 
   `Output` as `{"error": {"errorMessage", "errorContext", "lineNumber", "columnNumber"}}`.
   So check `Error` (or the Javascript `Output`) before trusting a result; a native `Throw`
   is what fails a run on purpose.
+- ⚠ **That holds for errors of the user's CODE, not of the engine (read in the source).** When
+  the script engine itself fails, the action FAILS: 1001 the engine is not configured, 1002 the
+  engine did not answer within the action's Timeout + 15 s, 1010 the engine is unreachable,
+  1011 "<engine> engine returned HTTP N". Nothing is retried, because user code is not
+  idempotent. A script's own `TimeoutError` (measured above) is the engine reporting the code;
+  a 1002 is the engine not reporting at all.
 - **docs.procesio.com/how-to/javascript serves the Python article** (its body is the Python
   page), so the Javascript action has no page of its own today.
 

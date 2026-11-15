@@ -44,9 +44,22 @@ there, not here.
 - `credential-copy` copies a credential from another workspace into `--workspace-id`. It
   tests the connection there and saves only if that passes, and it refuses a name the target
   already uses. Property values stay in memory: no file, argument or output holds them.
+- `procesio server-build` reads the Web-Api build an installation runs (version and commit)
+  from its public `/health`.
+- Uploads (`run-process-with-file`, `run-form-with-files`) retry with backoff while PROCESIO
+  answers 215 `FILE_LIST_LOCKED`. Sign-in refusals 406, 423 and 428 come back as their own
+  error codes with a hint.
+- `form-create` and `form-edit` warn when the server does not keep a form's saved queries.
+- The bundled action catalog has Upload Bulk (SFTP), and the notes list the credential types
+  prod offers.
 
 ### Changed
-- The plugin runs procesio-cli 0.1.6 (`plugin/pyproject.toml` and `plugin/uv.lock`).
+- The Claude Code plugin is now skills only. The plugin directory refuses a local MCP server,
+  scripts and package files from an organization it has not Verified, so `plugin/` no longer
+  starts the server: its README gives the one command that adds it
+  (`uvx procesio-cli==0.1.6`). The skills keep only `name` and a one-line `description` in
+  their frontmatter, the SQL helpers ship as Markdown, and the capacity calculator stays in
+  the repository. CI checks `plugin/` against these rules (`scripts/check-plugin.py`).
 - The bundled API reference has PROCESIO's signing corrections. `OrderMode` is gone, a
   signer can send their own signature spot, and 409 712 now means "try again".
 - `FORM-DEV-GUIDE/11-DOCUMENT-SIGNING.md` says what the designer and the fill page do.
@@ -64,6 +77,10 @@ there, not here.
   `label` with no error and returns every row, so don't rely on that filter yet.
 - `PROCESIO-CUSTOM-ACTION-NOTES.md` covers Action-Core 2.2: what it adds, and why a package built
   against a newer Action-Core than the host doesn't load.
+- A form built over the API gets the designer's full default theme, and its step functions
+  (`goToNextStep`, `goToPreviousStep`) can be called from form code.
+- `formlint` flags a `type=number` selector, which no longer matches the number field.
+- Notes cover the Web-Api v2.79.1 and v2.80.0 step and the later production changes.
 
 ### Fixed
 - Canvas areas on a crowded canvas: a group's rectangles grow from its first action and never
@@ -86,6 +103,9 @@ there, not here.
   the API can't stop a run.
 - `procesio_get_run_status` and `procesio_get_run_output` take a required `process_id`. Without
   it they could never read a run.
+- A Decisional condition joined with "or" was written as NONE, so the engine ignored every
+  condition after it. It is written as OR now, and `flow-lint` reports `DECISIONAL_TRUNCATED`
+  on a process built the old way.
 
 ## [0.1.6] - 2026-11-03
 

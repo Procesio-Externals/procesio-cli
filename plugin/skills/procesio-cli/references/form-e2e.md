@@ -34,6 +34,7 @@ Create or change a PROCESIO form and prove the user-visible behavior, process tr
 - For native synchronous result rendering, preserve existing direct process outputs and caller semantics. When the runtime writer consumes a variable-instance collection, use a compatible response envelope rather than replacing the established structured response.
 - Never persist an access token or credential as a form default, in plaintext JavaScript, or in screenshots/logs.
 - For a document-signing element, store the PDF with `form-signing-upload-document`, give every signer a SIGNATURE spot, and send the envelope yourself when the submission is made over the API (the element never sends it). The procesio tool's form development guide (its document-signing chapter) has the lifecycle and error codes.
+- For a form with saved Data Store queries, read them first and confirm every query is run by an element event: a designer save drops one that is not, and a save that omits the list deletes them all. Running a saved query is a mutation that needs approval, because the stored statement can write; the SQL is first checked when it runs. The procesio tool's form-queries note has the shapes and errors.
 
 ## Verify
 
@@ -48,6 +49,7 @@ Pass only when all relevant layers agree:
 7. Private/public access behaves as designed in an appropriate session.
 8. Screenshots mask secret fields and evidence confirms no secret default or embedded clear token exists.
 9. For a document-signing element, the published form shows the PDF with its placed blocks, an envelope seeds from the saved design, and a real submission leaves the envelope SENT with each signer's session showing their spot.
+10. For a saved Data Store query, the saved form still lists it after the last save, one approved run with the declared parameter names returns the expected rows or affected-row count, and the event's mapped fields show the result in the browser.
 
 ## Recovery and cleanup
 

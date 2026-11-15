@@ -104,6 +104,34 @@ def features(client, _args) -> dict:
     }
 
 
+def server_build(client, _args) -> dict:
+    """Which Web-Api build this environment runs, from its anonymous health check.
+
+    Since Web-Api v2.80.0 `GET /health` reports `entries.self.data = {version, commit}`. The
+    commit is the reliable part: it is the tag's commit in the Web-Api repository, so it says
+    which release is live without waiting for an announcement. `version` is the assembly
+    version and does not follow the release tags."""
+    import json as _json
+
+    status, raw, _ = client.request_bytes("GET", "/health")
+    try:
+        body = _json.loads((raw or b"").decode("utf-8", "replace") or "null")
+    except ValueError:
+        body = None
+    entries = body.get("entries") if isinstance(body, dict) else None
+    me = (entries or {}).get("self") if isinstance(entries, dict) else None
+    data = (me or {}).get("data") if isinstance(me, dict) else None
+    data = data if isinstance(data, dict) else {}
+    out = {"environment": client.env.get("name"), "web_base": config.web_base(client.profile),
+           "http_status": status,
+           "health": body.get("status") if isinstance(body, dict) else None,
+           "web_api": {"version": data.get("version"), "commit": data.get("commit")}}
+    if not data.get("commit"):
+        out["note"] = ("this environment's /health reports no build (a Web-Api older than "
+                       "v2.80.0, or a gateway that does not route /health)")
+    return out
+
+
 def logout(client, _args) -> dict:
     """Clear the cached session (in-process + persistent), best-effort server logOut."""
     name = client.name
@@ -132,6 +160,12 @@ ACTIONS = {
                      "customActions, dataStore, forms, executionEnvironment. An installation "
                      "can switch them off; their endpoints then answer 400 code 1013 "
                      "(error code feature_disabled)."),
+    ),
+    "server-build": ActionDef(
+        func=server_build, add_args=add_profile_arg, needs_client=True,
+        description=("Which Web-Api build this environment runs (GET /health, anonymous): the "
+                     "version and the commit, which is the release tag's commit in the Web-Api "
+                     "repository. Read-only."),
     ),
     "logout": ActionDef(
         func=logout, add_args=add_profile_arg, needs_client=True,

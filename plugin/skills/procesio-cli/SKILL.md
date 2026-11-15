@@ -1,23 +1,6 @@
 ---
 name: procesio-cli
-description: >-
-  Operate and troubleshoot PROCESIO resources through this repository's CLI or MCP.
-  Use when inspecting, creating, editing, running, validating, auditing, exporting,
-  importing, scheduling, triggering, testing, or verifying a PROCESIO process, form,
-  document, webhook, credential, data model, custom action, workspace, or execution instance.
-version: 1.0.4
-owner: procesio-cli maintainers
-last_verified: 2026-09-09
-baseline_version: da12de643c8a2355d019f40515766abf80a819df
-eval_suite: evals/evals.json
-source_policy: generated
-routing:
-  triggers:
-    - operate or troubleshoot a PROCESIO workspace through the CLI or MCP
-    - create, edit, run, validate, audit, export, import, schedule, trigger, test, or verify a PROCESIO resource
-    - inspect a PROCESIO process instance, form, document, webhook, credential, data model, or custom action
-  primary_action: capabilities
-  example: get-skill.py procesio-cli --content
+description: Operate and troubleshoot PROCESIO resources through this repository's CLI or MCP. Use when inspecting, creating, editing, running, validating, auditing, exporting, importing, scheduling, triggering, testing, or verifying a PROCESIO process, form, document, webhook, credential, data model, custom action, workspace, or execution instance.
 ---
 
 # Operate the PROCESIO CLI

@@ -29,13 +29,18 @@ testing a Query Store node on a personal workspace no longer returns error 1008.
 - Input `Query` - code-editor, TextFormat `datastore` (chips, see encoding below).
 - Input `Parameters` - map-parameters (`@name` -> value/variable), **bound as data** (safe).
 - Input `Time Out` - seconds, **60..1800, default 1800**; out of range is refused at validate.
-  It applies per row-returning statement, not to the whole script (v3.0.0).
+  It applies per row-returning statement, not to the whole script (v3.0.0). ⚠ The run clamps
+  it to [60, 1800] without a message (`ResolveTimeout`, read in the source): only the designer's
+  check refuses, so a value written over the API outside the range runs clamped.
 - Output `Result Rows` - a list of JSON objects, one per row; keys are the column names (or
   your `AS` aliases). **Empty for INSERT/UPDATE/DELETE/REPLACE.** Map to a **list of Json**.
 - Output `Total Count` - for a SELECT, rows returned; for INSERT/UPDATE/DELETE/REPLACE, rows
   affected (REPLACE that overwrites reports 2 = delete+insert). Map to an **Integer**.
   In a multi-statement script the affected-rows count covers the whole script (v3.0.0).
-- **No row limit.** A SELECT with no WHERE/LIMIT returns the whole table; add `LIMIT`.
+- **No row limit.** A SELECT with no WHERE/LIMIT returns the whole table; add `LIMIT`. The
+  raw-query path skips the per-table row cap (`MaxRowsPerTable`) a deployment may set for the
+  row endpoints, and the system-column stamping (Data-Store's own known-issues list), so an
+  INSERT here is not held to the cap.
 
 ## Saved node encoding (verified from a real export) - what a builder must emit
 The node's `Parameters` is a list of property objects `{TabPropertyId, Variable[], Value}`, one
@@ -60,6 +65,11 @@ reference uses PROCESIO's standard **`<%N%>` placeholder** inside `Value`, resol
 So the only Query-Store-specific part of the well-known `<%N%>`+`Variable[]` pattern is the
 chip entries typed `dataStoreTable` / `dataStoreColumn`, which carry `dataStoreId` (and
 `columnId`) instead of a `variableId`. Resolve those ids live from the Data Store metadata.
+
+The flow validator (Web-Api v2.80.0) refuses a malformed chip with its own codes: **152** a
+data-store binding without `dataStoreId`, **153** a column binding without `columnId`, **154** an
+unknown binding `type`. A binding entry with no `variableId` and no chip type answers
+`MISSING_VAR_ID`.
 
 ## The `Query` value chips (behaviour)
 A Data Store or column is inserted with Ctrl+I and stored as a chip **bound to the resource

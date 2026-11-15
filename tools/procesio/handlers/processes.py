@@ -19,7 +19,7 @@ from tools.procesio import reliability
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import parse_json_arg
 from tools.procesio.errors import ProcesioAPIError, UsageError
-from tools.procesio.handlers.common import add_paging_args, add_profile_arg
+from tools.procesio.handlers.common import add_paging_args, add_profile_arg, upload_retrying_lock
 
 
 # -- list / get -------------------------------------------------------------
@@ -221,11 +221,11 @@ def run_process_with_files(client, args) -> dict:
     for f in staged:
         with open(f["path"], "rb") as fh:
             content = fh.read()
-        client.request_multipart(
-            "/api/File/upload/flow",
+        upload_retrying_lock(
+            client, "/api/File/upload/flow",
             files={"package": (f["name"], content, f["mime"])},
             headers={"flowInstanceId": instance_id, "flowTemplateId": args.id,
-                     "variableName": f["var"], "fileId": f["file_id"]})
+                     "variableName": f["var"], "fileId": f["file_id"]}, log=log)
         log(f"uploaded {f['name']} ({f['size']} bytes) -> {f['var']}")
 
     client.post(f"/api/Projects/instances/{instance_id}/launch",

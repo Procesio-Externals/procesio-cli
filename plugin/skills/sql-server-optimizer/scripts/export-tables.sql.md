@@ -1,4 +1,8 @@
+# export-tables.sql
 
+Copy the script below and run it yourself; it is reference material, nothing in this plugin runs it.
+
+```sql
 /*Optimized SQL:*/
 -- Exports a database "definition file" containing:
 --  - Tables, columns, computed/identity, and full data types
@@ -365,3 +369,4 @@ Notes:
 - RAISERROR substitution parameters must be variables/constants; SUBSTRING(@Def,...) inline can throw a syntax error.
 - Using severity 0 + WITH NOWAIT prints progressively to the Messages tab without PRINT's 4k truncation.
 */
+```

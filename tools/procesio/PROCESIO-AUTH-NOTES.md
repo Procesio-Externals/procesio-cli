@@ -134,6 +134,24 @@ failure: probe it once with a knowingly invalid identity. If the response matche
 what the user is getting, the message carries no information and the fault must be
 located by varying one input at a time.
 
+### The refusals that DO say something (Web-Api v2.80.0 / Authentication-Proxy v2.38.0)
+
+Read in the source; the tool maps each to its own error code with a hint (`errors.py`).
+
+| Status | Tool code | Means |
+|---|---|---|
+| 423 | `account_locked` | too many failed sign-ins. Body `{error: "account_locked", error_description, retryAfterSeconds}`; the seconds count from receipt and **0 means unknown, not "retry now"** (`retry_after_s` is null then). Signing in again meanwhile keeps the lock. |
+| 428 | `otp_required` | the account has TOTP on and the request carried no `code`. The tool's userpass sign-in sends no one-time code: use an API key profile for such an account. |
+| 406 | `otp_setup_required` | on any call, not only sign-in: the workspace (or its master) requires two-factor authentication and this account has not set it up. The token is still valid. Since 2026-10-22 this also covers sub-workspaces that existed before the master turned it on. |
+
+- **A stale access cookie no longer breaks a sign-in.** Before v2.80.0 a login carrying an old
+  access cookie was refused with 401, and a rejected token left the cookies in place; now a
+  rejected token clears them (except on 406 and on a proxy 401). The client still clears its
+  cookie jar before each request (`_clear_jar`), which was the workaround; it stays.
+- **Forgot-password and complete-account match the email exactly, ignoring case** (v2.38.0).
+  Before, a request answered 200 and sent no mail when another account's email contained the
+  address, and any capital letter gave 401.
+
 ### Storing a credential needs the runner bypassed
 
 `add-credential` deliberately prompts for the secret instead of taking it on the
