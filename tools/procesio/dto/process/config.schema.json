@@ -130,7 +130,7 @@
         "left": {"$ref": "#/$defs/operand"},
         "op": {"type": "string", "description": "EQUALS, DOES_NOT_EQUAL, GREATER_THAN, LESS_THAN, CONTAINS, IS_EMPTY, IS_NOT_EMPTY, IS_TRUE, IS_FALSE, ..."},
         "right": {"$ref": "#/$defs/operand"},
-        "logic": {"type": "string", "enum": ["and", "or"]}
+        "logic": {"type": "string", "enum": ["and", "or"], "description": "how this condition joins the NEXT one (default and). The case is an OR of AND-groups: 'or' closes the current group. Ignored on the last condition."}
       }
     },
     "operand": {

@@ -198,7 +198,10 @@ def test_dark_override_wins():
     assert _mode_var(dto, "light", "--c-primary") != "#000000"
 
 
-def test_no_dark_by_default():
+def test_colors_carry_both_sides_as_the_designer_saves_them():
+    """The shell theme is the designer's getDefaultTheme(): its Colors group is {light, dark}
+    on every form, with or without `dark`; themeMode/themeDark are never saved."""
     dto = builder.build({"name": "F", "elements": [{"type": "input", "label": "X"}]}, _ctx())
-    assert isinstance(_colors_group(dto)["properties"], list)        # flat, no {light,dark}
+    assert set(_colors_group(dto)["properties"]) == {"light", "dark"}
+    assert _mode_var(dto, "dark", "--c-primary") == "#4663f5"
     assert "themeMode" not in dto["Data"] and "themeDark" not in dto["Data"]

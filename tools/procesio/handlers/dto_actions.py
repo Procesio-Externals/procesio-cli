@@ -95,6 +95,7 @@ def _make_create(component):
         ctx["_no_types"] = getattr(args, "no_types", False)
         ctx["_allow_undocumented"] = getattr(args, "allow_undocumented", False)
         ctx["_doc"] = {}
+        ctx["_build_warnings"] = []   # created before any copy of ctx, so builders share it
         dto = framework.build_dto(component, config, ctx)
         # Self-documentation first: it is cheap, and an undocumented process is not worth a
         # validation round trip. A dry-run reports the gaps instead of stopping on them.
@@ -109,7 +110,7 @@ def _make_create(component):
             oracle = framework.run_validate(component, client, dto, ctx)
         # Non-blocking lint of what is about to be saved (for a form: field names a
         # designer save would rename, phantom parents, ...). Reported, never enforced.
-        warnings = component.lint(dto) if component.lint else []
+        warnings = (component.lint(dto) if component.lint else []) + ctx["_build_warnings"]
         if args.dry_run:
             out = {"dry_run": True, "component": component.name, "dto": dto,
                    "validation": oracle}
@@ -127,6 +128,8 @@ def _make_create(component):
             out["capture"] = resp["_capture"]
         if documentation is not None:
             out["documentation"] = documentation
+        if component.persist_check and verified is not None:
+            warnings = warnings + component.persist_check(dto, verified)
         if warnings:
             out["warnings"] = warnings
         return out
@@ -154,6 +157,7 @@ def _make_edit(component):
         ctx["_allow_remove"] = getattr(args, "allow_remove", False)
         ctx["_allow_undocumented"] = getattr(args, "allow_undocumented", False)
         ctx["_doc"] = {}
+        ctx["_build_warnings"] = []   # created before any copy of ctx, so builders share it
         if args.dry_run:
             # Build it the way the EDIT would, so the preview shows the ids the edit would keep.
             dto = framework.build_edit_dto(component, client, args.id, config, ctx)
@@ -166,7 +170,7 @@ def _make_edit(component):
                 out["live_read_failed"] = (
                     f"{ctx['_live_read_error']}. This preview carries nothing over from the live "
                     f"resource, so its ids are new ones, and a real edit stops on the same failure.")
-            warnings = component.lint(dto) if component.lint else []
+            warnings = (component.lint(dto) if component.lint else []) + ctx["_build_warnings"]
             if warnings:
                 out["warnings"] = warnings
             return out
@@ -178,7 +182,9 @@ def _make_edit(component):
         documentation = _doc_report(component, ctx, enforce=False)
         if documentation is not None:
             out["documentation"] = documentation
-        warnings = component.lint(resp) if component.lint else []
+        warnings = (component.lint(resp) if component.lint else []) + ctx["_build_warnings"]
+        if component.persist_check and ctx.get("_sent_dto") is not None:
+            warnings = warnings + component.persist_check(ctx["_sent_dto"], resp)
         if warnings:
             out["warnings"] = warnings
         return out

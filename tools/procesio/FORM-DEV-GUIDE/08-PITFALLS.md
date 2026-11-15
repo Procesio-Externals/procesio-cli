@@ -180,6 +180,26 @@ value has landed by then. Verified live, with a MAP that never saw the value its
 own chain had written.
 **Rule.** Never branch a MAP on a value the same chain's JS just wrote. Hand off
 through a field's own `onInput` chain instead: [04](04-INTERACTION-RECIPES.md) §16.
+**What changed (ui-builder 1.45, read in the source).** Before a trigger chain, a submit
+or a validation starts, the runtime now writes every pending typed value and waits for it
+(`flushPendingInputs`; a click also writes the focused field). So what the user typed
+before clicking is in the model when the chain starts. It flushes once, before the
+chain, not between its steps: a value the chain's own JS writes still lands after the
+MAP that reads it, so the rule above stands.
+
+### A number field rejects what was typed, or a script cannot find it
+**Cause.** Since ui-builder 0.184 / 1.41 the number field is `<input type="text"
+inputmode="decimal">`. Thousands separators are refused, text that is not a number blocks
+submit ("Enter a number, for example 1234.5."), `min`/`max` do nothing, and a
+`type=number` selector matches nothing.
+**Rule.** Validate ranges yourself, select the field by its class, and never format a
+number field's value with separators. [03](03-DOM-CONTRACT.md) §5 has the contract.
+
+### An element can block submit, with the reason in the button's tooltip
+**Cause.** A control can veto the submit (ui-builder 1.41+): a number field holding
+text that is not a number, or a document-signing setup that is not saved. The submit
+button is disabled and its tooltip names the reason; nothing else on the page says so.
+**Rule.** When a submit looks dead, hover it before debugging the chain.
 
 ### A programmatic click on another form button, from inside a chain, does nothing
 **Cause.** While a button's chain runs the form is locked: every element is

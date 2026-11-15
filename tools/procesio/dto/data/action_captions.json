@@ -213,6 +213,7 @@
   "Unzip": "Extracts a list of files from a zip archive.",
   "Update": "XML Update enables you to update an XML input, if the input tag exists, or to insert the input tag, if it doesn't exist, using XPath.",
   "Update DateTime": "Updates a specific subdivision of a DateTime.",
+  "Upload Bulk": "Uploads multiple files based on an input list of FileModel.",
   "Upload File": "Enables you to upload a file on a SFTP server.",
   "Word Mail Merge": "Assign specified values to Mail Merge Fields from a word document.",
   "XLS To XLSX": "Convert an XLS file to an XLSX file. Styles will not be ported and the maximum permitted size for the XLS file is 10 Mb.",

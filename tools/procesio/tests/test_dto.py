@@ -263,7 +263,7 @@ def test_form_events_and_theme():
     ev = next(c["value"] for c in btn["configs"] if c["key"] == "onClickEvents")
     assert ev["events"][0]["action"] == "RUN_JAVASCRIPT"
     assert ev["events"][1]["action"] == "RUN_PROCESS" and ev["events"][1]["config"]["processId"] == "PID"
-    prim = next(p["value"] for s in dto["Data"]["theme"] for p in s.get("properties", [])
+    prim = next(p["value"] for s in dto["Data"]["theme"] for p in fb._group_props(s)
                 if p.get("cssVariable") == "--c-primary")
     assert prim == "#abc123"
 
@@ -374,6 +374,30 @@ def test_process_decisional_branches():
     assert any(p.get("Data", {}).get("isDefault") == "default" for p in dec["Ports"])
     # user-supplied Stops -> no auto stop duplication
     assert sum(1 for a in dto["Actions"] if a["ActionName"] == "Stop") == 2
+
+
+def test_decisional_or_is_the_engines_or_not_none():
+    """LogicOperators is NONE = 0, AND = 1, OR = 2 (Process-Execution, and the designer's
+    LogicalOperator). NONE stops the evaluation, so `or` written as 0 made every condition
+    after it silently ignored."""
+    from tools.procesio.dto.process import builder as pb
+    cfg = {"title": "T", "variables": [{"name": "n", "type": "integer", "direction": "input"}],
+           "actions": [
+               {"id": "dec", "action": "Decisional", "branches": [
+                   {"to": "hi", "when": [
+                       {"left": {"var": "n"}, "op": "GREATER_THAN", "right": 100, "logic": "or"},
+                       {"left": {"var": "n"}, "op": "LESS_THAN", "right": 0, "logic": "and"},
+                       {"left": {"var": "n"}, "op": "IS_NOT_EMPTY"}]},
+                   {"to": "lo", "default": True}]},
+               {"id": "hi", "action": "Generate GUID"},
+               {"id": "lo", "action": "Generate GUID"},
+               {"id": "s1", "action": "Stop"}, {"id": "s2", "action": "Stop"}],
+           "edges": [["start", "dec"], ["hi", "s1"], ["lo", "s2"]]}
+    dto = pb.build(cfg, _proc_ctx())
+    dec = next(a for a in dto["Actions"] if a["ActionName"] == "Decisional")
+    cases = next(p for p in dec["Parameters"] if isinstance(p["Value"], list))
+    ops = [c["logicOperator"] for c in cases["Value"][0]["condition"]]
+    assert ops == [2, 1, 1]
 
 
 def test_process_error_port_and_join():

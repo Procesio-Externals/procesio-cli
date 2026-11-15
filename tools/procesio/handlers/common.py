@@ -26,6 +26,37 @@ def concurrency_token(dto):
     return None
 
 
+# Web-Api v2.79.1+ (PRC-5587): uploads to one owner (a flow instance and variable, a form
+# instance, a schedule, a test action) take a lock, and one that cannot get it answers
+# coded error 215 FILE_LIST_LOCKED and writes NOTHING, so retrying it is safe.
+FILE_LIST_LOCKED = 215
+_UPLOAD_BACKOFF_S = (0.5, 1.0, 2.0, 4.0)
+
+
+def upload_retrying_lock(client, path: str, *, files: dict, headers: dict | None = None,
+                         sleep=None, log=None):
+    """`client.request_multipart`, retried with backoff while the server answers 215
+    FILE_LIST_LOCKED (another upload to the same owner holds the file list). Any other
+    error, or a lock that outlasts the backoff, is raised as it came."""
+    import time
+
+    from tools.procesio.errors import ProcesioAPIError, procesio_error_items
+
+    sleep = sleep or time.sleep
+    for attempt, wait in enumerate((*_UPLOAD_BACKOFF_S, None)):
+        try:
+            return client.request_multipart(path, files=files, headers=headers)
+        except ProcesioAPIError as e:
+            locked = any(i.get("statusCode") == FILE_LIST_LOCKED
+                         for i in procesio_error_items(e.details))
+            if not locked or wait is None:
+                raise
+            if log:
+                log(f"file list locked by another upload; retrying in {wait:g}s "
+                    f"(attempt {attempt + 2})")
+            sleep(wait)
+
+
 def add_force_arg(p: argparse.ArgumentParser) -> None:
     """--force skips the optimistic-concurrency check (see guard_unchanged)."""
     p.add_argument(

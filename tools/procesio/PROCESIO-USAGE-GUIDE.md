@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**157 rules across 10 notes.**
+**164 rules across 12 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -143,6 +143,8 @@ Source: [`PROCESIO-API-NOTES.md`](PROCESIO-API-NOTES.md)
 - [Variable substitution into a script is LITERAL, and a json variable IS the escaping mechanism](PROCESIO-API-NOTES.md#variable-substitution-into-a-script-is-literal-and-a-json-variable-is-the-escaping-mechanism)
 - [Consequence: a form field cannot feed a json-typed process input](PROCESIO-API-NOTES.md#consequence-a-form-field-cannot-feed-a-json-typed-process-input)
 - [PROCESIO webhook handshake-response is NOT persistent - cannot reliably serve Meta inbound (2026-10-01, refines the earlier claim)](PROCESIO-API-NOTES.md#procesio-webhook-handshake-response-is-not-persistent---cannot-reliably-serve-meta-inbound-2026-10-01-refines-the-earlier-claim)
+- [v2.79.1 / v2.80.0 production step (2026-09-15 / 2026-09-21): what changed for API clients](PROCESIO-API-NOTES.md#v2791-v2800-production-step-2026-09-15-2026-09-21-what-changed-for-api-clients)
+- [Decisional, Join and Delay: designer and runtime behaviour (live, 2026-10)](PROCESIO-API-NOTES.md#decisional-join-and-delay-designer-and-runtime-behaviour-live-2026-10)
 - [List, text, number and date actions: measured behaviour (live, 2026-10)](PROCESIO-API-NOTES.md#list-text-number-and-date-actions-measured-behaviour-live-2026-10)
 - [Export / import in the UI: what travels, and what Override data really does (2026-10, measured)](PROCESIO-API-NOTES.md#export-import-in-the-ui-what-travels-and-what-override-data-really-does-2026-10-measured)
 - [Webhook query parameters, and a webhook as a tracking pixel (2026-10)](PROCESIO-API-NOTES.md#webhook-query-parameters-and-a-webhook-as-a-tracking-pixel-2026-10)
@@ -176,6 +178,23 @@ Source: [`PROCESIO-FORM-QUERIES-NOTES.md`](PROCESIO-FORM-QUERIES-NOTES.md)
 - [Running a query: parameter names exactly as declared](PROCESIO-FORM-QUERIES-NOTES.md#running-a-query-parameter-names-exactly-as-declared)
 - [The tool actions: running a saved statement is a write](PROCESIO-FORM-QUERIES-NOTES.md#the-tool-actions-running-a-saved-statement-is-a-write)
 
+## The Python action
+
+Source: [`PROCESIO-PYTHON-ACTION-NOTES.md`](PROCESIO-PYTHON-ACTION-NOTES.md)
+
+- [I/O mechanics - two traps](PROCESIO-PYTHON-ACTION-NOTES.md#io-mechanics---two-traps)
+- [spacy is on the list; a spacy MODEL is not](PROCESIO-PYTHON-ACTION-NOTES.md#spacy-is-on-the-list-a-spacy-model-is-not)
+- [Where the compute runs, and why it matters for sizing](PROCESIO-PYTHON-ACTION-NOTES.md#where-the-compute-runs-and-why-it-matters-for-sizing)
+- [Live behaviour of the four script actions (measured on PROD, 2026-10)](PROCESIO-PYTHON-ACTION-NOTES.md#live-behaviour-of-the-four-script-actions-measured-on-prod-2026-10)
+
+## Custom actions
+
+Source: [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md)
+
+- [Runtime, loader and upload (v3.0.0, 2026-10)](PROCESIO-CUSTOM-ACTION-NOTES.md#runtime-loader-and-upload-v300-2026-10)
+- [Action-Core 2.2 and the host version (2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#action-core-22-and-the-host-version-2026-11)
+- [What upload refuses (measured on prod, 2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#what-upload-refuses-measured-on-prod-2026-11)
+
 ## Procesio Foreach Notes
 
 Source: [`PROCESIO-FOREACH-NOTES.md`](PROCESIO-FOREACH-NOTES.md)
@@ -192,20 +211,12 @@ Source: [`PROCESIO-NODE-CODE-NOTES.md`](PROCESIO-NODE-CODE-NOTES.md)
 - [2. A process can read its own workspace's run history in-flow, with NO credential](PROCESIO-NODE-CODE-NOTES.md#2-a-process-can-read-its-own-workspaces-run-history-in-flow-with-no-credential)
 - [3. Editing a live Node's Code in place: fix BOTH copies (runtime param AND designer customData)](PROCESIO-NODE-CODE-NOTES.md#3-editing-a-live-nodes-code-in-place-fix-both-copies-runtime-param-and-designer-customdata)
 
-## The Python action
+## Procesio Query Store Notes
 
-Source: [`PROCESIO-PYTHON-ACTION-NOTES.md`](PROCESIO-PYTHON-ACTION-NOTES.md)
+Source: [`PROCESIO-QUERY-STORE-NOTES.md`](PROCESIO-QUERY-STORE-NOTES.md)
 
-- [I/O mechanics - two traps](PROCESIO-PYTHON-ACTION-NOTES.md#io-mechanics---two-traps)
-- [spacy is on the list; a spacy MODEL is not](PROCESIO-PYTHON-ACTION-NOTES.md#spacy-is-on-the-list-a-spacy-model-is-not)
-- [Where the compute runs, and why it matters for sizing](PROCESIO-PYTHON-ACTION-NOTES.md#where-the-compute-runs-and-why-it-matters-for-sizing)
-
-## Custom actions
-
-Source: [`PROCESIO-CUSTOM-ACTION-NOTES.md`](PROCESIO-CUSTOM-ACTION-NOTES.md)
-
-- [Action-Core 2.2 and the host version (2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#action-core-22-and-the-host-version-2026-11)
-- [What upload refuses (measured on prod, 2026-11)](PROCESIO-CUSTOM-ACTION-NOTES.md#what-upload-refuses-measured-on-prod-2026-11)
+- [I/O (as the catalog serves it)](PROCESIO-QUERY-STORE-NOTES.md#io-as-the-catalog-serves-it)
+- [The Query value chips (behaviour)](PROCESIO-QUERY-STORE-NOTES.md#the-query-value-chips-behaviour)
 
 ## Readings that turned out to be wrong
 
@@ -219,11 +230,17 @@ Source: [`PROCESIO-CARD-BUILD-NOTES.md`](PROCESIO-CARD-BUILD-NOTES.md)
 
 - [9. Assembling a file-in / file-out card through the builder (the renderer wiring)](PROCESIO-CARD-BUILD-NOTES.md#9-assembling-a-file-in-file-out-card-through-the-builder-the-renderer-wiring)
 
-## Procesio Query Store Notes
+## Procesio Data Conversion Notes
 
-Source: [`PROCESIO-QUERY-STORE-NOTES.md`](PROCESIO-QUERY-STORE-NOTES.md)
+Source: [`PROCESIO-DATA-CONVERSION-NOTES.md`](PROCESIO-DATA-CONVERSION-NOTES.md)
 
-- [The Query value chips (behaviour)](PROCESIO-QUERY-STORE-NOTES.md#the-query-value-chips-behaviour)
+- [An empty value for a non-string input (every action, since Process-Execution v0.25.0)](PROCESIO-DATA-CONVERSION-NOTES.md#an-empty-value-for-a-non-string-input-every-action-since-process-execution-v0250)
+
+## Send Email
+
+Source: [`PROCESIO-SEND-EMAIL-NOTES.md`](PROCESIO-SEND-EMAIL-NOTES.md)
+
+- [4. Attachment - bind a File-typed variable](PROCESIO-SEND-EMAIL-NOTES.md#4-attachment---bind-a-file-typed-variable)
 
 ## Notes not yet indexed here
 
@@ -236,7 +253,6 @@ one of them adds it here on the next build; read them directly meanwhile.
 - [`PROCESIO-AI-EXTRACTION-NOTES.md`](PROCESIO-AI-EXTRACTION-NOTES.md)
 - [`PROCESIO-AUTH-NOTES.md`](PROCESIO-AUTH-NOTES.md)
 - [`PROCESIO-CONNECTORS-NOTES.md`](PROCESIO-CONNECTORS-NOTES.md)
-- [`PROCESIO-DATA-CONVERSION-NOTES.md`](PROCESIO-DATA-CONVERSION-NOTES.md)
 - [`PROCESIO-DOCS-FIX-REPORT.md`](PROCESIO-DOCS-FIX-REPORT.md)
 - [`PROCESIO-ENVIRONMENTS-NOTES.md`](PROCESIO-ENVIRONMENTS-NOTES.md)
 - [`PROCESIO-EXTERNAL-CALLERS-NOTES.md`](PROCESIO-EXTERNAL-CALLERS-NOTES.md)
@@ -252,7 +268,6 @@ one of them adds it here on the next build; read them directly meanwhile.
 - [`PROCESIO-RECONCILIATION-PATTERNS.md`](PROCESIO-RECONCILIATION-PATTERNS.md)
 - [`PROCESIO-RESOURCE-MODEL-NOTES.md`](PROCESIO-RESOURCE-MODEL-NOTES.md)
 - [`PROCESIO-SEND-EMAIL-CRED-OPTIONALITY.md`](PROCESIO-SEND-EMAIL-CRED-OPTIONALITY.md)
-- [`PROCESIO-SEND-EMAIL-NOTES.md`](PROCESIO-SEND-EMAIL-NOTES.md)
 - [`PROCESIO-SQL-ACTIONS-NOTES.md`](PROCESIO-SQL-ACTIONS-NOTES.md)
 - [`PROCESIO-SUBPROCESS-NOTES.md`](PROCESIO-SUBPROCESS-NOTES.md)
 - [`SCHEDULE-INPUT-SECURITY-NOTES.md`](SCHEDULE-INPUT-SECURITY-NOTES.md)

@@ -47,6 +47,12 @@ whole exercise exists to prevent. Flatten to `{name: defaultValue}` before asser
 Implemented as the curated action `run-form-with-files` (the generated `<method>-<path>`
 actions cannot reach it: they send JSON only, with no custom headers and no multipart).
 
+**Uploads to one instance are serialized by the server (Web-Api v2.79.1).** Two uploads to
+the same owner at once: the one that cannot get the lock answers coded error **215
+FILE_LIST_LOCKED** and writes nothing. `run-form-with-files` and `run-process-with-file`
+retry it with backoff. The same file content may sit in several file slots of one form
+instance since v2.80.0 (`POST api/Form/upload` dropped its duplicate-hash refusal).
+
 ## The contract check, as a standard
 
 Run this for every card that ships a form. It is three layers, and the third is the one

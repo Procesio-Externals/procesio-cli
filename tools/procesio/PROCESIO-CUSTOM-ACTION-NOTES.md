@@ -55,6 +55,13 @@ from the public docs.
   an empty custom-action list is not proof that nothing was uploaded: an upload answering 1013
   means the environment has no store. Action-Execution downloads each package from the store
   path recorded on its own template.
+- **Packages uploaded to the old store were repointed** by a migration deployed with v3.0.0
+  (2026-10-22): a custom action from before October that fails to download carries a stale
+  `NugetPath`, and uploading it again fixes it.
+- ⚠ **An empty input value becomes null before your `Execute` sees it** (Process-Execution
+  v0.25.0 TypeConverter, read in the source). For a REQUIRED non-nullable value type (`bool`,
+  `Guid`, an enum) the run fails with "Input 'X' is required but was empty." Declare an
+  optional value-type input nullable (`bool?`, `Guid?`, `MyEnum?`).
 - **Upload and delete stamp `UpdatedOn` / `UpdatedById`** on the action template.
 - **`Credentials_Rest` uploads no longer fail with `TEMPLATE_ERROR`.** A credential type now
   resolves to its ROOT template. Before v3.0.0 a derived template that kept its parent's `Type`

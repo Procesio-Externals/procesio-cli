@@ -10,10 +10,22 @@ source in `docs_info/ui-builder-main`) and buildable via `builder.py`.
 > are written to be attached as chat context.
 
 ## 1. Form Theme - ✅ implemented
-`Data.theme`: 18 sections, ~190 CSS variables (`{label,types,properties:[{type,label,
-value,cssVariable}]}`). Pass `theme:{"--c-primary":"#0039e3","--h-input":"44px"}`;
-`_apply_theme` overrides by `cssVariable`. Form-wide, by control type. Defaults =
-`docs_info/form-theme.ts` `getDefaultTheme()` (== `data_shell.json` theme).
+`Data.theme`: 23 groups, ~270 CSS variables (`{label,types,properties:[{type,label,
+value,cssVariable}]}`; the Colors group's `properties` is `{light: [...], dark: [...]}`).
+Pass `theme:{"--c-primary":"#0039e3","--h-input":"44px"}` (Colors overrides land on the
+light side) and `themeDark:{...}` for the dark side; `_apply_theme` overrides by
+`cssVariable`. A variable the theme does not define is reported in `warnings`, never
+silently dropped. Form-wide, by control type.
+
+Defaults = the DESIGNER's `getDefaultTheme()`: the theme a form saved in the designer
+carries. `dto/form/sync_theme.py` runs ui-builder's `theme.ts` with Node at the tag the
+designer pins and writes `data_shell.json` (theme only) plus `theme_source.json` (tag,
+hash, groups); `procesio-release ui-builder-sync` calls it, and `fe-pins` reports
+`shell_theme_stale` when the designer moves. ⚠ Keep it on the designer's line: the runtime's
+line drops a few variables the designer still saves, and a shell older than the designer
+loses every override of a newer variable without a word (69 variables and five groups,
+including all of Document Signing, until 2026-11). The runtime applies the theme as rules on
+the form containers (`getThemeStyleRules`), no longer as one palette stylesheet.
 
 ## 2. Element event JavaScript - ✅ implemented
 Per-control onClick/onInput/etc → `{action:"RUN_JAVASCRIPT", config:{code}}` (plaintext)
@@ -125,21 +137,20 @@ from it), and its `src/js/model/config/index.ts` enums match `form-config-enums.
 ## Dark theme + element alignment (2026-08)
 
 **Dark theme.** A form carries both a light and a dark palette, swapped at runtime by
-`themeMode`/`activeThemeMode` (getPaletteStyleSheet injects the active one). The 16-var
-`DARK_PALETTE` (builder `_DARK_PALETTE`): `--c-primary` #4663f5, `--c-primary-variant`
-#8aa0ff, `--c-error` #ff6b6b, `--c-success` #32d583, `--c-info` #53b1fd, and the neutrals
-inverted `--c-neutral--900` #f8fafd … `--c-neutral--0` #141922. Opt in via config
-`themeMode`/`themeDark`; default forms stay light-only. The exact DTO persistence key for
-the dark palette is best-effort (`themeMode`/`themeDark` in Data) pending live confirmation.
+`themeMode`/`activeThemeMode`. Since the shell follows the designer (2026-11), every
+API-built form carries both sides, as a designer-saved one does; `themeDark` overrides
+the dark side and `dark` is kept only for older configs. The builder's 16-var
+`_DARK_PALETTE` (`--c-primary` #4663f5 …) now only serves an older flat shell.
+`themeMode` and `themeDark` are never saved in `Data`.
 
 **Element alignment.** Container elements accept three flex vars in their per-control
 `style`, keyed by an element SCOPE suffix: `--fd-<scope>` (flex-direction / "Inner
 direction"), `--jc-<scope>` (justify-content / "Inner main axis"), `--ai-<scope>`
 (align-items / "Inner cross axis"). Scopes: section, list-item, column, step, tab,
-side-panel (element types section, list, columns, stepper, tabs, side-panel). The builder
-accepts them additively today (`_alignment_props`); when the golden `data_shell.json` is
-refreshed from the launched `form-theme.ts` the golden's native definition (proper dropdown
-type + option list) wins.
+side-panel (element types section, list, columns, stepper, tabs, side-panel). The shell
+now defines them natively (Section, List, Column, Step, Tab, Side Panel groups), with the
+designer's dropdown type and options; `_alignment_props` stays as the fallback for an
+older shell, and the native definition wins.
 
 ## Buttons render LAST inside a section (2026-11)
 

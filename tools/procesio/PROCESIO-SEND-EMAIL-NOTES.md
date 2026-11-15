@@ -90,6 +90,11 @@ to a **File** flow variable.
   CSV*, a download action) earlier in the flow and pass that variable here. The
   binding is `Variable:[{id:N, variableId:<file var>, attribute:null}]`,
   `Value:"<%N%>"`.
+- ⚠ **A successful send does not prove the attachment went with it** (Process-Execution
+  v0.25.0, read in the source). An attachment entry that resolves to null (an empty variable,
+  a File whose content was cleaned up) is skipped: the mail goes out without it and the action
+  reports success. When the attachment matters, check the File is set before the send
+  (`Decisional IS_NOT_EMPTY`), and read the sent mail in a test.
 
 ## 5. Dynamic recipient - bind a String variable
 

@@ -470,6 +470,48 @@ def test_run_surfaces_the_platform_error_body():
     assert e.value.status == 400 and e.value.details == refusal
 
 
+# -- a build without the feature: the save answers 200 and keeps no queries ---
+
+def _older_build(stored_form: dict):
+    """A server whose PUT/POST accept anything and whose GET returns `stored_form`."""
+    def respond(method, url, kw):
+        if method == "GET" and "/api/FormTemplate/" in url:
+            return FakeResp(200, stored_form)
+        if method == "POST":
+            return FakeResp(200, {"id": "F1"})
+        return FakeResp(200, {})
+    return FakeSession(responder=respond)
+
+
+def _without_queries_key() -> dict:
+    form = _form()
+    del form["queries"]
+    return form
+
+
+@pytest.mark.parametrize("action, argv", [
+    ("form-create", []),
+    ("form-edit", ["--id", "F1"]),
+])
+def test_a_save_that_drops_the_queries_is_reported(action, argv):
+    s = _older_build(_without_queries_key())
+    out = _call(action, argv + ["--config", json.dumps(_config())], s)
+    (warning,) = [w for w in out.get("warnings", []) if "did not keep its saved queries" in w]
+    assert "'Find product'" in warning and "returns no `queries` at all" in warning
+
+
+def test_a_save_that_keeps_the_queries_reports_nothing_about_them():
+    cfg = _config(queries=[{"id": QID, "name": "Find product", "sql": SQL, "bindings": BINDINGS}])
+    s = _older_build(_form())
+    out = _call("form-edit", ["--id", "F1", "--config", json.dumps(cfg)], s)
+    assert not [w for w in out.get("warnings", []) if "did not keep" in w]
+
+
+def test_a_save_without_queries_is_never_checked_for_them():
+    assert fb._persist_check({"Data": {}}, _without_queries_key()) == []
+    assert fb._persist_check({"Queries": []}, _without_queries_key()) == []
+
+
 # -- reversibility: a saved statement can write ------------------------------
 
 def test_running_a_saved_statement_needs_approval():

@@ -32,6 +32,11 @@ Checks (per action, against the DESIGNER customData layer):
      the screen. The builder lays Query Store SQL out on the way in (tools/procesio/sqlformat.py);
      this catches everything that reached the flow another way.
 
+  9. DECISIONAL_TRUNCATED — a rule Decisional case whose condition before the last has logic
+     operator NONE (0). The engine folds a case into an OR of AND-groups and STOPS at NONE, so
+     every condition after it is ignored without a word (LogicOperators NONE 0 / AND 1 / OR 2).
+     The process builder wrote `or` as 0 until 2026-11, so processes it built with an OR carry it.
+
 Born 2026-07-05; rebuilt 2026-07-06 after runtime-only versions repeatedly reported false "clean".
 """
 from __future__ import annotations
@@ -178,6 +183,23 @@ def lint_flow_dto(flow: dict, template_sidepanel_ids: dict, target_vars_of) -> l
                             f"Output '{ov.get('name')}' must be a list<Object> (a SQL result set) - "
                             f"got isList={ov.get('isList')} dataType=...{dt[-4:]} "
                             f"(scalar/primitive -> designer 'data type mismatch')")
+
+        if tmpl == "Decisional":
+            for prm in a.get("parameters") or []:
+                val = prm.get("value")
+                for case in val if isinstance(val, list) else []:
+                    conds = (case or {}).get("condition") if isinstance(case, dict) else None
+                    if not isinstance(conds, list):
+                        continue
+                    conds = sorted((c for c in conds if isinstance(c, dict)),
+                                   key=lambda c: c.get("id") if isinstance(c.get("id"), int) else 0)
+                    stop = next((i for i, c in enumerate(conds[:-1])
+                                 if c.get("logicOperator") in (0, None)), None)
+                    if stop is not None:
+                        add(nm, "DECISIONAL_TRUNCATED",
+                            f"case {case.get('id')}: condition {stop + 1} of {len(conds)} has no "
+                            f"logic operator (NONE), so the engine stops there and ignores the "
+                            f"{len(conds) - stop - 1} after it; set AND (1) or OR (2)")
 
         ev = a.get("variableErrorId")
         if ev and ev not in vmap:

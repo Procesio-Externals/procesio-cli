@@ -6998,6 +6998,101 @@ Builder facts that make this expressible: the process builder's `refdata.primiti
 ### Send a WhatsApp document/image FROM a process (Meta Cloud API) + reusable media id
 To reply on WhatsApp with a file: upload it to Meta ONCE with `POST /v{ver}/{phone_number_id}/media` (multipart: `messaging_product=whatsapp`, `type=<mime>`, `file=@path`) -> returns `{id}` (an uploaded-media id, valid ~30 days, reusable across sends). Then send with a normal `Call API` POST to `/{phone_number_id}/messages`, RAW json body `{messaging_product:'whatsapp', to:<e164>, type:'document', document:{id:<media_id>, filename:'X.pdf', caption:'...'}}` (image/video/audio analogous with their own object). Bake the media id as a process-var DEFAULT so the flow just references it; refresh when it expires. A keyword branch (e.g. reply with an offer PDF when the inbound text matches `/ofert/i`) is a `Node` returning a boolean -> `Decisional IS_TRUE` -> a build-body `Node` -> the send `Call API`. Same 24h-window rule as any free-form message (the inbound that triggered it opens the window, so a reply always delivers). The RAW body param shape is `{"body":{"type":"RAW","value":{"RAW":{"format":"json","value":"<%0%>"}, "BINARY":"","FORM_DATA":[],"X_WWW_FORM_URLENCODED":[]}},"headers":[{"key":"Content-Type","value":"application/json","type":"TEXT"}],"queryParams":[]}` with `<%0%>` bound to the JSON-string variable the build Node produced.
 
+## v2.79.1 / v2.80.0 production step (2026-09-15 / 2026-09-21): what changed for API clients
+
+Aligned late (2026-11-15): no alignment was run for this step, so its changes are recorded here
+from the source, by tag range (Web-Api v2.79.0..v2.80.0, Process-Execution v0.24.0..v0.25.0,
+Authentication-Proxy v2.37.0..v2.38.0, Data-Store v1.0.0..v1.1.0). Released with Action-Execution
+v2.68.0, Test-Action v1.20.0, node-engine v1.11.0, python-engine v1.10.0, user-playground v1.114.0.
+The v2.80.0 tag is dated 2026-09-14; its post says it reached prod on 2026-09-21, so prod ran
+v2.79.1 in between. `procesio server-build` / `procesio-release prod-build` now read which release
+is live from `/health`.
+
+**Web-Api**
+- ⚠ **Uploads to one owner take a lock (PRC-5587, v2.79.1).** An upload to a form instance, a flow
+  instance and variable, a schedule, a test action or a connector action that cannot get the lock
+  answers coded error **215 FILE_LIST_LOCKED** ("The file list is being updated by another upload.
+  Retry the upload.") and writes nothing. `run-process-with-file` and `run-form-with-files` retry it
+  with backoff (`handlers/common.upload_retrying_lock`).
+- The same file content may now sit in several file slots of one form instance: `POST api/Form/upload`
+  no longer refuses a duplicate hash (PRC-5581).
+- Flow validation codes **152** (a data-store binding without its store id), **153** (a column binding
+  without its column id) and **154** (an unknown binding type), for the `type` / `dataStoreId` /
+  `columnId` fields a parameter binding gained for Query Store (PRC-4920). A binding entry with no
+  `variableId` now answers `MISSING_VAR_ID` instead of crashing the validator.
+- **Sign-in (PRC-5516, PRC-5488):** 423 carries a body Web-Api builds,
+  `{error: "account_locked", error_description, retryAfterSeconds}` (counted from receipt; 0 means
+  unknown, not "retry now"); 428 means the account has TOTP on and the request carried no `code`.
+  A sign-in carrying a stale access cookie is no longer refused with 401, and a rejected token now
+  also clears the cookies (except on 406 and on a proxy 401): that was the root cause the client's
+  `_clear_jar` works around, and the workaround stays. `errors.py` maps 423 `account_locked`
+  (`retry_after_s`), 428 `otp_required`, 406 `otp_setup_required`, each with a hint.
+- Anonymous **`GET /health`** reports `entries.self.data = {version, commit}`. The commit is the
+  release tag's commit; `version` is the assembly version and does not follow the tags.
+- **Swagger is generated with Newtonsoft (PRC-5519)**, so it publishes the property names actually
+  sent on the wire: 10 names changed (in CredentialsDto, DataAttributeDto, DocumentTemplateDto,
+  DocumentVariableDto, SimpleActionNodeDto, VariableAttributeDto and the 423 body), 7 `[JsonIgnore]`
+  properties and 36 schemas left the document. The endpoint index was regenerated after it; a DTO
+  written by hand from an older Swagger may carry a name the wire never used.
+
+**Process-Execution v0.25.0**
+- **Python V2 is a separate action**, not a change of "Python": Result / ListResult / Stdout / Error
+  and a Timeout of 10..180 s (default 60), on the python-engine. The legacy action ("Python (Old)" in
+  the palette) is unchanged: one `Output`, no timeout. Ruby and Node moved their Timeout from
+  60..300 to 10..180 s, and Node gained `Stdout`. Detail: `PROCESIO-PYTHON-ACTION-NOTES.md`.
+- ⚠ **Engine errors fail the action; user-code errors do not.** The script engine client raises
+  1001 (not configured), 1002 (timeout; the wait is the action's Timeout + 15 s), 1010 (unreachable)
+  and 1011 ("<engine> engine returned HTTP N"), and never retries, because user code is not
+  idempotent. An exception inside the script still lands in `Error` with the run going on.
+- ⚠ **Decisional:** a trailing logic operator on a case's last condition is ignored. A case is a
+  flat, ordered list folded into an OR of AND-groups; each condition's `logicOperator` joins it to
+  the NEXT one (LogicOperators NONE 0 / AND 1 / OR 2), and **NONE stops the walk**, so every
+  condition after a NONE is ignored without a word. The process builder wrote `or` as 0 (NONE)
+  until 2026-11-15: a process it built with an OR between conditions evaluated only up to that
+  OR. Fixed (`or` is 2), and `flow-lint` flags `DECISIONAL_TRUNCATED` on existing processes.
+- ⚠ **An empty string for a non-string input becomes null** (TypeConverter), for every type, not
+  only numbers. A REQUIRED non-nullable value type (bool, Guid, enum) left empty fails the action
+  with "Input 'X' is required but was empty." This applies to custom actions too: declare an
+  optional value-type input nullable (`bool?`, `Guid?`).
+- **Send Email (SMTP):** an attachment that resolves to null is skipped; the mail goes out without
+  it and the action reports success. A credential select value that is not a GUID is skipped
+  instead of throwing.
+
+**Authentication-Proxy v2.38.0:** forgot-password and complete-account match the email exactly,
+ignoring case (before, a 200 sent no mail when another account's email contained the address, and
+a capital letter gave 401).
+
+**Data-Store v1.1.0:** the CSV export quotes a field that holds a bare CR or LF (PRC-5212).
+
+### Later behaviour no wave section recorded (found 2026-11-15)
+
+- **Web-Api v3.0.0, signing:** `POST envelope/{id}/void` is gone, `my-session` no longer returns
+  `formId`, and `POST envelope` is refused for an element whose document the designer set: such an
+  element goes through `envelope/from-template`, then `send`.
+- **Web-Api v3.0.0, admin:** `PUT api/Workspace/any/{workspaceId}` and
+  `POST api/Workspace/{masterId}/sync` (Admin only, hidden from Swagger) return a
+  `WorkspaceNameSyncReportDto`. Not exposed by the tool.
+- **Database migration deployed 2026-10-22:** sub-workspaces that existed before their master turned
+  on two-factor authentication now enforce it too, so their members without OTP get **406**, not only
+  members of sub-workspaces created later. The same deployment repointed custom actions still
+  recorded on the old NuGet store to the current one (Action-Execution v3.0 downloads each package
+  from the row's `NugetPath`): a custom action uploaded before October that fails to download has a
+  stale path, and a re-upload fixes it.
+- **Web-Api v3.1.0 (PRC-5879):** the workspace File data type could be cached without its
+  properties, so a File property mapping came back empty until the cache expired. Intermittently
+  empty File properties before 2026-11-02 were this bug.
+- **Process-History v3.3.0 (2026-11-12):** a File value pointing at a file owned by an instance
+  already archived (a file read from a Data Store row, for example) blocked that instance's move to
+  history on every attempt. It now uses the existing cleanup copy, which is also what keeps a File
+  stored in a Data Store row readable after its first instance is archived.
+- **Query Store at run time:** the Timeout is clamped to [60, 1800] s without a message; the
+  designer's range check is the only refusal, so a value written over the API outside it runs
+  clamped. The raw-query path of Data-Store skips the per-table row cap (`MaxRowsPerTable`) and the
+  system-column stamping (its own known-issues list).
+- **Resource-Tracking v3.0.0:** with `ExecutionEnvironmentAnalytics:Enabled = false` (an on-prem
+  setting) the analytics endpoints answer empty objects: empty analytics there is not proof of no
+  usage.
+
 ## v3.0.0 production wave (2026-10-21): what changed for API clients
 
 Every backend service now runs on .NET 10. Unchanged for clients: Newtonsoft serialization
@@ -7070,7 +7165,7 @@ their summary/description, so do not derive permissions from Swagger text alone.
   (`_2`, `_3` on a clash, 64-char cap), value in `defaultValue`. Instance, history and archive
   reads always return them (no `getInternalVariables`); they survive data-retention cleanup like
   SYSTEM values, while PROCESS (20) values are still deleted.
-- **Measured live in prod:** on 2026-10-21 the engine already created these variables with the new readable names (`Call_Subprocess_InstanceId`, `Call_Subprocess_ChildInstanceId` holding the child's id, `Call_Subprocess_ChildInstanceIdList`) but typed them 20 (PROCESS), because the Call Subprocess template still served those settings as `ignore`. From 2026-10-22 the template serves `auto` and new runs type `Call_Subprocess_ChildInstanceId` and `Call_Subprocess_ChildInstanceIdList` as **50 (AUTO)**, holding the child's id; `Call_Subprocess_InstanceId` stays 20 because its setting is still `ignore`. Instances started before the fix keep type 20, so a reader that must cover older history should match by NAME, not by `type == 50`. Survival through data-retention cleanup is not verified yet.
+- **Measured live in prod:** on 2026-10-21 the engine already created these variables with the new readable names (`Call_Subprocess_InstanceId`, `Call_Subprocess_ChildInstanceId` holding the child's id, `Call_Subprocess_ChildInstanceIdList`) but typed them 20 (PROCESS), because the Call Subprocess template still served those settings as `ignore`. From 2026-10-22 the template serves `auto` and new runs type `Call_Subprocess_ChildInstanceId` and `Call_Subprocess_ChildInstanceIdList` as **50 (AUTO)**, holding the child's id; `Call_Subprocess_InstanceId` stays 20 because its setting is still `ignore`. Instances started before the fix keep type 20, so a reader that must cover older history should match by NAME, not by `type == 50`. Survival through data-retention cleanup is confirmed in the source (Process-History, Process-Monitor and Process-Execution keep AUTO values the way they keep SYSTEM ones), not measured on a cleaned-up instance.
 - Only Call Subprocess uses it today: two new OUTPUT settings, "Call subprocess child instance id"
   (`...a03fe3`) and "Call subprocess child instance id list" (`...a03fe4`). Prod serves them as
   setting `type: "ignore"`; the FE also knows a setting type `"auto"` it treats exactly like
@@ -7253,6 +7348,11 @@ below comes from a real run.
   so scope selectors to `.pup-c-case-selector` while it is open.
 - **Only the first true case runs**: with cases "> 1000" then "> 10", an input of 5000 took only the
   first branch.
+- ⚠ **Inside a case, conditions fold into an OR of AND-groups, and NONE stops the walk.** Each
+  condition's `logicOperator` joins it to the next (NONE 0 / AND 1 / OR 2); a NONE before the last
+  condition makes the engine ignore everything after it, with no error. The last condition's
+  operator is ignored (Process-Execution v0.25.0). `flow-lint` reports `DECISIONAL_TRUNCATED`; see
+  the v2.79.1 / v2.80.0 section for the builder bug that wrote OR as NONE.
 - **No Default**: tooltip "Stop the process if none of the conditions will be fulfilled. In a
   Foreach it will go to the next iteration." Both verified: inside a For Each the loop moved on to
   the next item; outside a loop the run ended with status 50 (finished, not failed) and ran nothing
@@ -7799,10 +7899,14 @@ variable mapped into a String column of a Data Store insert is stored as its tex
   so the designer shows only two step headers even when three `step` children exist; set it to the step
   labels. A `button` nested in a step is created with `section: "footer"` and renders after every other field
   of that step; set `section: "body"` to keep it where it was declared.
-- **`goToNextStep()` / `goToPreviousStep()` exist only on a form published from the designer.** On a form
-  created or updated over the API the call throws `... goToNextStep is not a function`, and after that JS
-  error the published form greys out every control. Open it in the designer, Save, Publish (the docs say the
-  same for forms published before v2.0.7). An API `form-update` afterwards removes them again.
+- **`goToNextStep()` / `goToPreviousStep()` on an API-built form: fixed in the tool on 2026-11-15.** The
+  runtime builds a callable only for a data-model attribute of type FUNCTION
+  (`1c2fd144-836e-419a-aa25-9e624a4c7e40`, `hidden: true`, as the designer writes it); the builder wrote
+  these as strings, so the call threw `... goToNextStep is not a function` and the published form greyed
+  out every control after that JS error. `form-create` / `form-edit` / `form-add-element` now write
+  FUNCTION, and a form built only over the API advanced its stepper from `goToNextStep()` on the live
+  runtime (measured 2026-11-15). A form built by the tool BEFORE that date still carries the string type:
+  rebuild it with `form-edit`, or open it in the designer, Save, Publish.
 - **Designer: Publish is disabled after any edit until you Save.** Save stores the template as a draft
   (`status 0`); Publish sets it back to `1`. A reset script that restores a form over the API must also send
   `--status 1 --state true`.

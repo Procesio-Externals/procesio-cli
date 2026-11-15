@@ -163,3 +163,28 @@ the live-behaviour section of the latter for how the four compare when run.
 - A custom action (.nupkg) that declares an `AZURE_STORAGE` credential receives null, with no error
   and no log line: Action-Execution has no builder for that credential type. The built-in Azure
   Storage connector works. Use a REST or custom credential in a custom action instead.
+
+## The credential types prod offers (read 2026-11-15)
+
+`get-credentials-types` on Main-PROD lists 36. `credential-create` handles any of them: it reads
+the chosen template live (`prepare_ctx`) and maps `properties: {label: value}` onto it, so a new
+type needs no tool change. The list, for reference (it moves; read it live before relying on it):
+
+- **General:** REST API, REST API / Prelude, SQL (SQL Server or MySQL by Server Type), SFTP,
+  Outbound e-mail (SMTP), Inbound e-mail (POP3 or IMAP), Azure Storage Account, HashMac Key,
+  AI OpenAI Compatible.
+- **OAuth2 (REST API) / ...**, each a REST template with the provider's base URL pinned: Azure
+  Storage, GitHub, Google Analytics Admin, Google Analytics Data, Google Calendar, Google Chat,
+  Google Docs, Google Drive, Google Forms, Google Mail, Google Meet, Google Sheets, Google Slides,
+  Google Tasks, Microsoft Bookings, Microsoft Graph, Microsoft Tasks, Microsoft Teams, OneNote,
+  Outlook Calendar, Outlook Contacts, Outlook Mail, People, Sharepoint, YouTube Analytics, YouTube
+  Data, YouTube Reporting.
+
+An OAuth2 credential saved over the API is not usable until it is authorized: the provider's
+consent runs in a signed-in browser (previous section), which the tool cannot do for you.
+
+**Upload Bulk** (an SFTP action, new to the bundled catalog on 2026-11-15): uploads a list of
+Files to an SFTP credential's server. Inputs: Select FTP Server (SFTP credential), Files (list
+of File), Target Folder (empty = root), SFTP Connections (parallel connections, 1 to 20, default
+1). Output: Errors, one entry per file that could not be uploaded, so an empty list is the
+success test.
