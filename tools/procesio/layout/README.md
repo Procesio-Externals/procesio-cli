@@ -187,6 +187,30 @@ re-layout (membership read on the old positions, rectangles fitted to the new), 
 actions. The viewport (`canvasData` x/y/zoom) is still never touched, and shapes holding no
 action (free notes) stay put.
 
+How a group's rectangles are chosen (the rules a crowded canvas taught):
+
+- **Grow, don't pair.** Start from the group's first member (flow order), add the nearest member
+  whose inclusion keeps the rectangle clear of every action outside the group, every rectangle of
+  an earlier group and every rectangle already made for this group; when none fits, start the next
+  rectangle. Merging the closest PAIRS first (the earlier version) painted itself into a corner on
+  a tight canvas: one rectangle per action, overlapping each other.
+- **A group's own rectangles never overlap**, and the first one (holding the first member) carries
+  the title and text; the rest are "(cont.)".
+- **Header trim.** Rows can sit closer than a header is tall (the row under a Decisional). Then the
+  header is started just below what it would hit, beside the icon where a left-aligned title fits,
+  instead of splitting the group.
+- **Reading back overlapping rectangles** (hand-drawn, or fitted before these rules): an action
+  inside several goes to the area its wired neighbours are in, then to the smallest. A rectangle
+  titled like an area that ended up holding no action is part of that area, never a free note, so
+  a re-fit does not leave it behind.
+- More than 2 rectangles for one area is reported as `AREA_FRAGMENTED` (warning): its actions are
+  not side by side, so re-arrange or regroup.
+
+**Fan lanes never squeeze.** The fan post-pass spreads each branch between the split and the
+merge; with a long branch next to a short one (and the merge pulled left by a fold) that gave 66 px
+per action, every name running into the next, and the icon-overlap quality gate could not see it.
+It now skips a fan whose lanes would get less than one column (`FAN_MIN_STEP`, 160 px) per action.
+
 ## Default arrangement on every save
 
 Every process the tool writes is arranged with the classic engine and clustering, the same

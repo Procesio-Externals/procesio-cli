@@ -34,10 +34,13 @@ _TERMINAL = {6, 40, 50}
 _LABEL = {1: "starting", 6: "stopped", 40: "finished_with_errors", 50: "finished"}
 
 
-def _json_call(client, method, path, *, query=None, body=None, headers=None):
+def _json_call(client, method, path, *, query=None, body=None, headers=None, timeout=None):
     """A JSON request that can carry extra headers. client.request() cannot, and these
-    endpoints are addressed by header, so everything here goes through request_bytes."""
-    status, raw, _ = client.request_bytes(method, path, query=query, body=body, headers=headers)
+    endpoints are addressed by header, so everything here goes through request_bytes.
+    `timeout` is passed on only when set, so the default stays request_bytes' own."""
+    extra = {"timeout": timeout} if timeout is not None else {}
+    status, raw, _ = client.request_bytes(method, path, query=query, body=body,
+                                          headers=headers, **extra)
     text = (raw or b"").decode("utf-8", "replace").strip()
     parsed = None
     if text:

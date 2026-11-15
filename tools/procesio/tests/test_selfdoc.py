@@ -280,3 +280,96 @@ def test_platform_reformatting_a_setting_does_not_outdate_a_purpose():
     assert selfdoc.fingerprint(a, {}) == selfdoc.fingerprint(b, {})
     b["parameters"][1]["value"] = "121"
     assert selfdoc.fingerprint(a, {}) != selfdoc.fingerprint(b, {})
+
+
+# -- crowded canvases (a long Decisional branch next to a short one) ---------------------
+
+def _long_branch_config():
+    """A 6-action run into a Decisional whose condition branch is 11 actions long and whose
+    default branch is one action, both meeting at a Join: the shape that made the fan-lanes
+    pass squeeze the long branch to 66 px per action and the areas fall apart."""
+    acts = [_act(f"a{i}", desc=f"step a{i} of the check") for i in range(1, 7)]
+    acts.append({"id": "dec", "action": "Decisional", "name": "dec", "description": "Routes a known caller.",
+                 "branches": [{"name": "known", "to": "b1", "when": [{"left": {"var": "s"}, "op": "IS_NOT_EMPTY"}]},
+                              {"to": "r", "default": True}]})
+    acts += [_act(f"b{i}", desc=f"step b{i} of the save") for i in range(1, 12)]
+    acts.append(_act("r", action="To Lower", desc="Answers that the entry is locked."))
+    acts.append({"id": "join", "action": "Join", "name": "join", "description": "Both paths end here."})
+    edges = ([["start", "a1"]] + [[f"a{i}", f"a{i + 1}"] for i in range(1, 6)] + [["a6", "dec"]]
+             + [[f"b{i}", f"b{i + 1}"] for i in range(1, 11)] + [["b11", "join"], ["r", "join"], ["join", "stop"]])
+    groups = [{"title": "Check", "text": "Checks the caller.", "actions": [f"a{i}" for i in range(1, 7)] + ["dec", "r"]},
+              {"title": "Save", "text": "Saves the entry.", "actions": ["b1", "b2", "b3"]},
+              {"title": "Rank", "text": "Ranks the others.", "actions": ["b4", "b5", "b6", "b7"]},
+              {"title": "Remember", "text": "Remembers what was shown.", "actions": ["b8", "b9", "b10", "b11", "join"]}]
+    return {"title": "crowded", "description": "Saves an entry and ranks the others.",
+            "variables": copy.deepcopy(VARS), "actions": acts, "edges": edges, "groups": groups}
+
+
+def test_a_long_branch_keeps_a_column_per_action():
+    dto, state = _built(_long_branch_config())
+    pos = {a["ActionName"]: a["CustomData"]["position"] for a in dto["Actions"]}
+    crowded = [(m, n) for m, n in itertools.combinations(sorted(pos), 2)
+               if abs(pos[m]["y"] - pos[n]["y"]) < 48 and abs(pos[m]["x"] - pos[n]["x"]) < 120]
+    assert not crowded, crowded                     # names under the icons cannot collide
+    assert not _codes(state)
+
+
+def test_areas_on_a_crowded_canvas_stay_few_and_never_overlap():
+    dto, _ = _built(_long_branch_config())
+    flow = _camel(dto)
+    shapes = flow["canvasData"]["shapes"]
+    rects = [areas.shape_rect(s) for s in shapes]
+    assert not [(shapes[i]["title"], shapes[j]["title"])
+                for i, j in itertools.combinations(range(len(shapes)), 2) if areas._hits(rects[i], rects[j])]
+    groups = {g["title"]: g for g in areas.groups_from_shapes(flow["actions"], shapes)}
+    # a run of consecutive actions stays one rectangle; the default branch's lone action lands
+    # far from its Decisional here, so "Check" is scattered and only that area is reported
+    assert len(groups["Save"]["shape_ids"]) == 1
+    assert max(len(g["shape_ids"]) for g in groups.values()) <= 3
+    frag = [f for f in docs.read(flow)["findings"] if f["code"] == "AREA_FRAGMENTED"]
+    assert [f["area"] for f in frag] == ["Check"]
+    name = {a["id"]: a["actionName"] for a in flow["actions"]}
+    assert sorted(name[m] for m in groups["Save"]["members"]) == ["b1", "b2", "b3"]
+    boxes = areas.node_boxes(flow["actions"])
+    for s, r in zip(shapes, rects):                 # no rectangle covers another area's action
+        mine = set(groups[areas.base_title(s["title"])]["members"])
+        assert {i for i, b in boxes.items() if areas._hits(r, b)} <= mine, s["title"]
+
+
+def test_fan_lanes_refuse_to_squeeze_a_branch():
+    """Directly on the post-pass: a split->merge pair whose long lane would get less than one
+    column per action is left as the engine placed it."""
+    from types import SimpleNamespace as N
+    ids = ["d"] + [f"b{i}" for i in range(11)] + ["r", "j"]
+    nodes = [N(id=i, shape="diamond" if i == "d" else "square", parent_id=None) for i in ids]
+    chain = ["d"] + [f"b{i}" for i in range(11)] + ["j"]
+    edges = [N(source=chain[k], dest=chain[k + 1], type=0) for k in range(len(chain) - 1)]
+    edges += [N(source="d", dest="r", type=0), N(source="r", dest="j", type=0)]
+    P = {i: {"x": 0.0, "y": 0.0} for i in ids}
+    P["d"], P["j"] = {"x": 0.0, "y": 0.0}, {"x": 800.0, "y": 0.0}
+    before = {k: dict(v) for k, v in P.items()}
+    out = adapter._apply_fan_lanes(P, N(nodes=nodes, edges=edges))
+    assert out == before
+
+
+def test_overlapping_rectangles_file_an_action_with_its_neighbours():
+    """Two overlapping rectangles both hold an action: it goes to the area its wired
+    neighbours are in, not to the smaller rectangle."""
+    def act(i, x, y, to=None):
+        return {"id": i, "actionTemplateName": "To Upper", "customData": {"type": "square", "position": {"x": x, "y": y}},
+                "ports": [{"sourceId": i, "destinationId": to}] if to else []}
+    acts = [act("p", 0, 0, "m"), act("m", 160, 0, "n"), act("n", 320, 0), act("o", 200, 200)]
+    big = {"id": "A", "kind": 0, "title": "Mine", "position": {"x": -60, "y": -60}, "dimension": {"width": 460, "height": 160}}
+    small = {"id": "B", "kind": 0, "title": "Other", "position": {"x": 150, "y": -20}, "dimension": {"width": 140, "height": 300}}
+    groups = {g["title"]: g["members"] for g in areas.groups_from_shapes(acts, [big, small])}
+    assert groups["Mine"] == ["p", "m", "n"] and groups["Other"] == ["o"]
+
+
+def test_a_rectangle_left_empty_is_part_of_its_area_not_a_note():
+    def act(i, x, y):
+        return {"id": i, "actionTemplateName": "To Upper", "customData": {"type": "square", "position": {"x": x, "y": y}}}
+    acts = [act("p", 0, 0), act("q", 160, 0)]
+    outer = {"id": "A", "kind": 0, "title": "Save", "position": {"x": -60, "y": -60}, "dimension": {"width": 400, "height": 200}}
+    inner = {"id": "B", "kind": 0, "title": "Save (cont.)", "position": {"x": -40, "y": -40}, "dimension": {"width": 380, "height": 160}}
+    note = {"id": "N", "kind": 0, "title": "TODO", "position": {"x": 900, "y": 900}, "dimension": {"width": 50, "height": 50}}
+    assert areas.free_shapes(acts, [outer, inner, note]) == [note]

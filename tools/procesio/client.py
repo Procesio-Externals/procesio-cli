@@ -278,11 +278,16 @@ class ProcesioClient:
         return self.request("DELETE", path, query=query, **kw)
 
     def request_bytes(self, method: str, path: str, *, query: dict | None = None,
-                      body: Any = None, headers: dict | None = None) -> tuple[int, bytes, dict]:
+                      body: Any = None, headers: dict | None = None,
+                      timeout: float | None = None) -> tuple[int, bytes, dict]:
         """Like request() but returns (status, raw_bytes, headers) without JSON
         parsing — for binary/file responses such as the Transport `.procesio`
         export (application/octet-stream) or the flow-instance file download
-        (identified by extra request HEADERS passed via `headers=`)."""
+        (identified by extra request HEADERS passed via `headers=`).
+
+        `timeout` (seconds, default 120) must outlast any server-side limit of the
+        call: a client that gives up first reports a failure for work the server
+        still finishes, and a retry then repeats it."""
         if not path.startswith("/"):
             path = "/" + path
         url = f"{config.web_base(self.profile)}{path}"
@@ -294,7 +299,7 @@ class ProcesioClient:
             hdrs.update({k: v for k, v in headers.items() if v is not None})
         self._clear_jar()
         resp = self._session.request(method.upper(), url, params=clean, json=body,
-                                     headers=hdrs, timeout=120)
+                                     headers=hdrs, timeout=timeout or 120)
         return (getattr(resp, "status_code", 0),
                 getattr(resp, "content", b""),
                 dict(getattr(resp, "headers", {}) or {}))

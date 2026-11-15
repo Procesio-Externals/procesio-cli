@@ -27,6 +27,9 @@ there, not here.
   that arranges the canvas. `flow-lint` reports a `documentation` block, `flow-digest` opens
   with the purpose and the areas, and the agent's `audit` and `verify` report the documented
   intent.
+- Forms run saved Data Store queries: `form-create` / `form-edit` author them, an element event
+  runs one and maps its rows into a table, and `form-get-queries` reads which elements run each.
+  `PROCESIO-FORM-QUERIES-NOTES.md` has the run-time rules.
 - `variable-delete` removes an unused variable from a live process.
 - The web driver opens one browser per persistent profile (a second Chromium on the same
   profile reset its storage), and a `<profile>.headed` marker makes every opener of that
@@ -63,6 +66,15 @@ there, not here.
   against a newer Action-Core than the host doesn't load.
 
 ### Fixed
+- Canvas areas on a crowded canvas: a group's rectangles grow from its first action and never
+  overlap each other or cover another area's action, a header that would run into the row above
+  is trimmed instead of splitting the group, and an area drawn as more than 2 rectangles is
+  reported as `AREA_FRAGMENTED`. Overlapping rectangles read back by wiring, so a re-fit keeps
+  each action in its area and leaves no stale rectangle behind.
+- The fan-lanes layout pass no longer squeezes a long branch to less than one column per action
+  (names ran into each other).
+- `process-screenshot` leaves room for the designer's expanded left panel, which hid the left
+  part of the canvas.
 - `process-edit` stops without writing when the live process can't be read. A failed read used
   to give every variable a new id and left the removal check nothing to compare against, which
   broke every form map with no error. `--dry-run` still previews and names the failure in

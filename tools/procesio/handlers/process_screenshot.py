@@ -28,7 +28,9 @@ from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.handlers.common import add_profile_arg
 from tools.procesio.layout import areas
 
-LEFT_BAR, TOP_BAR, RIGHT_BAR = 80, 64, 56     # designer chrome over the canvas, in screen px
+# Designer chrome over the canvas, in screen px. The left "All actions" panel opens EXPANDED
+# (~270 px) in a fresh headless designer, so content placed past an 80 px bar landed under it.
+LEFT_BAR, TOP_BAR, RIGHT_BAR = 272, 64, 56
 MARGIN = 40                                   # empty canvas kept around the content
 MIN_W, MIN_H = 1280, 800
 

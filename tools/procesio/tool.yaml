@@ -2657,7 +2657,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-create
-  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating. Non-blocking lint findings come back as `warnings`.'
+  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements, queries in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string
@@ -2735,10 +2735,54 @@ actions:
           type: array
           items:
             $ref: '#/$defs/element'
+        queries:
+          type: array
+          items:
+            $ref: '#/$defs/query'
+          description: 'the form''s saved Data Store queries (top-level Queries). Listed = this list replaces them; omitted = form-create saves none and form-edit keeps the live ones. Run one from an element event: {on, do: datastore, operation: QUERY, query: <name or id>}. A query no event runs is dropped by the next designer save.'
         chainConfig:
           type: object
           description: 'multi-form ''app'' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)'
       $defs:
+        query:
+          type: object
+          required:
+          - name
+          additionalProperties: false
+          properties:
+            id:
+              type: string
+              description: GUID chosen by the client and stable across saves (events point at it); generated when omitted
+            name:
+              type: string
+              minLength: 1
+              description: unique on the form
+            sql:
+              type: string
+              description: 'the statement: <%N%> tags for Data Store tables/columns (one binding per tag), @name for run-time parameters. Not checked at save.'
+            value:
+              type: string
+              description: wire name of sql
+            bindings:
+              type: array
+              items:
+                type: object
+              description: 'one per <%N%> tag, in the wire shape: {id: N, type: dataStoreTable, dataStoreId} or {id: N, type: dataStoreColumn, dataStoreId, columnId}. All stores must live in the same database.'
+            variable:
+              type: array
+              items:
+                type: object
+              description: wire name of bindings
+            parameters:
+              type: array
+              items:
+                type: string
+              description: the @names the statement takes, stored as written. Omitted = derived from the @names in the statement outside quotes and comments.
+            timeoutSeconds:
+              type:
+              - integer
+              - 'null'
+              description: 1..600; null = the default of 60
         element:
           type: object
           required:
@@ -2882,7 +2926,10 @@ actions:
               description: 'datastore trigger: target data store id'
             operation:
               type: string
-              description: 'datastore trigger: READ|ADD|UPDATE|DELETE'
+              description: 'datastore trigger: READ|ADD|UPDATE|DELETE, or QUERY to run one of the form''s saved queries (then no dataStoreId or filters)'
+            query:
+              type: string
+              description: 'operation QUERY: the saved query''s name or id. inputs = [{left: <parameter exactly as declared, e.g. @product>, right: <form field>}]; outputs = [{left: rows|columns|count|success, right: <form field>}]'
             filters:
               type: array
               description: 'datastore trigger: row filters (not for ADD)'
@@ -2989,6 +3036,41 @@ actions:
     type: boolean
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
+- name: form-delete-saved-statement
+  description: Remove one saved Data Store query from a form (by id or name). Refused while an element event still runs it, unless --allow-referenced. Returns the removed query.
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: form-id
+    type: string
+    required: true
+    description: form template id
+  - name: query-id
+    type: string
+    required: true
+    description: query id or name
+  - name: allow-referenced
+    type: boolean
+    required: false
+    description: remove the query even though an element event still runs it
+  - name: dry-run
+    type: boolean
+    required: false
+    description: report the change without writing
+  - name: force
+    type: boolean
+    required: false
+    description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-digest
   description: 'Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables resolved to names, MAP_FORM_DATA conditions, scripts saved beside. --out adds FORM-PROCESS-MAP.md.'
   args:
@@ -3024,7 +3106,7 @@ actions:
     required: true
     description: form template id
 - name: form-edit
-  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO. Non-blocking lint findings come back as `warnings`.'
+  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements, queries), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string
@@ -3164,6 +3246,25 @@ actions:
     type: string
     required: true
     description: element id, or its designer 'name' (e.g. doccipf)
+- name: form-get-queries
+  description: 'Read a form''s saved Data Store queries (SQL, tag bindings, declared parameters, timeout) and which elements run each one. A query no event runs comes back under `warnings`: a designer save drops it.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: form-id
+    type: string
+    required: true
+    description: form template id
 - name: form-list
   description: List forms (GET /api/FormTemplate/all/basic).
   args:
@@ -3179,6 +3280,41 @@ actions:
     type: string
     required: false
     description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+- name: form-run-saved-statement
+  description: 'RUN one of a form''s saved Data Store queries the way the form does (POST api/Form/dataStore/query/{id}). NOT read-only: the statement can be an INSERT, UPDATE or DELETE, and it runs for real. --params names are checked against the declared ones first. Returns rows (keyed by column display name), columns and count; for a write, count is the affected rows and rows is empty.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: form-id
+    type: string
+    required: true
+    description: form template id
+  - name: query-id
+    type: string
+    required: true
+    description: query id or name
+  - name: params
+    type: string
+    required: false
+    description: 'JSON object {parameter: value}, names exactly as the query declares them (e.g. {"@product": "apple"}); a declared parameter left out binds NULL'
+  - name: form-workspace-id
+    type: string
+    required: false
+    description: workspace that owns the form (formTemplateWorkspaceId header); defaults to the call's workspace
+  - name: form-instance-id
+    type: string
+    required: false
+    description: form instance the run belongs to (formInstanceId header)
 - name: form-set-code
   description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back after the write and fails with not_persisted if the server kept other code (PROCESIO has been seen answering 2xx while dropping the form''s Data). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open. Returns `warnings` when the code mounts UI on document.body or styles :root/html/body without propagating the form''s CSS scope attribute (those styles do not apply).'
   args:
@@ -3301,7 +3437,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-set-element-event
-  description: 'Wire one element''s trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element''s event config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take NAMES: left = a process variable name, right = a form FIELD name, a form variable (@Offer_ID), an element config (Paragraph9.label) or a data-model path (instance.currentUser.email) - each is resolved to the id/value-path the runtime needs. Do NOT hand-build the form value path; if you pass one it is CHECKED against the live form and refused when wrong, because a wrong path is saved without any error and the control then launches nothing. A DataStore op takes --data-store-id + --operation. An element saved before the trigger existed (e.g. an approval control from before Sep 2025, no onBeforeApprove slot) gets the missing slot added from the element template, listed in `backfilled`.'
+  description: 'Wire one element''s trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element''s event config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take NAMES: left = a process variable name, right = a form FIELD name, a form variable (@Offer_ID), an element config (Paragraph9.label) or a data-model path (instance.currentUser.email) - each is resolved to the id/value-path the runtime needs. Do NOT hand-build the form value path; if you pass one it is CHECKED against the live form and refused when wrong, because a wrong path is saved without any error and the control then launches nothing. A DataStore op takes --data-store-id + --operation; operation QUERY runs a saved query of the form instead (queryId or query name in --config, inputMap left = the parameter exactly as declared, outputMap left = rows|columns|count|success). An element saved before the trigger existed (e.g. an approval control from before Sep 2025, no onBeforeApprove slot) gets the missing slot added from the element template, listed in `backfilled`.'
   args:
   - name: profile
     type: string
@@ -3342,7 +3478,7 @@ actions:
   - name: operation
     type: string
     required: false
-    description: 'RUN_DATA_STORE_OPERATION: READ | ADD | UPDATE | DELETE'
+    description: 'RUN_DATA_STORE_OPERATION: READ | ADD | UPDATE | DELETE, or QUERY to run one of the form''s saved queries (--config then carries queryId, or query = its name, and no data store)'
   - name: config-file
     type: string
     required: false
@@ -3363,6 +3499,65 @@ actions:
     type: boolean
     required: false
     description: build the event and report it without writing
+  - name: force
+    type: boolean
+    required: false
+    description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
+- name: form-set-saved-statement
+  description: 'Add or change ONE saved Data Store query of a form in place (surgical: the other queries and the form''s content are untouched). Selects by --query-id, else by --name; no match creates it. Omitted fields keep their value; a new --sql without --parameters re-derives the @names. Checks tags against bindings, parameter names, timeout and duplicate ids/names before the save, then reads the form back. Returns the previous query. Wire the query to an event (operation QUERY) or the next designer save drops it.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: form-id
+    type: string
+    required: true
+    description: form template id
+  - name: query-id
+    type: string
+    required: false
+    description: id of the query to change; with no match it is the new query's id
+  - name: name
+    type: string
+    required: false
+    description: 'query name: selects the query when --query-id is not given, otherwise renames it'
+  - name: sql
+    type: string
+    required: false
+    description: the statement, with a numbered tag for each bound Data Store table or column and @name for each parameter
+  - name: sql-file
+    type: string
+    required: false
+    description: path to a file holding the statement
+  - name: bindings
+    type: string
+    required: false
+    description: 'JSON array, one binding per numbered tag: {id, type: dataStoreTable, dataStoreId} or {id, type: dataStoreColumn, dataStoreId, columnId}'
+  - name: parameters
+    type: string
+    required: false
+    description: JSON array of the @names the statement takes; when omitted and --sql is given they are derived from the statement
+  - name: timeout-seconds
+    type: integer
+    required: false
+    description: 1..600 (the default is 60)
+  - name: clear-timeout
+    type: boolean
+    required: false
+    description: go back to the default timeout
+  - name: dry-run
+    type: boolean
+    required: false
+    description: report the change without writing
   - name: force
     type: boolean
     required: false
