@@ -420,3 +420,23 @@ a data store from a PROCESS (not a form) use the **Query Store** action (see
 `../PROCESIO-CONNECTORS-NOTES.md`). The process-designer data-store node adds the control
 types `data-store-mapper` / `data-store-decisional` (`FeComponentType` 46 / 47) with a
 richer decisional operator set (BETWEEN, IN/BELONGS, IS_EMPTY→IsNull, IS_NOT_EMPTY→IsNotNull).
+
+### Saved queries: SQL from a form event
+
+The same event action takes a fifth operation, `QUERY`, that runs a **saved query** of the form
+instead of addressing one store: SQL stored on the template, bound to Data Store tables and
+columns, with `@name` parameters. The config then has `dataStoreId: null`, `filters: []` and a
+`queryId`; `inputMap.left` is a declared parameter name and `outputMap.left` is one of
+`rows | columns | count | success`.
+
+Three rules decide whether it works:
+
+1. **Every save must carry the queries.** The template PUT replaces everything, so a body
+   without `Queries` deletes them. The tool's form actions keep them; a hand-built PUT must too.
+2. **A query no event runs does not survive the designer.** A designer save sends only the
+   queries some event references, so wire each query to an event.
+3. **Parameter names are sent exactly as declared**, and the SQL is first checked when it runs.
+
+The shapes, the run route, its errors and the tool actions (`form-get-queries`,
+`form-set-saved-statement`, `form-delete-saved-statement`, `form-run-saved-statement`) are in
+[`../PROCESIO-FORM-QUERIES-NOTES.md`](../PROCESIO-FORM-QUERIES-NOTES.md).

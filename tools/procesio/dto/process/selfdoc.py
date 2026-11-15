@@ -301,6 +301,12 @@ def canvas(config: dict, ctx: dict, state: dict, actions: list, id_of: dict, new
                                      f"area {s['title']!r}: its text wraps past {areas.MAX_TEXT_LINES} lines "
                                      f"at this width and spills over the actions; shorten it to one sentence",
                                      severity="warn"))
+        if len(rects.get(s["key"]) or []) > areas.FRAGMENTED:
+            findings.append(_finding(
+                "AREA_FRAGMENTED",
+                f"area {s['title']!r} needs {len(rects[s['key']])} rectangles because its actions are not "
+                f"side by side on the canvas; keep an area's actions consecutive in the flow, or split "
+                f"it into areas that are", severity="warn"))
     shapes = keep_notes + areas.to_shapes(spec, rects, new_id)
     state["areas"] = [{"title": g["title"], "text": g["text"], "actions": g["members"],
                        "source": g["source"], "rectangles": len(rects.get(i) or [])}

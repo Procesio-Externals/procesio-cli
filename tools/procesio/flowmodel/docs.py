@@ -95,6 +95,10 @@ def read(flow: dict, captions: dict | None = None) -> dict:
                     findings.append({"code": "ACTION_UNGROUPED", "severity": "error",
                                      "action": r["name"], "detail": "sits in no area on the canvas"})
     for g in groups:
+        if len(g["shape_ids"]) > areas.FRAGMENTED:
+            findings.append({"code": "AREA_FRAGMENTED", "severity": "warn", "area": g["title"],
+                             "detail": f"drawn as {len(g['shape_ids'])} rectangles: its actions are not "
+                                       f"side by side; re-arrange the canvas or regroup"})
         if not g["text"]:
             findings.append({"code": "AREA_TEXT_MISSING", "severity": "warn", "area": g["title"],
                              "detail": "the area has a title but no text saying what its actions do"})

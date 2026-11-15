@@ -192,6 +192,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-create` | — | Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in… |
 | `form-delete` | `--id` | Delete a resource by id (DELETE /api/FormTemplate/{id}). |
 | `form-delete-element` | `--id`, `--element` | Remove one control from a LIVE form: out of Data.elements, out of the form's data model, and out of its container's own list - leaving every other element's id… |
+| `form-delete-saved-statement` | `--form-id`, `--query-id` | Remove one saved Data Store query from a form (by id or name). Refused while an element event still runs it, unless --allow-referenced. Returns the removed… |
 | `form-digest` | `--in` | Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process… |
 | `form-duplicate` | `--id` | POST /api/FormTemplate/{id}/duplicate. |
 | `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |
@@ -199,11 +200,14 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-get-code` | `--id` | Read a form's global CSS + JavaScript (decrypts Data.code). |
 | `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (id or name). |
 | `form-get-element-events` | `--id`, `--element` | List one element's event handlers, by trigger. |
+| `form-get-queries` | `--form-id` | Read a form's saved Data Store queries (SQL, tag bindings, declared parameters, timeout) and which elements run each one. A query no event runs comes back… |
 | `form-list` | — | List forms (GET /api/FormTemplate/all/basic). |
+| `form-run-saved-statement` | `--form-id`, `--query-id` | RUN one of a form's saved Data Store queries the way the form does (POST api/Form/dataStore/query/{id}). NOT read-only: the statement can be an INSERT, UPDATE… |
 | `form-set-code` | `--id` | Set a form's global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back… |
 | `form-set-element-chains` | `--id` | Rewrite the ORDERED event chains of one or more elements on a live form in ONE save (surgical: only the listed element triggers change). Each chain lists its… |
 | `form-set-element-config` | `--id`, `--element` | Set one element's plain configs in place (surgical: only that element's config values change, ids preserved; returns the previous values). Event configs go… |
 | `form-set-element-event` | `--id`, `--element`, `--on`, `--action` | Wire one element's trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element's event config changes). In a… |
+| `form-set-saved-statement` | `--form-id` | Add or change ONE saved Data Store query of a form in place (surgical: the other queries and the form's content are untouched). Selects by --query-id, else by… |
 | `form-signing-upload-document` | `--form-id`, `--file` | Store the PDF a document-signing form element asks people to sign (POST /api/form/signing/template-document, multipart) -> {fileId, name, pageCount}. With… |
 | `form-update` | `--id` | Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data patch into its Data (and/or override --name/--status/--state/--is-private), then… |
 

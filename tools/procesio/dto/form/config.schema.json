@@ -21,9 +21,25 @@
     "javascript": {"type": "string", "description": "form-level JavaScript ('Switch to code' JS tab); AES-encrypted into Data.code"},
     "code": {"type": "object", "description": "alternative to css/javascript: {\"css\":\"...\",\"javascript\":\"...\"}"},
     "elements": {"type": "array", "items": {"$ref": "#/$defs/element"}},
+    "queries": {"type": "array", "items": {"$ref": "#/$defs/query"}, "description": "the form's saved Data Store queries (top-level Queries). Listed = this list replaces them; omitted = form-create saves none and form-edit keeps the live ones. Run one from an element event: {on, do: datastore, operation: QUERY, query: <name or id>}. A query no event runs is dropped by the next designer save."},
     "chainConfig": {"type": "object", "description": "multi-form 'app' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)"}
   },
   "$defs": {
+    "query": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {"type": "string", "description": "GUID chosen by the client and stable across saves (events point at it); generated when omitted"},
+        "name": {"type": "string", "minLength": 1, "description": "unique on the form"},
+        "sql": {"type": "string", "description": "the statement: <%N%> tags for Data Store tables/columns (one binding per tag), @name for run-time parameters. Not checked at save."},
+        "value": {"type": "string", "description": "wire name of sql"},
+        "bindings": {"type": "array", "items": {"type": "object"}, "description": "one per <%N%> tag, in the wire shape: {id: N, type: dataStoreTable, dataStoreId} or {id: N, type: dataStoreColumn, dataStoreId, columnId}. All stores must live in the same database."},
+        "variable": {"type": "array", "items": {"type": "object"}, "description": "wire name of bindings"},
+        "parameters": {"type": "array", "items": {"type": "string"}, "description": "the @names the statement takes, stored as written. Omitted = derived from the @names in the statement outside quotes and comments."},
+        "timeoutSeconds": {"type": ["integer", "null"], "description": "1..600; null = the default of 60"}
+      }
+    },
     "element": {
       "type": "object",
       "required": ["type"],
@@ -66,7 +82,8 @@
         "do": {"type": "string", "enum": ["map", "process", "js", "form", "datastore"]},
         "processId": {"type": "string"}, "formId": {"type": "string"},
         "dataStoreId": {"type": "string", "description": "datastore trigger: target data store id"},
-        "operation": {"type": "string", "description": "datastore trigger: READ|ADD|UPDATE|DELETE"},
+        "operation": {"type": "string", "description": "datastore trigger: READ|ADD|UPDATE|DELETE, or QUERY to run one of the form's saved queries (then no dataStoreId or filters)"},
+        "query": {"type": "string", "description": "operation QUERY: the saved query's name or id. inputs = [{left: <parameter exactly as declared, e.g. @product>, right: <form field>}]; outputs = [{left: rows|columns|count|success, right: <form field>}]"},
         "filters": {"type": "array", "description": "datastore trigger: row filters (not for ADD)"},
         "code": {"type": "string"}, "syncRun": {"type": "boolean"},
         "mapLatestTriggerOnly": {"type": "boolean"},

@@ -28,7 +28,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from tools.procesio.client import VARIABLES_ONLY
-from tools.procesio.dto.form import fieldpath
+from tools.procesio.dto.form import fieldpath, queries as form_queries
 from tools.procesio.dto.framework import Component
 from tools.procesio.errors import UsageError
 
@@ -299,6 +299,27 @@ def _ds_map(rows) -> list:
     return out
 
 
+def _query_trigger(ev: dict, ctx) -> dict:
+    """The RUN_DATA_STORE_OPERATION config that runs one of the form's saved queries, in
+    the shape a designer save writes: no Data Store, no filters, the query by id, one
+    inputMap row per mapped parameter and all four outputs (unmapped ones with an empty
+    right side). `query` names the query by name or id; parameter names are the declared
+    spellings, because the run refuses any other."""
+    query = form_queries.resolve(ctx.get("queries") or [], ev.get("query") or ev.get("queryId"))
+    inputs = _ds_map(ev.get("inputs") or ev.get("inputMap"))
+    form_queries.check_parameter_names(query, [row["left"] for row in inputs])
+    mapped = {row["left"]: row["right"] for row in _ds_map(ev.get("outputs") or ev.get("outputMap"))}
+    unknown = [name for name in mapped if name not in form_queries.OUTPUTS]
+    if unknown:
+        raise UsageError(f"a query event has no output {unknown}; "
+                         f"use {' | '.join(form_queries.OUTPUTS)}")
+    outputs = [{"id": i, "left": name, "right": mapped.get(name) or ""}
+               for i, name in enumerate(form_queries.OUTPUTS)]
+    return {"action": "RUN_DATA_STORE_OPERATION", "config": {
+        "dataStoreId": None, "operation": "QUERY", "inputMap": inputs,
+        "outputMap": outputs, "filters": [], "queryId": query["id"]}}
+
+
 def _trigger(ev: dict, ctx) -> dict:
     """The {action, config} for one event trigger.
     do = map | process | js | form | datastore."""
@@ -329,6 +350,8 @@ def _trigger(ev: dict, ctx) -> dict:
         # READ/ADD/UPDATE/DELETE; filters apply to every op except ADD. The map item is
         # {id, left, right} (DataStoreMapItem); the operation wire encoding + map
         # orientation must be re-verified live. See PROCESIO-RESOURCE-MODEL-NOTES.md.
+        if str(ev.get("operation") or "").strip().upper() == "QUERY":
+            return _query_trigger(ev, ctx)
         cfg = {
             "dataStoreId": ev.get("dataStoreId"),
             "operation": ev.get("operation"),
@@ -373,14 +396,16 @@ def _resolve_late_field_refs(elements: list, ctx) -> None:
     blank, and the fields never populate. Runs once every path is known, so ordering in
     the config no longer changes the wiring."""
     paths = ctx.get("field_paths") or {}
-    if not paths:
+    row_sources = ctx.get("row_source_paths") or {}
+    tables = ctx.get("table_rows") or {}
+    if not paths and not row_sources and not tables:
         return
 
-    def fix(rows) -> None:
+    def fix(rows, sides) -> None:
         for row in rows or []:
             if not isinstance(row, dict):
                 continue
-            for side in ("left", "right"):
+            for side in sides:
                 v = row.get(side)
                 if isinstance(v, str) and v in paths:
                     row[side] = paths[v]
@@ -392,8 +417,27 @@ def _resolve_late_field_refs(elements: list, ctx) -> None:
                 continue
             for ev in val.get("events") or []:
                 ecfg = (ev or {}).get("config") or {}
+                # A query event's left side is a parameter or output NAME (`count`, `rows`),
+                # never a field, even when a field happens to share it.
+                is_query = ecfg.get("operation") == "QUERY"
+                sides = ("right",) if is_query else ("left", "right")
+                if is_query:
+                    # A table shows a query's rows only through its dynamic row's source:
+                    # written to the table's or the row's value, the rows arrive with every
+                    # cell empty and no error.
+                    for row in ecfg.get("outputMap") or []:
+                        target = row.get("right")
+                        if row.get("left") != "rows" or not isinstance(target, str):
+                            continue
+                        if target in row_sources:
+                            row["right"] = row_sources[target]
+                        elif target in tables:
+                            raise UsageError(
+                                f"a query's rows cannot fill table {target!r}: only a dynamic "
+                                f"table (dynamic: true) takes them, through its row's source. "
+                                f"Written anywhere else the rows arrive with every cell empty.")
                 for key in ("inputMap", "outputMap", "mapping"):
-                    fix(ecfg.get(key))
+                    fix(ecfg.get(key), sides)
 
 
 _HEADER = {"heading"}
@@ -538,6 +582,10 @@ def _build_table(spec: dict, ctx: dict, out: list) -> dict:
     for c in rcfg:
         c["id"] = _new_id(ctx)
     rowname = name + "row"
+    # every table and row name, so a query's `rows` aimed at one that cannot take them
+    # (a static table) is refused instead of being saved to a path that shows nothing
+    is_dynamic = bool(spec.get("dynamic"))
+    ctx.setdefault("table_rows", {}).update({name: is_dynamic, rowname: is_dynamic})
     _set_config(rcfg, "name", rowname, ctx)
     _set_config(rcfg, "id", rowname, ctx)
     out.append(row)
@@ -559,6 +607,10 @@ def _build_table(spec: dict, ctx: dict, out: list) -> dict:
         _set_config(rcfg, "tableColumnsSourceType", "static-list", ctx)
         _set_config(rcfg, "tableColumnsSourceValue", cols, ctx)
         _apply_events(spec, rcfg, ctx)   # onTableRowAdded/Deleted events, if any
+        source = next((c for c in rcfg if c.get("key") == "sourceValue"), None)
+        if source and ctx.get("form_id"):
+            path = fieldpath.build(ctx["dm_root_id"], row["id"], source["id"])
+            ctx.setdefault("row_source_paths", {}).update({name: path, rowname: path})
     _set_config(configs, "rows", [rowname], ctx)
     return el
 
@@ -707,6 +759,8 @@ def _dm_shape(el: dict, c: dict) -> tuple[str, bool] | None:
     if not k or k.endswith("Events") or k in _SKIP_DM_ATTR:
         return None
     if k == "sourceValue":
+        if el.get("type") == "dynamic-table-row":
+            return _OBJECT, True   # designer capture: present on every dynamic row, set or not
         return (_OBJECT, True) if isinstance(c.get("value"), list) else None
     vkey = _value_key(el.get("type"))
     if k == vkey:
@@ -896,6 +950,20 @@ def build(config: dict, ctx: dict) -> dict:
                          or _form_var.get("id") or _new_id(ctx))
     ctx["field_paths"] = {}
     ctx["value_attr_ids"] = {}
+    # Created here, not with setdefault where a table is built: a table inside a section,
+    # column or tab is built with a COPY of ctx, and a dict first created on the copy is
+    # lost, so the query wiring would never see that table.
+    ctx["row_source_paths"] = {}
+    ctx["table_rows"] = {}
+    # The PUT replaces the whole template, so a save without `Queries` deletes them. A
+    # config that lists `queries` decides them; one that does not keeps whatever the edit
+    # read from the live form, and a create sends none.
+    if "queries" in config:
+        queries = [form_queries.from_config(q, lambda: _new_id(ctx)) for q in config["queries"] or []]
+        form_queries.check(queries)
+    else:
+        queries = ctx.get("live_queries") or None
+    ctx["queries"] = queries or []
     elements: list = []
     for e in config.get("elements", []):
         _build_element(e, ctx, elements)
@@ -943,7 +1011,7 @@ def build(config: dict, ctx: dict) -> dict:
     else:
         involves_users = bool(assignees) or any(e.get("type") == "assignee" for e in elements)
         ftype = "usertask" if involves_users else "general"
-    return {
+    dto = {
         "Id": ctx["form_id"],
         "Name": config["name"],
         "IsPrivate": bool(config.get("isPrivate", False)),
@@ -954,6 +1022,9 @@ def build(config: dict, ctx: dict) -> dict:
         "Data": data,
         "CustomUrl": None,
     }
+    if queries is not None:
+        dto["Queries"] = queries
+    return dto
 
 
 def _collect_process_ids(elements: list, out: set) -> None:
@@ -1003,10 +1074,28 @@ def _extract_id(resp, dto):
     return dto.get("Id") if isinstance(dto, dict) else None
 
 
-def _edit(client, resource_id, config, ctx):
+def _live_queries(client, resource_id) -> list:
+    body = client.get(f"/api/FormTemplate/{resource_id}")
+    if isinstance(body, dict) and isinstance(body.get("result"), dict):
+        body = body["result"]
+    if not isinstance(body, dict) or "data" not in body:
+        raise UsageError(f"could not read form {resource_id!r} to keep its saved queries; "
+                         f"nothing was written")
+    return body.get("queries") or []
+
+
+def _edit_ctx(client, resource_id, config, ctx):
+    """What an edit carries over from the LIVE form: its saved queries, unless the config
+    lists `queries` itself. Shared with the dry-run preview."""
     ctx = dict(ctx)
     ctx["form_id"] = resource_id
-    dto = build(config, ctx)
+    if "queries" not in config:
+        ctx["live_queries"] = _live_queries(client, resource_id)
+    return ctx
+
+
+def _edit(client, resource_id, config, ctx):
+    dto = build(config, _edit_ctx(client, resource_id, config, ctx))
     client.put("/api/FormTemplate", dto)
     return client.get(f"/api/FormTemplate/{resource_id}")
 
@@ -1016,7 +1105,10 @@ def _lint(resource) -> list[str]:
     from tools.procesio import formlint
     if not isinstance(resource, dict):
         return []
-    return formlint.lint_form_data(resource.get("Data") or resource.get("data"))
+    data = resource.get("Data") or resource.get("data")
+    queries = resource.get("Queries") or resource.get("queries")
+    elements = data.get("elements") if isinstance(data, dict) else []
+    return formlint.lint_form_data(data) + form_queries.warnings(queries, elements)
 
 
 COMPONENT = Component(
@@ -1029,6 +1121,7 @@ COMPONENT = Component(
     extract_id=_extract_id,
     prepare_ctx=_prepare_ctx,
     edit=_edit,
+    edit_ctx=_edit_ctx,
     patch_action="form-update",
     add_action="form-add-element",
     lint=_lint,

@@ -136,7 +136,11 @@ hold no action are a person's notes and are kept where they are.
 
 Good areas follow the story of the process: read the input, look up, decide, write,
 answer. Keep each area's actions consecutive in the flow and its text to one sentence;
-a long text wraps over the row above and the tool warns (`AREA_TEXT_LONG`).
+a long text wraps over the row above and the tool warns (`AREA_TEXT_LONG`). An area drawn
+as more than 2 rectangles (`AREA_FRAGMENTED`) means its actions are scattered: a typical
+case is a Decisional's one-action default branch placed far from the Decisional; give that
+branch its own area or join it to the area it leads into. Check the result with
+`process-screenshot`, not just the stored coordinates.
 
 ## 7. When you build or re-organize a process
 

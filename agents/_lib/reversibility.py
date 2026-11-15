@@ -33,6 +33,9 @@ IRREVERSIBLE_VERBS: tuple[str, ...] = (
     "send", "delete", "remove", "purge", "drop", "pay", "purchase", "buy",
     "charge", "transfer", "post", "publish", "ban", "kick", "issue-invoice",
     "wire", "refund", "archive", "revoke", "deactivate", "wipe",
+    # Runs stored SQL that may be an INSERT, UPDATE or DELETE; the name alone cannot say
+    # which, so every run is treated as a write that can lose data.
+    "run-saved-statement",
 )
 
 # The four blast-radius classes worth naming: data loss, money out, message sent,
@@ -45,6 +48,7 @@ _CLASS_OF_VERB: dict[str, str] = {
     "wire": "money-out", "refund": "money-out",
     "delete": "data-loss", "remove": "data-loss", "purge": "data-loss",
     "drop": "data-loss", "wipe": "data-loss", "archive": "data-loss",
+    "run-saved-statement": "data-loss",
     "ban": "third-party-state", "kick": "third-party-state",
     "revoke": "third-party-state", "deactivate": "third-party-state",
 }

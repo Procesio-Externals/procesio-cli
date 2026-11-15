@@ -43,6 +43,7 @@ TEXT_LINE = 15.0       # body text at the default 12px
 CHAR_W = 6.6           # average glyph width of the 12px body font
 MAX_TEXT_LINES = 4     # beyond this the header would cover the row above: keep area text short
 CONT = " (cont.)"      # title suffix of a group's second and later rectangles
+FRAGMENTED = 2         # more rectangles than this for one area: its actions are scattered
 Z_DEFAULT = -500       # canvas-engine SHAPE_DEFAULT
 SHAPE_MIN, SHAPE_MAX = -1000, -1
 
@@ -182,52 +183,90 @@ def _frame(members_rect, title, text):
     return (x0, y0 - header_height(title, text, x1 - x0), x1, y1 + SIDE_PAD)
 
 
+def _gap(a, b) -> float:
+    """Distance between two rectangles (0 when they touch or overlap)."""
+    dx = max(0.0, max(a[0], b[0]) - min(a[2], b[2]))
+    dy = max(0.0, max(a[1], b[1]) - min(a[3], b[3]))
+    return math.hypot(dx, dy)
+
+
+def _clip_header(fr, members_rect, obstacles):
+    """A rectangle around a single action whose header runs into something ABOVE it (rows sit
+    closer than a header is tall, e.g. right under a Decisional): start it just below the lowest
+    such obstacle instead, as long as that still clears the action itself. The header then
+    shares the band beside the icon, where a left-aligned title has room."""
+    tops = [o[3] for o in obstacles if _hits(fr, o) and o[3] <= members_rect[1]]
+    if not tops:
+        return fr
+    return (fr[0], max(fr[1], max(tops) + 2.0), fr[2], fr[3])
+
+
 def fit(boxes: dict, groups: list[tuple], texts: dict | None = None) -> dict:
-    """Rectangles for each group, as {key: [rect, ...]} in reading order.
+    """Rectangles for each group, as {key: [rect, ...]}; the first one holds the group's first
+    member (in the order given, which is flow order) and carries the title and text.
 
     `groups` is [(key, [member ids])]; `texts` {key: (title, text)} sizes each header. A group
-    whose members sit together gets ONE rectangle. Members that cannot share a rectangle without
-    it covering a node outside the group, or another group's rectangle, are split into several
-    (agglomerative: the closest pair that can merge does, until none can). Deterministic."""
+    whose members sit together gets ONE rectangle. Otherwise the rectangles GROW: start from the
+    first unplaced member, add the nearest member whose inclusion keeps the rectangle clear of
+    every node outside the group, every rectangle of an earlier group AND every rectangle already
+    made for this group, repeat until no member fits, then start the next rectangle. So a group
+    becomes as few rectangles as the canvas allows, and its own rectangles never overlap (an
+    earlier pairwise-merge version let them, and on a crowded canvas split a group into one
+    rectangle per action). Deterministic."""
     texts = texts or {}
     placed: list = []                     # rectangles of earlier groups: never overlapped
     out: dict = {}
     for key, members in groups:
-        members = [m for m in members if m in boxes]
+        members = list(dict.fromkeys(m for m in members if m in boxes))
         if not members:
             out[key] = []
             continue
         title, text = texts.get(key, ("", ""))
         mine = set(members)
         foreign = [b for nid, b in boxes.items() if nid not in mine]
-        clusters = [[m] for m in sorted(members, key=lambda m: (boxes[m][0], boxes[m][1], m))]
+        own: list = []                    # this group's rectangles made so far
 
         def ok(rect):
-            return not any(_hits(rect, f) for f in foreign) and not any(_hits(rect, p) for p in placed)
+            return not any(_hits(rect, f) for f in foreign + placed + own)
 
-        while True:
-            best = None
-            for i in range(len(clusters)):
-                for j in range(i + 1, len(clusters)):
-                    u = _union([boxes[m] for m in clusters[i] + clusters[j]])
-                    fr = _frame(u, title, text)
-                    if not ok(fr):
-                        continue
-                    area = (fr[2] - fr[0]) * (fr[3] - fr[1])
-                    if best is None or area < best[0]:
-                        best = (area, i, j)
-            if best is None:
-                break
-            _, i, j = best
-            clusters[i] = clusters[i] + clusters[j]
-            del clusters[j]
-        rects = []
-        for c in sorted(clusters, key=lambda c: (min(boxes[m][1] for m in c), min(boxes[m][0] for m in c))):
-            u = _union([boxes[m] for m in c])
-            rects.append(_frame(u, title, text) if not rects else
-                         _frame(u, title + CONT, ""))
-        out[key] = rects
-        placed.extend(rects)
+        def framed(u, cont=False):
+            """The rectangle around `u`, its header trimmed when it would run into something
+            above (see _clip_header); None when even that leaves it touching something."""
+            fr = _frame(u, title + CONT, "") if cont else _frame(u, title, text)
+            if not ok(fr):
+                fr = _clip_header(fr, u, foreign + placed + own)
+            return fr if ok(fr) else None
+
+        whole = framed(_union([boxes[m] for m in members]))
+        if whole is not None:
+            out[key] = [whole]
+            placed.append(whole)
+            continue
+        left = list(members)
+        clusters = []
+        while left:
+            cluster = [left.pop(0)]
+            while True:
+                cur = _union([boxes[m] for m in cluster])
+                best = None
+                for m in left:
+                    if framed(_union([cur, boxes[m]]), cont=bool(clusters)) is not None:
+                        d = _gap(cur, boxes[m])
+                        if best is None or d < best[0]:
+                            best = (d, m)
+                if best is None:
+                    break
+                cluster.append(best[1])
+                left.remove(best[1])
+            clusters.append(cluster)
+            u = _union([boxes[m] for m in cluster])
+            fr = framed(u, cont=len(clusters) > 1)
+            if fr is None:                # a lone member boxed in on every side: best effort
+                base = _frame(u, title + CONT, "") if len(clusters) > 1 else _frame(u, title, text)
+                fr = _clip_header(base, u, foreign + placed + own)
+            own.append(fr)
+        out[key] = own
+        placed.extend(own)
     return out
 
 
@@ -270,22 +309,52 @@ def base_title(title: str) -> str:
     return t[: -len(CONT)].strip() if t.endswith(CONT) else t
 
 
+def _neighbours(actions: list[dict]) -> dict:
+    """action id -> ids it is wired to (in or out), from the ports on each source action."""
+    out: dict = {}
+    for a in actions:
+        sid = _g(a, "id")
+        for p in _g(a, "ports", default=[]) or []:
+            d = _g(p, "destinationId")
+            src = _g(p, "sourceId") or sid
+            if d and src and d != src:
+                out.setdefault(src, set()).add(d)
+                out.setdefault(d, set()).add(src)
+    return out
+
+
 def membership(actions: list[dict], shapes: list[dict]) -> dict:
-    """{shape index: [top-level action ids]} - an action belongs to the SMALLEST shape whose
-    rectangle holds its centre. Children of a For Each follow their container."""
+    """{shape index: [top-level action ids]} - an action belongs to the shape whose rectangle
+    holds its centre. Children of a For Each follow their container.
+
+    When several shapes hold it (rectangles that overlap, as hand-drawn ones or older fits can),
+    the area its wired neighbours belong to wins - an action sits in the same area as the actions
+    before and after it far more often than not - and only then the smallest rectangle. Smallest
+    alone misfiled an action into a neighbouring area's corner on a crowded canvas."""
     by_id = {_g(a, "id"): a for a in actions}
     top = top_level_of(actions)
     rects = [shape_rect(s) for s in shapes]
+    titles = [base_title(_g(s, "title", default="") or "") for s in shapes]
+    size = [(r[2] - r[0]) * (r[3] - r[1]) for r in rects]
     out: dict = {i: [] for i in range(len(shapes))}
+    cands: dict = {}
     for a in actions:
         aid = _g(a, "id")
         if top.get(aid) != aid:
             continue
         cx, cy = centre(a, by_id)
-        hit = [(r[2] - r[0]) * (r[3] - r[1]) for r in rects]
-        cands = [i for i, r in enumerate(rects) if r[0] <= cx <= r[2] and r[1] <= cy <= r[3]]
-        if cands:
-            out[min(cands, key=lambda i: (hit[i], i))].append(aid)
+        hit = [i for i, r in enumerate(rects) if r[0] <= cx <= r[2] and r[1] <= cy <= r[3]]
+        if hit:
+            cands[aid] = hit
+    settled = {aid: hit[0] for aid, hit in cands.items() if len(hit) == 1}
+    nb = _neighbours(actions)
+    for aid, hit in cands.items():
+        if aid in settled:
+            continue
+        near = [titles[settled[n]] for n in nb.get(aid, ()) if n in settled]
+        settled[aid] = min(hit, key=lambda i: (-near.count(titles[i]), size[i], i))
+    for aid in cands:                     # keep the actions' own order inside each shape
+        out[settled[aid]].append(aid)
     return out
 
 
@@ -312,9 +381,15 @@ def groups_from_shapes(actions: list[dict], shapes: list[dict]) -> list[dict]:
 
 
 def free_shapes(actions: list[dict], shapes: list[dict]) -> list[dict]:
-    """Shapes that hold no action - a person's notes on the canvas. Kept as they are."""
+    """Shapes that hold no action - a person's notes on the canvas. Kept as they are. A shape
+    titled like one of the areas (its "(cont.)" rectangles included) is part of that area even
+    when overlapping rectangles left it no action of its own, so it is not a note: keeping it
+    would leave a stale rectangle behind on every re-fit."""
     mem = membership(actions, shapes)
-    return [s for i, s in enumerate(shapes) if not mem.get(i)]
+    area_titles = {base_title(_g(s, "title", default="") or "") for i, s in enumerate(shapes)
+                   if mem.get(i)}
+    return [s for i, s in enumerate(shapes) if not mem.get(i)
+            and base_title(_g(s, "title", default="") or "") not in area_titles]
 
 
 def refit(old_actions: list[dict], new_actions: list[dict], shapes: list[dict], new_id) -> list[dict]:

@@ -16,7 +16,7 @@ This page carries the rule and a pointer. The reasoning, the measurement and
 the worked example stay in the note it points at, one copy, so a correction
 lands in exactly one place and this page follows on the next build.
 
-**153 rules across 9 notes.**
+**157 rules across 10 notes.**
 
 ## The API, and what its answers actually mean
 
@@ -166,6 +166,15 @@ Source: [`PROCESIO-INSTANCE-HISTORY-NOTES.md`](PROCESIO-INSTANCE-HISTORY-NOTES.m
 - [Capturing a run's output - capture it LIVE, don't count on reading it back](PROCESIO-INSTANCE-HISTORY-NOTES.md#capturing-a-runs-output---capture-it-live-dont-count-on-reading-it-back)
 - [Only FORM-launched instances are LISTED; API-launched ones are only COUNTED](PROCESIO-INSTANCE-HISTORY-NOTES.md#only-form-launched-instances-are-listed-api-launched-ones-are-only-counted)
 - [There is no version anywhere on either object](PROCESIO-INSTANCE-HISTORY-NOTES.md#there-is-no-version-anywhere-on-either-object)
+
+## Procesio Form Queries Notes
+
+Source: [`PROCESIO-FORM-QUERIES-NOTES.md`](PROCESIO-FORM-QUERIES-NOTES.md)
+
+- [Saving: a save without Queries deletes them, and the SQL is not checked](PROCESIO-FORM-QUERIES-NOTES.md#saving-a-save-without-queries-deletes-them-and-the-sql-is-not-checked)
+- [A designer save drops a query no event runs](PROCESIO-FORM-QUERIES-NOTES.md#a-designer-save-drops-a-query-no-event-runs)
+- [Running a query: parameter names exactly as declared](PROCESIO-FORM-QUERIES-NOTES.md#running-a-query-parameter-names-exactly-as-declared)
+- [The tool actions: running a saved statement is a write](PROCESIO-FORM-QUERIES-NOTES.md#the-tool-actions-running-a-saved-statement-is-a-write)
 
 ## Procesio Foreach Notes
 

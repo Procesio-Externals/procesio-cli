@@ -39,7 +39,7 @@ from tools.procesio.dto.form.builder import _EVENT_KEY, _EVENT_TYPE, _golden  # 
 
 # The value-path rule itself is shared with the builder, so the action that CHECKS a path and
 # the one that WRITES one cannot disagree.
-from tools.procesio.dto.form import fieldpath  # noqa: E402
+from tools.procesio.dto.form import fieldpath, queries as form_queries  # noqa: E402
 
 ACTIONS_ALLOWED = ("RUN_PROCESS", "RUN_JAVASCRIPT", "RUN_DATA_STORE_OPERATION")
 
@@ -51,7 +51,22 @@ ACTIONS_ALLOWED = ("RUN_PROCESS", "RUN_JAVASCRIPT", "RUN_DATA_STORE_OPERATION")
 # (dataStoreOperationSupportsFilters). The operation wire encoding (string vs numeric)
 # must be re-verified live — pass a numeric operation via --config if the platform
 # rejects the name. See PROCESIO-RESOURCE-MODEL-NOTES.md.
-_DATA_STORE_OPS = ("READ", "ADD", "UPDATE", "DELETE")
+_DATA_STORE_OPS = ("READ", "ADD", "UPDATE", "DELETE", "QUERY")
+
+
+def _query_config(ev_config: dict, form: dict) -> dict:
+    """Operation QUERY runs one of the form's saved queries instead of addressing a Data
+    Store: `queryId` (or `query`, a name) is resolved against the live form, the inputMap
+    must name parameters exactly as the query declares them, and the config takes the
+    designer's shape - no Data Store, no filters."""
+    query = form_queries.resolve(form.get("queries") or [],
+                                 ev_config.get("queryId") or ev_config.get("query"))
+    inputs = ev_config.get("inputMap") or []
+    form_queries.check_parameter_names(
+        query, [row.get("left") for row in inputs if isinstance(row, dict)])
+    return {"dataStoreId": None, "operation": "QUERY", "inputMap": inputs,
+            "outputMap": ev_config.get("outputMap") or [], "filters": [],
+            "queryId": query["id"]}
 
 
 def _normalize_op(raw):
@@ -292,7 +307,9 @@ def set_element_event(client, args) -> dict:
             ev_config["dataStoreId"] = args.data_store_id
         if getattr(args, "operation", None):
             ev_config["operation"] = _normalize_op(args.operation)
-        if not ev_config.get("dataStoreId"):
+        if _normalize_op(ev_config.get("operation")) == "QUERY":
+            ev_config = _query_config(ev_config, form)
+        elif not ev_config.get("dataStoreId"):
             raise UsageError("RUN_DATA_STORE_OPERATION needs a dataStoreId "
                              "(--data-store-id or in --config)")
         if ev_config.get("operation") in (None, ""):
@@ -301,7 +318,7 @@ def set_element_event(client, args) -> dict:
         ev_config.setdefault("inputMap", [])
         ev_config.setdefault("outputMap", [])
         # Filters apply to every operation except ADD (dataStoreOperationSupportsFilters).
-        if str(ev_config.get("operation")).upper() != "ADD":
+        if str(ev_config.get("operation")).upper() not in ("ADD", "QUERY"):
             ev_config.setdefault("filters", [])
             ev_config.setdefault("areFiltersConfigured", bool(ev_config.get("filters")))
     elif not ev_config.get("code"):
@@ -415,7 +432,9 @@ def _set_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--data-store-id", dest="data_store_id",
                    help="RUN_DATA_STORE_OPERATION: the target data store id")
     p.add_argument("--operation",
-                   help="RUN_DATA_STORE_OPERATION: READ | ADD | UPDATE | DELETE")
+                   help="RUN_DATA_STORE_OPERATION: READ | ADD | UPDATE | DELETE, or QUERY to "
+                        "run one of the form's saved queries (--config then carries queryId, "
+                        "or query = its name, and no data store)")
     p.add_argument("--config-file", dest="config_file", help="path to a JSON config file")
     p.add_argument("--type", help="override the event type (default follows the trigger)")
     p.add_argument("--replace", action="store_true",
@@ -446,7 +465,10 @@ ACTIONS = {
                     "the form value path; if you pass one it is CHECKED against the live form "
                     "and refused when wrong, because a wrong path is saved without any error "
                     "and the control then launches nothing. A DataStore op takes "
-                    "--data-store-id + --operation. An element saved before the trigger "
+                    "--data-store-id + --operation; operation QUERY runs a saved query of the "
+                    "form instead (queryId or query name in --config, inputMap left = the "
+                    "parameter exactly as declared, outputMap left = rows|columns|count|success). "
+                    "An element saved before the trigger "
                     "existed (e.g. an approval control from before Sep 2025, no "
                     "onBeforeApprove slot) gets the missing slot added from the element "
                     "template, listed in `backfilled`.",

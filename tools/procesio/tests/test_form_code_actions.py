@@ -156,18 +156,23 @@ def test_put_keys_track_the_form_builder_top_level_shape():
     """The surgical PUT rebuilds the FormTemplate DTO from _PUT_KEYS (all the surgical
     handlers share this one list). If the form BUILDER ever grows a new top-level field,
     a surgical write would silently drop it — so lock the two together: the builder's
-    top-level keys, minus Data, must be exactly _PUT_KEYS."""
+    top-level keys, minus Data, must be exactly _PUT_KEYS. A config that uses every
+    optional top-level field (the saved queries) must produce exactly the optional keys
+    on top, so a field the builder can write is always one a surgical save echoes."""
     import itertools
     import json as _json
 
     from tools.procesio.dto.form import builder as fb
-    from tools.procesio.handlers.form_code import _PUT_KEYS
+    from tools.procesio.handlers.form_code import _OPTIONAL_PUT_KEYS, _PUT_KEYS
 
     cnt = itertools.count(1)
     ctx = {"new_id": lambda: f"00000000-0000-0000-0000-{next(cnt):012d}"}
     cfg = _json.loads((fb.DIR / "fixtures" / "reg.config.json").read_text(encoding="utf-8"))
     dto = fb.build(cfg, ctx)
     assert set(dto) - {"Data"} == set(_PUT_KEYS)
+
+    with_queries = fb.build({**cfg, "queries": [{"name": "All", "sql": "SELECT 1"}]}, ctx)
+    assert set(with_queries) - {"Data"} == set(_PUT_KEYS) | set(_OPTIONAL_PUT_KEYS)
 
 
 def test_set_code_reads_back_and_reports_verified():

@@ -53,7 +53,31 @@ fine), so forms are fully buildable server-side.
   ui-builder trigger.ts + EventType enum).
   `do` ∈ **map** (`mapping:[{to,value|from}]`), **process** (`processId,syncRun,
   inputs:[{to,from}],outputs`), **js** (`code`), **form** → EventAction.TRIGGER_FORM
-  (`formId`,`mapping`).
+  (`formId`,`mapping`), **datastore** → RUN_DATA_STORE_OPERATION (`dataStoreId`,
+  `operation` READ/ADD/UPDATE/DELETE, `inputs`, `outputs`, `filters`), or with
+  `operation: "query"` one of the form's saved queries (next bullet). To show a query's rows
+  in a table, give the table's name as the `rows` output: it must be `"dynamic": true` with
+  column `key`s equal to the returned column names (the Data Store display names).
+  An INSERT must name `CreatedById` and `UpdatedById` and bind them to a parameter mapped from
+  a form field holding a user id (a read-only field with a default, or a user picker): nothing
+  supplies them to a form query.
+- **queries** - the form's saved Data Store queries (top-level `Queries` on the DTO):
+  `"queries":[{"name":"Find product","sql":"SELECT Product, Qty FROM <%1%> WHERE Product = @product","bindings":[{"id":1,"type":"dataStoreTable","dataStoreId":"<store id>"}]}]`.
+  `id` is generated when omitted (give it to keep it stable across edits), `parameters` is
+  derived from the `@name`s in the statement outside quotes and comments when omitted,
+  `timeoutSeconds` is 1..600 (null = 60). `bindings` is one entry per `<%N%>` tag in the wire
+  shape (`dataStoreColumn` also takes `columnId`). The builder refuses, before the save, what
+  the save would refuse: a tag without a binding or bound twice, an unknown binding kind, a bad
+  or duplicate parameter name, a timeout out of range, empty text, duplicate ids or names. The
+  SQL itself is checked by nobody until the query runs.
+  Run it from an event: `{"on":"click","do":"datastore","operation":"query","query":"Find product",
+  "inputs":[{"left":"@product","right":"productField"}],"outputs":[{"left":"rows","right":"resultField"}]}`
+  - `query` is the name or id, `inputs.left` the parameter exactly as declared, `outputs.left`
+  one of `rows|columns|count|success`, `right` a form field name.
+  **`form-edit` and queries:** a config that lists `queries` replaces them (`[]` removes all); a
+  config that does not mention `queries` keeps the live ones, and its events can still name them.
+  A query no event runs is dropped by the next designer save, and comes back under `warnings`.
+  Everything else: `../../PROCESIO-FORM-QUERIES-NOTES.md`.
 - **tasks/assignees** - `assignee`/`assigneeReplacement` on section/tabs/table;
   `approver`/`approverReplacement` on the `approval` control. The form's top-level
   **`Assignees`** list is what the designer shows as the task routing: rows

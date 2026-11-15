@@ -78,6 +78,9 @@ def _best_of_engines(obj: dict, flow_id: str | None = None,
     return legacy
 
 
+FAN_MIN_STEP = 160.0   # one layout column (engine DX): an action plus its name under the icon
+
+
 def _apply_fan_lanes(positions: dict, fg) -> dict:
     """The reference FAN pattern (hand-arranged entry spine): when a decisional's parallel alternative
     branches all reconnect at the SAME merge, stack each branch as a flat LANE parallel to
@@ -171,6 +174,13 @@ def _apply_fan_lanes(positions: dict, fg) -> dict:
         # 3 branches -> lanes -2, -1, +1.
         infos = sorted([(sorted(P[b]["y"] for b in body)[len(body) // 2], body)
                         for body in branches], key=lambda bi: bi[0])
+        # A lane spreads its body EVENLY between split and merge, so a long branch between two
+        # close columns gets squeezed: 11 actions in 800 px land 66 px apart and every label
+        # runs into the next one. The icon-overlap gate below cannot see that (icons are 48 px),
+        # so refuse the fan here when any lane would need less than one column per action;
+        # the engine's own arrangement (folded when clustering) stays.
+        if any((mx - sx) / (len(body) + 1) < FAN_MIN_STEP for _m, body in infos):
+            continue
         n_above = (len(infos) + 1) // 2
         lanes = [(-(n_above - i), body) for i, (_m, body) in enumerate(infos[:n_above])]
         lanes += [(+(i + 1), body) for i, (_m, body) in enumerate(infos[n_above:])]

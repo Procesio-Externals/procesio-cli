@@ -65,8 +65,8 @@ def collect_actions() -> dict[str, ActionDef]:
     from tools.procesio.handlers import (
         auth_actions, catalog, customaction_ops, datastore_ops, datatype_ops,
         dto_actions, environment_admin, files,
-        flowgraph, form_chains, form_code, form_element, form_events, form_signing, form_update,
-        formprocess, generic,
+        flowgraph, form_chains, form_code, form_element, form_events, form_queries, form_signing,
+        form_update, formprocess, generic,
         layout, usageguide,
         process_docs, process_layout, process_naming, process_screenshot, processes,
         profile_admin,
@@ -126,6 +126,8 @@ def collect_actions() -> dict[str, ActionDef]:
     # Arbitrary safe save: GET a live form, deep-merge a Data patch (and/or override
     # name/status/state), PUT the accepted DTO — the general form-save form-edit isn't.
     curated.update(form_update.ACTIONS)
+    # A form's saved Data Store queries: read them, change one in place, run one.
+    curated.update(form_queries.ACTIONS)
     # SQL Server action hardening: scan + convert inline <%N%> SQL to parameterized (@param) binding.
     curated.update(sqlactions.ACTIONS)
     # Surgical single-parameter edits on a live designer-built flow (endpoint/timeout/SQL/script):
