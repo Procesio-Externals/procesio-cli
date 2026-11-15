@@ -28,7 +28,7 @@ from tools._lib.io import log
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import parse_json_arg
 from tools.procesio.errors import ProcesioAPIError, UsageError
-from tools.procesio.handlers.common import add_profile_arg
+from tools.procesio.handlers.common import add_profile_arg, upload_retrying_lock
 
 _TERMINAL = {6, 40, 50}
 _LABEL = {1: "starting", 6: "stopped", 40: "finished_with_errors", 50: "finished"}
@@ -86,7 +86,7 @@ def run_form_with_files(client, args) -> dict:
                          "formTemplateWorkspaceId header")
     hdr = {"formTemplateWorkspaceId": ws}
 
-    payload = parse_json_arg(args.payload, "--payload") if args.payload else {}
+    payload = parse_json_arg(args.payload, "payload") if args.payload else {}
     if not isinstance(payload, dict):
         raise UsageError("--payload must be a JSON object")
 
@@ -121,11 +121,11 @@ def run_form_with_files(client, args) -> dict:
     for f in staged:
         with open(f["path"], "rb") as fh:
             content = fh.read()
-        client.request_multipart(
-            f"/api/FormProcess/{form_id}/{inst}/upload",
+        upload_retrying_lock(
+            client, f"/api/FormProcess/{form_id}/{inst}/upload",
             files={"package": (f["name"], content, f["mime"])},
             headers={"flowTemplateId": process_id, "variableName": f["var"],
-                     "fileId": f["file_id"], "formTemplateWorkspaceId": ws})
+                     "fileId": f["file_id"], "formTemplateWorkspaceId": ws}, log=log)
         log(f"uploaded {f['name']} ({f['size']} bytes) -> {f['var']}")
 
     # The launch route's second path segment is documented as processTemplateId, but the

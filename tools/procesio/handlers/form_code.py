@@ -207,7 +207,7 @@ def set_code(client, args) -> dict:
         "previous": {"css": previous["CSS"], "javascript": previous["JAVASCRIPT"]},
         "elements": len(form["data"].get("elements") or []),
     }
-    warnings = formlint.lint_form_code_scope(css, js)
+    warnings = formlint.lint_form_code_scope(css, js) + formlint.lint_form_code_runtime(css, js)
     if warnings:
         result["warnings"] = warnings
     if args.dry_run:

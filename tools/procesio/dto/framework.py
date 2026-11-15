@@ -47,6 +47,10 @@ class Component:
     # Non-blocking warnings for a built DTO or a fetched resource, attached to
     # <name>-create / <name>-edit output as `warnings`. Never raises, never blocks.
     lint: Callable[[Any], list] | None = None
+    # (sent_dto, stored_resource) -> warnings for parts of the DTO the server accepted and
+    # then did not keep (a field an older build ignores). Run on the read-back after a
+    # create, and after an edit whose `edit` hook left the sent DTO in ctx["_sent_dto"].
+    persist_check: Callable[[Any, Any], list] | None = None
     # Self-documentation gate (process): reads the report build() left in ctx["_doc"],
     # raises errors.DocumentationMissing when the resource does not document itself
     # (unless ctx["_allow_undocumented"]), and returns the report for the result.

@@ -269,7 +269,11 @@ def _operand(spec, var_ids: dict, counter: list, ctx: dict) -> dict:
     return {"value": val, "variable": []}
 
 
-_LOGIC = {"and": 1, "or": 0}
+# A rule Decisional condition's `logicOperator` joins it to the NEXT condition. The engine's
+# LogicOperators enum is NONE = 0, AND = 1, OR = 2, and NONE STOPS the evaluation
+# (Process-Execution EvaluateConditionsHelper): `or` written as 0 made every condition after
+# it silently ignored. The last condition's operator is ignored since Process-Execution v0.25.
+_LOGIC = {"and": 1, "or": 2}
 
 
 def _build_decisional(template: dict, spec: dict, node_id: dict, var_ids: dict, ctx: dict):

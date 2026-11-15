@@ -39,34 +39,28 @@ jobs:
         # 35 of them shipped with invalid YAML frontmatter. The validator is the
         # thing that would have caught it.
         run: uv run python scripts/validate-skills.py
-      - name: the plugin lock matches its pyproject
-        # A locked install refuses a lock that no longer matches plugin/pyproject.toml.
-        if: runner.os == 'Linux'
-        run: uv lock --check --project plugin
-      - name: both MCP surfaces start, and the plugin launches the one plugin/.mcp.json names
-        # The launch command is read OUT of .mcp.json rather than repeated here. A gate
-        # that names its own command stops testing the plugin the moment the config
-        # points somewhere else, and stays green the whole time it is not testing it.
-        #
-        # Proving this here is the only place it gets proven: a plugin that installs and
-        # then fails to start is indistinguishable from a broken product. Both surfaces
-        # are checked because both ship - the curated one the plugin uses, and the full
-        # registry one anybody can still configure by hand.
+      - name: the plugin folder passes the directory's rules for a non-Verified organization
+        # The Claude plugin directory refuses, from an organization it has not Verified, a
+        # local MCP server, any file that is not Markdown / text / JSON / YAML / an image,
+        # and SKILL.md frontmatter beyond plain name + description lines. Generated from
+        # tools/procesio-oss/community.py in Agents-and-Tools; a PR that breaks a rule
+        # fails here instead of in the directory's review.
+        run: uv run python scripts/check-plugin.py plugin
+      - name: both MCP surfaces start, including the release the plugin README names
+        # The plugin declares no server (see above); its README tells people to add
+        # `uvx procesio-cli==0.1.6` themselves, so that exact command is
+        # what this launches. The full registry surface is the one anybody can configure.
         if: runner.os == 'Linux'
         run: |
           python - <<'PY'
-          import json, os, pathlib, subprocess
+          import json, os, subprocess
 
-          # The plugin runs `uvx procesio-cli==<runtime>`, a release already on PyPI (the
-          # same one plugin/uv.lock pins), so it launches here exactly as it ships.
-          cfg = json.loads(pathlib.Path("plugin/.mcp.json").read_text())["mcpServers"]["procesio"]
-          args = list(cfg["args"])
-          plugin_env = {**os.environ, **cfg.get("env", {})}
-          plugin_argv = [cfg["command"]] + args
+          plugin_argv = ["uvx", "procesio-cli==0.1.6"]
+          plugin_env = {**os.environ, "UV_PYTHON_PREFERENCE": "system"}
           request = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}\n'
 
           for label, argv, env in (
-              ("plugin, per plugin/.mcp.json", plugin_argv, plugin_env),
+              ("the release the plugin README names", plugin_argv, plugin_env),
               ("full registry surface", ["uvx", "--python-preference", "system",
                                          "--python", ">=3.11",
                                          "--from", ".", "--constraints", "constraints.txt",

@@ -41,7 +41,7 @@ Show low/base/high scenarios, input sources, units and uncertainty. Never substi
 
 ## Offline arithmetic helper
 
-Run `python <skill-root>/scripts/estimate_capacity.py --input <measurement.json>` with Python 3.11+; no dependencies, network calls or file writes. It accepts one UTF-8 JSON object (maximum 64 KiB):
+Do this arithmetic by hand, or with the capacity calculator in the procesio-cli repository (skills/procesio-platform-advisor/scripts, Python 3.11+, not part of this plugin). Its input is one UTF-8 JSON object (maximum 64 KiB):
 
 ```json
 {

@@ -152,7 +152,7 @@ def _style_groups() -> list:
     groups = []
     for g in _shell().get("theme") or []:
         props = {p["cssVariable"]: {"label": p.get("label", ""), "type": p.get("type")}
-                 for p in g.get("properties") or [] if p.get("cssVariable")}
+                 for p in _group_props(g) if p.get("cssVariable")}
         groups.append((g.get("label"), set(g.get("types") or []), props))
     return groups
 
@@ -626,6 +626,10 @@ def _build_code(config: dict, ctx: dict) -> str:
     js = code.get("javascript", config.get("javascript", config.get("js")))
     if not (css or js):
         return ""
+    # the saved blob is encrypted, so a lint of the DTO cannot read it: check it here
+    from tools.procesio import formlint
+    for w in formlint.lint_form_code_scope(css, js) + formlint.lint_form_code_runtime(css, js):
+        _warn(ctx, w)
     key = ctx.get("form_code_key")
     if not key:
         # The key stored for THIS call's environment, never another installation's:
@@ -637,17 +641,45 @@ def _build_code(config: dict, ctx: dict) -> str:
 
 
 def _apply_theme(theme: list, overrides: dict) -> list:
-    """Apply {cssVariable: value} overrides onto the shell theme (deep-copied)."""
+    """Apply {cssVariable: value} overrides onto the shell theme (deep-copied). A group
+    whose properties are {light, dark} (the Colors group, as the designer saves it) takes
+    `theme` overrides on its light side; `themeDark` sets the dark side (_apply_dark)."""
     if not overrides:
         return theme
     theme = copy.deepcopy(theme)
-    norm = {(k if k.startswith("--") else f"--{k}"): v for k, v in overrides.items()}
+    norm = _norm_vars(overrides)
     for section in theme or []:
-        for prop in section.get("properties", []):
+        for prop in _group_props(section):
             cv = prop.get("cssVariable")
             if cv in norm:
                 prop["value"] = norm[cv]
     return theme
+
+
+def _norm_vars(overrides: dict) -> dict:
+    return {(k if k.startswith("--") else f"--{k}"): v for k, v in (overrides or {}).items()}
+
+
+def _group_props(group: dict, mode: str = "light") -> list:
+    """A theme group's CSSProperty list; for a {light, dark} group, the `mode` side."""
+    props = (group or {}).get("properties")
+    if isinstance(props, dict):
+        props = props.get(mode)
+    return [p for p in props or [] if isinstance(p, dict)]
+
+
+def _unknown_theme_vars(theme: list, overrides: dict) -> list:
+    """Override keys the theme does not define: they would be dropped without a word."""
+    known = {p.get("cssVariable") for g in theme or [] for p in _group_props(g)}
+    return sorted(k for k in _norm_vars(overrides) if k not in known)
+
+
+def _warn(ctx, message: str) -> None:
+    """A non-blocking build finding. `ctx["_build_warnings"]` is a list the caller created
+    before any copy of ctx was made, so every copy appends to the same one."""
+    found = ctx.get("_build_warnings") if isinstance(ctx, dict) else None
+    if isinstance(found, list) and message not in found:
+        found.append(message)
 
 
 # DARK_PALETTE — the 16 dark-mode color variables (ui-builder theme.ts DARK_PALETTE).
@@ -674,6 +706,16 @@ def _apply_dark(theme_list: list, overrides: dict) -> list:
     DARK_PALETTE plus any caller `themeDark` overrides, keyed by cssVariable. Every other
     group keeps a flat CSSProperty[]. themeMode is editor-only and never persisted."""
     theme_list = copy.deepcopy(theme_list)
+    for group in theme_list or []:
+        props = group.get("properties")
+        if str(group.get("label", "")).strip().lower() == "colors" and isinstance(props, dict):
+            # the shell already carries the designer's own dark palette: only the
+            # caller's themeDark overrides change it
+            norm = _norm_vars(overrides)
+            for pr in props.get("dark") or []:
+                if pr.get("cssVariable") in norm:
+                    pr["value"] = norm[pr["cssVariable"]]
+            return theme_list
     dark_vals = {**_DARK_PALETTE, **(overrides or {})}
     dark_vals = {(k if k.startswith("--") else f"--{k}"): v for k, v in dark_vals.items()}
     for group in theme_list or []:
@@ -696,6 +738,12 @@ _JSON = "0317bfee-b2f5-4bde-bfe8-121212121220"
 # PROCESIO's generic Object type. A select's STATIC option list is a list of these in
 # the data model (designer capture, 2026-10-01).
 _OBJECT = "0317bfee-b2f5-4bde-bfe8-121212121221"
+# A config of type `function` (stepper goToNextStep/goToPreviousStep, the side panel's
+# open/close) is callable from form JS only when its data-model attribute has this type:
+# the runtime builds the callable for dataTypeId FUNCTION and nothing else, so a function
+# typed as a string throws "... is not a function". The designer also hides it
+# (user-playground Form.model.ts, NonPrimitives.FUNCTION).
+_FUNCTION = "1c2fd144-836e-419a-aa25-9e624a4c7e40"
 _BOOL_CFG = {"visible", "readonly", "required", "submit", "multiple", "searchable",
              "clearable", "hasNow", "disabledIfFormIsInvalid", "canAdd", "canRemove",
              "outlined", "disabled",
@@ -744,7 +792,7 @@ def _dm_attr(name, aid, type_id, parent, is_list=False):
     return {"id": aid, "name": name, "displayName": name, "dataTypeId": type_id,
             "isDataModel": False, "isList": is_list, "isProcesio": False,
             "isPublic": False, "parentDataTypeId": parent, "jsonProperty": None,
-            "attributes": [], "hidden": False}
+            "attributes": [], "hidden": type_id == _FUNCTION}
 
 
 def _dm_shape(el: dict, c: dict) -> tuple[str, bool] | None:
@@ -765,6 +813,8 @@ def _dm_shape(el: dict, c: dict) -> tuple[str, bool] | None:
     vkey = _value_key(el.get("type"))
     if k == vkey:
         return _VALUE_TYPE.get(el.get("type"), _STR), _value_is_list(el)
+    if c.get("type") == "function":
+        return _FUNCTION, False
     return (_BOOL if k in _BOOL_CFG else _INT if k in _INT_CFG else _STR), False
 
 
@@ -983,13 +1033,19 @@ def build(config: dict, ctx: dict) -> dict:
     }
     if config.get("chainConfig") is not None:
         data["chainConfig"] = config["chainConfig"]
-    # Dark theme (opt-in): the dark palette is persisted INSIDE the single `theme` array —
-    # the COLORS group's `properties` becomes a {light, dark} ModeProperties object (verified
-    # vs ui-builder main: getPaletteStyleSheet reads properties.light/.dark). themeMode is
-    # editor-only and never saved. Emitted only when the caller opts in via `dark`/`themeDark`,
-    # so light-only forms are byte-identical.
+    # Dark theme: the dark palette is persisted INSIDE the single `theme` array, as the
+    # COLORS group's {light, dark} ModeProperties. The shell theme is the designer's own
+    # getDefaultTheme() (sync_theme.py), which carries both sides on every form, as a form
+    # saved in the designer does; `themeDark` overrides the dark side. themeMode is
+    # editor-only and never saved. An older flat shell still gets the opt-in conversion.
     if config.get("dark") or config.get("themeDark") is not None or config.get("themeMode") == "dark":
         data["theme"] = _apply_dark(data["theme"], config.get("themeDark"))
+    for key, label in (("theme", "theme"), ("themeDark", "themeDark")):
+        unknown = _unknown_theme_vars(shell.get("theme"), config.get(key))
+        if unknown:
+            _warn(ctx, f"{label} sets {', '.join(unknown)}, which the form theme does not define, "
+                       f"so the form ignores {'it' if len(unknown) == 1 else 'them'}. The theme "
+                       f"follows the designer's ui-builder (dto/form/theme_source.json).")
     # Guard the field-name-resolution invariant (see dm_root_id above): the dataModel
     # root and every field-path root must equal the form handle variable id, or the
     # designer renders process<->form maps as raw guids/blanks. Fail loudly here so a
@@ -1097,7 +1153,30 @@ def _edit_ctx(client, resource_id, config, ctx):
 def _edit(client, resource_id, config, ctx):
     dto = build(config, _edit_ctx(client, resource_id, config, ctx))
     client.put("/api/FormTemplate", dto)
+    ctx["_sent_dto"] = dto   # for persist_check on the read-back
     return client.get(f"/api/FormTemplate/{resource_id}")
+
+
+def _persist_check(dto, stored) -> list[str]:
+    """Saved queries the save accepted and did not keep. A build without the saved-query
+    feature ignores `Queries` and answers 200, so the form exists while every QUERY event
+    points at a query that is not there."""
+    sent = (dto or {}).get("Queries") if isinstance(dto, dict) else None
+    if not sent:
+        return []
+    body = stored.get("result") if isinstance(stored, dict) and isinstance(
+        stored.get("result"), dict) else stored
+    if not isinstance(body, dict):
+        return []
+    kept = {str(q.get("id") or "").lower() for q in body.get("queries") or [] if isinstance(q, dict)}
+    lost = [q.get("name") for q in sent if str(q.get("id") or "").lower() not in kept]
+    if not lost:
+        return []
+    why = ("this environment returns no `queries` at all, so its build does not have saved "
+           "form queries yet" if "queries" not in body else "another save may have replaced them")
+    return [f"the form was saved but the server did not keep its saved queries "
+            f"{', '.join(map(repr, lost))}: {why}. Every QUERY event on the form points at a "
+            f"query that does not exist."]
 
 
 def _lint(resource) -> list[str]:
@@ -1122,6 +1201,7 @@ COMPONENT = Component(
     prepare_ctx=_prepare_ctx,
     edit=_edit,
     edit_ctx=_edit_ctx,
+    persist_check=_persist_check,
     patch_action="form-update",
     add_action="form-add-element",
     lint=_lint,

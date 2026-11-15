@@ -15,6 +15,14 @@ JSON`, `Mapper`, `Sanitizer`, `Object To String`), not the older labels some doc
 - **Base64**: File To Base64, Base64 To File, Base64 To String, String To Base64.
 - **Utilitary**: Generate GUID, GUID Converter, Generate Integer, Generate String.
 
+## An empty value for a non-string input (every action, since Process-Execution v0.25.0)
+
+⚠ Read in the source (TypeConverter, 2026-09-21): an empty string bound to an input that is not
+a string becomes **null**, for every type, not only numbers. A REQUIRED input of a non-nullable
+value type (bool, Guid, an enum) left empty then fails the action with "Input 'X' is required but
+was empty." Custom actions get the same conversion, so an optional value-type input must be
+declared nullable (`bool?`, `Guid?`) or an empty value fails it.
+
 ## JSON
 
 - **String To JSON** (`Text` -> `Json` / `Json List`): a text holding an object fills `Json` and leaves `Json List` null;

@@ -112,3 +112,23 @@ def test_customdata_guid_form_clean():
     flow = {"actions": [_node_cd("Build Msg", "return f(v1);")],
             "variables": [{"id": "v1", "type": 20, "isError": False}]}
     assert "CUSTOMDATA_PLACEHOLDER" not in {p["kind"] for p in lint_flow_dto(flow, SP, lambda f: {})}
+
+
+def _decisional(ops):
+    conds = [{"id": i, "operator": "EQUALS", "logicOperator": op} for i, op in enumerate(ops)]
+    return {"actionName": "D", "actionTemplateName": "Decisional",
+            "parameters": [{"tabPropertyId": "cases", "value": [
+                {"id": 0, "actionid": "T", "condition": conds}]}]}
+
+
+def test_a_none_operator_before_the_last_condition_is_flagged():
+    probs = lint_flow_dto({"actions": [_decisional([1, 0, 1])], "variables": []}, SP, lambda f: {})
+    (p,) = [p for p in probs if p["kind"] == "DECISIONAL_TRUNCATED"]
+    assert "condition 2 of 3" in p["detail"] and "ignores the 1 after it" in p["detail"]
+
+
+def test_and_or_chains_and_a_trailing_none_are_clean():
+    for ops in ([1, 2, 1], [2, 0], [0]):
+        flow = {"actions": [_decisional(ops)], "variables": []}
+        assert [p for p in lint_flow_dto(flow, SP, lambda f: {})
+                if p["kind"] == "DECISIONAL_TRUNCATED"] == []

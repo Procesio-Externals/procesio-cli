@@ -150,6 +150,19 @@ came back the moment it answered). With `syncRun: false` the chain ends at launc
 button can run while the async process is still going. A runtime that clicks a hidden button after
 a sync step must wait for `button.disabled === false`, not for a timer.
 
+**What the public runtime changed around a run (form-runtime 1.30 to 1.32, 2026-10, read in the
+source; the runtime is never announced).**
+- A trigger that fails shows an error toast of the runtime's own; before, nothing on the page said so.
+  A form with its own toasts may show two.
+- An async run whose push message does not arrive falls back to polling the run's status, so the
+  outputs still land, later.
+- Leaving the page while a run is still starting asks the visitor to confirm.
+- With `mapLatestTriggerOnly`, a fire superseded by a newer one creates no run at all (before, it
+  ran and only its outputs were dropped).
+- File uploads of one launch go up side by side before the launch.
+- A script's data stores load on its first data-store operation; a script on a form that
+  references none fails that operation with "Data store operations are not available."
+
 **A list loaded at FORM_LOAD goes stale while the page stays open** (a signer signs, a status
 moves on). To refresh it without a page reload, put the same RUN_PROCESS on a hidden button whose
 output map writes the dynamic row again; the table re-renders from the new value and the selected

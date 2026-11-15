@@ -29,9 +29,9 @@ Read-only metadata can disclose confidential code and embedded secrets. Before r
 
 The bundled legacy inspection-only helpers have no object allowlist and cover the whole current database (subject to metadata visibility):
 
-- `scripts/export-tables.sql`: user tables, constraints, computed/default expressions, DML and database DDL trigger definitions. `@p_Database` labels output only; it does not switch the connection's database. Server-wide trigger definitions extend beyond database scope and require separate approval plus explicit `@p_IncludeServerTriggers = 1`; the default is `0`, even with server permissions.
-- `scripts/export-indexes.sql`: all visible non-constraint, non-hypothetical indexes on user tables, including filter literals. Its generic rowstore-shaped serializer is not valid for columnstore, XML, spatial, hash or other non-rowstore types. Do not automatically run it on mixed/unsupported types; request a bounded catalog projection instead. Never execute generated DDL as an automatic next step.
-- `scripts/export-procs-and-functions.sql`: all visible user procedure and SQL function definitions (FN/IF/TF), not only modules called by the query. Definitions can contain sensitive literals; unavailable definitions do not prove absence.
+- `scripts/export-tables.sql.md`: user tables, constraints, computed/default expressions, DML and database DDL trigger definitions. `@p_Database` labels output only; it does not switch the connection's database. Server-wide trigger definitions extend beyond database scope and require separate approval plus explicit `@p_IncludeServerTriggers = 1`; the default is `0`, even with server permissions.
+- `scripts/export-indexes.sql.md`: all visible non-constraint, non-hypothetical indexes on user tables, including filter literals. Its generic rowstore-shaped serializer is not valid for columnstore, XML, spatial, hash or other non-rowstore types. Do not automatically run it on mixed/unsupported types; request a bounded catalog projection instead. Never execute generated DDL as an automatic next step.
+- `scripts/export-procs-and-functions.sql.md`: all visible user procedure and SQL function definitions (FN/IF/TF), not only modules called by the query. Definitions can contain sensitive literals; unavailable definitions do not prove absence.
 
 ### Qualification blockers retained from source
 

@@ -626,6 +626,12 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `run-process` | `--id` | Run a process (POST /api/Projects/{id}/run). Supports --dry-run. |
 | `run-process-with-file` | `--id` | Run a process that takes File input variable(s): publish -> upload bytes -> launch -> poll -> output. --file VARNAME=PATH (repeatable). |
 
+### server
+
+| action | required args | what it does |
+|---|---|---|
+| `server-build` | — | Which Web-Api build this environment runs (GET /health, anonymous): the version and the commit, which is the release tag's commit in the Web-Api repository.… |
+
 ### set
 
 | action | required args | what it does |

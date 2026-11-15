@@ -429,6 +429,15 @@ inside carries the element's `id` config as its DOM `id` and most configs as att
 - **Dynamic table:** `.form-builder--table` > `.pds-c-table--container` > `table.pds-c-table`;
   header cells `th#th<column key>`; the dynamic row's own `.pds-c-table--wrapper--empty` shows
   "Row is empty." with no data.
+- **Number field (`number-input`), since ui-builder 0.184 / 1.41 (design-system ADR 0001; measured
+  on the live runtime 2026-11-15: `1,5` accepted, `1.234,5` refused with the message below):** a
+  text field, `<input type="text" inputmode="decimal">`, not a native number input.
+  ⚠ `input[type=number]` matches nothing; select it by the element's class or wrapper. A dot or
+  a comma is the decimal separator (`1,5` is 1.5); thousands separators are refused. The model
+  gets the number as text with a dot, or `""` when cleared; text that is not a number is not
+  written (the last number stays) and blocks submit with "Enter a number, for example 1234.5.",
+  shown once the field is left. No spinner, no arrow-key or wheel stepping, and `min` / `max`
+  are not applied.
 
 ## 6. Responsive and reduced motion
 

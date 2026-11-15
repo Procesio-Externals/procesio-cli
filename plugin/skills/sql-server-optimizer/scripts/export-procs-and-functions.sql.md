@@ -1,3 +1,8 @@
+# export-procs-and-functions.sql
+
+Copy the script below and run it yourself; it is reference material, nothing in this plugin runs it.
+
+```sql
 /*Optimized SQL:*/
 -- Exports all user stored procedures and user-defined functions (inline/table/scalar)
 -- into a single NVARCHAR(MAX) definition blob, then prints it in SSMS-safe chunks.
@@ -116,3 +121,4 @@ Notes:
 - Encrypted modules (or insufficient permissions) return NULL definition; script inserts a NOTE line instead.
 - Output is printed in 3,800-char chunks to avoid SSMS PRINT truncation.
 */
+```

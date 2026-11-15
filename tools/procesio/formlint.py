@@ -382,6 +382,47 @@ def lint_document_signing(data: Any) -> list[str]:
     return out
 
 
+# The form's number field is no native number input (ui-builder 0.184 / 1.41, design-system
+# ADR 0001): it renders <input type="text" inputmode="decimal">, so a selector on
+# type=number matches nothing.
+_NUMBER_TYPE_SELECTOR = re.compile(r"""type\s*=\s*\\?["']?number\b|\.type\s*===?\s*["']number["']""", re.I)
+# Since form-runtime 1.30 / designer 1.115, `deserialze(x)` is replaced with the value as JSON
+# (a string variable that holds JSON goes in parsed, any other string as a quoted literal).
+# Wrapped in quotes, the call now yields text that carries the quotes of the literal.
+_QUOTED_DESERIALZE = re.compile(r"""(["'`])\s*deserialze\(""")
+
+
+def lint_form_code_runtime(css: str | None, js: str | None, where: str = "form code") -> list[str]:
+    """Code written for runtime behaviour that changed in the 2026-10 front ends."""
+    out = []
+    text = f"{css or ''}\n{js or ''}"
+    if _NUMBER_TYPE_SELECTOR.search(text):
+        out.append(f"{where} selects a number input by type=number, but a form's number field "
+                   f"renders <input type=\"text\" inputmode=\"decimal\">: the selector matches "
+                   f"nothing. Select it by the element's class or name instead.")
+    if _QUOTED_DESERIALZE.search(js or ""):
+        out.append(f"{where} wraps deserialze(...) in quotes. The runtime now inserts the value "
+                   f"as JSON (a string as a quoted literal), so the quotes end up inside the "
+                   f"value. Write deserialze(name) without quotes around it.")
+    return out
+
+
+def lint_event_scripts(data: Any) -> list[str]:
+    """lint_form_code_runtime over every RUN_JAVASCRIPT event of the form's elements."""
+    out: list[str] = []
+    for el in _elements(data):
+        for c in el.get("configs") or []:
+            val = c.get("value")
+            events = val.get("events") if isinstance(val, dict) else None
+            for ev in events if isinstance(events, list) else []:
+                if isinstance(ev, dict) and ev.get("action") == "RUN_JAVASCRIPT":
+                    code = (ev.get("config") or {}).get("code")
+                    for w in lint_form_code_runtime(None, code, f"the {c.get('key')} script of {_label(el)}"):
+                        if w not in out:
+                            out.append(w)
+    return out
+
+
 def lint_form_data(data: Any) -> list[str]:
     """All structural (element-level) lints for a form's Data."""
     return (lint_phantom_parent(data)
@@ -389,4 +430,5 @@ def lint_form_data(data: Any) -> list[str]:
             + lint_multiple_select_islist(data)
             + lint_string_boolean_conditions(data)
             + lint_field_names(data)
-            + lint_document_signing(data))
+            + lint_document_signing(data)
+            + lint_event_scripts(data))
