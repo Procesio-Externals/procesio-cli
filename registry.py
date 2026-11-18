@@ -176,6 +176,25 @@ def list_tools() -> list[dict[str, Any]]:
     return out
 
 
+def _named_manifest(root: Path, filename: str, name: str, hidden: set[str]) -> Path | None:
+    """The manifest in the folder a tool or agent called `name` normally lives in, or None.
+
+    A name is its folder's name, with hyphens where some folders (those that are also imported
+    as Python packages) have underscores. Going there first means a lookup reads ONE manifest
+    instead of walking and parsing every folder until the name turns up - which a process that
+    has just started pays in full, on every tool call. The walk stays as the fallback, so a
+    folder named differently from its manifest still resolves."""
+    for folder in dict.fromkeys((name, name.replace("-", "_"))):
+        if not folder or folder.startswith("_") or folder in hidden:
+            continue
+        if Path(folder).name != folder:  # a name is one path segment, never a way out of root
+            continue
+        candidate = root / folder / filename
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def get_tool(name: str, *, respect_hidden: bool = True):
     """Resolve a tool manifest by name.
 
@@ -189,6 +208,18 @@ def get_tool(name: str, *, respect_hidden: bool = True):
     hidden = hidden_tools() if respect_hidden else set()
     if name in hidden:
         raise KeyError(f"tool not found: {name}")
+    direct = _named_manifest(TOOLS_DIR, "tool.yaml", name, hidden)
+    if direct is not None:
+        try:
+            m = load_tool(direct)
+        except Exception:  # noqa: BLE001
+            # The folder named exactly like the tool holds its manifest: say what is wrong
+            # with it. Any other folder is left to the walk below, which skips it with a warning.
+            if direct.parent.name == name:
+                raise
+        else:
+            if m.name == name:
+                return m
     for manifest_path in TOOLS_DIR.glob("*/tool.yaml"):
         if manifest_path.parent.name.startswith("_") or manifest_path.parent.name in hidden:
             continue
@@ -272,6 +303,16 @@ def list_agents(tool_index: dict[str, dict] | None = None) -> list[dict[str, Any
 
 
 def get_agent(name: str):
+    direct = _named_manifest(AGENTS_DIR, "agent.yaml", name, set())
+    if direct is not None:
+        try:
+            m = load_agent(direct)
+        except Exception:  # noqa: BLE001 - as get_tool: only the agent's own folder speaks for it
+            if direct.parent.name == name:
+                raise
+        else:
+            if m.name == name:
+                return m
     for manifest_path in AGENTS_DIR.glob("*/agent.yaml"):
         if manifest_path.parent.name.startswith("_"):
             continue

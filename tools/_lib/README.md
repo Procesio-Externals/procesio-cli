@@ -61,6 +61,12 @@ fail("invalid_input", "name is required", {"arg": "name"})  # stdout error + exi
 
 Used by `registry.py`. Tool authors don't usually touch this directly.
 
+A parsed manifest is kept for the life of the process and reused while the file's
+modification time and size are unchanged, so an edited manifest is read again without
+a restart. The object you get back is shared: treat it as read-only. A test that
+rewrites a manifest inside the same clock tick with the same length calls
+`clear_manifest_cache()` first.
+
 ## google_auth.py — shared Google OAuth (multi-account)
 
 All Google tools (calendar, contacts, mail, drive, sheets, docs, slides) share

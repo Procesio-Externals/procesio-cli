@@ -90,6 +90,14 @@ requires:
     check: '{python} -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); p.chromium.executable_path; p.stop()"'
     install: uv run playwright install chromium
 
+# On the PROCESIO platform: the user's AI assistant API key (AI assistant settings), turned into
+# a procesio API-key profile for the turn's workspace. Kept ABOVE `actions:` - gen_manifest
+# rewrites everything after that line, so a block placed below it is lost on regeneration.
+procesio_credential:
+  template: PROCESIO_API_KEY
+  label: PROCESIO
+  adapter: procesio-profile
+
 actions:
 - name: add-credential
   description: Store a new credential profile (apikey or userpass) in Credential Manager.
@@ -2584,12 +2592,24 @@ actions:
     required: false
     description: fetch from archived storage
 - name: flow-digest
-  description: 'Readable Markdown digest of flows (offline): variable contract, nodes in execution order, each node''s script/SQL/HTTP/subprocess parameters with variable and flow ids resolved to names. --in a file or a directory; --out writes one .md per flow + INDEX.md.'
+  description: 'Readable Markdown digest of flows: variable contract, nodes in execution order, each node''s script/SQL/HTTP/subprocess parameters with variable and flow ids resolved to names. --in a file, a directory, or a live process id (the cheapest way to read a live process''s inputs/outputs - the raw get-projects-by-id answer is hundreds of KB); --out writes one .md per flow + INDEX.md.'
   args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
   - name: in
     type: string
     required: true
-    description: a flow JSON / API envelope / .procesio bundle file, OR a directory of them (every *.json is read; subprocess targets resolve to titles across the set)
+    description: a flow JSON / API envelope / .procesio bundle file, OR a directory of them (every *.json is read; subprocess targets resolve to titles across the set), OR the id (GUID) of a live process, read from the workspace
   - name: out
     type: string
     required: false
@@ -3072,16 +3092,28 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-digest
-  description: 'Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables resolved to names, MAP_FORM_DATA conditions, scripts saved beside. --out adds FORM-PROCESS-MAP.md.'
+  description: 'Readable Markdown digest of forms: structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables resolved to names, MAP_FORM_DATA conditions, scripts saved beside. --in a file, a directory, or a live form id; --processes a directory or live process ids (the cheapest way to check a live form''s process mapping). --out adds FORM-PROCESS-MAP.md.'
   args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
   - name: in
     type: string
     required: true
-    description: a form template JSON (form-get output) or a directory of them; a sibling <id>.code.json (form-get-code output) adds the global CSS/JS
+    description: a form template JSON (form-get output) or a directory of them; a sibling <id>.code.json (form-get-code output) adds the global CSS/JS. OR the id (GUID) of a live form, read from the workspace (global CSS/JS not included)
   - name: processes
     type: string
     required: false
-    description: directory of process JSON (API envelope / flow) to name RUN_PROCESS targets and their variables
+    description: directory of process JSON (API envelope / flow) to name RUN_PROCESS targets and their variables, OR comma-separated live process ids
   - name: out
     type: string
     required: false
@@ -7137,12 +7169,24 @@ actions:
     required: false
     description: send importDataStores=false (default true)
 - name: inspect-flow
-  description: 'Structural summary of a flow (offline): counts, action families, branches, subprocess calls, resources, variables, advisory smells.'
+  description: 'Structural summary of a flow: counts, action families, branches, subprocess calls, resources, variables, advisory smells. --in a file, raw JSON, or a live process id.'
   args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
   - name: in
     type: string
     required: true
-    description: '.procesio export or flow JSON: a path, ''-'' for stdin, or raw JSON'
+    description: '.procesio export or flow JSON: a path, ''-'' for stdin, raw JSON, or the id (GUID) of a live process, read from the workspace'
   - name: flow-id
     type: string
     required: false
@@ -12018,12 +12062,24 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: read-flow-graph
-  description: Parse a .procesio export/flow into a node/edge graph model (offline). --resource-map for the cross-process graph.
+  description: Parse a .procesio export/flow into a node/edge graph model. --in a file, raw JSON, or a live process id. --resource-map for the cross-process graph.
   args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
   - name: in
     type: string
     required: true
-    description: '.procesio export or flow JSON: a path, ''-'' for stdin, or raw JSON'
+    description: '.procesio export or flow JSON: a path, ''-'' for stdin, raw JSON, or the id (GUID) of a live process, read from the workspace'
   - name: flow-id
     type: string
     required: false

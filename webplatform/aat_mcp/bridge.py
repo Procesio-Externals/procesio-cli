@@ -14,9 +14,12 @@ from __future__ import annotations
 
 import contextvars
 import difflib
+import functools
 import json
 import os
 import sys
+import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -26,11 +29,18 @@ from typing import Any
 _REPO = Path(__file__).resolve().parents[2]
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
+_HERE = str(Path(__file__).resolve().parent)
+if _HERE not in sys.path:
+    sys.path.insert(0, _HERE)  # sibling modules (turn_credentials) however bridge is imported
 
+import metrics  # noqa: E402  (sibling module: runtime metrics, off unless a listener runs)
 import registry  # noqa: E402
+import turn_credentials  # noqa: E402  (sibling module: Web-Api credential lookup per turn)
+from tools._lib.manifest import PROCESIO_TEMPLATE_IDS  # noqa: E402
 from tools._lib.skill_resources import read_text_resource, resource_index  # noqa: E402
 from dashboard.server import runner  # noqa: E402  (shared shell-to-script bridge)
 from tools._lib import accounting  # noqa: E402  (per-work-unit accounting seam, P0.0-05)
+from tools._lib import httptrace  # noqa: E402  (the trace of a tool's HTTP requests)
 
 # Per-request user id (multi-user web platform). Set by the aat-mcp HTTP server from a
 # SERVER-ESTABLISHED header (the authenticated session), NEVER from model output. Read
@@ -108,12 +118,29 @@ def _managed_turn_refusal(agent: str, action: str | None) -> dict | None:
         return None
     if (agent.lower(), (action or "").lower()) not in _managed_turn_block():
         return None
+    metrics.refusal("managed_turn")
     return {"ok": False, "refused": {
         "agent": agent, "action": action, "reason": "managed_turn",
         "message": (f"'{agent} {action}' starts a second orchestration loop, and this turn is already "
                     f"one step of an externally-managed plan. Do the concrete increment yourself with "
                     f"run_tool / run_agent, then end your reply with the control line you were given."),
     }}
+
+
+# Per-request TURN TOKEN (PROCESIO platform turns). Set by the HTTP server from the
+# X-AAT-Turn-Token header the worker writes into that turn's opencode config - never from
+# model output. Its only use here is asking Web-Api for credentials; it is never handed to
+# a tool subprocess.
+_turn_token_ctx: "contextvars.ContextVar" = contextvars.ContextVar("aat_turn_token", default=None)
+
+
+def set_turn_token(token: str | None):
+    """Set the current request's turn token; returns a token for reset_turn_token()."""
+    return _turn_token_ctx.set(token or None)
+
+
+def reset_turn_token(token) -> None:
+    _turn_token_ctx.reset(token)
 
 
 def _user_env() -> dict | None:
@@ -125,6 +152,249 @@ def _user_env() -> dict | None:
     if ws:
         env["AAT_WORKSPACE_ID"] = str(ws)
     return env or None
+
+
+def _secret_manifests(kind: str, name: str) -> list:
+    """The manifests of the tools whose secrets this run can need: the tool itself, or every
+    tool an agent drives - each only if it declares a secret. Unknown names yield nothing;
+    the run then fails on its own terms, not here."""
+    try:
+        names = [name] if kind == "tool" else list(getattr(registry.get_agent(name), "tools", []) or [])
+    except Exception:  # noqa: BLE001
+        return []
+    out = []
+    for tool in names:
+        try:
+            manifest = registry.get_tool(tool)
+        except Exception:  # noqa: BLE001
+            continue
+        if getattr(manifest, "secrets", None):
+            out.append(manifest)
+    return out
+
+
+def _secrets_from_credential(manifest, values: dict[str, str],
+                             secrets: dict[str, dict[str, str]]) -> str | None:
+    """Fill `secrets` with what the manifest maps from one credential's fields ({be_id: value}).
+
+    Returns a sentence for the model when the credential lacks a mapped field; None when every
+    mapped secret was found."""
+    missing = []
+    for secret, be_id in manifest.procesio_credential.map.items():
+        value = values.get(be_id)
+        if not value:
+            missing.append(be_id)
+            continue
+        # A shared `namespace:name` secret is read by creds.get(namespace, name).
+        namespace, _, secret_name = secret.rpartition(":")
+        secrets.setdefault(namespace or manifest.name, {})[secret_name] = value
+    if missing:
+        return (f"The PROCESIO credential chosen for {manifest.credential_label()} has no "
+                f"{', '.join(missing)} value. Do not retry with it: the user has to fill it in, or "
+                f"choose another credential.")
+    return None
+
+
+# The profile name the procesio tool sees on the platform. One per turn, built from the user's AI
+# assistant API key; the tool resolves it as its default, exactly as it would a locally stored one.
+_PROCESIO_PROFILE = "platform"
+
+
+def _procesio_profile(manifest, key: "turn_credentials.ProcesioKey",
+                      secrets: dict[str, dict[str, str]]) -> None:
+    """The procesio tool does not read flat secrets: it reads a profile index, a default profile
+    name and one JSON profile (tools/procesio/profiles.py). Build that from the user's API key,
+    plus what only the platform knows: this turn's workspace and the Web-Api URL.
+
+    An API-key profile never writes back (only user/password profiles cache a token), so the
+    read-only per-turn secrets are enough - nothing of it reaches the disk."""
+    profile = {"type": "apikey", "key": key.key, "value": key.value}
+    workspace = key.workspace_id or _workspace_ctx.get()
+    if workspace:
+        profile["workspace_id"] = str(workspace)
+    # The same Web-Api this server fetches credentials from; AAT_PROCESIO_WEB_BASE overrides it
+    # when the tool must go through another address (a public gateway, say).
+    web_base = os.environ.get("AAT_PROCESIO_WEB_BASE") or os.environ.get("AAT_WEBAPI_URL")
+    if web_base:
+        profile["web_base"] = web_base.rstrip("/")
+    secrets[manifest.name] = {
+        "credentials": json.dumps([{"name": _PROCESIO_PROFILE, "type": "apikey"}]),
+        "default-profile": _PROCESIO_PROFILE,
+        f"cred-{_PROCESIO_PROFILE}": json.dumps(profile),
+    }
+
+
+def _candidates(manifest, key: "turn_credentials.ProcesioKey",
+                turn_token: str) -> "turn_credentials.ToolCredentials":
+    """The user's credentials that could serve this tool: of its template, on one of its hosts."""
+    spec = manifest.procesio_credential
+    template_id = spec.template_id()
+    if not spec.hosts:
+        return turn_credentials.fetch_tool_credentials(key, template_id, None, turn_token)
+    merged: dict[str, dict] = {}
+    for host in spec.hosts:
+        found = turn_credentials.fetch_tool_credentials(key, template_id, host, turn_token)
+        if found.message:
+            return found
+        for item in found.items:
+            merged.setdefault(item["id"], item)
+    return turn_credentials.ToolCredentials(items=list(merged.values()))
+
+
+def _choose(manifest, found: "turn_credentials.ToolCredentials",
+            requested: str | None) -> tuple[dict | None, str | None]:
+    """Pick the credential a tool runs with, or say why none was picked.
+
+    One candidate is used as is - unless it is a REST API credential and the tool names no host:
+    a REST API credential says nothing about which service it is for, so then even a single one
+    could belong to anything else and is never sent unasked. Several: the model has to name one
+    (`credential` on run_tool), after asking the user or trying them in turn."""
+    if found.message:
+        return None, found.message
+    spec = manifest.procesio_credential
+    label = manifest.credential_label()
+    items = found.items
+    names = ", ".join(f"'{c['name']}'" for c in items)
+    if requested:
+        wanted = requested.strip().lower()
+        named = [c for c in items if c["name"].strip().lower() == wanted or c["id"].lower() == wanted]
+        if len(named) == 1:
+            return named[0], None
+        return None, (f"No single PROCESIO credential named '{requested}' fits {label}. "
+                      + (f"The ones that fit: {names}." if items else "None fits.")
+                      + " Call this tool again with one of those names as credential.")
+    if not items:
+        kind = "REST API" if spec.template_id() == _REST_API_TEMPLATE_ID else spec.template
+        where = f" whose URL is on {' or '.join(spec.hosts)}" if spec.hosts else ""
+        return None, (f"The user has no PROCESIO {kind} credential{where} for {label}. Do not retry: "
+                      f"the user has to create one in PROCESIO (Credentials) first.")
+    if len(items) == 1 and (spec.hosts or spec.template_id() != _REST_API_TEMPLATE_ID):
+        return items[0], None
+    return None, (f"Several PROCESIO credentials could be used for {label}: {names}. Ask the user which "
+                  f"one to use (or try them in turn), then call this tool again with credential='<name>'.")
+
+
+_REST_API_TEMPLATE_ID = PROCESIO_TEMPLATE_IDS["REST_API"]
+
+
+def _no_key_refusal(message: str) -> dict:
+    """The answer to a call that needs PROCESIO credentials when the turn has no usable key. The
+    tool is not started: without the key it can only fail, and a failing tool invites the model to
+    try another one, each attempt costing a run of the turn."""
+    return {"ok": False, "error": {
+        "code": "procesio_key_unavailable",
+        "message": (f"{message} No tool that uses PROCESIO credentials can run in this turn. Stop calling "
+                    f"tools now: end your reply by telling the user what to fix.")}}
+
+
+def _run_timeout() -> float:
+    """How long one tool or agent call may run before it is stopped (AAT_TOOL_TIMEOUT_SECONDS,
+    default 180). A process save validates and writes a whole flow, which outlives a minute."""
+    try:
+        return max(1.0, float(os.environ.get("AAT_TOOL_TIMEOUT_SECONDS", "180")))
+    except ValueError:
+        return 180.0
+
+
+_PERSONAL_WORKSPACE = "00000000-0000-0000-0000-000000000000"
+
+
+def _workspace_refusal(kind: str, name: str, args: dict | None) -> dict | None:
+    """A turn's API key belongs to the turn's workspace only, so a tool on that key that is told
+    to act in ANOTHER workspace (--workspace-id) can only be refused by PROCESIO (403) - after a
+    full tool start. Answer that here, at once, and say which workspace the turn is in. The
+    turn's own workspace (or none given) passes. The personal workspace is Guid.Empty, which the
+    request context holds as None."""
+    if not isinstance(args, dict):
+        return None
+    asked = next((args[k] for k in ("workspace-id", "workspace_id", "workspaceId") if args.get(k)), None)
+    if not asked:
+        return None
+    turn_ws = (_workspace_ctx.get() or _PERSONAL_WORKSPACE).lower()
+    if str(asked).strip().lower() == turn_ws:
+        return None
+    if not any(m.procesio_credential is not None and m.procesio_credential.is_api_key()
+               for m in _secret_manifests(kind, name)):
+        return None
+    where = "the user's personal workspace" if turn_ws == _PERSONAL_WORKSPACE else f"workspace {turn_ws}"
+    metrics.refusal("workspace_out_of_turn")
+    return {"ok": False, "error": {
+        "code": "workspace_out_of_turn",
+        "message": (f"This turn runs in {where}, and its PROCESIO API key is valid only there. Do not pass "
+                    f"--workspace-id {asked}: call the tool without --workspace-id. Resources in other "
+                    f"workspaces cannot be reached from this turn.")}}
+
+
+# What a tool reports when PROCESIO rejected the key it was given (tools/procesio/errors.py).
+_AUTH_FAILURE_CODES = {"auth_required", "permission_denied", "unauthorized", "forbidden"}
+
+
+def _after_auth_failure(kind: str, name: str, turn_token: str, res: dict) -> dict:
+    """A tool that runs on the turn's API key gets the key itself, so only its result says the key
+    was revoked mid-turn. On a 401/403 from such a tool, ask Web-Api once whether the key stands:
+    if not, this answer and every later call of the turn say so and the model is told to stop."""
+    err = res.get("error") if isinstance(res, dict) else None
+    if res.get("ok", False) or not isinstance(err, dict) or err.get("code") not in _AUTH_FAILURE_CODES:
+        return res
+    if not any(m.procesio_credential is not None and m.procesio_credential.is_api_key()
+               for m in _secret_manifests(kind, name)):
+        return res
+    # Calls started in parallel with the old key all come back refused: once one of them found the
+    # key revoked, the rest read that from the turn's memory instead of asking Web-Api again.
+    known = turn_credentials.fetch_key(turn_token)
+    key = known if not known.key else turn_credentials.recheck_key(turn_token)
+    if key.key:
+        return res  # the key stands: a plain missing permission, the tool's own answer is right
+    return _no_key_refusal(key.message or "The AI assistant's PROCESIO API key was revoked.")
+
+
+def _turn_env(kind: str, name: str, turn_token: str, credential: str | None = None) -> dict | None:
+    """Environment for a subprocess run inside a PROCESIO turn.
+
+    The subprocess does NOT inherit the container's environment (runner is called with
+    inherit_env=False): it gets a safe base plus exactly this. Credentials are read for THIS
+    turn's user, for THESE tools only, and reach the tool through the env backend - so no shared
+    secret, no other tool's secret, and not the turn token itself ever reach a tool. Isolation
+    between turns is free: the process dies with its env.
+
+    The turn token buys one thing: the user's AI assistant API key. Everything else is read with
+    that key, so a tool gets exactly the credentials its user can see. turn_credentials keeps both
+    in memory for the rest of the turn (see its module docstring), so a turn's many tool calls ask
+    Web-Api once; nothing reaches the disk.
+
+    Returns None when the turn has no usable PROCESIO key but this tool needs one: the caller
+    answers with _no_key_refusal instead of starting it."""
+    secrets: dict[str, dict[str, str]] = {}
+    hints: list[str] = []
+    key = None  # fetched once, and only when a tool needs PROCESIO credentials
+    for manifest in _secret_manifests(kind, name):
+        spec = manifest.procesio_credential
+        if spec is None:
+            hints.append(f"'{manifest.name}' cannot use PROCESIO credentials yet (its manifest declares no "
+                         f"procesio_credential). Do not retry this tool.")
+            continue
+        if key is None:
+            key = turn_credentials.fetch_key(turn_token)
+        if not key.key:
+            metrics.refusal("procesio_key_unavailable")  # the caller answers without starting the tool
+            return None
+        if spec.is_api_key():
+            _procesio_profile(manifest, key, secrets)
+            continue
+        chosen, problem = _choose(manifest, _candidates(manifest, key, turn_token), credential)
+        if chosen is not None:
+            problem = _secrets_from_credential(manifest, chosen["values"], secrets)
+        if problem:
+            hints.append(problem)
+
+    env = dict(_user_env() or {})
+    env["AAT_CREDS_BACKEND"] = "env"
+    env["AAT_SECRETS_JSON"] = json.dumps(secrets)
+    if hints:
+        # creds.get() appends this to its "missing credential" error, so the model reads
+        # WHY and what fixes it instead of rediscovering the tool (see creds.MISSING_HINT_ENV).
+        env["AAT_CREDS_MISSING_HINT"] = " ".join(dict.fromkeys(hints))
+    return env
 
 # Tools that cannot run in a container (browser/profile, DB driver, media system libs).
 # When AAT_HOST_RUNNER_URL is set, these (and agents that drive them) are executed on
@@ -256,24 +526,86 @@ def _full(entry: dict, kind: str) -> dict:
 
 
 _REG_CACHE: dict = {}
+_REG_LOCK = threading.Lock()
+
+
+def _registry_stamp() -> tuple:
+    """What a registry scan is made from: every manifest's path, modification time and size,
+    and the names hidden from this session. Equal stamps mean a new scan would read the same
+    files. A few hundred `stat` calls, against parsing and re-reporting every manifest."""
+    files = []
+    for root, pattern in ((registry.TOOLS_DIR, "*/tool.yaml"), (registry.AGENTS_DIR, "*/agent.yaml"),
+                          (registry.SKILLS_DIR, "*/SKILL.md")):
+        for path in sorted(root.glob(pattern)):
+            try:
+                stat = path.stat()
+            except OSError:
+                continue
+            files.append((str(path), stat.st_mtime_ns, stat.st_size))
+    return tuple(sorted(registry.hidden_tools())), tuple(files)
+
+
+def _readiness_is_fixed() -> bool:
+    """True when which secrets are present cannot change while this process runs.
+
+    A scan also reports readiness (`missing_secrets`), and that part is not in the files: on a
+    workstation someone stores a credential and the next listing has to show the tool ready. The
+    env backend is the exception - it reads AAT_SECRETS_JSON once, when it is first used - and it
+    is the one a container runs on."""
+    return (os.environ.get("AAT_CREDS_BACKEND") or "").strip().lower() in ("env", "envjson", "env-json")
 
 
 def _scan_registry():
-    """Cache the registry scan (parse ~74 manifests + per-secret presence checks) for a
-    short TTL. In a running container the registry is static and the model calls
-    capabilities several times per loop; without this each call re-parses every manifest
-    and re-checks every secret. AAT_REGISTRY_TTL seconds (0 = off)."""
+    """The registry as (tools, agents, skills), scanned at most once per AAT_REGISTRY_TTL
+    seconds (default 30; 0 = scan on every call).
+
+    When that time is up the scan is repeated only if it could come out different: a manifest
+    changed, or credentials can appear while the process runs (see _readiness_is_fixed). In a
+    container neither happens, so the registry is scanned once and after that the cost of a call
+    is the stamp. Callers that arrive while a scan runs wait for it instead of each starting
+    their own: a scan is CPU work, and several at once only make every one of them slower."""
     ttl = float(os.environ.get("AAT_REGISTRY_TTL", "30") or 0)
-    if ttl > 0:
+    if ttl <= 0:
+        return _scan_registry_now()
+    hit = _REG_CACHE.get("data")
+    if hit is not None and hit[1] > time.monotonic():
+        return hit[0]
+    with _REG_LOCK:
         hit = _REG_CACHE.get("data")
         if hit is not None and hit[1] > time.monotonic():
-            return hit[0]
+            return hit[0]  # another caller scanned while this one waited
+        stamp = _registry_stamp()
+        if hit is not None and len(hit) > 2 and hit[2] == stamp and _readiness_is_fixed():
+            scanned = hit[0]
+        else:
+            scanned = _scan_registry_now()
+        _REG_CACHE["data"] = (scanned, time.monotonic() + ttl, stamp)
+        return scanned
+
+
+def _scan_registry_now():
     tools = registry.list_tools()
     agents = registry.list_agents({t["name"]: t for t in tools})
     skills = registry.list_skills()
-    if ttl > 0:
-        _REG_CACHE["data"] = ((tools, agents, skills), time.monotonic() + ttl)
+    if metrics.enabled():
+        _index_metric_names(tools, agents)
     return tools, agents, skills
+
+
+def warm_registry() -> threading.Thread:
+    """Scan the registry in the background, so the first caller of a server that has just
+    started waits for a scan already under way instead of starting it. Never raises: a scan
+    that fails here is simply made again by the first call that needs it."""
+    def scan() -> None:
+        try:
+            _scan_registry()
+        except Exception as e:  # noqa: BLE001
+            print(f"[aat-mcp] registry warm-up failed ({type(e).__name__}); the first call scans again",
+                  file=sys.stderr, flush=True)
+
+    thread = threading.Thread(target=scan, name="aat-registry-warm-up", daemon=True)
+    thread.start()
+    return thread
 
 
 # --- targeted discovery ---------------------------------------------------
@@ -655,10 +987,149 @@ def capabilities(kind: str | None = None, name: str | None = None,
     return {"count": len(out), "capabilities": out}
 
 
-def run_tool(tool: str, action: str | None, args: dict[str, Any] | None) -> dict:
+# What a metric may carry as its `tool` and `action` labels: {kind: {name: its declared actions}},
+# as of the last registry scan. It is kept apart from _REG_CACHE because it has to answer without
+# ever scanning: a label is looked up at the end of every call, and a scan there (seconds, on a
+# cold cache) would be paid by the caller. Empty while metrics are off.
+_METRIC_NAMES: dict[str, dict[str, frozenset]] = {}
+
+
+def _index_metric_names(tools: list, agents: list) -> None:
+    """Refresh _METRIC_NAMES from a registry scan. Never raises: a label is not worth a failed scan."""
+    try:
+        _METRIC_NAMES.update(
+            tool={e["name"]: frozenset(_action_names(e)) for e in tools if e.get("name")},
+            agent={e["name"]: frozenset(_action_names(e)) for e in agents if e.get("name")})
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def warm_metric_labels() -> threading.Thread:
+    """Scan the registry once, in the background, so that calls carry their labels from the start
+    instead of from the first `capabilities` call on. Until it ends a call is labelled `unknown`."""
+    def scan() -> None:
+        try:
+            tools, agents, _ = _scan_registry()
+            _index_metric_names(tools, agents)
+        except Exception as e:  # noqa: BLE001
+            print(f"[aat-metrics] registry scan for the metric labels failed ({type(e).__name__}); "
+                  f"calls are labelled 'unknown' until the next scan", file=sys.stderr, flush=True)
+
+    thread = threading.Thread(target=scan, name="aat-metrics-labels", daemon=True)
+    thread.start()
+    return thread
+
+
+def _metric_labels(kind: str, name, action) -> tuple[str, str]:
+    """The (tool, action) label values of one call. Both arrive from the model, so a name is used
+    only when the registry lists it, and an action only when that capability declares it."""
+    actions = _METRIC_NAMES.get(kind, {}).get(name) if isinstance(name, str) else None
+    if actions is None:
+        return metrics.UNKNOWN, metrics.UNKNOWN
+    if not action:
+        return name, metrics.NONE
+    return name, action if isinstance(action, str) and action in actions else metrics.UNKNOWN
+
+
+# The file the current call's subprocess appends its HTTP requests to (tools/_lib/httptrace.py),
+# or None: metrics are off, or the file could not be made. Set around each measured call.
+_http_trace_ctx: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "aat_http_trace", default=None)
+_HTTP_TRACE_DIR: list[str] = []
+_HTTP_TRACE_DIR_LOCK = threading.Lock()
+
+
+def _open_http_trace() -> str | None:
+    """An empty file for one call's HTTP trace, or None. Never raises.
+
+    A tool runs as a uid of its own (runner._run_isolated) and its private HOME is removed with
+    it, so the file lives here instead: in a folder of this process that others can enter but
+    not list, under a random name, writable by anyone who was given the name. What comes back in
+    it is read as untrusted input (metrics.http_trace)."""
+    try:
+        with _HTTP_TRACE_DIR_LOCK:
+            if not _HTTP_TRACE_DIR or not os.path.isdir(_HTTP_TRACE_DIR[0]):
+                folder = tempfile.mkdtemp(prefix="aat-http-trace-")
+                os.chmod(folder, 0o711)
+                _HTTP_TRACE_DIR[:] = [folder]
+            folder = _HTTP_TRACE_DIR[0]
+        fd, path = tempfile.mkstemp(prefix="call-", dir=folder)
+        os.close(fd)
+        os.chmod(path, 0o666)
+        return path
+    except Exception:  # noqa: BLE001 - no trace is not a reason to fail a call
+        return None
+
+
+def _take_http_trace(path: str) -> str | None:
+    """What the call wrote to its trace file, which is then removed. Never raises."""
+    try:
+        with open(path, "rb") as f:
+            data = f.read(metrics.HTTP_TRACE_MAX_BYTES)
+        return data.decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        try:
+            os.unlink(path)
+        except OSError:
+            pass
+
+
+def _with_http_trace(env: dict | None) -> dict | None:
+    """`env` plus the variable that tells the subprocess where to note its HTTP requests, when
+    this call has a trace file. Unchanged otherwise."""
+    path = _http_trace_ctx.get()
+    if not path:
+        return env
+    return {**(env or {}), httptrace.ENV: path}
+
+
+def _timed_out(result) -> bool:
+    error = result.get("error") if isinstance(result, dict) else None
+    return isinstance(error, dict) and error.get("code") == "timeout"
+
+
+def _measured(kind: str):
+    """Record every call of the wrapped run_tool / run_agent in the runtime metrics: how long it
+    took, whether it succeeded, that it is running, and the HTTP requests its subprocess noted.
+    Changes nothing about the call - the arguments, the result and any exception pass through
+    untouched - and costs nothing while metrics are off."""
+    def wrap(fn):
+        @functools.wraps(fn)
+        def call(*args, **kwargs):
+            if not metrics.enabled():
+                return fn(*args, **kwargs)
+            # The first parameter is named after the kind (tool= / agent=), the second is action.
+            name = args[0] if args else kwargs.get(kind)
+            action = args[1] if len(args) > 1 else kwargs.get("action")
+            trace = _open_http_trace()
+            token = _http_trace_ctx.set(trace)
+            result = None
+            seen = None
+            try:
+                with metrics.tool_call(kind, lambda: _metric_labels(kind, name, action)) as seen:
+                    result = seen.result = fn(*args, **kwargs)
+                    return result
+            finally:
+                _http_trace_ctx.reset(token)
+                if trace:
+                    metrics.http_trace(_take_http_trace(trace), kind,
+                                       getattr(seen, "tool", metrics.UNKNOWN),
+                                       getattr(seen, "action", metrics.UNKNOWN), _timed_out(result))
+        return call
+    return wrap
+
+
+@_measured("tool")
+def run_tool(tool: str, action: str | None, args: dict[str, Any] | None,
+             credential: str | None = None) -> dict:
     """Execute a tool. args is a JSON object -> --flags via runner.flags_from
     (dict/list values are JSON-encoded into ONE argv element; no shell). Host-only
-    tools are delegated to the host-runner when AAT_HOST_RUNNER_URL is set."""
+    tools are delegated to the host-runner when AAT_HOST_RUNNER_URL is set.
+
+    credential: inside a PROCESIO turn, the name of the PROCESIO credential to use when several
+    fit the tool (the previous call listed them). Ignored outside a turn."""
     # Wrap in a per-work-unit accounting span (no-op locally; the platform injects a
     # sink that acquires an EE slot + emits TrackAction - spec P0.0-05 / seam S2).
     with accounting.work_unit("tool", ws=_workspace_ctx.get(),
@@ -669,10 +1140,24 @@ def run_tool(tool: str, action: str | None, args: dict[str, Any] | None) -> dict
         if os.environ.get("AAT_HOST_RUNNER_URL") and _is_host_only("tool", tool):
             return _delegate("tool", tool, action, args)
         argv = ([action] if action else []) + runner.flags_from(args)
-        return runner.run_tool(tool, argv, env=_user_env())
+        turn_token = _turn_token_ctx.get()
+        if turn_token:
+            refusal = _workspace_refusal("tool", tool, args)
+            if refusal is not None:
+                return refusal
+            env = _turn_env("tool", tool, turn_token, credential)
+            if env is None:
+                return _no_key_refusal(turn_credentials.fetch_key(turn_token).message)
+            return _after_auth_failure("tool", tool, turn_token,
+                                       runner.run_tool(tool, argv, env=_with_http_trace(env),
+                                                       inherit_env=False,
+                                                       timeout=_run_timeout()))
+        return runner.run_tool(tool, argv, env=_with_http_trace(_user_env()), timeout=_run_timeout())
 
 
-def run_agent(agent: str, action: str | None, args: dict[str, Any] | None) -> dict:
+@_measured("agent")
+def run_agent(agent: str, action: str | None, args: dict[str, Any] | None,
+              credential: str | None = None) -> dict:
     refusal = _managed_turn_refusal(agent, action)
     if refusal is not None:
         return refusal
@@ -684,7 +1169,19 @@ def run_agent(agent: str, action: str | None, args: dict[str, Any] | None) -> di
         if os.environ.get("AAT_HOST_RUNNER_URL") and _is_host_only("agent", agent):
             return _delegate("agent", agent, action, args)
         argv = ([action] if action else []) + runner.flags_from(args)
-        return runner.run_agent(agent, argv, env=_user_env())
+        turn_token = _turn_token_ctx.get()
+        if turn_token:
+            refusal = _workspace_refusal("agent", agent, args)
+            if refusal is not None:
+                return refusal
+            env = _turn_env("agent", agent, turn_token, credential)
+            if env is None:
+                return _no_key_refusal(turn_credentials.fetch_key(turn_token).message)
+            return _after_auth_failure("agent", agent, turn_token,
+                                       runner.run_agent(agent, argv, env=_with_http_trace(env),
+                                                        inherit_env=False,
+                                                        timeout=_run_timeout()))
+        return runner.run_agent(agent, argv, env=_with_http_trace(_user_env()), timeout=_run_timeout())
 
 
 def get_skill(name: str) -> dict:

@@ -6,6 +6,10 @@ the existing scripts as a subprocess, so each runs in its own venv-correct proce
 exactly as it does from the terminal - the dashboard never reimplements a tool's
 logic or its credential handling.
 
+One caller is different: a run inside a PROCESIO turn (`inherit_env=False`). There the
+tool's or agent's entry point is started directly, without the launcher script - see
+_run_entry for why.
+
 Every well-behaved tool emits exactly one JSON object on stdout (io.emit / io.fail)
 and logs to stderr, so we parse stdout as JSON and keep stderr for diagnostics.
 """
@@ -13,8 +17,12 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import signal
 import subprocess
 import sys
+import tempfile
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -23,8 +31,9 @@ VENV_PY = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
 
 
 def python_exe() -> str:
-    """The interpreter to launch scripts with. Prefer the project venv; the
-    scripts also self-reexec into it, so this is belt-and-suspenders."""
+    """The interpreter to launch with. Prefer the project venv. The launcher scripts also
+    re-run themselves under it, but a run inside a turn starts no launcher script, so
+    there this choice is the only one made."""
     return str(VENV_PY) if VENV_PY.exists() else sys.executable
 
 
@@ -47,16 +56,149 @@ def flags_from(args: dict[str, Any] | None) -> list[str]:
     return out
 
 
+# What a subprocess may inherit when it must NOT see the parent's environment (a tool run
+# inside a PROCESIO turn, see run_script inherit_env). Enough to start Python, find the
+# venv, resolve user data, reach the network and write temp files - and nothing that can
+# carry a secret. Names are exact; the prefixes cover locale and interpreter settings.
+# Extend per deployment with AAT_TOOL_ENV_ALLOW (comma-separated names), never with a
+# secret's name.
+_SAFE_ENV_NAMES = {
+    "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "OS",
+    "TEMP", "TMP", "TMPDIR", "HOME", "USERPROFILE", "USERNAME", "HOMEDRIVE", "HOMEPATH",
+    "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "PROGRAMFILES", "PROGRAMFILES(X86)",
+    "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE", "TZ", "LANG", "LANGUAGE",
+    "VIRTUAL_ENV", "PLAYWRIGHT_BROWSERS_PATH",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
+    "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
+    "AAT_USERDATA_DIR",
+}
+_SAFE_ENV_PREFIXES = ("LC_", "PYTHON", "XDG_")
+
+
+def _safe_base_env() -> dict[str, str]:
+    extra = {n.strip() for n in os.environ.get("AAT_TOOL_ENV_ALLOW", "").split(",") if n.strip()}
+    allowed = _SAFE_ENV_NAMES | extra
+    return {k: v for k, v in os.environ.items()
+            if k in allowed or k.upper() in allowed or k.upper().startswith(_SAFE_ENV_PREFIXES)}
+
+
+# Process isolation for tools run inside a PROCESIO turn (inherit_env=False) on a POSIX host where
+# this process is root - the aat-runtime container. Each such subprocess runs as its OWN
+# unprivileged uid, drawn from AAT_TOOL_UID_RANGE ("first-last") and held until the process group
+# is gone, with the shared group AAT_TOOL_GID for the user-data folder. A tool then cannot read
+# another tool's /proc/<pid>/environ (another user's secrets) nor this server's (its service code
+# and bearer token): /proc/<pid>/environ is readable by the same uid only. Unset = no isolation
+# (local runs, Windows), exactly as before.
+_uid_lock = threading.Lock()
+_uids_in_use: set[int] = set()
+
+
+def _isolation() -> tuple[range, int] | None:
+    spec = os.environ.get("AAT_TOOL_UID_RANGE", "").strip()
+    if not spec or os.name != "posix" or os.geteuid() != 0:
+        return None
+    try:
+        first, last = (int(p) for p in spec.split("-", 1))
+        gid = int(os.environ.get("AAT_TOOL_GID", str(first)))
+    except ValueError:
+        return None
+    return (range(first, last + 1), gid) if 0 < first <= last else None
+
+
+def _take_uid(uids: range) -> int:
+    with _uid_lock:
+        for uid in uids:
+            if uid not in _uids_in_use:
+                _uids_in_use.add(uid)
+                return uid
+    raise RuntimeError("no free tool uid: raise AAT_TOOL_UID_RANGE")
+
+
+def _release_uid(uid: int) -> None:
+    with _uid_lock:
+        _uids_in_use.discard(uid)
+
+
+def _run_isolated(cmd: list[str], stdin_text: str | None, timeout: float,
+                  proc_env: dict[str, str], uids: range, gid: int) -> dict[str, Any]:
+    """Run `cmd` as a fresh uid, in its own session, with a private HOME/TMP that is removed after."""
+    uid = _take_uid(uids)
+    home = tempfile.mkdtemp(prefix=f"aat-tool-{uid}-")
+    proc: subprocess.Popen | None = None
+    try:
+        os.chown(home, uid, gid)
+        os.chmod(home, 0o700)
+        env = {**proc_env, "HOME": home, "TMPDIR": home, "TEMP": home, "TMP": home,
+               "PYTHONDONTWRITEBYTECODE": "1"}
+        proc = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            text=True, encoding="utf-8", errors="replace", cwd=str(PROJECT_ROOT), env=env,
+            user=uid, group=gid, extra_groups=[], umask=0o007, start_new_session=True,
+        )
+        try:
+            stdout, stderr = proc.communicate(stdin_text, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            # What the tool printed before it was stopped says where it was stuck.
+            _, stderr = proc.communicate()
+            tail = (stderr or "")[-1500:].strip()
+            return {"returncode": -1, "stdout": "",
+                    "stderr": f"timeout after {timeout}s" + (f"; last stderr:\n{tail}" if tail else ""),
+                    "timed_out": True, "cmd": cmd}
+        return {"returncode": proc.returncode, "stdout": stdout, "stderr": stderr,
+                "timed_out": False, "cmd": cmd}
+    finally:
+        # Nothing of this call may outlive it under a uid the next call is handed: the whole
+        # session goes, including anything the tool left running in the background.
+        if proc is not None:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+        shutil.rmtree(home, ignore_errors=True)
+        _release_uid(uid)
+
+
 def run_script(script_rel: str, argv: list[str], *, stdin_text: str | None = None,
-               timeout: float = 60.0, env: dict[str, str] | None = None) -> dict[str, Any]:
+               timeout: float = 60.0, env: dict[str, str] | None = None,
+               inherit_env: bool = True) -> dict[str, Any]:
     """Run scripts/<script_rel> with argv. Returns raw process result.
 
     `env` overlays extra environment on the inherited env (e.g. AAT_USER_ID for the
     multi-user web platform, so userdata + creds resolve per-user in the subprocess).
+
+    `inherit_env=False` starts the subprocess from a SAFE BASE (_SAFE_ENV_NAMES) instead of
+    this process's whole environment, then overlays `env`. The AAT MCP server uses it for
+    tools run inside a PROCESIO turn: the container's own secrets (shared AAT_SECRETS_JSON,
+    service codes, bearer tokens) must not reach a tool, which gets only what `env` gives it.
+
     Never raises on a non-zero exit - the caller inspects returncode/stdout."""
     script = PROJECT_ROOT / "scripts" / script_rel
     cmd = [python_exe(), str(script), *argv]
-    proc_env = {**os.environ, **env} if env else None
+    return _run_command(cmd, stdin_text=stdin_text, timeout=timeout, env=env, inherit_env=inherit_env)
+
+
+def _run_command(cmd: list[str], *, stdin_text: str | None = None, timeout: float = 60.0,
+                 env: dict[str, str] | None = None, inherit_env: bool = True) -> dict[str, Any]:
+    """Run one command from the project root and return the raw process result (see run_script
+    for `env` and `inherit_env`)."""
+    if not inherit_env:
+        # AAT_RUNNER=0, and last so nothing can turn it back on: a tool run inside a turn never
+        # goes through the shared warm runner. A worker there outlives the call and keeps what it
+        # loaded for it, the caller's credentials included.
+        proc_env = {**_safe_base_env(), **(env or {}), "AAT_RUNNER": "0"}
+        isolation = _isolation()
+        if isolation is not None:
+            return _run_isolated(cmd, stdin_text, timeout, proc_env, *isolation)
+    else:
+        proc_env = {**os.environ, **env} if env else None
     try:
         proc = subprocess.run(
             cmd, input=stdin_text, capture_output=True, text=True,
@@ -90,20 +232,63 @@ def _parse_json(text: str) -> Any:
 
 
 def run_tool(tool: str, argv: list[str], *, timeout: float = 60.0,
-             env: dict[str, str] | None = None) -> dict[str, Any]:
+             env: dict[str, str] | None = None, inherit_env: bool = True) -> dict[str, Any]:
     """Run a tool via scripts/run-tool.py and normalize the outcome.
 
     Returns {ok, data, error, returncode, stderr}. `ok` is True only when the
     process exited 0 AND stdout parsed to a non-error JSON object. `env` overlays
-    extra environment (e.g. AAT_USER_ID for per-user isolation)."""
-    res = run_script("run-tool.py", [tool, *argv], timeout=timeout, env=env)
+    extra environment (e.g. AAT_USER_ID for per-user isolation); `inherit_env=False`
+    starts from a safe base instead of this process's environment (see run_script)."""
+    if inherit_env:
+        res = run_script("run-tool.py", [tool, *argv], timeout=timeout, env=env)
+    else:
+        res = _run_entry("tool", tool, argv, timeout=timeout, env=env)
     return _normalize(res)
 
 
 def run_agent(agent: str, argv: list[str], *, timeout: float = 120.0,
-              env: dict[str, str] | None = None) -> dict[str, Any]:
-    res = run_script("run-agent.py", [agent, *argv], timeout=timeout, env=env)
+              env: dict[str, str] | None = None, inherit_env: bool = True) -> dict[str, Any]:
+    if inherit_env:
+        res = run_script("run-agent.py", [agent, *argv], timeout=timeout, env=env)
+    else:
+        res = _run_entry("agent", agent, argv, timeout=timeout, env=env)
     return _normalize(res)
+
+
+def _refused(cmd: list[str], returncode: int, message: str) -> dict[str, Any]:
+    """The process result of a call that was not started, shaped like one that was."""
+    return {"returncode": returncode, "stdout": "", "stderr": message, "timed_out": False, "cmd": cmd}
+
+
+def _run_entry(kind: str, name: str, argv: list[str], *, timeout: float,
+               env: dict[str, str] | None) -> dict[str, Any]:
+    """Start a tool's or an agent's entry point itself, for a run inside a PROCESIO turn.
+
+    scripts/run-tool.py and run-agent.py do two things before they start the entry point: try
+    the warm runner, which a turn never uses (see _run_command), and look the name up in the
+    registry. This process has already read that manifest, so doing both again in a second
+    interpreter is start-up time on every call and nothing else. The answers to a name that
+    cannot be started are the scripts' own, word for word, so a caller reads the same error.
+
+    The lookup happens HERE, in the server, so what the server hides (AAT_TOOLS_HIDE) is
+    refused here too - the tool process never sees that variable and could not refuse it."""
+    if str(PROJECT_ROOT) not in sys.path:
+        sys.path.insert(0, str(PROJECT_ROOT))
+    import registry
+
+    label = [f"<{kind}>", name, *argv]
+    try:
+        manifest = registry.get_tool(name) if kind == "tool" else registry.get_agent(name)
+    except KeyError as e:
+        return _refused(label, 2, f"error: {e}")
+    except Exception as e:  # noqa: BLE001 - an unreadable manifest is this call's error, not the server's
+        return _refused(label, 1, f"error: {type(e).__name__}: {e}")
+    if manifest.path is None:
+        return _refused(label, 2, f"error: manifest for {name} has no path")
+    entry = manifest.path / manifest.entrypoint
+    if not entry.exists():
+        return _refused(label, 2, f"error: entrypoint not found: {entry}")
+    return _run_command([python_exe(), str(entry), *argv], timeout=timeout, env=env, inherit_env=False)
 
 
 def _normalize(res: dict[str, Any]) -> dict[str, Any]:
