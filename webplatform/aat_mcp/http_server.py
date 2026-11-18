@@ -10,6 +10,8 @@ tenant). GET returns 405 (no server-initiated stream is needed for these tools).
 Run:  python webplatform/aat_mcp/http_server.py --host 0.0.0.0 --port 8901 [--token X]
 Auth: if --token or AAT_MCP_HTTP_TOKEN is set, requests must send
       `Authorization: Bearer <token>` (use for any non-loopback bind).
+Metrics: if AAT_METRICS_PORT is set, a second listener on that port serves Prometheus text at
+      /metrics, without authentication and with nothing else on it (metrics.py). Unset or 0 = off.
 """
 from __future__ import annotations
 
@@ -21,9 +23,12 @@ import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import metrics  # noqa: E402  (runtime metrics on their own port; off unless AAT_METRICS_PORT is set)
 import server  # noqa: E402  (reuse handle/TOOLS/dispatch)
+import turn_token as turn_token_reader  # noqa: E402
 
 PATH = "/mcp"
+_MCP_TOOL_NAMES = frozenset(t["name"] for t in server.TOOLS)  # the only values of the mcp_tool label
 
 
 def _make_handler(token: str | None):
@@ -80,16 +85,35 @@ def _make_handler(token: str | None):
                      "error": {"code": -32700, "message": "parse error"}}).encode())
                 return
 
-            # Server-established user (multi-user platform). The auth gateway sets
-            # X-AAT-User; it is NEVER taken from the JSON-RPC body / model output. Bound
-            # for this request only, so the tool subprocess runs as that user.
-            uid = self.headers.get("X-AAT-User") or None
+            # Who this request runs as. Never from the JSON-RPC body / model output; bound for
+            # this request only, so the tool subprocess runs as that user.
+            #
+            # A PROCESIO turn carries X-AAT-Turn-Token (the worker writes it into that turn's
+            # opencode config). Its payload names the workspace and user, and it is the only
+            # identity used then - X-AAT-User / X-AAT-Workspace are ignored, so a header cannot
+            # contradict the token. The payload is read, not verified (only Web-Api holds the
+            # key): it scopes user data locally, while credentials stay Web-Api's decision.
+            #
+            # Without a token (local driver, dashboard) the older X-AAT-User header still works.
+            turn_token = (self.headers.get(turn_token_reader.HEADER) or "").strip() or None
+            claims = turn_token_reader.read(turn_token)
+            if turn_token and claims is None:
+                # Malformed or expired: run without it rather than as someone. Tools that need
+                # no credential still work; the rest report "could not be resolved".
+                self.log_message("ignoring an unreadable or expired turn token")
+                turn_token = None
+            if claims is not None:
+                uid, ws = claims["user"], claims["workspace"]
+            else:
+                uid, ws = self.headers.get("X-AAT-User") or None, None
             _utok = server.bridge.set_user(uid)
+            _wtok = server.bridge.set_workspace(ws)
+            _ttok = server.bridge.set_turn_token(turn_token)
             # Same rule for the managed-turn flag: it comes from the CALLER's config (the worker sets
             # it on every turn it drives), never from the JSON-RPC body, so the model cannot clear it
             # to unlock a competing orchestration loop.
-            _mtok = server.bridge.set_managed_turn(
-                (self.headers.get("X-AAT-Managed-Turn") or "").strip().lower() in ("1", "true", "yes"))
+            managed = (self.headers.get("X-AAT-Managed-Turn") or "").strip().lower() in ("1", "true", "yes")
+            _mtok = server.bridge.set_managed_turn(managed)
             try:
                 batch = msg if isinstance(msg, list) else [msg]
                 responses = []
@@ -101,11 +125,14 @@ def _make_handler(token: str | None):
                         is_initialize = True
                     # Legacy era only: modern Streamable HTTP requires the Mcp-Method / Mcp-Name
                     # header rules, which this transport does not implement.
-                    resp = server.handle(m, modern=False)
+                    with metrics.mcp_request(m, _MCP_TOOL_NAMES) as seen:
+                        resp = seen.response = server.handle(m, modern=False)
                     if resp is not None:
                         responses.append(resp)
             finally:
                 server.bridge.reset_managed_turn(_mtok)
+                server.bridge.reset_turn_token(_ttok)
+                server.bridge.reset_workspace(_wtok)
                 server.bridge.reset_user(_utok)
 
             if not responses:
@@ -128,6 +155,13 @@ def main() -> int:
     sys.stderr.write(f"[aat-mcp-http] listening on http://{a.host}:{a.port}{PATH} "
                      f"(auth: {'on' if a.token else 'off'})\n")
     sys.stderr.flush()
+    # After the port is bound, and in the background: the health probe answers at once, and the
+    # first tool call does not start the registry scan itself.
+    server.bridge.warm_registry()
+    # Never fatal: a metrics port that cannot be opened is logged. The label scan waits for the
+    # warm-up above and reuses its result instead of scanning again.
+    if metrics.start_listener(a.host) is not None:
+        server.bridge.warm_metric_labels()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

@@ -13,8 +13,8 @@ so a fresh install can be verified in one command instead of by incident.
   python scripts/check-requirements.py --json
   python scripts/check-requirements.py --quiet     # only what's missing
 
-Exit code: 0 if nothing REQUIRED is missing (self-installing ones are warnings),
-1 otherwise — so it can gate an onboarding run.
+Exit code: 0 if nothing REQUIRED is missing (self-installing ones and `optional`
+ones - needed only on machines that use that tool - are warnings), 1 otherwise — so it can gate an onboarding run.
 """
 from __future__ import annotations
 
@@ -78,7 +78,8 @@ def collect(only: str | None = None) -> list[dict]:
             present, detail = cache[req.name]
             rows.append({
                 "tool": tool.name, "requirement": req.name, "kind": req.kind,
-                "present": present, "auto": req.auto, "detail": detail,
+                "present": present, "auto": req.auto, "optional": req.optional,
+                "detail": detail,
                 "why": req.why.strip(), "install": req.install,
             })
     return rows
@@ -95,7 +96,7 @@ def main() -> None:
     if args.as_json:
         print(json.dumps({"requirements": rows}, indent=1))
     missing = [r for r in rows if not r["present"]]
-    blocking = [r for r in missing if not r["auto"]]
+    blocking = [r for r in missing if not (r["auto"] or r["optional"])]
 
     if not args.as_json:
         by_req: dict[str, list[dict]] = {}
@@ -105,7 +106,8 @@ def main() -> None:
             first = group[0]
             if first["present"] and args.quiet:
                 continue
-            mark = "OK  " if first["present"] else ("WARN" if first["auto"] else "MISS")
+            warn_only = all(g["auto"] or g["optional"] for g in group)
+            mark = "OK  " if first["present"] else ("WARN" if warn_only else "MISS")
             tools = ", ".join(sorted({g["tool"] for g in group}))
             print(f"[{mark}] {name} ({first['kind']}) — needed by {len(set(t['tool'] for t in group))} tool(s)")
             print(f"       {tools}")
@@ -118,6 +120,8 @@ def main() -> None:
                     print(f"       install: {first['install']}")
                 if first["auto"]:
                     print("       (self-installing on first use — warning, not a blocker)")
+                elif warn_only:
+                    print("       (optional: needed only on machines that use this tool — warning, not a blocker)")
             print()
         if not missing:
             print("All declared machine requirements are present.")

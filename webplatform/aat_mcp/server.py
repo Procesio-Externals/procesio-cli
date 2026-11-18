@@ -34,6 +34,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bridge  # noqa: E402  (sibling module)
 import gate  # noqa: E402
+import metrics  # noqa: E402  (runtime metrics, off unless a listener runs)
 import protocol  # noqa: E402  (shared MCP mechanics)
 
 SERVER_INFO = {"name": "aat-mcp", "version": "0.2.0"}
@@ -45,6 +46,9 @@ _RUN_TOOL_SCHEMA = {
         "tool": {"type": "string", "description": "registered tool name"},
         "action": {"type": "string", "description": "action name (omit for a flat tool)"},
         "args": {"type": "object", "description": "flag name -> value (objects/arrays pass cleanly)"},
+        "credential": {"type": "string", "description": (
+            "PROCESIO credential name to use, ONLY when a previous call said several credentials "
+            "fit this tool and listed them")},
     },
     "required": ["tool"],
 }
@@ -54,6 +58,9 @@ _RUN_AGENT_SCHEMA = {
         "agent": {"type": "string", "description": "registered agent name"},
         "action": {"type": "string", "description": "action name"},
         "args": {"type": "object", "description": "flag name -> value"},
+        "credential": {"type": "string", "description": (
+            "PROCESIO credential name to use, ONLY when a previous call said several credentials "
+            "fit and listed them")},
     },
     "required": ["agent"],
 }
@@ -187,6 +194,11 @@ def _log(msg: str) -> None:
     print(f"[aat-mcp] {msg}", file=sys.stderr, flush=True)
 
 
+# Refusals the bridge raises for a turn (bridge._no_key_refusal / _workspace_refusal): final for
+# the turn, so they reach the model as they are, without the generic retry hint.
+_FINAL_REFUSAL_CODES = {"procesio_key_unavailable", "workspace_out_of_turn"}
+
+
 def _run(kind: str, arguments: dict, confirmed: bool) -> tuple[dict, bool]:
     """Execute a tool/agent through the reversibility gate.
 
@@ -201,6 +213,7 @@ def _run(kind: str, arguments: dict, confirmed: bool) -> tuple[dict, bool]:
 
     if not confirmed and not verdict["reversible"]:
         # Plain tool refuses an irreversible action and names the confirmed path.
+        metrics.refusal("approval_required")
         return {"approval_required": {
             key: target, "action": action, "verb": verdict["verb"],
             "blast_class": verdict["blast_class"], "reason": verdict["reason"],
@@ -211,12 +224,20 @@ def _run(kind: str, arguments: dict, confirmed: bool) -> tuple[dict, bool]:
 
     if confirmed and not verdict["reversible"] and gate.deny_irreversible_env():
         # Headless fail-safe: no human in the seat to approve.
+        metrics.refusal("irreversible_denied")
         return {"refused": ("irreversible action denied (AAT_MCP_DENY_IRREVERSIBLE "
                             "is set; no human in the seat)"),
                 "verb": verdict["verb"], "blast_class": verdict["blast_class"]}, True
 
     runner = bridge.run_tool if kind == "tool" else bridge.run_agent
-    res = runner(target, action, arguments.get("args"))
+    # Only when given: most callers never name a credential.
+    credential = arguments.get("credential")
+    res = runner(target, action, arguments.get("args"), **({"credential": credential} if credential else {}))
+    err_code = (res.get("error") or {}).get("code") if isinstance(res.get("error"), dict) else None
+    if not res.get("ok", False) and err_code in _FINAL_REFUSAL_CODES:
+        # The platform's own answer that no retry can fix: the generic hint below ("this does
+        # NOT mean you lack access ... retry") would contradict it and send the model looping.
+        return res, True
     if not res.get("ok", False):
         # Recovery hint so the driver re-discovers instead of guessing again, falling
         # back to bash, or claiming it lacks access (observed with weaker models on a

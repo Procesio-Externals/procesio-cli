@@ -181,7 +181,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `flow-digest` | `--in` | Readable Markdown digest of flows (offline): variable contract, nodes in execution order, each node's script/SQL/HTTP/subprocess parameters with variable and… |
+| `flow-digest` | `--in` | Readable Markdown digest of flows: variable contract, nodes in execution order, each node's script/SQL/HTTP/subprocess parameters with variable and flow ids… |
 | `flow-lint` | `--id` | Designer-layer 'Process Errors' lint on a live flow (the check that blocks designer SAVE, which POST /Projects/validate does NOT catch): stale subprocess… |
 
 ### form
@@ -193,7 +193,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-delete` | `--id` | Delete a resource by id (DELETE /api/FormTemplate/{id}). |
 | `form-delete-element` | `--id`, `--element` | Remove one control from a LIVE form: out of Data.elements, out of the form's data model, and out of its container's own list - leaving every other element's id… |
 | `form-delete-saved-statement` | `--form-id`, `--query-id` | Remove one saved Data Store query from a form (by id or name). Refused while an element event still runs it, unless --allow-referenced. Returns the removed… |
-| `form-digest` | `--in` | Readable Markdown digest of forms (offline): structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process… |
+| `form-digest` | `--in` | Readable Markdown digest of forms: structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables… |
 | `form-duplicate` | `--id` | POST /api/FormTemplate/{id}/duplicate. |
 | `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |
 | `form-get` | `--id` | Get one resource by id (GET /api/FormTemplate/{id}). |
@@ -363,7 +363,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `inspect-flow` | `--in` | Structural summary of a flow (offline): counts, action families, branches, subprocess calls, resources, variables, advisory smells. |
+| `inspect-flow` | `--in` | Structural summary of a flow: counts, action families, branches, subprocess calls, resources, variables, advisory smells. --in a file, raw JSON, or a live… |
 
 ### layout
 
@@ -585,7 +585,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 
 | action | required args | what it does |
 |---|---|---|
-| `read-flow-graph` | `--in` | Parse a .procesio export/flow into a node/edge graph model (offline). --resource-map for the cross-process graph. |
+| `read-flow-graph` | `--in` | Parse a .procesio export/flow into a node/edge graph model. --in a file, raw JSON, or a live process id. --resource-map for the cross-process graph. |
 
 ### relayout
 

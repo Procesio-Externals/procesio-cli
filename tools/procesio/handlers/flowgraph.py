@@ -1,13 +1,19 @@
-"""Offline structural reader actions over a .procesio export / live flow DTO.
+"""Structural reader actions over a .procesio export / live flow DTO.
 
 `read-flow-graph` returns the canonical node/edge graph model (the substrate the canvas
-layout tool and inspect-flow build on). No network; reads a file, '-' (stdin), or a raw
-JSON string.
+layout tool and inspect-flow build on). --in is a file, '-' (stdin), a raw JSON string, or
+the id of a live process, which is then read from the workspace (the only network call).
+
+Why a process id is accepted: a live flow is hundreds of KB, so an agent whose host keeps
+large tool output in a local file cannot hand that file to a tool that runs elsewhere (a
+container does not see the agent host's disk). Reading by id lets the tool fetch the flow
+itself and return only the summary, in one call.
 """
 from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -15,12 +21,45 @@ from tools.procesio.actiondef import ActionDef
 from tools.procesio import errors
 from tools.procesio.flowmodel import read_bundle, read_flow
 from tools.procesio.flowmodel.inspect import inspect as _inspect
+from tools.procesio.handlers.common import add_profile_arg
+
+_GUID = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+_IN_HELP = (".procesio export or flow JSON: a path, '-' for stdin, raw JSON, or the id (GUID) of a "
+            "live process, read from the workspace")
 
 
-def _load_in(value: str) -> str:
-    """Resolve --in to a JSON string: '-' = stdin, an existing path = file, else literal."""
+def _process_id(value: str) -> str | None:
+    """`value` when it is a process id rather than something on disk."""
+    value = (value or "").strip()
+    if not _GUID.match(value):
+        return None
+    try:
+        if Path(value).exists():
+            return None
+    except OSError:
+        pass
+    return value
+
+
+def _fetch_live(args, resource_id: str, route: str = "/api/Projects/"):
+    """GET {route}{id} (a process by default, a form with /api/FormTemplate/) with the action's
+    --profile / --workspace-id / --environment."""
+    from tools.procesio.client import ProcesioClient
+    client = ProcesioClient(getattr(args, "profile", None), environment=getattr(args, "environment", None))
+    if getattr(args, "workspace_id", None):
+        client.workspace_id = args.workspace_id
+    return client.get(f"{route}{resource_id}")
+
+
+def _load_in(value: str, args=None) -> str:
+    """Resolve --in to a JSON string: '-' = stdin, an existing path = file, a process id = the
+    live flow, else literal."""
     if value == "-":
         return sys.stdin.read()
+    pid = _process_id(value)
+    if pid is not None and args is not None:
+        return json.dumps(_fetch_live(args, pid))
     try:
         p = Path(value)
         if p.exists() and p.is_file():
@@ -31,8 +70,8 @@ def _load_in(value: str) -> str:
 
 
 def _in_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--in", dest="in_path", required=True,
-                   help=".procesio export or flow JSON: a path, '-' for stdin, or raw JSON")
+    add_profile_arg(p)
+    p.add_argument("--in", dest="in_path", required=True, help=_IN_HELP)
     p.add_argument("--flow-id", dest="flow_id",
                    help="which flow when the bundle has more than one")
     p.add_argument("--resource-map", dest="resource_map", action="store_true",
@@ -40,7 +79,7 @@ def _in_args(p: argparse.ArgumentParser) -> None:
 
 
 def read_flow_graph(args) -> dict:
-    raw = _load_in(args.in_path)
+    raw = _load_in(args.in_path, args)
     try:
         obj = json.loads(raw)
     except json.JSONDecodeError as e:
@@ -51,14 +90,14 @@ def read_flow_graph(args) -> dict:
 
 
 def _inspect_args(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--in", dest="in_path", required=True,
-                   help=".procesio export or flow JSON: a path, '-' for stdin, or raw JSON")
+    add_profile_arg(p)
+    p.add_argument("--in", dest="in_path", required=True, help=_IN_HELP)
     p.add_argument("--flow-id", dest="flow_id",
                    help="which flow when the bundle has more than one")
 
 
 def inspect_flow(args) -> dict:
-    raw = _load_in(args.in_path)
+    raw = _load_in(args.in_path, args)
     try:
         obj = json.loads(raw)
     except json.JSONDecodeError as e:
@@ -67,9 +106,11 @@ def inspect_flow(args) -> dict:
 
 
 def _digest_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
     p.add_argument("--in", dest="in_path", required=True,
                    help="a flow JSON / API envelope / .procesio bundle file, OR a directory of them "
-                        "(every *.json is read; subprocess targets resolve to titles across the set)")
+                        "(every *.json is read; subprocess targets resolve to titles across the set), "
+                        "OR the id (GUID) of a live process, read from the workspace")
     p.add_argument("--out", dest="out_dir",
                    help="write one <slug>.md per flow + INDEX.md here; omit to return the Markdown inline")
     p.add_argument("--names", dest="names",
@@ -85,16 +126,20 @@ def _slug(title: str) -> str:
 
 def flow_digest(args) -> dict:
     from tools.procesio.flowmodel import digest as _d
-    src = Path(args.in_path)
-    paths = sorted(src.glob("*.json")) if src.is_dir() else [src]
-    if not paths:
-        raise errors.UsageError(f"--in {args.in_path}: no .json files")
     flows = []
-    for p in paths:
-        try:
-            flows += _d.unwrap(json.loads(p.read_text(encoding="utf-8")))
-        except (json.JSONDecodeError, OSError) as e:
-            raise errors.UsageError(f"{p}: {e}")
+    pid = _process_id(args.in_path)
+    if pid is not None:
+        flows = _d.unwrap(_fetch_live(args, pid))
+    else:
+        src = Path(args.in_path)
+        paths = sorted(src.glob("*.json")) if src.is_dir() else [src]
+        if not paths:
+            raise errors.UsageError(f"--in {args.in_path}: no .json files")
+        for p in paths:
+            try:
+                flows += _d.unwrap(json.loads(p.read_text(encoding="utf-8")))
+            except (json.JSONDecodeError, OSError) as e:
+                raise errors.UsageError(f"{p}: {e}")
     names = {f.get("id"): _d._title(f) for f in flows if f.get("id")}
     if args.names:
         try:
@@ -122,27 +167,37 @@ def flow_digest(args) -> dict:
 
 
 def _form_digest_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
     p.add_argument("--in", dest="in_path", required=True,
                    help="a form template JSON (form-get output) or a directory of them; a sibling "
-                        "<id>.code.json (form-get-code output) adds the global CSS/JS")
+                        "<id>.code.json (form-get-code output) adds the global CSS/JS. OR the id (GUID) "
+                        "of a live form, read from the workspace (global CSS/JS not included)")
     p.add_argument("--processes", dest="processes",
                    help="directory of process JSON (API envelope / flow) to name RUN_PROCESS targets "
-                        "and their variables")
+                        "and their variables, OR comma-separated live process ids")
     p.add_argument("--out", dest="out_dir",
                    help="write <slug>.md + <slug>/ (scripts, global form.js/form.css) per form and "
                         "FORM-PROCESS-MAP.md here; omit to return the Markdown inline")
 
 
+def _live_ids(value: str | None) -> list[str] | None:
+    """`value` as a list of process ids when every comma-separated part is one, else None."""
+    parts = [p.strip() for p in (value or "").split(",") if p.strip()]
+    ids = [_process_id(p) for p in parts]
+    return ids if parts and all(ids) else None
+
+
 def form_digest(args) -> dict:
     from tools.procesio.flowmodel import digest as _d
     from tools.procesio.flowmodel import formdigest as _fd
-    src = Path(args.in_path)
-    paths = ([p for p in sorted(src.glob("*.json")) if not p.name.endswith(".code.json")]
-             if src.is_dir() else [src])
-    if not paths:
-        raise errors.UsageError(f"--in {args.in_path}: no form .json files")
     processes: dict = {}
-    if args.processes:
+    live_processes = _live_ids(args.processes)
+    if live_processes:
+        for pid in live_processes:
+            for f in _d.unwrap(_fetch_live(args, pid)):
+                if f.get("id"):
+                    processes[f["id"]] = f
+    elif args.processes:
         for p in sorted(Path(args.processes).glob("*.json")):
             try:
                 for f in _d.unwrap(json.loads(p.read_text(encoding="utf-8"))):
@@ -151,6 +206,16 @@ def form_digest(args) -> dict:
             except (json.JSONDecodeError, OSError):
                 continue
     forms = []
+    form_id = _process_id(args.in_path)  # a GUID that is not on disk: a live form id
+    if form_id is not None:
+        forms.append((_fd.unwrap(_fetch_live(args, form_id, "/api/FormTemplate/")), {}))
+        paths = []
+    else:
+        src = Path(args.in_path)
+        paths = ([p for p in sorted(src.glob("*.json")) if not p.name.endswith(".code.json")]
+                 if src.is_dir() else [src])
+        if not paths:
+            raise errors.UsageError(f"--in {args.in_path}: no form .json files")
     for p in paths:
         try:
             form = _fd.unwrap(json.loads(p.read_text(encoding="utf-8")))
@@ -204,26 +269,31 @@ def form_digest(args) -> dict:
 ACTIONS = {
     "form-digest": ActionDef(
         func=form_digest, add_args=_form_digest_args, needs_client=False,
-        description="Readable Markdown digest of forms (offline): structure tree, every element / "
+        description="Readable Markdown digest of forms: structure tree, every element / "
                     "form-level event, RUN_PROCESS input/output maps with form paths and process "
                     "variables resolved to names, MAP_FORM_DATA conditions, scripts saved beside. "
+                    "--in a file, a directory, or a live form id; --processes a directory or live "
+                    "process ids (the cheapest way to check a live form's process mapping). "
                     "--out adds FORM-PROCESS-MAP.md.",
     ),
     "flow-digest": ActionDef(
         func=flow_digest, add_args=_digest_args, needs_client=False,
-        description="Readable Markdown digest of flows (offline): variable contract, nodes in "
+        description="Readable Markdown digest of flows: variable contract, nodes in "
                     "execution order, each node's script/SQL/HTTP/subprocess parameters with "
-                    "variable and flow ids resolved to names. --in a file or a directory; --out "
-                    "writes one .md per flow + INDEX.md.",
+                    "variable and flow ids resolved to names. --in a file, a directory, or a live "
+                    "process id (the cheapest way to read a live process's inputs/outputs - the "
+                    "raw get-projects-by-id answer is hundreds of KB); --out writes one .md per "
+                    "flow + INDEX.md.",
     ),
     "read-flow-graph": ActionDef(
         func=read_flow_graph, add_args=_in_args, needs_client=False,
-        description="Parse a .procesio export/flow into a node/edge graph model "
-                    "(offline). --resource-map for the cross-process graph.",
+        description="Parse a .procesio export/flow into a node/edge graph model. --in a file, "
+                    "raw JSON, or a live process id. --resource-map for the cross-process graph.",
     ),
     "inspect-flow": ActionDef(
         func=inspect_flow, add_args=_inspect_args, needs_client=False,
-        description="Structural summary of a flow (offline): counts, action families, "
-                    "branches, subprocess calls, resources, variables, advisory smells.",
+        description="Structural summary of a flow: counts, action families, branches, "
+                    "subprocess calls, resources, variables, advisory smells. --in a file, raw "
+                    "JSON, or a live process id.",
     ),
 }

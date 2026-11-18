@@ -7,6 +7,11 @@ from typing import Any
 
 RESOURCE_CATEGORIES = ("references", "scripts", "assets")
 MAX_TEXT_BYTES = 512_000
+# Longest file or folder name accepted, in UTF-8 bytes: the common filesystem limit. Checked
+# before the disk is touched, because the operating systems disagree on a longer name - Linux
+# raises "name too long", Windows answers "not found" - and the caller must get the same answer
+# everywhere.
+MAX_NAME_BYTES = 255
 
 
 class SkillResourceError(ValueError):
@@ -77,6 +82,10 @@ def _requested_path(requested: str) -> PurePosixPath:
     if len(path.parts) < 2 or path.parts[0] not in RESOURCE_CATEGORIES:
         allowed = ", ".join(f"{item}/" for item in RESOURCE_CATEGORIES)
         raise SkillResourceError(f"resource path must start with one of: {allowed}")
+    if any(len(part.encode("utf-8")) > MAX_NAME_BYTES for part in path.parts):
+        raise SkillResourceError(
+            f"resource path has a name longer than {MAX_NAME_BYTES} bytes"
+        )
     return path
 
 

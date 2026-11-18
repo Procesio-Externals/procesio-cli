@@ -1,12 +1,58 @@
 """Tool and agent manifest loading + validation."""
 from __future__ import annotations
 
+import threading
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+# libyaml's safe loader where PyYAML was built with it, the pure-Python one otherwise. Both are
+# safe loaders and read a manifest into the same data; the C one is several times faster, which
+# matters because a large manifest is read on every tool call (tests/test_manifest_loading.py
+# holds the two to the same result for every manifest in the repo).
+_YAML_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
+def _parse_yaml(text: str) -> Any:
+    return yaml.load(text, Loader=_YAML_LOADER)  # noqa: S506 - a safe loader either way
+
+
+# Parsed manifests of this process: path -> ((mtime_ns, size), manifest). A manifest is read
+# again only when its file changed, so a long-lived process (the MCP server, the dashboard) pays
+# for each one once instead of on every lookup. What comes back is the SHARED object: read it,
+# never change it.
+_LOADED: dict[str, tuple[tuple[int, int], Any]] = {}
+_LOADED_LOCK = threading.Lock()
+
+
+def clear_manifest_cache() -> None:
+    """Forget every parsed manifest. For tests, and for a caller that rewrote one in place
+    faster than the file's timestamp can show."""
+    with _LOADED_LOCK:
+        _LOADED.clear()
+
+
+def _load_manifest(manifest_path: Path, model: type):
+    """The manifest at `manifest_path` as `model`, from this process's memory while the file is
+    unchanged. The lock is held while one is parsed, so callers that arrive together wait for
+    that one parse instead of each doing their own."""
+    stat = manifest_path.stat()
+    stamp = (stat.st_mtime_ns, stat.st_size)
+    key = str(manifest_path)
+    with _LOADED_LOCK:
+        hit = _LOADED.get(key)
+        if hit is not None and hit[0] == stamp:
+            return hit[1]
+        raw = _parse_yaml(manifest_path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict):
+            raise ValueError(f"{manifest_path}: top-level YAML must be a mapping")
+        manifest = model(**raw)
+        manifest.path = manifest_path.parent
+        _LOADED[key] = (stamp, manifest)
+        return manifest
 
 
 class ArgSpec(BaseModel):
@@ -116,6 +162,10 @@ class RequirementSpec(BaseModel):
     - `install`: how to get it (a winget id, a documented command).
     - `auto`: the tool installs it itself on first use, so a missing one is a
       warning rather than a blocker (ffmpeg does this via tools/_lib/ffmpeg.py).
+    - `optional`: only machines that USE this tool need it (a client product one
+      team installs and another never does), so a missing one is a warning with
+      its install pointer, never a blocker of the onboarding gate. Without it, a
+      tool for one team makes the check fail on every other team's machine.
     """
     model_config = ConfigDict(extra="forbid")
 
@@ -125,6 +175,73 @@ class RequirementSpec(BaseModel):
     check: str = ""
     install: str = ""
     auto: bool = False
+    optional: bool = False
+
+
+# PROCESIO's built-in credential templates, by the name their `Type` carries, as the id Web-Api
+# reports them (credentials_template.Gid read through Guid.ToByteArray - which is why the second
+# group reads 0001 while the stored hex reads 0100). CUSTOM is deliberately absent: every custom
+# template shares that Type, so a custom one must be named by its id.
+PROCESIO_TEMPLATE_IDS = {
+    "REST_API": "10101010-0001-0000-0000-aaaaaaaaaaaa",
+    "SMTP": "20202020-0001-0000-0000-aaaaaaaaaaaa",
+    "AI_OPENAI_COMPATIBLE": "27272727-0001-0000-0000-aaaaaaaaaaaa",
+    "FTP": "30303030-0001-0000-0000-aaaaaaaaaaaa",
+    "DB": "40404040-0001-0000-0000-aaaaaaaaaaaa",
+    "REDIS": "80808080-0001-0000-0000-aaaaaaaaaaaa",
+}
+
+
+# Not a template: the PROCESIO API key the user generated for the AI assistant (AI assistant
+# settings). A tool naming it acts on PROCESIO itself, with that user's permissions.
+PROCESIO_API_KEY = "PROCESIO_API_KEY"
+
+
+class ProcesioCredentialSpec(BaseModel):
+    """Where this tool's secrets come from on the PROCESIO platform.
+
+    During a PROCESIO turn the AAT MCP server reads them with the turn user's own API key, so a tool
+    gets exactly the credentials that user can see. For a template, it asks Web-Api for the user's
+    credentials of that template (api/aat/tool-credentials), each as `{be_id: value}`, and builds
+    the tool's secrets from `map`. Web-Api knows nothing about AAT's secret names - the pair
+    (template, be_id) is the whole contract.
+
+    - `template`: where the secrets come from:
+        * a built-in Type name - REST_API or AI_OPENAI_COMPATIBLE, the two a tool may read - or a
+          template id. `map` says which field is which secret.
+        * `PROCESIO_API_KEY` - the user's AI assistant API key itself, turned into secrets by
+          `adapter`. For a tool that acts on PROCESIO.
+    - `map`: this tool's secret name -> the be_id holding it (`Value`, `Password`, `UserName`,
+      `URL`, ...). A `namespace:name` secret (shared, e.g. `google:oauth-token`) is mapped under
+      that same name.
+    - `hosts`: the hosts a credential's URL must be on for this tool to pick it, e.g.
+      `api.github.com`, or `*.atlassian.net` for any subdomain. Empty: every credential of the
+      template is a candidate. A REST API credential carries no notion of which service it is for,
+      so without hosts a workspace's process credentials are all candidates too.
+    - `adapter`: build the tool's secrets in code instead of by `map`. `procesio-profile` (for
+      PROCESIO_API_KEY): the key becomes a procesio API-key profile.
+    - `label`: how the service is named to the model and the user, e.g. in "create a REST API
+      credential for GitHub"; defaults to the tool name.
+
+    When several credentials match, the model picks one by name (run_tool's `credential`). Without
+    this block a tool with secrets cannot get them inside a PROCESIO turn.
+    """
+    model_config = ConfigDict(extra="forbid")
+
+    template: str
+    map: dict[str, str] = Field(default_factory=dict)
+    hosts: list[str] = Field(default_factory=list)
+    adapter: Literal["procesio-profile"] | None = None
+    label: str | None = None
+
+    def is_api_key(self) -> bool:
+        return self.template.strip().upper() == PROCESIO_API_KEY
+
+    def template_id(self) -> str | None:
+        """The template id Web-Api is asked for; None for PROCESIO_API_KEY."""
+        if self.is_api_key():
+            return None
+        return PROCESIO_TEMPLATE_IDS.get(self.template.strip().upper(), self.template.strip().lower())
 
 
 class ActionSpec(BaseModel):
@@ -164,10 +281,38 @@ class ToolManifest(BaseModel):
     healthcheck: HealthcheckSpec | None = None
     web_session: WebSessionSpec | None = None
     requires: list[RequirementSpec] = Field(default_factory=list)
+    procesio_credential: ProcesioCredentialSpec | None = None
     output_schema: str = ""
     examples: list[dict] = Field(default_factory=list)
     # path is filled by the loader; not part of the YAML
     path: Path | None = None
+
+    @model_validator(mode="after")
+    def _procesio_credential_is_consistent(self) -> "ToolManifest":
+        spec = self.procesio_credential
+        if spec is None:
+            return self
+        declared = {s.name for s in self.secrets}
+        # A map entry for a secret the tool does not declare would fill a name nothing reads,
+        # and the tool would fail later as "missing credential" with the mapping looking fine.
+        unknown = sorted(set(spec.map) - declared)
+        if unknown:
+            raise ValueError(f"procesio_credential.map names undeclared secrets: {unknown}")
+        if spec.is_api_key():
+            if spec.adapter is None or spec.map or spec.hosts:
+                raise ValueError("procesio_credential PROCESIO_API_KEY takes an adapter, and no map or hosts")
+        elif spec.adapter is not None or not spec.map:
+            raise ValueError("procesio_credential needs a map (and no adapter) for a PROCESIO template")
+        return self
+
+    def credential_template_id(self) -> str | None:
+        """The PROCESIO template this tool's credential is read from; None without one."""
+        return None if self.procesio_credential is None else self.procesio_credential.template_id()
+
+    def credential_label(self) -> str:
+        """How the service this tool needs a credential for is named to the model and the user."""
+        spec = self.procesio_credential
+        return (spec.label if spec is not None else None) or self.name
 
     def is_action_based(self) -> bool:
         return len(self.actions) > 0
@@ -183,12 +328,7 @@ class ToolManifest(BaseModel):
 
 
 def load_tool(manifest_path: Path) -> ToolManifest:
-    raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"{manifest_path}: top-level YAML must be a mapping")
-    m = ToolManifest(**raw)
-    m.path = manifest_path.parent
-    return m
+    return _load_manifest(manifest_path, ToolManifest)
 
 
 class AgentManifest(BaseModel):
@@ -234,12 +374,7 @@ class AgentManifest(BaseModel):
 
 
 def load_agent(manifest_path: Path) -> AgentManifest:
-    raw = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
-    if not isinstance(raw, dict):
-        raise ValueError(f"{manifest_path}: top-level YAML must be a mapping")
-    m = AgentManifest(**raw)
-    m.path = manifest_path.parent
-    return m
+    return _load_manifest(manifest_path, AgentManifest)
 
 
 class SkillManifest(BaseModel):
@@ -283,7 +418,7 @@ def _split_frontmatter(text: str) -> dict:
         raise ValueError("SKILL.md is missing its '---' YAML frontmatter")
     for i in range(1, len(lines)):
         if lines[i].strip() == "---":
-            raw = yaml.safe_load("\n".join(lines[1:i]))
+            raw = _parse_yaml("\n".join(lines[1:i]))
             if not isinstance(raw, dict):
                 raise ValueError("SKILL.md frontmatter must be a YAML mapping")
             return raw

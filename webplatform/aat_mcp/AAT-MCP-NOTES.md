@@ -141,12 +141,46 @@ normalize or prettify them.
   it back.
 - **Execution reuse:** `bridge.run_tool/run_agent` delegate to
   `dashboard.server.runner` (`flags_from` + `run_tool`/`run_agent`) — ONE definition of
-  "shell a framework script and normalize its JSON". `flags_from` JSON-encodes
+  "start a framework process and normalize its JSON". `flags_from` JSON-encodes
   dict/list arg values into a single argv element; the subprocess is a **list** (no
   shell), which is why structured args don't need escaping.
-- **Registry cost:** `aat_capabilities` (no name) calls `registry.list_tools/agents`,
-  which probes credential presence per secret — a few hundred ms. Fine for the low
-  call volume; cache if it ever matters.
+- **A turn starts the entry point, not the launcher script.** Outside a turn the
+  runner starts `scripts/run-tool.py` / `run-agent.py`, as a terminal does. Inside a
+  turn (`inherit_env=False`) `runner._run_entry` resolves the tool or agent in the
+  server and starts its `main.py` directly, with the same filtered environment and
+  per-call user. The launcher only repeated the lookup and added an interpreter, and it
+  can hand a call to the warm runner, which a turn must never reach — so
+  `runner._run_command` forces `AAT_RUNNER=0` on every process a turn starts.
+- **Hiding a tool blocks it only where the hidden names are known.** The process a
+  turn starts gets a filtered environment that does not carry `AAT_TOOLS_HIDE`, so a
+  check made there never fires. The server does know the names, and in a turn the
+  server does the lookup (`_run_entry`), so a hidden tool answers `tool not found`.
+  Agents have no hide switch, and a tool an agent runs itself is resolved with
+  `respect_hidden=False`. To keep a capability out for certain, leave it out of the
+  image.
+- **Registry cost:** a scan (`registry.list_tools/agents/skills`) parses every manifest
+  and probes credential presence per secret: seconds on a large registry, in the
+  thread of whoever asked. Three things keep it off the call path:
+  - *One manifest for one name.* `registry.get_tool/get_agent` open the folder the
+    name points to (hyphen or underscore form) and walk the folders only when that
+    misses. A lookup by name must never cost a scan.
+  - *Parse once.* `tools/_lib/manifest` reads YAML with `CSafeLoader` when PyYAML has
+    libyaml, and reuses a parsed manifest while the file's modification time and size
+    are unchanged. The pure-Python loader is several times slower, and the largest
+    manifest is about 500 KB.
+  - *Scan again only on change.* After `AAT_REGISTRY_TTL` (default 30 s; 0 scans on
+    every call) the bridge compares `_registry_stamp()` — path, modification time and
+    size of every manifest, plus the hidden names — and reuses the last scan when the
+    stamp is unchanged. That shortcut applies only where readiness cannot change while
+    the server runs (`AAT_CREDS_BACKEND` is an `env` kind). Where a credential can be
+    stored at any moment, the window still ends in a scan, because readiness is part
+    of the scan and is not in the manifest files. Callers that arrive together share
+    one scan, and `http_server` warms the registry in a background thread at start.
+- **Bytecode in the image.** A tool process in a turn runs as a per-call user that
+  cannot write `__pycache__`, so without compiled files every call compiles its imports
+  again. The Dockerfile runs `compileall` for that reason; a local run with
+  `PYTHONDONTWRITEBYTECODE=1` shows the same cost and is the wrong baseline for a
+  timing.
 - **Creds backend:** `registry` uses `tools/_lib/creds` (Windows Credential Manager
   today). Running the server on another OS needs the creds backend from spec 06.
 

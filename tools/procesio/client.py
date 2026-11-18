@@ -16,6 +16,7 @@ import json
 import time
 from typing import Any
 
+from tools._lib import httptrace
 from tools.procesio import auth, config, environments, profiles, reliability
 from tools.procesio.errors import DeadlineExceeded, DesignerUnrenderable, ProcesioAPIError
 
@@ -73,7 +74,9 @@ class ProcesioClient:
             val = self.env.get(key)
             if val:
                 self.profile.setdefault(key, val)
-        self._session = _require_session(session)
+        # When whoever started this run asked for a trace of its HTTP requests (httptrace), every
+        # request of the session is noted: method, path, status, time. A no-op otherwise.
+        self._session = httptrace.wrap_session(_require_session(session))
         # Per-call override of the active-workspace header. Wins over a profile's
         # own workspace_id, and scopes a userpass cookie session to a workspace.
         self.workspace_id = workspace_id
@@ -226,6 +229,7 @@ class ProcesioClient:
                 if reliability.network_error_retryable(method_u, attempt) \
                         and self._budget_ok(deadline_at):
                     attempt += 1
+                    httptrace.retry(method_u, path)
                     self._backoff(attempt, None, deadline_at,
                                   f"{method_u} {path}: {exc.__class__.__name__}")
                     continue
@@ -235,6 +239,7 @@ class ProcesioClient:
             if reliability.is_retryable(method_u, status, attempt) \
                     and self._budget_ok(deadline_at):
                 attempt += 1
+                httptrace.retry(method_u, path)
                 retry_after = reliability.parse_retry_after(
                     (self.last_meta or {}).get("headers")) if status == 429 else None
                 self._backoff(attempt, retry_after, deadline_at,

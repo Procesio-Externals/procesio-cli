@@ -17,6 +17,12 @@ from tools._lib import creds_backends
 
 NAMESPACE = "agents-and-tools"
 
+# Set by whoever started this process when it already knows WHY a credential may be absent
+# (the AAT MCP server, for a tool run inside a PROCESIO turn: "not configured for this
+# workspace", "PROCESIO unreachable", ...). Appended to get()'s KeyError, because a bare
+# "missing credential" sends a model looking for the secret instead of reporting the fix.
+MISSING_HINT_ENV = "AAT_CREDS_MISSING_HINT"
+
 _backend = None
 
 
@@ -41,7 +47,9 @@ def get(tool: str, secret_name: str) -> str:
     """Return the secret value. Raises KeyError if missing."""
     value = _b().get_optional(tool, secret_name)
     if value is None:
-        raise KeyError(f"missing credential: {_service(tool)} / {secret_name}")
+        hint = (os.environ.get(MISSING_HINT_ENV) or "").strip()
+        message = f"missing credential: {_service(tool)} / {secret_name}"
+        raise KeyError(f"{message}. {hint}" if hint else message)
     return value
 
 
