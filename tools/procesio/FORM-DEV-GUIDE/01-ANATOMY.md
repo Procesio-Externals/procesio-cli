@@ -173,7 +173,7 @@ writes `{debounce, events}`.
 | click | `onClickEvents` | `CLICK` |
 | input / change | `onInputEvents` | `INPUT` |
 | focus / blur / hover | `onFocusEvents` / `onBlurEvents` / `onHoverEvents` | `FOCUS` / `BLUR` / `HOVER` |
-| ready | `onReadyEvents` | `READY` |
+| ready | `onReadyEvents` | `READY` (not on `file-upload`, `button`, `table` or `columns`: those templates have no slot; for "run once when the form opens" use a form-level `FORM_LOAD` RUN_JAVASCRIPT in `data.events`) |
 | open / close | `onOpenEvents` / `onCloseEvents` | `SIDE_PANEL_OPEN` / `SIDE_PANEL_CLOSE` |
 | tabchange | `onTabChangeEvents` | `TAB_CHANGE` |
 | rowadded / rowdeleted | `onTableRowAddedEvents` / `onTableRowDeletedEvents` | `TABLE_ROW_ADDED` / `TABLE_ROW_DELETED` |
