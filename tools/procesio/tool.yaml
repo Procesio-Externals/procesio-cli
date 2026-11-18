@@ -2605,7 +2605,7 @@ actions:
   - name: environment
     type: string
     required: false
-    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
   - name: in
     type: string
     required: true
@@ -3105,7 +3105,7 @@ actions:
   - name: environment
     type: string
     required: false
-    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
   - name: in
     type: string
     required: true
@@ -7182,7 +7182,7 @@ actions:
   - name: environment
     type: string
     required: false
-    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
   - name: in
     type: string
     required: true
@@ -7658,6 +7658,18 @@ actions:
     type: boolean
     required: false
     description: edit + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-bind-var
   description: 'Bind a process variable into one node parameter''s value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable (repeatable); optional --find/--replace turns a mistyped literal token (e.g. a text ''<%firstName%>'' that never resolves) into ''<%0%>'' in the same write. The value''s placeholder set must equal the bound set. Regenerates the designer layer -> validate + flow-lint -> PUT. --dry-run previews.'
   args:
@@ -7701,6 +7713,18 @@ actions:
     type: boolean
     required: false
     description: patch + normalize + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-delete
   description: 'Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) -> validate + flow-lint -> PUT. Refuses Start/Stop and a node with more than one outgoing port. --dry-run previews; variables are left alone.'
   args:
@@ -7728,6 +7752,18 @@ actions:
     type: boolean
     required: false
     description: delete + heal + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-insert
   description: 'Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor''s successor and the anchor is repointed at it -> validate + flow-lint -> PUT. Refuses an anchor with more than one outgoing port (which branch it belongs on is a design decision). --dry-run previews.'
   args:
@@ -7771,6 +7807,18 @@ actions:
     type: boolean
     required: false
     description: build + splice + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-params
   description: List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only).
   args:
@@ -7868,6 +7916,18 @@ actions:
     type: boolean
     required: false
     description: replace + normalize + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-set-error-port
   description: Wire ONE node's error port to a handler action on a live process, so a fault routes instead of killing the run. Writes all THREE parts the engine needs (the type-1 port, the node's variableErrorId, and an isError variable of the error datatype); wiring only some of them validates clean and never fires. Reach for it when a flow a FORM launches on load must still reach Stop with one section empty. The handler is named, never inferred, because it has to tolerate a null input - the node's own successor is the usual choice. --clear removes it. Refused on Start/Stop/Join/For Each, which have no error port. Validates + flow-lints before PUT; --dry-run previews.
   args:
@@ -7903,6 +7963,18 @@ actions:
     type: boolean
     required: false
     description: wire + normalize + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-set-param
   description: Surgically set ONE node parameter's literal text on a live process (an endpoint, timeout, SQL or script body) -> regenerate the designer layer from the runtime layer -> validate + flow-lint -> PUT. --dry-run to preview; an invalid flow is never PUT. Structured (list/dict) parameters stay process-edit territory.
   args:
@@ -7946,6 +8018,18 @@ actions:
     type: boolean
     required: false
     description: patch + normalize + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: node-set-query
   description: 'Replace a Query Store node''s STATEMENT and its Data Store chips together on a live process, writing the SQL with the same {{ds:Store}} / {{col:Store.Column}} tokens a process config uses. This is the edit node-set-param cannot make: it holds the `<%N%>` set fixed (those indices bind Variable[] positionally), so it refuses a statement that names one more column - or names the same column twice, which is unavoidable when a value must be rebuilt from several expressions over it, because a placeholder is not reusable. Each token occurrence gets its own chip. Refused when the node''s Parameters map is non-empty, since the map''s sources share the index sequence. Validates + flow-lints before PUT; --dry-run previews.'
   args:
@@ -7989,6 +8073,18 @@ actions:
     type: boolean
     required: false
     description: render + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: patch-actions-folders-rename
   description: 'PATCH /api/Actions/folders/rename  [Actions] - Permission required: ProcessDesigner.Update'
   args:
@@ -10626,14 +10722,12 @@ actions:
             $ref: '#/$defs/action'
         groups:
           type: array
-          description: 'AREAS on the canvas: each a rectangle drawn behind the actions it groups, with a title and one sentence on what those actions do together. Required when the process has more than 3 actions besides Start and Stop; every top-level action then belongs to exactly one area (a For Each''s children go with their container). On edit, omitted keeps the live areas and re-fits them to the new layout.'
+          description: 'AREAS on the canvas: each a rectangle drawn behind the actions it groups, with a title and one sentence on what those actions do together. Required when the process has more than 3 actions besides Start and Stop; every top-level action then belongs to exactly one area (a For Each''s children go with their container). On edit, `groups` works PER AREA, by title: each entry restates (or, with remove:true, deletes) one area and the areas it does not name are kept as they are, re-fitted to the new layout; an entry may give only `text` (members kept) or only `actions` (text kept). An area whose action changed, was added or removed must be restated this way.'
           items:
             type: object
             additionalProperties: false
             required:
             - title
-            - text
-            - actions
             properties:
               title:
                 type: string
@@ -10642,13 +10736,16 @@ actions:
               text:
                 type: string
                 minLength: 1
-                description: one sentence on what the area's actions do together in this process
+                description: one sentence on what the area's actions do together in this process (required for a new area)
               actions:
                 type: array
                 minItems: 1
                 items:
                   type: string
-                description: ids of the config actions in this area (not start/stop)
+                description: ids of the config actions in this area (not start/stop; required for a new area)
+              remove:
+                type: boolean
+                description: 'edit only: delete this area (its actions must go to another area or the process must drop to 3 actions or fewer)'
         edges:
           type: array
           description: Explicit wiring between action ids ('start'/'stop' reserved). Omit for a linear chain.
@@ -12075,7 +12172,7 @@ actions:
   - name: environment
     type: string
     required: false
-    description: PROCESIO environment for this call, e.g. Internal-QA (defaults to the credential's binding, else the default environment / Internal-PROD)
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
   - name: in
     type: string
     required: true
@@ -12467,6 +12564,18 @@ actions:
     type: boolean
     required: false
     description: convert + validate + lint but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: sql-parameterize
   description: Convert inline N'<%N%>' SQL nodes to safe named-@param binding (--node or --all); validate then PUT (--dry-run to preview).
   args:
@@ -12679,6 +12788,18 @@ actions:
     type: boolean
     required: false
     description: add + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: variable-delete
   description: 'Remove ONE variable from a live process -> validate + flow-lint -> PUT. REFUSES while anything still references it - a node parameter bind, a source inside a Query Store Parameters map, an error-port variableErrorId, a subprocess input/output map - and NAMES every reference, because ''it is used somewhere'' is not actionable. Refuses an input/output without --allow-contract-change. Renumbers nothing: a node''s <%N%> indices address that node''s own variable[] list, not the flow''s. --dry-run previews.'
   args:
@@ -12710,6 +12831,18 @@ actions:
     type: boolean
     required: false
     description: delete + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: variable-set-default
   description: 'Set (or --clear) one variable''s defaultValue on a live process -> validate + flow-lint -> PUT. This is how an input stops being something the caller must supply: a File default is honoured on a run that omits it, and the platform re-stages the file into that run''s own instance. Needs --allow-contract-change on an input/output. --json parses the value first (use for a File object).'
   args:
@@ -12757,6 +12890,18 @@ actions:
     type: boolean
     required: false
     description: set + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: variable-set-required
   description: Set or clear one INPUT variable's isRequired flag on a live process -> validate + flow-lint -> PUT. Clearing it is allowed outright (no existing caller breaks); making an optional input required needs --allow-contract-change. Refused on a non-input variable. Guard any bare raw placeholder that reads the variable (`var f = <%6%>;` -> `[<%6%>][0]`) BEFORE clearing, or an absent value becomes a SyntaxError at run time.
   args:
@@ -12792,6 +12937,18 @@ actions:
     type: boolean
     required: false
     description: set + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: variable-set-type
   description: Retype one variable of a live process (dataType, optionally isList) -> validate + flow-lint -> PUT. Refuses an input/output variable without --allow-contract-change, because those are the run payload and the response shape callers depend on.
   args:
@@ -12831,6 +12988,18 @@ actions:
     type: boolean
     required: false
     description: retype + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
 - name: verify-layout
   description: Simulate the designer's rendering of a flow's positions and report problems (container children outside their frame, node overlaps).
   args:

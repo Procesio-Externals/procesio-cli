@@ -188,9 +188,15 @@ def test_edit_refuses_an_action_that_changed_without_a_restated_purpose():
     cfg["actions"][1]["params"]["Input String"] = "literal text"     # a2 now does something else
     with pytest.raises(DocumentationMissing) as ei:
         _edit(live, cfg)
+    codes = {f["code"]: f for f in ei.value.report["findings"]}
     stale = [f for f in ei.value.report["findings"] if f["code"] == "ACTION_DESCRIPTION_STALE"]
     assert [f["action"] for f in stale] == ["a2"]
+    # the change also asks whether the process purpose and a2's area still hold
+    assert {"PROCESS_DESCRIPTION_REVIEW", "AREA_TEXT_REVIEW"} <= set(codes)
+    assert "Prepare" in codes["AREA_TEXT_REVIEW"]["detail"]
     cfg["actions"][1]["description"] = "uppercases a fixed label instead of the input"
+    cfg["description"] = "Normalises a name before it is stored."                 # confirmed word for word
+    cfg["groups"] = [{"title": "Prepare", "text": "Cleans the name and stamps a fixed label."}]
     put, state = _edit(live, cfg)
     assert not _codes(state)
     assert {a["ActionName"]: a["CustomData"].get("description") for a in put["Actions"]}["a2"] == \
@@ -203,11 +209,15 @@ def test_edit_new_action_needs_a_purpose_and_an_area():
     cfg["actions"].append(_act("a6", action="To Lower"))
     with pytest.raises(DocumentationMissing) as ei:
         _edit(live, cfg)
-    assert {"ACTION_DESCRIPTION_MISSING", "ACTION_UNGROUPED"} <= {f["code"] for f in ei.value.report["findings"]}
+    assert {"ACTION_DESCRIPTION_MISSING", "ACTION_UNGROUPED", "PROCESS_DESCRIPTION_REVIEW"} <=         {f["code"] for f in ei.value.report["findings"]}
     cfg["actions"][-1]["description"] = "lower-cases a copy for the search index"
-    cfg["groups"] = _config(5)["groups"]
-    cfg["groups"][1]["actions"].append("a6")
+    cfg["description"] = "Normalises a name and keeps a lower-case copy for search."
+    # only the area the new action joins is restated; "Prepare" is kept as it is
+    cfg["groups"] = [{"title": "Finish", "text": "Produces the stored and the searchable form.",
+                      "actions": ["a4", "a5", "a6"]}]
     put, state = _edit(live, cfg)
+    assert put["Description"] == "Normalises a name and keeps a lower-case copy for search."
+    assert sorted(s["title"] for s in put["CanvasData"]["shapes"]) == ["Finish", "Prepare"]
     assert not _codes(state)
 
 
@@ -217,9 +227,9 @@ def test_edit_deleting_an_area_member_asks_to_restate_the_area():
     cfg["actions"] = [a for a in cfg["actions"] if a["id"] != "a5"]
     with pytest.raises(DocumentationMissing) as ei:
         _edit(live, cfg, _allow_remove=True)
-    assert "AREA_MEMBERS_CHANGED" in {f["code"] for f in ei.value.report["findings"]}
-    cfg["groups"] = [{"title": "Prepare", "text": "Cleans the incoming name.", "actions": ["a1", "a2", "a3"]},
-                     {"title": "Finish", "text": "Produces the stored form.", "actions": ["a4"]}]
+    assert {"AREA_MEMBERS_CHANGED", "PROCESS_DESCRIPTION_REVIEW"} <= {f["code"] for f in ei.value.report["findings"]}
+    cfg["description"] = "Normalises a name before it is stored."
+    cfg["groups"] = [{"title": "Finish", "text": "Produces the stored form."}]   # text confirmed
     put, state = _edit(live, cfg, _allow_remove=True)
     assert not _codes(state)
 

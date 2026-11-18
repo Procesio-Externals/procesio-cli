@@ -36,6 +36,7 @@ import bridge  # noqa: E402  (sibling module)
 import gate  # noqa: E402
 import metrics  # noqa: E402  (runtime metrics, off unless a listener runs)
 import protocol  # noqa: E402  (shared MCP mechanics)
+import runtime_log  # noqa: E402  (the one writer of log lines)
 
 SERVER_INFO = {"name": "aat-mcp", "version": "0.2.0"}
 DEFAULT_PROTOCOL = protocol.LEGACY_VERSIONS[0]  # what `initialize` gets when it names no version
@@ -191,7 +192,7 @@ for _t in TOOLS:
 
 
 def _log(msg: str) -> None:
-    print(f"[aat-mcp] {msg}", file=sys.stderr, flush=True)
+    runtime_log.write("aat-mcp", msg)
 
 
 # Refusals the bridge raises for a turn (bridge._no_key_refusal / _workspace_refusal): final for
@@ -214,6 +215,8 @@ def _run(kind: str, arguments: dict, confirmed: bool) -> tuple[dict, bool]:
     if not confirmed and not verdict["reversible"]:
         # Plain tool refuses an irreversible action and names the confirmed path.
         metrics.refusal("approval_required")
+        bridge.log_refusal("approval_required", target, action,
+                           "an irreversible action was called on the tool that runs without approval")
         return {"approval_required": {
             key: target, "action": action, "verb": verdict["verb"],
             "blast_class": verdict["blast_class"], "reason": verdict["reason"],
@@ -225,6 +228,8 @@ def _run(kind: str, arguments: dict, confirmed: bool) -> tuple[dict, bool]:
     if confirmed and not verdict["reversible"] and gate.deny_irreversible_env():
         # Headless fail-safe: no human in the seat to approve.
         metrics.refusal("irreversible_denied")
+        bridge.log_refusal("irreversible_denied", target, action,
+                           "irreversible actions are denied on this server, confirmed or not")
         return {"refused": ("irreversible action denied (AAT_MCP_DENY_IRREVERSIBLE "
                             "is set; no human in the seat)"),
                 "verb": verdict["verb"], "blast_class": verdict["blast_class"]}, True

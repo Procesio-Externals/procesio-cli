@@ -126,6 +126,34 @@ def test_outside_a_turn_the_warm_runner_setting_is_left_alone(monkeypatch):
     assert seen["env"]["KEEP"] == "me"
 
 
+@pytest.mark.parametrize("platform, relative", [
+    ("win32", ".venv/Scripts/python.exe"),
+    ("linux", ".venv/bin/python"),
+    ("darwin", ".venv/bin/python"),
+])
+def test_the_project_venv_is_looked_for_where_the_system_puts_it(platform, relative):
+    assert runner._venv_python(platform) == runner.PROJECT_ROOT / relative
+
+
+def test_the_project_venv_is_preferred_and_its_absence_is_not_an_error(tmp_path, monkeypatch):
+    """A turn starts the entry point with this interpreter and nothing switches it afterwards."""
+    venv_python = tmp_path / "python"
+    monkeypatch.setattr(runner, "VENV_PY", venv_python)
+    assert runner.python_exe() == sys.executable  # no project venv: the server's own interpreter
+
+    venv_python.write_text("", encoding="utf-8")
+    assert runner.python_exe() == str(venv_python)
+
+
+def test_the_launcher_scripts_look_for_the_venv_in_the_same_two_places():
+    """Outside a turn the scripts re-run themselves under the venv. Both sides have to agree on
+    where it is, or a call lands on a different interpreter depending on how it was started."""
+    for script in ("run-tool.py", "run-agent.py"):
+        text = (runner.PROJECT_ROOT / "scripts" / script).read_text(encoding="utf-8")
+        assert '".venv" / "Scripts" / "python.exe" if sys.platform == "win32"' in text
+        assert '".venv" / "bin" / "python"' in text
+
+
 def test_a_turn_runs_a_real_tool_end_to_end(tmp_path):
     openpyxl = pytest.importorskip("openpyxl")
     book = openpyxl.Workbook()

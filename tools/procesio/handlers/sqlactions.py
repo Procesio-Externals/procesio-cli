@@ -16,7 +16,10 @@ from __future__ import annotations
 
 import argparse
 
+import copy
+
 from tools.procesio.actiondef import ActionDef
+from tools.procesio.dto.process import docwrite
 from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.errors import ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import sqlparam
@@ -135,6 +138,7 @@ def _resolve_variable(flow: dict, key: str) -> str:
 def sql_convert(client, args) -> dict:
     target = sqlparam.EQ_TEMPLATE if args.to == "query" else sqlparam.EC_TEMPLATE
     flow = _fetch_flow(client, args.id)
+    before = copy.deepcopy(flow)           # the documentation gate reads the action as it was
     node = sqlparam.find_node(flow, args.node)
     if not node:
         raise UsageError(f"node not found in process {args.id}: {args.node}")
@@ -161,6 +165,12 @@ def sql_convert(client, args) -> dict:
         result["errors"] = errors
         result["put"] = False
         return result
+
+    # A different SQL family is a different action: its purpose, its area and the process's
+    # purpose are asked for (or confirmed) before anything is validated or written.
+    result["documentation"] = docwrite.apply(
+        before, flow, {"kind": "behaviour", "node": node.get("id")}, docwrite.parse(args),
+        allow=bool(getattr(args, "allow_undocumented", False)), enforce=not args.dry_run)
 
     # The BE validator does not see designer save-blockers, and "Execute Query with a null Output"
     # is exactly one of them — the case this conversion is most likely to create.
@@ -216,9 +226,14 @@ def _convert_args(p: argparse.ArgumentParser) -> None:
                    help="convert + validate + lint but do not PUT")
 
 
+def _convert_args_with_doc(p: argparse.ArgumentParser) -> None:
+    _convert_args(p)
+    docwrite.add_args(p)
+
+
 ACTIONS = {
     "sql-convert": ActionDef(
-        func=sql_convert, add_args=_convert_args, needs_client=True,
+        func=sql_convert, add_args=_convert_args_with_doc, needs_client=True,
         description=("Move one SQL node between the Execute Command and Execute Query families "
                      "(--to) and optionally rebind its Output (--output-variable); validate + "
                      "flow-lint then PUT (--dry-run to preview). A SELECT-ing procedure on a Command "

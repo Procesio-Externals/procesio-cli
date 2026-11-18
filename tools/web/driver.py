@@ -230,7 +230,7 @@ class PlaywrightDriver:
             self._apply_stealth()
         except Exception as exc:  # noqa: BLE001
             self.close()
-            raise _wrap(exc)
+            raise _launch_error(exc)
         return self
 
     def _attach_diagnostics(self) -> None:
@@ -869,6 +869,21 @@ class PlaywrightDriver:
                     self._context.add_cookies([c])
                 except Exception:  # noqa: BLE001
                     pass
+
+
+def _launch_error(exc: Exception) -> BrowserError:
+    """A launch failure as a BrowserError; when it looks like Windows blocking the
+    browser binary (spawn UNKNOWN / side-by-side), the remedy rides along in the
+    message and in details.hint."""
+    from tools._lib import browserlaunch
+
+    err = _wrap(exc)
+    hint = browserlaunch.launch_hint(str(exc))
+    if hint:
+        err.details = {**(err.details or {}), "hint": hint,
+                       "env_var": browserlaunch.ENV_VAR}
+        err.args = (f"{err.args[0] if err.args else ''} - {hint}",)
+    return err
 
 
 def _wrap(exc: Exception, details: dict | None = None) -> BrowserError:

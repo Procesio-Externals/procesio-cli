@@ -20,10 +20,12 @@ JSON in / JSON out; impure (live client). Thin wrappers over GET / validate / PU
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 
 from tools.procesio.actiondef import ActionDef
 from tools.procesio.client import VARIABLES_ONLY
+from tools.procesio.dto.process import docwrite
 from tools.procesio.dto.process.builder import fetch_datastore_meta, render_query_tokens
 from tools.procesio.dto.process.normalize import (align_node_shapes, normalize_designer_layer,
                                                    rebuild_missing_designer_config)
@@ -34,9 +36,17 @@ from tools.procesio.handlers.fevalidate import run_fe_validation, save_flow
 from tools.procesio.handlers.flowlint import _template_sidepanel_ids, lint_flow_dto
 
 
+_BEFORE: dict = {}      # process id -> the flow as first read in this call (documentation gate)
+
+
 def _fetch_flow(client, pid: str) -> dict:
     flow = client.get(f"/api/Projects/{pid}")
-    return flow.get("flow") if isinstance(flow, dict) and "flow" in flow else flow
+    flow = flow.get("flow") if isinstance(flow, dict) and "flow" in flow else flow
+    if isinstance(flow, dict):
+        # The writers patch the flow in place; the documentation gate needs it as it was, to
+        # know which area an action sat in and what its text said before the change.
+        _BEFORE[pid] = copy.deepcopy(flow)
+    return flow
 
 
 def _validate(client, flow: dict):
@@ -72,7 +82,8 @@ def _finding_key(f: dict) -> tuple:
     return (f.get("code"), f.get("action"), f.get("text"))
 
 
-def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool = True) -> dict:
+def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool = True,
+                  doc_change: dict | None = None) -> dict:
     """The tail every surgical writer shares: validate, lint, then save or say why not.
 
     One copy, because four call sites held drifted copies of it and a copy is where a
@@ -94,6 +105,14 @@ def _gate_and_put(client, flow: dict, args, result: dict, *, block_on_lint: bool
     stays valid unless the edit ADDED a designer finding: our lint is stricter than the
     designer's, so a flow saved valid there can carry findings it was already saved with.
     """
+    if doc_change is not None:
+        # Documentation first: what this change can make untrue is asked for (or confirmed)
+        # before anything is validated or written, and the area shapes follow the change.
+        before = _BEFORE.pop(args.id, None) or flow
+        result["documentation"] = docwrite.apply(
+            before, flow, doc_change, docwrite.parse(args),
+            allow=bool(getattr(args, "allow_undocumented", False)),
+            enforce=not getattr(args, "dry_run", False))
     valid, errors = _validate(client, flow)
     problems = _lint(client, flow)
     result["lint_problems"] = problems
@@ -177,7 +196,7 @@ def node_set_param(client, args) -> dict:
         return result
 
     result["normalized"] = normalize_designer_layer(flow)
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "behaviour", "node": node.get("id")})
 
 
 def node_delete(client, args) -> dict:
@@ -193,7 +212,7 @@ def node_delete(client, args) -> dict:
         result["put"] = False
         return result
 
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "delete", "node": node.get("id")})
 
 
 def node_replace_text(client, args) -> dict:
@@ -224,7 +243,7 @@ def node_replace_text(client, args) -> dict:
         return result
 
     result["normalized"] = normalize_designer_layer(flow)
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "behaviour", "node": node.get("id")})
 
 
 def variable_set_type(client, args) -> dict:
@@ -247,7 +266,7 @@ def variable_set_type(client, args) -> dict:
         result["put"] = False
         return result
 
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+    return _gate_and_put(client, flow, args, result, block_on_lint=False, doc_change={"kind": "contract", "variable": var})
 
 
 def variable_set_required(client, args) -> dict:
@@ -271,7 +290,7 @@ def variable_set_required(client, args) -> dict:
         result["put"] = False
         return result
 
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+    return _gate_and_put(client, flow, args, result, block_on_lint=False, doc_change={"kind": "contract", "variable": var})
 
 
 def variable_add(client, args) -> dict:
@@ -289,7 +308,7 @@ def variable_add(client, args) -> dict:
               "direction": args.direction.lower(), "isList": var["isList"],
               "isRequired": var["isRequired"]}
 
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+    return _gate_and_put(client, flow, args, result, block_on_lint=False, doc_change={"kind": "contract", "variable": var})
 
 
 def variable_delete(client, args) -> dict:
@@ -304,7 +323,7 @@ def variable_delete(client, args) -> dict:
         raise UsageError(str(e)) from e
 
     result = {"id": args.id, "title": flow.get("title"), "variable": var.get("name"), **change}
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+    return _gate_and_put(client, flow, args, result, block_on_lint=False, doc_change={"kind": "contract", "variable": var})
 
 
 def variable_set_default(client, args) -> dict:
@@ -347,7 +366,7 @@ def variable_set_default(client, args) -> dict:
         result["note"] = "default already set to that value; nothing to PUT"
         result["put"] = False
         return result
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+    return _gate_and_put(client, flow, args, result, block_on_lint=False, doc_change={"kind": "contract", "variable": var})
 
 
 def node_insert(client, args) -> dict:
@@ -402,7 +421,18 @@ def node_insert(client, args) -> dict:
         return result
 
     result["inserted"] = True
-    return _gate_and_put(client, flow, args, result, block_on_lint=False)
+    # It was placed one column right of its anchor, which is where the anchor's old successor
+    # already sits: re-tidy ONLY the new action so it lands in free space (everything else stays
+    # byte-stable), before its area is fitted around it.
+    try:
+        from tools.procesio.layout import adapter as _adapter
+        laid = _adapter.layout_flow(flow, only=[action.get("id")])["bundle"]
+        for a in laid.get("actions") or []:
+            if a.get("id") == action.get("id"):
+                action["customData"]["position"] = dict(a["customData"]["position"])
+    except Exception:  # noqa: BLE001 - a layout failure must not block the insert itself
+        pass
+    return _gate_and_put(client, flow, args, result, block_on_lint=False, doc_change={"kind": "insert", "node": action.get("id")})
 
 
 def node_repair_designer(client, args) -> dict:
@@ -475,7 +505,7 @@ def node_bind_var(client, args) -> dict:
     result = {"id": args.id, "title": flow.get("title"), "node": node.get("actionName"),
               "property": param.get("tabPropertyId"), **change}
     result["normalized"] = normalize_designer_layer(flow)
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "behaviour", "node": node.get("id")})
 
 
 def _params_args(p: argparse.ArgumentParser) -> None:
@@ -668,7 +698,7 @@ def node_set_error_port(client, args) -> dict:
         raise UsageError(str(e)) from e
     result = {"id": args.id, "title": flow.get("title"), **change}
     result["normalized"] = normalize_designer_layer(flow)
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "process", "node": node.get("id")})
 def _errorport_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="process (project) id")
@@ -795,7 +825,7 @@ def node_set_query(client, args) -> dict:
               "stores_referenced": sorted({c["dataStoreId"] for c in chips if c.get("dataStoreId")}),
               "statement": text}
     result["normalized"] = normalize_designer_layer(flow)
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "behaviour", "node": node.get("id")})
 def _setquery_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="process (project) id")
@@ -889,7 +919,7 @@ def node_add_binding(client, args) -> dict:
               "property": param.get("tabPropertyId"), **change}
     # the designer copy too, or a designer save / an export brings the old body back
     result["normalized"] = normalize_designer_layer(flow)
-    return _gate_and_put(client, flow, args, result)
+    return _gate_and_put(client, flow, args, result, doc_change={"kind": "behaviour", "node": node.get("id")})
 def _addbinding_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="process (project) id")
@@ -908,9 +938,17 @@ def _addbinding_args(p: argparse.ArgumentParser) -> None:
                    help="edit + validate but do not PUT")
 
 
+def _with_doc(add):
+    """Argument set of a writer that changes what a process does: its own, plus --doc."""
+    def _args(p: argparse.ArgumentParser) -> None:
+        add(p)
+        docwrite.add_args(p)
+    return _args
+
+
 ACTIONS = {
     "node-insert": ActionDef(
-        func=node_insert, add_args=_insert_args, needs_client=True,
+        func=node_insert, add_args=_with_doc(_insert_args), needs_client=True,
         description="Insert ONE action into a live process immediately after another, rewiring the "
                     "graph: the new node takes the anchor's successor and the anchor is repointed at "
                     "it -> validate + flow-lint -> PUT. Refuses an anchor with more than one outgoing "
@@ -920,7 +958,7 @@ ACTIONS = {
         description="List a live process's nodes with each runtime parameter's designer label, "
                     "current value, editability and bound variables (read-only)."),
     "node-set-param": ActionDef(
-        func=node_set_param, add_args=_set_args, needs_client=True,
+        func=node_set_param, add_args=_with_doc(_set_args), needs_client=True,
         description="Surgically set ONE node parameter's literal text on a live process (an endpoint, "
                     "timeout, SQL or script body) -> regenerate the designer layer from the runtime "
                     "layer -> validate + flow-lint -> PUT. --dry-run to preview; an invalid flow is "
@@ -936,13 +974,13 @@ ACTIONS = {
                     "layer, so what executes is unchanged. Validates + flow-lints before PUT; "
                     "--dry-run previews."),
     "node-delete": ActionDef(
-        func=node_delete, add_args=_delete_args, needs_client=True,
+        func=node_delete, add_args=_with_doc(_delete_args), needs_client=True,
         description="Delete ONE action from a live process and heal the graph: every port that pointed "
                     "at it is re-pointed at its successor (or dropped when it has none) -> validate + "
                     "flow-lint -> PUT. Refuses Start/Stop and a node with more than one outgoing port. "
                     "--dry-run previews; variables are left alone."),
     "node-bind-var": ActionDef(
-        func=node_bind_var, add_args=_bindvar_args, needs_client=True,
+        func=node_bind_var, add_args=_with_doc(_bindvar_args), needs_client=True,
         description="Bind a process variable into one node parameter's value: set its variable[] "
                     "so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable "
                     "(repeatable); optional --find/--replace turns a mistyped literal token (e.g. a "
@@ -950,7 +988,7 @@ ACTIONS = {
                     "value's placeholder set must equal the bound set. Regenerates the designer layer "
                     "-> validate + flow-lint -> PUT. --dry-run previews."),
     "node-set-error-port": ActionDef(
-        func=node_set_error_port, add_args=_errorport_args, needs_client=True,
+        func=node_set_error_port, add_args=_with_doc(_errorport_args), needs_client=True,
         description="Wire ONE node's error port to a handler action on a live process, so a fault "
                     "routes instead of killing the run. Writes all THREE parts the engine needs (the "
                     "type-1 port, the node's variableErrorId, and an isError variable of the error "
@@ -961,7 +999,7 @@ ACTIONS = {
                     "Start/Stop/Join/For Each, which have no error port. Validates + flow-lints before "
                     "PUT; --dry-run previews."),
     "node-set-query": ActionDef(
-        func=node_set_query, add_args=_setquery_args, needs_client=True,
+        func=node_set_query, add_args=_with_doc(_setquery_args), needs_client=True,
         description="Replace a Query Store node's STATEMENT and its Data Store chips together on "
                     "a live process, writing the SQL with the same {{ds:Store}} / "
                     "{{col:Store.Column}} tokens a process config uses. This is the edit "
@@ -973,7 +1011,7 @@ ACTIONS = {
                     "node's Parameters map is non-empty, since the map's sources share the index "
                     "sequence. Validates + flow-lints before PUT; --dry-run previews."),
     "node-add-binding": ActionDef(
-        func=node_add_binding, add_args=_addbinding_args, needs_client=True,
+        func=node_add_binding, add_args=_with_doc(_addbinding_args), needs_client=True,
         description="Add bindings to ONE node parameter, optionally editing its text in the same "
                     "write - the edit neither node-bind-var nor node-replace-text can make. "
                     "node-bind-var takes a STRING parameter and replaces the whole binding list; "
@@ -986,25 +1024,25 @@ ACTIONS = {
                     "<%N%> unbound or a binding unused. Validates + flow-lints before PUT; "
                     "--dry-run previews."),
     "node-replace-text": ActionDef(
-        func=node_replace_text, add_args=_replace_args, needs_client=True,
+        func=node_replace_text, add_args=_with_doc(_replace_args), needs_client=True,
         description="Replace an EXACT literal in every string leaf of a node's runtime parameters AND "
                     "designer settings on a live process - the safe way to reach a value nested inside "
                     "a structured parameter (a Map Data expression, a decisional literal). --expect N "
                     "asserts the hit count; --dry-run previews. Validates + flow-lints before PUT."),
     "variable-set-type": ActionDef(
-        func=variable_set_type, add_args=_vartype_args, needs_client=True,
+        func=variable_set_type, add_args=_with_doc(_vartype_args), needs_client=True,
         description="Retype one variable of a live process (dataType, optionally isList) -> validate + "
                     "flow-lint -> PUT. Refuses an input/output variable without --allow-contract-change, "
                     "because those are the run payload and the response shape callers depend on."),
     "variable-add": ActionDef(
-        func=variable_add, add_args=_varadd_args, needs_client=True,
+        func=variable_add, add_args=_with_doc(_varadd_args), needs_client=True,
         description="Add ONE variable to a live process (name, data type, direction) -> validate + "
                     "flow-lint -> PUT. Safe for existing wiring: everything else addresses variables "
                     "by id, and nothing can already point at an id that did not exist. Refuses a "
                     "duplicate NAME (the form-event tooling resolves names to ids) and an unknown "
                     "direction. --dry-run previews."),
     "variable-delete": ActionDef(
-        func=variable_delete, add_args=_vardelete_args, needs_client=True,
+        func=variable_delete, add_args=_with_doc(_vardelete_args), needs_client=True,
         description="Remove ONE variable from a live process -> validate + flow-lint -> PUT. "
                     "REFUSES while anything still references it - a node parameter bind, a "
                     "source inside a Query Store Parameters map, an error-port variableErrorId, "
@@ -1013,14 +1051,14 @@ ACTIONS = {
                     "--allow-contract-change. Renumbers nothing: a node's <%N%> indices address "
                     "that node's own variable[] list, not the flow's. --dry-run previews."),
     "variable-set-default": ActionDef(
-        func=variable_set_default, add_args=_vardefault_args, needs_client=True,
+        func=variable_set_default, add_args=_with_doc(_vardefault_args), needs_client=True,
         description="Set (or --clear) one variable's defaultValue on a live process -> validate + "
                     "flow-lint -> PUT. This is how an input stops being something the caller must "
                     "supply: a File default is honoured on a run that omits it, and the platform "
                     "re-stages the file into that run's own instance. Needs --allow-contract-change "
                     "on an input/output. --json parses the value first (use for a File object)."),
     "variable-set-required": ActionDef(
-        func=variable_set_required, add_args=_varrequired_args, needs_client=True,
+        func=variable_set_required, add_args=_with_doc(_varrequired_args), needs_client=True,
         description="Set or clear one INPUT variable's isRequired flag on a live process -> validate "
                     "+ flow-lint -> PUT. Clearing it is allowed outright (no existing caller breaks); "
                     "making an optional input required needs --allow-contract-change. Refused on a "

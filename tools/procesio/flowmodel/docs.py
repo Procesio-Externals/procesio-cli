@@ -11,7 +11,8 @@ edit write them):
   (`canvasData.shapes`) with a title and a text, grouping the actions by what they do together.
   Membership is geometric (layout/areas.py).
 
-`read(flow)` returns that intent as data - the first thing to read when analysing a process or a
+`read(flow)` returns that intent as data (`use_baseline=True` adds what changed by hand since the
+tool last documented the process, from this machine's record - see dto/process/baseline.py) - the first thing to read when analysing a process or a
 workspace you do not know, before reading parameters. `findings(flow)` lists the gaps. Pure;
 works on the live camelCase flow and the PascalCase DTO / export alike.
 """
@@ -40,7 +41,7 @@ def _flow(obj: dict) -> dict:
     return obj
 
 
-def read(flow: dict, captions: dict | None = None) -> dict:
+def read(flow: dict, captions: dict | None = None, use_baseline: bool = False) -> dict:
     """{title, id, purpose, actions: [{id, name, template, purpose, documented, area}],
     areas: [{title, text, actions: [names]}], notes: [free canvas notes], coverage, findings,
     documented}. `captions` ({template lower: caption}) adds live stock captions to the bundled
@@ -102,6 +103,10 @@ def read(flow: dict, captions: dict | None = None) -> dict:
         if not g["text"]:
             findings.append({"code": "AREA_TEXT_MISSING", "severity": "warn", "area": g["title"],
                              "detail": "the area has a title but no text saying what its actions do"})
+
+    if use_baseline:                       # changed by hand since the tool documented it
+        from tools.procesio.dto.process import baseline
+        findings.extend(baseline.findings(flow))
 
     names = {_g(a, "id"): _name(a) for a in acts}
     notes = [{"title": _g(s, "title", default=""), "text": _g(s, "text", default="")}

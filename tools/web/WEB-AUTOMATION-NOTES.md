@@ -35,6 +35,21 @@ Confirmed: headless `send-message` + `read-messages` against the saved
   `chromium-<rev>/chrome-win64/chrome.exe`; headless can use
   `chromium_headless_shell-<rev>`.
 - Always invoke via the venv: `.\.venv\Scripts\python.exe -m playwright install chromium`.
+- **Installed is not the same as startable.** Some Windows security policies block
+  executing binaries from under `%LOCALAPPDATA%` - Playwright's default install
+  folder (`%LOCALAPPDATA%\ms-playwright`). The launch then fails with
+  `BrowserType.launch: spawn UNKNOWN` or Windows' "The application has failed to
+  start because its side-by-side configuration is incorrect". The headless SHELL
+  can still start, so the test suite passes and only a headed launch
+  (`save-session`, `--headed`, persistent profiles) fails. Fix that works: set the
+  user env var `PLAYWRIGHT_BROWSERS_PATH` to a non-AppData folder (e.g.
+  `C:\ms-playwright`), open a new shell (Playwright reads it at install AND launch
+  time), and reinstall there. Detection is shared in `tools/_lib/browserlaunch.py`:
+  the driver adds the remedy to that launch `browser_error` (message +
+  `details.hint`), and the `playwright-chromium-headed-launch` requirement
+  (`python scripts/check-requirements.py --tool web`) actually launches headed
+  Chromium off-screen on Windows to catch it before first use. Not fixed by:
+  `--force` reinstalling into the same AppData folder.
 
 ## WhatsApp session capture
 

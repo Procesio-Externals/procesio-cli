@@ -184,6 +184,27 @@ normalize or prettify them.
 - **Creds backend:** `registry` uses `tools/_lib/creds` (Windows Credential Manager
   today). Running the server on another OS needs the creds backend from spec 06.
 
+## Log lines
+
+- **One writer, two formats.** Every line goes through `runtime_log.write`. `AAT_LOG_FORMAT=json`
+  (set in the k8s configmap) writes one JSON object per line; unset or `text` writes
+  `[source] sentence`, which is what a local run and the stdio servers show. Never write to
+  stderr directly in `bridge`, `http_server`, `metrics` or `server`: one plain line among JSON
+  lines is a line the log store cannot parse. A test holds that.
+- **The JSON keys are the ones the .NET services write** - `Timestamp`, `Level`,
+  `RenderedMessage`, `Properties` - so one query reads the three services. `RenderedMessage` is
+  the sentence of the text line, unchanged. `Properties` holds its values one by one.
+- **A turn is found by `Properties.MessageId`**, the same key the other services use. The lines
+  about a call and a refusal carry `SourceContext: Procesio.Aat.Turn`, the category the other
+  services give their lines about a turn. The other sources are `aat-mcp-http`, `aat-metrics`,
+  `aat-mcp` and `entrypoint`. A line of a request without an id has no `MessageId` key.
+- **The access line says what the request was for**: the MCP method, the MCP tool, and the tool
+  or agent and action the call names, with the time the request took. Names only. `args`, a
+  search text and a payload can hold what the user wrote and are never logged.
+- **An exception is one line.** The HTTP server class and the uncaught-exception hooks put the
+  traceback in the `Exception` key. The standard handlers print it over many lines, each of
+  which a log store reads as an entry of its own.
+
 ## Safety gate (spec 03)
 
 - **Code-authoritative, pre-execution** (`gate.py` → `agents/_lib/reversibility`). The

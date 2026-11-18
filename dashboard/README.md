@@ -24,6 +24,23 @@ your browser. Options: `--port <n>`, `--no-browser`, `--host` (loopback only).
 > with `PYTHON_KEYRING_BACKEND=keyring.backends.Windows.WinVaultKeyring`
 > (serve.py already sets this).
 
+### Before first use: the browser engine
+
+The dashboard's web-login capture and every browser tool need Playwright's
+Chromium, which `uv sync` (and `Start-Dashboard.cmd`) does not install:
+
+```powershell
+uv run playwright install chromium
+python scripts/check-requirements.py --tool web
+```
+
+On Windows machines whose security policy blocks executables under
+`%LOCALAPPDATA%` (headed launch fails with `spawn UNKNOWN` / "side-by-side
+configuration is incorrect"), set the user env var `PLAYWRIGHT_BROWSERS_PATH` to a
+non-AppData folder (e.g. `C:\ms-playwright`), open a new shell - and restart the
+dashboard from it - then re-run the install. The `check-requirements.py` headed-launch
+check prints this remedy when it applies.
+
 ## What you get
 
 - **Inventory** - every tool, agent, and skill from the live registry, grouped
@@ -41,6 +58,11 @@ your browser. Options: `--port <n>`, `--no-browser`, `--host` (loopback only).
   (ryver-web, whatsapp, quickmail-web, fgo-web, linkedin-web, the *-invoices tools).
   Their card shows a **Connect** button prefilled with the right session name and
   URL - no guessing - and a missing login counts as needs-setup.
+- **Google profiles** - the Google profile login runs `google-mail auth-login
+  --all-google`: one consent for every Google tool's DEFAULT scopes. Workspace
+  admin scopes are opt-in and never part of it (`apps.alerts` is rejected for the
+  OAuth client and would fail the whole consent); an admin connects them from
+  the google-admin card, whose `auth-login` requests them itself.
 - **OAuth** - tools with an `auth-login` action (google-*, linkedin) show a
   **Connect** button on the card; the oauth token/accounts secrets (produced by
   the flow, not typed) are hidden so only the client key is settable.

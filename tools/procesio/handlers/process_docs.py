@@ -31,7 +31,7 @@ def process_docs(client, args) -> dict:
         flow = _flow(client, args.id)
     except ProcesioAPIError as e:
         raise UsageError(f"could not read process {args.id}: {e}") from e
-    return {"result": docs.read(flow)}
+    return {"result": docs.read(flow, use_baseline=True)}
 
 
 def _ws_args(p: argparse.ArgumentParser) -> None:
@@ -67,7 +67,7 @@ def workspace_docs(client, args) -> dict:
                "purpose": (p.get("description") or "").strip()}
         if not args.purpose_only:
             try:
-                d = docs.read(_flow(client, p.get("id")))
+                d = docs.read(_flow(client, p.get("id")), use_baseline=True)
             except ProcesioAPIError as e:
                 unread.append({"id": p.get("id"), "title": p.get("title"), "error": str(e)})
                 rows.append(row)

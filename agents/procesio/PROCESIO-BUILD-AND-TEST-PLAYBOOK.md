@@ -105,9 +105,22 @@ How an edit keeps it true (the tool enforces each rule):
 - A new action needs a description and a place in an area.
 - Deleting an action from an area means restating `groups`, because the area's text may
   still describe it.
-- A changed process purpose goes in `description`; omitting it keeps the current one.
-- Areas move with the layout (create, edit, `relayout-process`). A person's free notes on
-  the canvas (shapes that hold no action) are left alone.
+- When the process itself changes (an action added, removed or changed, or its inputs or
+  outputs), `description` must be restated, word for word if it still holds; a changed purpose
+  goes there too. An unchanged process keeps its description.
+- An area holding an action that changed must have its text restated. `groups` on an edit is
+  per area: name only the areas a change touched (title + text, or `remove: true`).
+- The surgical writers (`node-insert`, `node-delete`, `node-set-param`, `node-set-query`,
+  `node-replace-text`, `node-add-binding`, `node-bind-var`, `node-set-error-port`,
+  `sql-convert`, `variable-*` on an input/output) take the same documentation through
+  `--doc '{"action": ..., "area": ..., "process": ...}'` (a text replaces, `true` confirms) and
+  refuse without it. Behaviour-preserving ones (`sql-parameterize`, renames, re-layout) ask
+  nothing. Never answer `true` without reading the text you confirm.
+- Areas move with every save (create, edit, the surgical writers, `relayout-process`). A
+  person's free notes on the canvas (shapes that hold no action) are left alone.
+- A change made by hand in the designer after the tool's last save shows up as
+  `ACTION_CHANGED_SINCE_DOCUMENTED` in `process-docs` / `audit` / `verify`: restate that
+  action's description.
 
 Reading it back: `process-docs --id` (one process), `workspace-docs` (every process in a
 workspace with its purpose and gaps; the first read on a workspace you do not know),

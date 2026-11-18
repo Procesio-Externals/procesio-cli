@@ -27,13 +27,22 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-VENV_PY = PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+def _venv_python(platform: str = sys.platform) -> Path:
+    """Where the project venv keeps its interpreter: Scripts/python.exe on Windows, bin/python
+    everywhere else. The launcher scripts make the same choice in the same way."""
+    if platform == "win32":
+        return PROJECT_ROOT / ".venv" / "Scripts" / "python.exe"
+    return PROJECT_ROOT / ".venv" / "bin" / "python"
+
+
+VENV_PY = _venv_python()
 
 
 def python_exe() -> str:
     """The interpreter to launch with. Prefer the project venv. The launcher scripts also
     re-run themselves under it, but a run inside a turn starts no launcher script, so
-    there this choice is the only one made."""
+    there this choice is the only one made. Without a project venv - the container installs
+    its packages for the system interpreter - it is the interpreter that runs this process."""
     return str(VENV_PY) if VENV_PY.exists() else sys.executable
 
 

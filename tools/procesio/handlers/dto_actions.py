@@ -120,6 +120,8 @@ def _make_create(component):
                 out["warnings"] = warnings
             return out
         resp = framework.run_create(component, client, dto, ctx)
+        if component.after_save:
+            component.after_save(dto)
         rid = component.extract_id(resp, dto)
         verified = framework.run_get(component, client, rid, ctx) if rid else None
         out = {"created": True, "component": component.name, "id": rid,
@@ -178,6 +180,8 @@ def _make_edit(component):
             raise UsageError(f"{component.name} does not support edit yet")
         framework.validate_config(component, config)
         resp = component.edit(client, args.id, config, ctx)
+        if component.after_save:
+            component.after_save(resp)
         out = {"edited": True, "component": component.name, "id": args.id, "result": resp}
         documentation = _doc_report(component, ctx, enforce=False)
         if documentation is not None:

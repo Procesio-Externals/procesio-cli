@@ -230,3 +230,16 @@ requires:
       and the tests pass while the first real action fails with browser_error.
     check: '{python} -c "from playwright.sync_api import sync_playwright; p=sync_playwright().start(); p.chromium.executable_path; p.stop()"'
     install: uv run playwright install chromium
+  - name: playwright-chromium-headed-launch
+    kind: browser
+    why: >
+      the browser being INSTALLED is not the browser being able to START. Some Windows
+      security policies block executing anything under %LOCALAPPDATA%, which is
+      Playwright's default install folder, and the headed launch then fails with
+      "spawn UNKNOWN" / "side-by-side configuration is incorrect" - while the
+      headless shell may still start, so the tests pass. This check actually
+      launches headed Chromium for a moment (window off-screen; Windows only).
+    check: '{python} -m tools._lib.browserlaunch --headed'
+    install: >
+      setx PLAYWRIGHT_BROWSERS_PATH C:\ms-playwright (any non-AppData folder), open a
+      NEW shell, then: uv run playwright install chromium

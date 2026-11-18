@@ -226,6 +226,8 @@ def save_flow(client, flow: dict, *, flow_id: str, valid: bool, layout: bool | N
     flow["isValid"] = bool(valid)
     out: dict = {"stamped": bool(valid), "layout": note}
     client.put("/api/Projects", flow)
+    from tools.procesio.dto.process import baseline
+    baseline.record(flow)              # what each action does, as documented now (best effort)
     try:
         stored = client.get(f"/api/Projects/{flow_id}")
         f = stored.get("flow", stored) if isinstance(stored, dict) else stored

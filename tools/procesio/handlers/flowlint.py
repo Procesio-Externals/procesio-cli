@@ -284,7 +284,7 @@ def flow_lint(client, args) -> dict:
     problems = lint_flow_dto(flow, tmpl_sp, target_vars_of)
     # Self-documentation is reported beside the designer check, not inside it: `clean` keeps
     # meaning "the designer will save this", which other gates depend on.
-    doc = docs.read(flow, captions)
+    doc = docs.read(flow, captions, use_baseline=True)
     return {"id": args.id, "title": flow.get("title"), "clean": not problems,
             "problem_count": len(problems), "problems": problems,
             "documentation": {"documented": doc["documented"], "purpose": doc["purpose"],

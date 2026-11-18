@@ -80,7 +80,10 @@ def login(req) -> Any:
         return (400, {"error": "invalid label",
                       "message": "Use a short label like 'personal' or 'work' "
                                  "(lowercase letters, digits, . _ - ). Not an email."})
-    argv = ["run-tool.py", _DRIVER] + _account_args(["auth-login"],
+    # --all-google: one consent covers every Google tool's DEFAULT scopes. The
+    # Workspace admin scopes are opt-in and never in that set (apps.alerts is
+    # rejected for the OAuth client and would fail the whole consent).
+    argv = ["run-tool.py", _DRIVER] + _account_args(["auth-login", "--all-google"],
                                                     "" if label == "default" else label)
     job = jobs.create("google-oauth", argv, stdin_signal=False)
     snap = job.snapshot()

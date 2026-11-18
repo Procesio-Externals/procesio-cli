@@ -158,7 +158,10 @@ Config shapes (full schemas in `dto/<component>/config.schema.json`):
   this process) and `groups` (titled areas on the canvas, required past 3 actions besides
   Start/Stop). Create refuses without them and edit keeps them true
   (`documentation_missing`; `--allow-undocumented` saves anyway); see
-  `dto/process/description.md` and `dto/process/selfdoc.py`.
+  `dto/process/description.md` and `dto/process/selfdoc.py`. The surgical `node-*`,
+  `sql-convert` and `variable-*` writers take the same documentation through `--doc`
+  (`dto/process/docwrite.py`), and a change made by hand in the designer is reported as
+  `ACTION_CHANGED_SINCE_DOCUMENTED` (`dto/process/baseline.py`).
 - **form** - `elements[]` of `{type,label,name,required,options,children,...}`;
   renders at `forms.procesio.app/{tinyUrl}` after a CustomUrl is created.
 - After changing any handler/builder, regenerate the manifest:

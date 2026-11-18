@@ -27,7 +27,7 @@ from pathlib import Path
 
 from tools.procesio.dto import refdata
 from tools.procesio.dto.framework import Component
-from tools.procesio.dto.process import naming, selfdoc
+from tools.procesio.dto.process import baseline, naming, selfdoc
 from tools.procesio.sqlformat import format_sql, is_unreadable
 from tools.procesio.errors import ProcesioAPIError, RemovalBlocked, UsageError
 
@@ -2055,4 +2055,5 @@ COMPONENT = Component(
     edit_ctx=_edit_ctx,
     save_gate=_save_gate,
     doc_gate=selfdoc.gate,
+    after_save=baseline.record,
 )

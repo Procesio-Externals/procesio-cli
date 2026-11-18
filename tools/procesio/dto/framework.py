@@ -55,6 +55,9 @@ class Component:
     # raises errors.DocumentationMissing when the resource does not document itself
     # (unless ctx["_allow_undocumented"]), and returns the report for the result.
     doc_gate: Callable[[dict], Any] | None = None
+    # Called with the saved DTO after a successful create/edit (process: records what each
+    # action does as documented now, for drift detection - dto/process/baseline.py).
+    after_save: Callable[[Any], None] | None = None
 
     @property
     def schema_path(self) -> Path:

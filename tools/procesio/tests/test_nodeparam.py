@@ -1000,8 +1000,10 @@ def _edit_with_findings(monkeypatch, *, stored_valid, before, after):
     monkeypatch.setattr(nodeparams, "_lint", lambda c, f: [])
     monkeypatch.setattr(nodeparams, "run_fe_validation", fe)
     monkeypatch.setattr(nodeparams, "save_flow", fake_save)
+    # documentation is not what these tests check (test_docwrite.py does)
     args = SimpleNamespace(id="p1", node="Node (1)", property="Code", find="return 1;",
-                           replace="return 2;", expect=None, allow_binding_change=False, dry_run=False)
+                           replace="return 2;", expect=None, allow_binding_change=False, dry_run=False,
+                           allow_undocumented=True)
     return nodeparams.node_replace_text(_Client(), args), saved
 
 
@@ -1075,7 +1077,7 @@ def test_variable_add_preserves_the_canvas_on_save(monkeypatch):
     monkeypatch.setattr(nodeparams, "run_fe_validation", lambda c, f: {"clean": True, "errors": []})
     monkeypatch.setattr(nodeparams, "save_flow", fake_save)
 
-    args = SimpleNamespace(id="p1", name="brandNew", data_type="string", direction="output",
+    args = SimpleNamespace(allow_undocumented=True, id="p1", name="brandNew", data_type="string", direction="output",
                            is_list=False, default=None, required=False, dry_run=False)
     res = nodeparams.variable_add(_Client(), args)
     assert res["put"] is True
