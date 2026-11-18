@@ -34,7 +34,10 @@ import threading
 import time
 import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from typing import Callable, Iterable
+from typing import Callable, Iterable, NamedTuple
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import runtime_log  # noqa: E402  (sibling module, standard library only: the one writer of log lines)
 
 CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8"
 PATH = "/metrics"
@@ -613,11 +616,24 @@ def _seconds(value, limit: float = 86400.0) -> float | None:
     return float(value) if math.isfinite(value) and 0 <= value <= limit else None
 
 
+def _named(msg) -> str | None:
+    """A turn's message id as a JSON log line holds it: the id, or nothing when the caller
+    passed the `-` a text line writes for a turn without one."""
+    return msg if isinstance(msg, str) and msg not in ("", "-") else None
+
+
 def _printable(path) -> str:
     """A request path as it may be logged: no query string, no control characters, capped."""
     if not isinstance(path, str):
         return "?"
     return "".join(ch if ch.isprintable() else "?" for ch in path.split("?", 1)[0])[:300]
+
+
+class HttpSummary(NamedTuple):
+    """What one call's HTTP trace held, for the caller's own log line about the call."""
+    requests: int                                   # answered or failed, plus the unfinished ones
+    slowest: tuple[str, str, float, str] | None     # (method, route, seconds, status)
+    unfinished: int                                 # sent and never answered before the call ended
 
 
 def _request_key(event: dict) -> tuple | None:
@@ -634,7 +650,8 @@ def _request_key(event: dict) -> tuple | None:
     return (pid if isinstance(pid, int) and not isinstance(pid, bool) else None, number)
 
 
-def http_trace(text: str | None, kind: str, tool: str, action: str, call_killed: bool) -> None:
+def http_trace(text: str | None, kind: str, tool: str, action: str, call_killed: bool,
+               msg: str = "-") -> HttpSummary | None:
     """Record the HTTP requests one tool call noted in its trace file (tools/_lib/httptrace.py).
 
     `kind` says whether the call was a tool or an agent call; it comes from the bridge, not from
@@ -644,12 +661,19 @@ def http_trace(text: str | None, kind: str, tool: str, action: str, call_killed:
     a start and no end. Everything in `text` was written by the tool and is validated here; a
     line that does not fit is skipped. A request that never ended, and one slower than
     AAT_HTTP_SLOW_LOG_SECONDS, is also logged with its real path - the route alone does not say
-    which resource it was."""
+    which resource it was. `msg` is the turn's message id as a log line writes it; it ends those
+    two lines, so they are found by the same search as the call's own line, and it is never a
+    label.
+
+    Returns a summary of the trace - how many requests, the slowest one by route, how many never
+    ended - or None when nothing was recorded."""
     if not _enabled or not text:
-        return
+        return None
     try:
         slow = _slow_log_seconds()
         logged = 0
+        requests = 0
+        slowest: tuple[str, str, float, str] | None = None
         open_requests: dict = {}
         never_ended: list[dict] = []
         for event in _trace_events(text):
@@ -677,16 +701,24 @@ def http_trace(text: str | None, kind: str, tool: str, action: str, call_killed:
                 else:
                     outcome = _fixed(event.get("x"), _HTTP_ERRORS, ERROR)
                 HTTP_REQUEST_DURATION.observe(seconds, kind, tool, method, route, outcome)
+                requests += 1
+                if slowest is None or seconds > slowest[2]:
+                    slowest = (method, route, seconds, outcome)
                 if seconds >= slow > 0 and logged < HTTP_LOG_LINES_PER_CALL:
                     logged += 1
                     _log(f"slow http request: {tool} {action}: {method} "
-                         f"{_printable(started.get('p'))} -> {outcome} in {seconds:.1f}s")
+                         f"{_printable(started.get('p'))} -> {outcome} in {seconds:.1f}s msg={msg}",
+                         {"Event": "slow_http_request", "MessageId": _named(msg), "Kind": kind, "Tool": tool,
+                          "Action": action, "RequestMethod": method,
+                          "RequestPath": _printable(started.get("p")), "Outcome": outcome,
+                          "Seconds": round(seconds, 1)}, runtime_log.WARNING)
             elif what == "retry":
                 HTTP_RETRIES.add(1, kind, tool, _fixed(event.get("m"), _HTTP_METHODS, OTHER),
                                  http_route(event.get("p")))
         reason = CALL_KILLED if call_killed else TOOL_GAVE_UP
         now = time.time()
-        for started in never_ended + list(open_requests.values()):
+        unfinished = never_ended + list(open_requests.values())
+        for started in unfinished:
             method = _fixed(started.get("m"), _HTTP_METHODS, OTHER)
             route = http_route(started.get("p"))
             HTTP_UNFINISHED.add(1, kind, tool, action, method, route, reason)
@@ -694,20 +726,26 @@ def http_trace(text: str | None, kind: str, tool: str, action: str, call_killed:
             waited = _seconds(now - sent_at) if sent_at is not None else None
             if waited is not None:
                 HTTP_REQUEST_DURATION.observe(waited, kind, tool, method, route, UNFINISHED)
+                if slowest is None or waited > slowest[2]:
+                    slowest = (method, route, waited, UNFINISHED)
             if logged < HTTP_LOG_LINES_PER_CALL:
                 logged += 1
                 age = f" after {waited:.1f}s" if waited is not None else ""
                 _log(f"http request never answered ({reason}): {tool} {action}: {method} "
-                     f"{_printable(started.get('p'))}{age}")
+                     f"{_printable(started.get('p'))}{age} msg={msg}",
+                     {"Event": "http_request_never_answered", "MessageId": _named(msg), "Kind": kind,
+                      "Tool": tool, "Action": action, "RequestMethod": method,
+                      "RequestPath": _printable(started.get("p")), "Reason": reason,
+                      "Seconds": round(waited, 1) if waited is not None else None}, runtime_log.WARNING)
+        return HttpSummary(requests + len(unfinished), slowest, len(unfinished))
     except Exception:  # noqa: BLE001
-        pass
+        return None
 
 
 # --- the listener -----------------------------------------------------------------------------
 
-def _log(message: str) -> None:
-    sys.stderr.write(f"[aat-metrics] {message}\n")
-    sys.stderr.flush()
+def _log(message: str, fields: dict | None = None, level: str = runtime_log.INFO) -> None:
+    runtime_log.write("aat-metrics", message, level=level, fields=fields)
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -758,14 +796,14 @@ def start_listener(host: str = "127.0.0.1") -> ThreadingHTTPServer | None:
     try:
         port = int(raw)
     except ValueError:
-        _log(f"{PORT_ENV}={raw!r} is not a port; metrics are off")
+        _log(f"{PORT_ENV}={raw!r} is not a port; metrics are off", level=runtime_log.WARNING)
         return None
     if port <= 0:
         return None
     try:
         httpd = serve(host, port)
     except (OSError, OverflowError) as e:
-        _log(f"cannot listen on {host}:{port} ({e}); metrics are off")
+        _log(f"cannot listen on {host}:{port} ({e}); metrics are off", level=runtime_log.WARNING)
         return None
     enable()
     _log(f"listening on http://{host}:{port}{PATH}")

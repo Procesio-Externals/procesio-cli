@@ -129,6 +129,8 @@ def apply(config: dict, ctx: dict, nodes: dict, seq: list, dto_vars: list) -> di
     new_vars = _var_names(dto_vars)
     findings: list = []
     actions_report: list = []
+    changed: list = []                     # matched actions whose behaviour differs from the live one
+    added: list = []                       # actions with no live counterpart
     by_cfg = {(a.get("id") or f"a{i}"): a for i, a in enumerate(config.get("actions", []))}
 
     for cid in seq:
@@ -140,6 +142,11 @@ def apply(config: dict, ctx: dict, nodes: dict, seq: list, dto_vars: list) -> di
         cfg = by_cfg.get(cid, {})
         explicit = str(cfg.get("description") or "").strip()
         la = live_match.get(cid)
+        if live is not None:
+            if la is None:
+                added.append(cid)
+            elif fingerprint(la, live_vars) != fingerprint(node, new_vars):
+                changed.append(cid)
         status, desc = "missing", ""
         if explicit:
             desc, status = explicit, "set"
@@ -172,28 +179,74 @@ def apply(config: dict, ctx: dict, nodes: dict, seq: list, dto_vars: list) -> di
         actions_report.append({"id": cid, "name": name, "template": tpl, "status": status,
                                "description": desc})
 
-    # process purpose
+    # what changed in the process as a whole (edit only)
+    removed: list = []
+    io_changed = False
+    if live is not None:
+        kept_ids = {_g(la, "id") for la in live_match.values()}
+        removed = [str(_g(a, "actionName") or _g(a, "actionTemplateName") or "")
+                   for a in (_g(live, "actions", default=[]) or [])
+                   if _g(a, "id") not in kept_ids
+                   and str(_g(a, "actionTemplateName") or "").strip().lower() not in STRUCTURAL]
+        io_changed = _io_contract(_g(live, "variables", default=[]) or []) != _io_contract(dto_vars)
+    structure = {"added": added, "changed": changed, "removed": removed, "io_changed": io_changed}
+    structural = bool(added or changed or removed or io_changed)
+
+    # process purpose: stated, kept, or - after a structural change - to be stated again
     pdesc = str(config.get("description") or "").strip()
     pstatus = "set" if pdesc else "missing"
     if not pdesc and live:
         pdesc = str(_g(live, "description") or "").strip()
         pstatus = "kept" if pdesc else "missing"
+        if pdesc and structural:
+            pstatus = "review"
+            what = ", ".join(x for x in (
+                f"{len(added)} action(s) added" if added else "",
+                f"{len(removed)} removed" if removed else "",
+                f"{len(changed)} changed" if changed else "",
+                "inputs/outputs changed" if io_changed else "") if x)
+            findings.append(_finding(
+                "PROCESS_DESCRIPTION_REVIEW",
+                f"the process changed ({what}) and its purpose was not restated; the live one reads "
+                f"{pdesc!r}. Restate `description` - repeat it word for word if it still holds"))
     if not pdesc:
         findings.append(_finding("PROCESS_DESCRIPTION_MISSING",
                                  "the process has no purpose: set `description` to what it is for, "
                                  "who or what starts it, and what it produces"))
     count = len(actions_report)
     return {"process": {"status": pstatus, "description": pdesc}, "actions": actions_report,
-            "action_count": count, "areas_required": count > THRESHOLD, "findings": findings}
+            "action_count": count, "areas_required": count > THRESHOLD, "findings": findings,
+            "structure": structure}
+
+
+def _io_contract(variables) -> set:
+    """What callers see of a process: its input (10) and output (30) variables."""
+    out = set()
+    for v in variables or []:
+        t = int(_g(v, "type", default=0) or 0)
+        if t in (10, 30):
+            out.add((str(_g(v, "name") or "").strip().lower(), t, str(_g(v, "dataType") or "").lower(),
+                     bool(_g(v, "isList")), bool(_g(v, "isRequired"))))
+    return out
 
 
 def _config_groups(config: dict, nodes: dict, parent_cid: dict) -> list:
+    """The config's `groups` entries, checked. On an edit an entry may carry only what changes:
+    `actions` absent keeps the area's members, `text` absent keeps its text (members/text are
+    then None), and `remove: true` deletes the area."""
     out = []
     seen: dict = {}
     for gi, g in enumerate(config.get("groups") or []):
         title = str(g.get("title") or "").strip()
         if not title:
             raise UsageError(f"groups[{gi}] needs a `title` (the area's name on the canvas)")
+        if g.get("remove"):
+            out.append({"title": title, "remove": True})
+            continue
+        if g.get("actions") is None:
+            out.append({"title": title, "text": None if g.get("text") is None else str(g["text"]).strip(),
+                        "members": None, "source": "config"})
+            continue
         members = []
         for cid in g.get("actions") or []:
             if cid in ("start", "stop") or cid not in nodes:
@@ -207,8 +260,8 @@ def _config_groups(config: dict, nodes: dict, parent_cid: dict) -> list:
                                  f"belongs to one area")
             seen[cid] = title
             members.append(cid)
-        out.append({"title": title, "text": str(g.get("text") or "").strip(), "members": members,
-                    "source": "config"})
+        out.append({"title": title, "text": None if g.get("text") is None else str(g["text"]).strip(),
+                    "members": members, "source": "config"})
     return out
 
 
@@ -253,19 +306,59 @@ def canvas(config: dict, ctx: dict, state: dict, actions: list, id_of: dict, new
     live_acts = (_g(live, "actions", default=[]) or []) if live else []
     keep_notes = areas.free_shapes(live_acts, live_shapes) if live_shapes else []
 
-    if config.get("groups") is not None:
-        groups = _config_groups(config, nodes, parent_cid)
-    elif live:
+    entries = _config_groups(config, nodes, parent_cid) if config.get("groups") is not None else []
+    listed = {e["title"] for e in entries}
+    if live:
+        # An edit starts from the live areas; each `groups` entry restates (or removes) ONE area by
+        # title, and the areas it does not name stay as they are - so restating the one area a
+        # change touched does not mean repeating all of them.
         live_to_cid = {_g(la, "id"): cid for cid, la in (ctx.get("existing_actions") or {}).items()}
         groups, lost = _live_groups(ctx, live_to_cid)
+        moved = {m for e in entries if e.get("members") for m in e["members"]}
+        by_title = {g["title"]: g for g in groups}
+        for g in groups:                   # an action listed under another area moves there
+            gone = [m for m in g["members"] if m in moved]
+            if gone and g["title"] not in listed:
+                lost += [(g["title"], nodes[m].get("ActionName")) for m in gone if m in nodes]
+            g["members"] = [m for m in g["members"] if m not in moved]
+        for e in entries:
+            if e.get("remove"):
+                by_title.pop(e["title"], None)
+                continue
+            g = by_title.get(e["title"])
+            if g is None:
+                if e.get("members") is None:
+                    raise UsageError(f"area {e['title']!r} is new: list its `actions`")
+                g = {"title": e["title"], "text": "", "members": [], "source": "config"}
+                by_title[e["title"]] = g
+            g["source"] = "config"
+            if e.get("members") is not None:
+                g["members"] = list(e["members"])
+            if e.get("text") is not None:
+                g["text"] = e["text"]
+        groups = [g for g in by_title.values() if g["members"]]
         for title, nm in lost:
+            if title in listed:
+                continue
             findings.append(_finding(
                 "AREA_MEMBERS_CHANGED",
                 f"area {title!r} lost the action {nm!r}; its text may still describe it. Restate "
-                f"`groups` (repeat the text if it is still true)"))
-        groups = [g for g in groups if g["members"]]
+                f"that area in `groups` (title + text; repeat the text if it is still true)"))
+        changed = set((state.get("structure") or {}).get("changed") or [])
+        for g in groups:
+            hit = [m for m in g["members"] if m in changed]
+            if hit and g["title"] not in listed:
+                findings.append(_finding(
+                    "AREA_TEXT_REVIEW",
+                    f"area {g['title']!r} holds {', '.join(map(repr, hit))}, which changed what it does; "
+                    f"its text reads {g['text']!r}. Restate that area in `groups` (title + text; repeat "
+                    f"the text if it still holds)"))
     else:
-        groups = []
+        for e in entries:
+            if not e.get("remove") and e.get("members") is None:
+                raise UsageError(f"area {e['title']!r}: list its `actions`")
+        groups = [{"title": e["title"], "text": e.get("text") or "", "members": e["members"],
+                   "source": "config"} for e in entries if not e.get("remove")]
 
     grouped = {m for g in groups for m in g["members"]}
     if state["areas_required"]:

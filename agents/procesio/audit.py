@@ -233,7 +233,7 @@ def documented_intent(flow: dict) -> dict | None:
     except Exception:  # noqa: BLE001 - tool package absent: degrade, never crash the audit
         return None
     try:
-        return docs.read(flow)
+        return docs.read(flow, use_baseline=True)
     except Exception:  # noqa: BLE001 - unknown shape: skip rather than invent a finding
         return None
 

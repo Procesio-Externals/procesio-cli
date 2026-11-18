@@ -10,6 +10,21 @@ there, not here.
 ## [Unreleased]
 
 ### Added
+- `web`: a browser that cannot start because Windows blocks Playwright's Chromium comes back
+  with the remedy in the error (`details.hint`).
+- The MCP bridge's turn log writes JSON lines with the same keys as the platform's services, and
+  a tool call no longer re-reads every manifest.
+- Process documentation stays true through every change. `process-edit` asks to restate the
+  process purpose when actions are added, removed or changed or the inputs/outputs change
+  (`PROCESS_DESCRIPTION_REVIEW`), and an area's text when one of its actions changed
+  (`AREA_TEXT_REVIEW`); `groups` on an edit works per area (name only the areas a change
+  touched, or `remove: true`). The surgical writers (`node-insert`, `node-delete`,
+  `node-set-param`, `node-set-query`, `node-replace-text`, `node-add-binding`,
+  `node-bind-var`, `node-set-error-port`, `sql-convert`, `variable-*` on inputs/outputs) take
+  the same documentation through `--doc` and refuse without it; areas are re-fitted after each
+  of them and `node-insert` places the new action in free canvas. A change made by hand in the
+  designer after the tool's last save is reported as `ACTION_CHANGED_SINCE_DOCUMENTED`.
+  `put-projects` reports the documentation of what it sends.
 - Self-documenting processes. `process-create` and `process-edit` write the process purpose
   (`description`), each action's purpose in the process (`actions[].description`, stored as the
   designer's Description field) and, past 3 actions besides Start and Stop, titled areas on the

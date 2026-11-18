@@ -13,12 +13,13 @@
     "actions": {"type": "array", "items": {"$ref": "#/$defs/action"}},
     "groups": {
       "type": "array",
-      "description": "AREAS on the canvas: each a rectangle drawn behind the actions it groups, with a title and one sentence on what those actions do together. Required when the process has more than 3 actions besides Start and Stop; every top-level action then belongs to exactly one area (a For Each's children go with their container). On edit, omitted keeps the live areas and re-fits them to the new layout.",
-      "items": {"type": "object", "additionalProperties": false, "required": ["title", "text", "actions"],
+      "description": "AREAS on the canvas: each a rectangle drawn behind the actions it groups, with a title and one sentence on what those actions do together. Required when the process has more than 3 actions besides Start and Stop; every top-level action then belongs to exactly one area (a For Each's children go with their container). On edit, `groups` works PER AREA, by title: each entry restates (or, with remove:true, deletes) one area and the areas it does not name are kept as they are, re-fitted to the new layout; an entry may give only `text` (members kept) or only `actions` (text kept). An area whose action changed, was added or removed must be restated this way.",
+      "items": {"type": "object", "additionalProperties": false, "required": ["title"],
         "properties": {
           "title": {"type": "string", "minLength": 1, "description": "area name shown on the canvas, e.g. 'Read the order'"},
-          "text": {"type": "string", "minLength": 1, "description": "one sentence on what the area's actions do together in this process"},
-          "actions": {"type": "array", "minItems": 1, "items": {"type": "string"}, "description": "ids of the config actions in this area (not start/stop)"}}}
+          "text": {"type": "string", "minLength": 1, "description": "one sentence on what the area's actions do together in this process (required for a new area)"},
+          "actions": {"type": "array", "minItems": 1, "items": {"type": "string"}, "description": "ids of the config actions in this area (not start/stop; required for a new area)"},
+          "remove": {"type": "boolean", "description": "edit only: delete this area (its actions must go to another area or the process must drop to 3 actions or fewer)"}}}
     },
     "edges": {
       "type": "array",

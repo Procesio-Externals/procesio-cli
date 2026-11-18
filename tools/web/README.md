@@ -39,6 +39,19 @@ real browser will fail with a `browser_error` telling you to install it.
 > `uv run playwright install chromium --force` (or
 > `.\.venv\Scripts\python.exe -m playwright install chromium --force`).
 
+> **Headed Chromium will not start (`spawn UNKNOWN` / "side-by-side configuration is
+> incorrect")?** Some Windows security policies block running executables from
+> `%LOCALAPPDATA%`, which is where Playwright installs its browsers by default. The headless
+> shell may still start, so tests pass and only a headed launch (a login window) fails.
+> Install the browsers outside AppData: set the user env var `PLAYWRIGHT_BROWSERS_PATH`
+> (e.g. `setx PLAYWRIGHT_BROWSERS_PATH C:\ms-playwright`), open a NEW shell, and re-run
+> `uv run playwright install chromium`. Verify with
+> `python scripts/check-requirements.py --tool web` - its `playwright-chromium-headed-launch`
+> check really launches headed Chromium for a moment and prints this remedy when it cannot.
+>
+> A launch that fails this way returns `browser_error` with the remedy in the
+> message and in `details.hint`.
+
 ## Actions
 
 | Action | Purpose |

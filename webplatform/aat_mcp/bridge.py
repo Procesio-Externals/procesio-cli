@@ -17,6 +17,7 @@ import difflib
 import functools
 import json
 import os
+import re
 import sys
 import tempfile
 import threading
@@ -34,6 +35,7 @@ if _HERE not in sys.path:
     sys.path.insert(0, _HERE)  # sibling modules (turn_credentials) however bridge is imported
 
 import metrics  # noqa: E402  (sibling module: runtime metrics, off unless a listener runs)
+import runtime_log  # noqa: E402  (sibling module: the one writer of log lines)
 import registry  # noqa: E402
 import turn_credentials  # noqa: E402  (sibling module: Web-Api credential lookup per turn)
 from tools._lib.manifest import PROCESIO_TEMPLATE_IDS  # noqa: E402
@@ -119,6 +121,8 @@ def _managed_turn_refusal(agent: str, action: str | None) -> dict | None:
     if (agent.lower(), (action or "").lower()) not in _managed_turn_block():
         return None
     metrics.refusal("managed_turn")
+    log_refusal("managed_turn", agent, action,
+                "the action starts a second orchestration loop inside a managed turn")
     return {"ok": False, "refused": {
         "agent": agent, "action": action, "reason": "managed_turn",
         "message": (f"'{agent} {action}' starts a second orchestration loop, and this turn is already "
@@ -141,6 +145,207 @@ def set_turn_token(token: str | None):
 
 def reset_turn_token(token) -> None:
     _turn_token_ctx.reset(token)
+
+
+# Per-request MESSAGE ID of the turn. Set by the HTTP server from the X-AAT-Message-Id header the
+# worker writes into that turn's opencode config - never from model output. It names the turn on
+# this server's log lines and does nothing else: no decision, cache key or metric label reads it.
+MESSAGE_ID_HEADER = "X-AAT-Message-Id"
+_MESSAGE_ID = re.compile(r"[0-9A-Za-z-]{1,64}")
+_NO_VALUE = "-"  # how a log line writes a value that is absent
+_message_id_ctx: "contextvars.ContextVar" = contextvars.ContextVar("aat_message_id", default=None)
+
+
+def first_message_id(*candidates) -> str | None:
+    """The first of `candidates` that is a usable message id, or None.
+
+    A request can name its turn in two places: the header the worker wrote, and the turn token.
+    The caller passes both, in the order it prefers them. Each is checked on its own, so a header
+    that is present and unusable does not hide the id the token holds."""
+    for value in candidates:
+        if isinstance(value, str) and _MESSAGE_ID.fullmatch(value) is not None:
+            return value
+    return None
+
+
+def set_message_id(value: str | None):
+    """Set the current request's message id; returns a token for reset_message_id().
+
+    Only a short id of letters, digits and hyphens is kept. Anything else counts as absent, so
+    what a header carries can never write a second field, or a second line, into the log."""
+    return _message_id_ctx.set(first_message_id(value))
+
+
+def reset_message_id(token) -> None:
+    _message_id_ctx.reset(token)
+
+
+def message_id() -> str:
+    """The current request's message id as a log line writes it: the id, or `-` without one."""
+    return _message_id_ctx.get() or _NO_VALUE
+
+
+# --- the troubleshooting log ----------------------------------------------------------------------
+#
+# One line on stderr per finished call and per refusal, each naming the turn by its message id, so
+# one search by that id shows what this server did for the turn. stderr, because in stdio mode
+# stdout carries the JSON-RPC stream. A line holds ids, names, codes, counts and durations - never
+# an argument, a result or a credential - and writing it never fails or changes the call.
+
+_LOG_NAME_MAX = 80
+_LOG_MESSAGE_MAX = 300
+_LOG_MESSAGE_SCAN = 4000   # how much of an error message is looked at before it is cut
+_BARE_VALUE = re.compile(r"[A-Za-z0-9_.:/@+-]+")
+# What an error message may quote and a log line must not: a URL's query string, and the value
+# of an Authorization header.
+_QUERY_STRING = re.compile(r"(?<=\S)\?[^\s\"'<>]+")
+_AUTH_VALUE = re.compile(r"\b(bearer|basic)\s+[A-Za-z0-9._~+/=-]{8,}", re.IGNORECASE)
+# Errors whose message quotes an argument of the call. The code says what happened; the text
+# stays out of the log.
+_ARGUMENT_ECHO_CODES = frozenset({"workspace_out_of_turn"})
+# The runner's verdicts on a process that gave no error of its own. The runner builds their
+# message from whatever the process wrote to stdout and stderr, and that output can hold what the
+# tool read or was given: a record, a personal number, the URL of a webhook. The line says what
+# happened in a sentence of its own instead; the exit code is beside it.
+_RUNNER_VERDICTS = {
+    "no_json": "the tool ended without a JSON answer",
+    "nonzero_exit": "the tool ended with an error exit code and no error of its own",
+    "timeout": "the tool did not end in time and was stopped",
+}
+
+
+def _one_line(text: str) -> str:
+    """`text` on one line: every control or other unprintable character becomes a space, and
+    runs of spaces become one."""
+    return " ".join("".join(ch if ch.isprintable() else " " for ch in text).split())
+
+
+def _inside_quotes(text: str) -> str:
+    """`text` as it can stand between two double quotes on a log line, with no escaping.
+
+    A double quote would end the value early. A backslash would be read as the start of an
+    escape: as the last character it turns the closing quote into part of the value, and what
+    follows on the line - real fields, or text made to look like fields - is read as this one.
+    The line uses no escapes at all, so both are replaced rather than escaped: `'` and `/`."""
+    return text.replace('"', "'").replace("\\", "/")
+
+
+def _is_the_tool_s_own_error(result: dict, error) -> bool:
+    """True when `error` is the error object the tool itself wrote in its JSON answer.
+
+    The runner hands that object on as it is, next to the answer it came from. Every other
+    error of a result was built by the runner or by this server."""
+    data = result.get("data")
+    return isinstance(data, dict) and "error" in data and data["error"] == error
+
+
+def _log_name(value) -> str:
+    """A tool name, an action name or an error code as a log line writes it.
+
+    All three can come from the model or from a tool's output, so they are free text: cut,
+    put on one line, and quoted unless they are a plain word - a name with a space or an
+    equals sign in it must not read as more fields. The raw name is kept rather than its
+    registry name: a log line has no cardinality limit, and what was actually sent is what
+    explains a failed call."""
+    if value is None or value == "":
+        return _NO_VALUE
+    if not isinstance(value, str):
+        return f'"<{type(value).__name__}>"'  # a name that is not text: its type says enough
+    text = _one_line(value[:_LOG_NAME_MAX])
+    if not text:
+        return _NO_VALUE
+    return text if _BARE_VALUE.fullmatch(text) else '"' + _inside_quotes(text) + '"'
+
+
+def _log_text(value) -> str:
+    """The start of an error message as a log line writes it inside quotes, or '' for none."""
+    if not isinstance(value, str):
+        return ""
+    text = _QUERY_STRING.sub("", value[:_LOG_MESSAGE_SCAN])
+    text = _AUTH_VALUE.sub(r"\1 [removed]", text)
+    return _inside_quotes(_one_line(text)[:_LOG_MESSAGE_MAX])
+
+
+def _field(value, limit: int = _LOG_NAME_MAX):
+    """A name or a code as a JSON log line holds it: the same cut and the same single line as
+    in the text line, without the quoting - JSON does its own. None for a value that is absent."""
+    if value is None or value == "":
+        return None
+    if not isinstance(value, str):
+        return f"<{type(value).__name__}>"
+    return _one_line(value[:limit]) or None
+
+
+def _log(line: str, fields: dict | None = None, level: str = runtime_log.INFO) -> None:
+    """Write one log line about a call of a turn. `line` is the whole text line; `fields` are
+    its values for the JSON format, where the message id is added to them."""
+    runtime_log.write("aat-mcp", line, level=level, category=runtime_log.TURN,
+                      fields={"MessageId": _message_id_ctx.get(), **(fields or {})})
+
+
+def log_refusal(code: str, name, action, reason: str) -> None:
+    """Write the line of one call that was answered without starting, or instead of, a tool or an
+    agent. `reason` is a fixed sentence of the calling site, never built from the call's
+    arguments. Never raises."""
+    try:
+        _log(f"refused msg={message_id()} tool={_log_name(name)} action={_log_name(action)} "
+             f'code={_log_name(code)} reason="{reason}"',
+             {"Event": "refused", "Tool": _field(name), "Action": _field(action), "Code": _field(code),
+              "Reason": reason}, runtime_log.WARNING)
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _log_call(kind: str, name, action, result, raised: str | None, seconds: float,
+              http: "metrics.HttpSummary | None") -> None:
+    """Write the line of one finished run_tool / run_agent call. Never raises.
+
+    `raised` is the type name of the exception the call ended with, or None. Only the type is
+    logged for an exception, because its text can quote the call's arguments. `http` is the
+    summary of the call's HTTP trace, or None when the call had no trace."""
+    try:
+        ok = raised is None and isinstance(result, dict) and bool(result.get("ok", False))
+        code = message = None
+        if raised is not None:
+            code, message = "exception", raised
+        elif not ok and isinstance(result, dict):
+            error, refused = result.get("error"), result.get("refused")
+            if isinstance(error, dict):
+                code, message = error.get("code"), error.get("message")
+                if (isinstance(code, str) and code in _RUNNER_VERDICTS
+                        and not _is_the_tool_s_own_error(result, error)):
+                    message = _RUNNER_VERDICTS[code]
+            elif isinstance(error, str):
+                message = error
+            elif isinstance(refused, dict):  # the bridge's own refusal carries a reason, not an error
+                code = refused.get("reason")
+        parts = [f"call msg={message_id()}", f"kind={kind}", f"tool={_log_name(name)}",
+                 f"action={_log_name(action)}", f"outcome={'ok' if ok else 'error'}",
+                 f"code={_log_name(code)}", f"seconds={seconds:.3f}"]
+        fields = {"Event": "call", "Kind": kind, "Tool": _field(name), "Action": _field(action),
+                  "Outcome": "ok" if ok else "error", "Code": _field(code), "Seconds": round(seconds, 3)}
+        exit_code = result.get("returncode") if isinstance(result, dict) else None
+        if isinstance(exit_code, int) and not isinstance(exit_code, bool):
+            parts.append(f"exit={exit_code}")
+            fields["ExitCode"] = exit_code
+        if http is not None:
+            parts.append(f"http={http.requests}")
+            fields["HttpRequests"] = http.requests
+            if http.slowest is not None:
+                method, route, took, status = http.slowest
+                parts.append(f'slowest="{method} {route} {took:.1f}s {status}"')
+                fields.update(SlowestRequest=f"{method} {route}", SlowestRequestSeconds=round(took, 1),
+                              SlowestRequestStatus=status)
+            parts.append(f"unfinished={http.unfinished}")
+            fields["UnfinishedRequests"] = http.unfinished
+        if not ok and not (isinstance(code, str) and code in _ARGUMENT_ECHO_CODES):
+            text = _log_text(message)
+            if text:
+                parts.append(f'message="{text}"')
+                fields["Message"] = text
+        _log(" ".join(parts), fields, runtime_log.INFO if ok else runtime_log.WARNING)
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def _user_env() -> dict | None:
@@ -299,7 +504,8 @@ def _run_timeout() -> float:
 _PERSONAL_WORKSPACE = "00000000-0000-0000-0000-000000000000"
 
 
-def _workspace_refusal(kind: str, name: str, args: dict | None) -> dict | None:
+def _workspace_refusal(kind: str, name: str, args: dict | None,
+                       action: str | None = None) -> dict | None:
     """A turn's API key belongs to the turn's workspace only, so a tool on that key that is told
     to act in ANOTHER workspace (--workspace-id) can only be refused by PROCESIO (403) - after a
     full tool start. Answer that here, at once, and say which workspace the turn is in. The
@@ -318,6 +524,8 @@ def _workspace_refusal(kind: str, name: str, args: dict | None) -> dict | None:
         return None
     where = "the user's personal workspace" if turn_ws == _PERSONAL_WORKSPACE else f"workspace {turn_ws}"
     metrics.refusal("workspace_out_of_turn")
+    log_refusal("workspace_out_of_turn", name, action,
+                "the call names a workspace other than the one of the turn")
     return {"ok": False, "error": {
         "code": "workspace_out_of_turn",
         "message": (f"This turn runs in {where}, and its PROCESIO API key is valid only there. Do not pass "
@@ -329,7 +537,8 @@ def _workspace_refusal(kind: str, name: str, args: dict | None) -> dict | None:
 _AUTH_FAILURE_CODES = {"auth_required", "permission_denied", "unauthorized", "forbidden"}
 
 
-def _after_auth_failure(kind: str, name: str, turn_token: str, res: dict) -> dict:
+def _after_auth_failure(kind: str, name: str, turn_token: str, res: dict,
+                        action: str | None = None) -> dict:
     """A tool that runs on the turn's API key gets the key itself, so only its result says the key
     was revoked mid-turn. On a 401/403 from such a tool, ask Web-Api once whether the key stands:
     if not, this answer and every later call of the turn say so and the model is told to stop."""
@@ -345,10 +554,13 @@ def _after_auth_failure(kind: str, name: str, turn_token: str, res: dict) -> dic
     key = known if not known.key else turn_credentials.recheck_key(turn_token)
     if key.key:
         return res  # the key stands: a plain missing permission, the tool's own answer is right
+    log_refusal("procesio_key_unavailable", name, action,
+                "the PROCESIO API key of the turn stopped being valid after the tool ran")
     return _no_key_refusal(key.message or "The AI assistant's PROCESIO API key was revoked.")
 
 
-def _turn_env(kind: str, name: str, turn_token: str, credential: str | None = None) -> dict | None:
+def _turn_env(kind: str, name: str, turn_token: str, credential: str | None = None,
+              action: str | None = None) -> dict | None:
     """Environment for a subprocess run inside a PROCESIO turn.
 
     The subprocess does NOT inherit the container's environment (runner is called with
@@ -377,6 +589,8 @@ def _turn_env(kind: str, name: str, turn_token: str, credential: str | None = No
             key = turn_credentials.fetch_key(turn_token)
         if not key.key:
             metrics.refusal("procesio_key_unavailable")  # the caller answers without starting the tool
+            log_refusal("procesio_key_unavailable", name, action,
+                        "the turn has no usable PROCESIO API key")
             return None
         if spec.is_api_key():
             _procesio_profile(manifest, key, secrets)
@@ -600,8 +814,9 @@ def warm_registry() -> threading.Thread:
         try:
             _scan_registry()
         except Exception as e:  # noqa: BLE001
-            print(f"[aat-mcp] registry warm-up failed ({type(e).__name__}); the first call scans again",
-                  file=sys.stderr, flush=True)
+            runtime_log.write("aat-mcp", f"registry warm-up failed ({type(e).__name__}); "
+                              "the first call scans again", level=runtime_log.WARNING,
+                              fields={"ExceptionType": type(e).__name__})
 
     thread = threading.Thread(target=scan, name="aat-registry-warm-up", daemon=True)
     thread.start()
@@ -1012,8 +1227,9 @@ def warm_metric_labels() -> threading.Thread:
             tools, agents, _ = _scan_registry()
             _index_metric_names(tools, agents)
         except Exception as e:  # noqa: BLE001
-            print(f"[aat-metrics] registry scan for the metric labels failed ({type(e).__name__}); "
-                  f"calls are labelled 'unknown' until the next scan", file=sys.stderr, flush=True)
+            runtime_log.write("aat-metrics", f"registry scan for the metric labels failed "
+                              f"({type(e).__name__}); calls are labelled 'unknown' until the next scan",
+                              level=runtime_log.WARNING, fields={"ExceptionType": type(e).__name__})
 
     thread = threading.Thread(target=scan, name="aat-metrics-labels", daemon=True)
     thread.start()
@@ -1091,32 +1307,42 @@ def _timed_out(result) -> bool:
 
 
 def _measured(kind: str):
-    """Record every call of the wrapped run_tool / run_agent in the runtime metrics: how long it
-    took, whether it succeeded, that it is running, and the HTTP requests its subprocess noted.
-    Changes nothing about the call - the arguments, the result and any exception pass through
-    untouched - and costs nothing while metrics are off."""
+    """Record every call of the wrapped run_tool / run_agent: one log line when it ends, and, in
+    the runtime metrics, how long it took, whether it succeeded, that it is running, and the HTTP
+    requests its subprocess noted. Changes nothing about the call - the arguments, the result and
+    any exception pass through untouched. While metrics are off only the log line is written."""
     def wrap(fn):
         @functools.wraps(fn)
         def call(*args, **kwargs):
-            if not metrics.enabled():
-                return fn(*args, **kwargs)
             # The first parameter is named after the kind (tool= / agent=), the second is action.
             name = args[0] if args else kwargs.get(kind)
             action = args[1] if len(args) > 1 else kwargs.get("action")
-            trace = _open_http_trace()
-            token = _http_trace_ctx.set(trace)
-            result = None
-            seen = None
+            result = raised = http = None
+            # A clock of its own: the metrics clock is read exactly twice per call.
+            started = time.perf_counter()
             try:
-                with metrics.tool_call(kind, lambda: _metric_labels(kind, name, action)) as seen:
-                    result = seen.result = fn(*args, **kwargs)
+                if not metrics.enabled():
+                    result = fn(*args, **kwargs)
                     return result
+                trace = _open_http_trace()
+                token = _http_trace_ctx.set(trace)
+                seen = None
+                try:
+                    with metrics.tool_call(kind, lambda: _metric_labels(kind, name, action)) as seen:
+                        result = seen.result = fn(*args, **kwargs)
+                        return result
+                finally:
+                    _http_trace_ctx.reset(token)
+                    if trace:
+                        http = metrics.http_trace(
+                            _take_http_trace(trace), kind, getattr(seen, "tool", metrics.UNKNOWN),
+                            getattr(seen, "action", metrics.UNKNOWN), _timed_out(result),
+                            msg=message_id())
+            except BaseException as e:
+                raised = type(e).__name__
+                raise
             finally:
-                _http_trace_ctx.reset(token)
-                if trace:
-                    metrics.http_trace(_take_http_trace(trace), kind,
-                                       getattr(seen, "tool", metrics.UNKNOWN),
-                                       getattr(seen, "action", metrics.UNKNOWN), _timed_out(result))
+                _log_call(kind, name, action, result, raised, time.perf_counter() - started, http)
         return call
     return wrap
 
@@ -1142,16 +1368,16 @@ def run_tool(tool: str, action: str | None, args: dict[str, Any] | None,
         argv = ([action] if action else []) + runner.flags_from(args)
         turn_token = _turn_token_ctx.get()
         if turn_token:
-            refusal = _workspace_refusal("tool", tool, args)
+            refusal = _workspace_refusal("tool", tool, args, action)
             if refusal is not None:
                 return refusal
-            env = _turn_env("tool", tool, turn_token, credential)
+            env = _turn_env("tool", tool, turn_token, credential, action)
             if env is None:
                 return _no_key_refusal(turn_credentials.fetch_key(turn_token).message)
             return _after_auth_failure("tool", tool, turn_token,
                                        runner.run_tool(tool, argv, env=_with_http_trace(env),
                                                        inherit_env=False,
-                                                       timeout=_run_timeout()))
+                                                       timeout=_run_timeout()), action)
         return runner.run_tool(tool, argv, env=_with_http_trace(_user_env()), timeout=_run_timeout())
 
 
@@ -1171,16 +1397,16 @@ def run_agent(agent: str, action: str | None, args: dict[str, Any] | None,
         argv = ([action] if action else []) + runner.flags_from(args)
         turn_token = _turn_token_ctx.get()
         if turn_token:
-            refusal = _workspace_refusal("agent", agent, args)
+            refusal = _workspace_refusal("agent", agent, args, action)
             if refusal is not None:
                 return refusal
-            env = _turn_env("agent", agent, turn_token, credential)
+            env = _turn_env("agent", agent, turn_token, credential, action)
             if env is None:
                 return _no_key_refusal(turn_credentials.fetch_key(turn_token).message)
             return _after_auth_failure("agent", agent, turn_token,
                                        runner.run_agent(agent, argv, env=_with_http_trace(env),
                                                         inherit_env=False,
-                                                        timeout=_run_timeout()))
+                                                        timeout=_run_timeout()), action)
         return runner.run_agent(agent, argv, env=_with_http_trace(_user_env()), timeout=_run_timeout())
 
 

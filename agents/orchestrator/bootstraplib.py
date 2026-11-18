@@ -7,7 +7,11 @@ and this module is the guidance engine:
 - **Templates** live in the FRAMEWORK, beside the component that owns them, as
   ``<name>.template.json`` (e.g. ``agents/email-classifier/accounts.template.json``).
   They contain placeholders only - never real user data - and map to
-  ``context-state-knowledge/config/<component>/<name>.json``.
+  ``context-state-knowledge/config/<component>/<name>.json``. The component is the
+  template's folder name, unless the template declares ``"_component": "<name>"``
+  (a template that lives in a shared, non-component folder - e.g. ``tools/_lib/`` -
+  MUST declare it; failing that, a template in a ``_``-prefixed folder maps to its
+  own stem, so ``tools/_lib/identity.template.json`` -> ``config/identity/``).
 - **freshness()** decides "fresh start": zero records in the store AND zero files
   under config/. A brand-new (or wiped) install trips it; the orchestrator and
   curator surface it so the driver prompts the user instead of acting blind.
@@ -17,7 +21,7 @@ and this module is the guidance engine:
 """
 from __future__ import annotations
 
-import shutil
+import json
 from pathlib import Path
 
 from tools._lib import userdata
@@ -27,6 +31,26 @@ FRAMEWORK_ROOT = Path(__file__).resolve().parents[2]
 _TEMPLATE_SUFFIX = ".template.json"
 # Only the top level of each component dir - deep matches would pick up fixtures.
 _TEMPLATE_GLOBS = ("tools/*/*.template.json", "agents/*/*.template.json")
+_COMPONENT_KEY = "_component"
+
+
+def template_component(tpl: Path) -> str:
+    """The config component a template seeds.
+
+    Precedence: an explicit ``"_component"`` key inside the template, else - for a
+    template in a shared ``_``-prefixed folder (``tools/_lib``), which is NOT a
+    component - the template's own stem, else the folder name. Never returns a
+    ``_``-prefixed name: that would create a config dir no component reads."""
+    try:
+        data = json.loads(tpl.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = None
+    declared = data.get(_COMPONENT_KEY) if isinstance(data, dict) else None
+    if isinstance(declared, str) and declared.strip():
+        return declared.strip()
+    if tpl.parent.name.startswith("_"):
+        return tpl.name[: -len(_TEMPLATE_SUFFIX)]
+    return tpl.parent.name
 
 
 def find_templates() -> list[dict]:
@@ -35,7 +59,7 @@ def find_templates() -> list[dict]:
     base = userdata.base()
     for pattern in _TEMPLATE_GLOBS:
         for tpl in sorted(FRAMEWORK_ROOT.glob(pattern)):
-            component = tpl.parent.name
+            component = template_component(tpl)
             target_name = tpl.name[: -len(_TEMPLATE_SUFFIX)] + ".json"
             target = base / "config" / component / target_name
             out.append({
@@ -147,7 +171,15 @@ def bootstrap(ctx, *, with_templates: bool = False) -> dict:
                 skipped.append(t["target"])
                 continue
             target.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(FRAMEWORK_ROOT / t["template"], target)
+            data = (FRAMEWORK_ROOT / t["template"]).read_bytes()
+            try:
+                # "x" = exclusive create: never clobbers a file that appeared
+                # between the exists() check and the write.
+                with open(target, "xb") as fh:
+                    fh.write(data)
+            except FileExistsError:
+                skipped.append(t["target"])
+                continue
             copied.append(t["target"])
 
     return {

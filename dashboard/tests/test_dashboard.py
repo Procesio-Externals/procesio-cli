@@ -121,10 +121,11 @@ def test_google_login_builds_account_argv(monkeypatch):
 
     monkeypatch.setattr(google.jobs, "create", fake_create)
     google.login(_Req({"account": "work"}))
-    assert captured["argv"] == ["run-tool.py", "google-mail", "auth-login", "--account", "work"]
+    assert captured["argv"] == ["run-tool.py", "google-mail", "auth-login", "--all-google",
+                                "--account", "work"]
     captured.clear()
     google.login(_Req({"account": "default"}))  # default -> no --account
-    assert captured["argv"] == ["run-tool.py", "google-mail", "auth-login"]
+    assert captured["argv"] == ["run-tool.py", "google-mail", "auth-login", "--all-google"]
 
 
 def test_google_login_rejects_email_label():

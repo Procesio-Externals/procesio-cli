@@ -71,11 +71,48 @@ saves anyway. Edit resolves what the config omits against the live flow:
 
 | config omits... | the edit... |
 |---|---|
-| `description` | keeps the live process purpose |
+| `description`, process unchanged | keeps the live process purpose |
+| `description`, process CHANGED (an action added, removed or changed, or the input/output variables changed) | refuses: `PROCESS_DESCRIPTION_REVIEW` - restate it, word for word if it still holds |
 | an action's `description`, action unchanged | keeps the live text |
 | an action's `description`, action CHANGED (type or parameters, compared GUID-free, timestamps and number formatting normalised) | refuses: `ACTION_DESCRIPTION_STALE` - restate it, word for word if the purpose is the same |
 | a NEW action's `description` | refuses: `ACTION_DESCRIPTION_MISSING` |
-| `groups` | reads the areas off the live shapes and re-fits them; refuses `ACTION_UNGROUPED` for a new action outside every area and `AREA_MEMBERS_CHANGED` when an area lost an action (restate `groups`) |
+| `groups` (or the area concerned) | reads the areas off the live shapes and re-fits them; refuses `ACTION_UNGROUPED` for a new action outside every area, `AREA_MEMBERS_CHANGED` when an area lost an action, and `AREA_TEXT_REVIEW` when an area holds an action that changed |
+
+**`groups` on an edit works per area, by title.** Each entry restates one area and the areas it
+does not name stay as they are, so a change that touches one area restates only that one:
+`{"title": "Read the order", "text": "..."}` (members kept), `{"title": ..., "actions": [...]}`
+(text kept), both, or `{"title": ..., "remove": true}`. Listing an action under another area
+moves it there (and asks to restate the area it left).
+
+### The same contract for every other writer
+
+The surgical writers change a live process in place and take the same documentation through
+one argument (`dto/process/docwrite.py`):
+
+    --doc '{"action": "<purpose>" | true, "area": {"title": ..., "text": ...} | true,
+            "process": "<purpose>" | true}'
+
+A text replaces, `true` confirms the current one is still right. Each asks only what its change
+can make untrue: `node-set-param`, `node-set-query`, `node-replace-text`, `node-add-binding`,
+`node-bind-var` and `sql-convert` (the action now does something else) ask for the action, its
+area and the process; `node-insert` for the new action's purpose, its area (an existing title to
+join, or a new title + text) and the process; `node-delete` for the area it leaves (an area left
+empty is removed) and the process; `node-set-error-port` for the process; `variable-*` for the
+process when the variable is an input or an output. Behaviour-preserving writers
+(`sql-parameterize`, `rename-actions`, `node-repair-designer`, `process-rename`,
+`relayout-process`) ask nothing. Missing documentation stops the save with
+`documentation_missing`; a dry run reports it; `--allow-undocumented` saves anyway. The area
+shapes are re-fitted after every such change, and `node-insert` re-tidies the new action into
+free canvas first. `put-projects` (a raw PUT) enforces nothing but reports the documentation of
+what it sends.
+
+### Changes made by hand in the designer
+
+The designer keeps nothing extra in a process, so every save the tool makes records, in this
+machine's user data, what each action did and what it said (`dto/process/baseline.py`).
+`process-docs`, `workspace-docs`, `flow-lint`, `audit` and `verify` then report
+`ACTION_CHANGED_SINCE_DOCUMENTED` for an action that does something else since, while its
+description stayed the same. It sees only changes after a save by the tool on the same machine.
 
 Every result carries a `documentation` block (`documented`, per-action `status`
 set/kept/stale/missing/generic, `areas`, `findings`). Read it back with `process-docs`,

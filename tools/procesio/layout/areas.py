@@ -392,24 +392,58 @@ def free_shapes(actions: list[dict], shapes: list[dict]) -> list[dict]:
             and base_title(_g(s, "title", default="") or "") not in area_titles]
 
 
-def refit(old_actions: list[dict], new_actions: list[dict], shapes: list[dict], new_id) -> list[dict]:
-    """Re-fit area shapes after the actions moved (a re-layout): membership is read on the OLD
-    positions, the rectangles are recomputed around the NEW ones. Free notes stay put. Shape
-    ids, titles, texts and styles are kept."""
-    if not shapes:
-        return shapes
-    groups = groups_from_shapes(old_actions, shapes)
-    if not groups:
+def rebuild(old_actions: list[dict], new_actions: list[dict], shapes: list[dict], new_id, *,
+            add: dict | None = None, remove: set | None = None, texts: dict | None = None,
+            new_areas: dict | None = None) -> list[dict]:
+    """Re-fit the area shapes after a change to the process: membership is read on the OLD
+    actions and positions, then `remove` (action ids) leave their areas, `add` ({action id:
+    area title}) join one - a title no area has yet opens a new area whose text is in
+    `new_areas` ({title: text}) - and `texts` ({title: text}) replace an area's text. The
+    rectangles are fitted around the NEW positions. An area left with no action disappears
+    with its rectangles; free notes stay put; shape ids, titles and styles are kept."""
+    add, remove, texts, new_areas = add or {}, set(remove or ()), texts or {}, new_areas or {}
+    groups = groups_from_shapes(old_actions, shapes) if shapes else []
+    if not groups and not add:
         return shapes
     by_title = {}
-    for s in shapes:
+    for s in shapes or []:
         by_title.setdefault(base_title(_g(s, "title", default="") or ""), s)
+    for g in groups:
+        g["members"] = [m for m in g["members"] if m not in remove and m not in add]
+    known = {g["title"]: g for g in groups}
+    for aid, title in add.items():
+        g = known.get(title)
+        if g is None:
+            g = {"title": title, "text": (new_areas.get(title) or "").strip(), "shape_ids": [None],
+                 "members": []}
+            groups.append(g)
+            known[title] = g
+        g["members"].append(aid)
+    for title, text in texts.items():
+        if title in known:
+            known[title]["text"] = (text or "").strip()
+    groups = [g for g in groups if g["members"]]
     spec, keyed = [], []
     for gi, g in enumerate(groups):
         first = by_title.get(g["title"]) or {}
         spec.append({"key": gi, "title": g["title"], "text": g["text"], "id": g["shape_ids"][0],
                      "style": _g(first, "style")})
         keyed.append((gi, g["members"]))
-    boxes = node_boxes(new_actions)
-    rects = fit(boxes, keyed, {s["key"]: (s["title"], s["text"]) for s in spec})
-    return free_shapes(old_actions, shapes) + to_shapes(spec, rects, new_id)
+    rects = fit(node_boxes(new_actions), keyed, {s["key"]: (s["title"], s["text"]) for s in spec})
+    notes = free_shapes(old_actions, shapes) if shapes else []
+    return notes + to_shapes(spec, rects, new_id)
+
+
+def area_of(actions: list[dict], shapes: list[dict], action_id: str) -> str | None:
+    """Title of the area an action (or its For Each container) sits in, or None."""
+    top = top_level_of(actions).get(action_id, action_id)
+    for g in groups_from_shapes(actions, shapes or []):
+        if top in g["members"]:
+            return g["title"]
+    return None
+
+
+def refit(old_actions: list[dict], new_actions: list[dict], shapes: list[dict], new_id) -> list[dict]:
+    """Re-fit area shapes after the actions moved (a re-layout): `rebuild` with no change of
+    membership. Free notes stay put; shape ids, titles, texts and styles are kept."""
+    return rebuild(old_actions, new_actions, shapes, new_id)
