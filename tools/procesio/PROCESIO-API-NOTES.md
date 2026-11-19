@@ -4625,6 +4625,45 @@ bite on a body push specifically:
   stdin form, and a newline-bearing value quoted onto a Windows command line is where bytes get
   lost.
 
+### Several surgical edits: one save, and one writer at a time
+
+Every surgical writer reads the whole flow, changes one thing, and saves the whole flow.
+Two consequences follow, and both matter most for a caller that sends several edits in one
+step, as an assistant does.
+
+- **Cost.** Each edit pays for a validation and a save of the whole process, and edits that
+  run together slow each other down. `node-edit-batch --id <proc> --changes '[...]'` applies a
+  list of changes to ONE copy of the flow and runs the tail once. A change is
+  `{op, node, ...}` with `op` one of `set`, `bind`, `add-binding`, `replace-text`, and each
+  means what the single writer of that name does. The list is applied whole or not at all: a
+  change that cannot be applied refuses the list and names its position, before anything is
+  validated or saved. Use the batch whenever there is more than one change. A refusal inside
+  the list names the KEY of a change (`'allow_binding_change'`, `'bind'`), not the flag of the
+  single writer the message came from: the batch has no such flag to pass.
+- **Documentation in a batch.** The batch follows the contract of every surgical writer
+  (`docwrite.py`): each node that a change alters needs its purpose and its area's text
+  restated or confirmed, and the process needs its own. A change carries its node's part under
+  `doc` (`{"action": ..., "area": ...}`); `--doc` carries `{"process": ...}` and may carry an
+  `action` and an `area` that stand for every node whose change gives none. Every node is
+  checked before anything is refused, so one answer lists all that is missing.
+- **Lost changes.** Two writers that run together both read the same version, and the second
+  save discards the first change. Both report success. Every writer in `handlers/nodeparams.py`
+  therefore holds a lock on the process id from its read to its save
+  (`handlers/editlock.py`). A writer that waits longer than the lock allows fails with
+  `process_busy`, having read and written nothing, so it is safe to repeat.
+- **A lock orders only the writers that look in the same folder.** The lock is a file, and a
+  server that isolates tool calls gives each call a temp folder of its own, so a lock kept in
+  the temp folder is seen by nobody else and orders no one. The folder is therefore a setting,
+  `AAT_LOCK_DIR`: one path that every tool call on the machine is given and can write. The
+  runner passes it to an isolated call, and the aat-runtime entry point makes the folder for
+  the tool group. Without the setting the temp folder is used, which is right where every call
+  shares one. An edit that had to run without the lock says `unserialized` in its result.
+- **What the lock does not cover.** Only the writers of `handlers/nodeparams.py` take it.
+  `process-edit`, the layout actions (`relayout-process`) and `process-docs` also save a whole
+  process, without the lock: one of those running beside a surgical edit can still overwrite
+  it, or be overwritten. Neither does the lock see a save made in the Process Designer or a
+  writer on another machine; for all of these the platform keeps the last write.
+
 ## An arithmetic `Add` node can be a silent no-op
 
 Seen live on a flow that computed `year = year + (-1)`: an **`Add`** action (template

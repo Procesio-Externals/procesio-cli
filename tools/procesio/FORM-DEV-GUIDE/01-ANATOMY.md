@@ -173,6 +173,14 @@ list of events as the value (`trigger.ts::getTriggersDataByKey` wraps it with th
 debounce); `form-get-element-events` reads both shapes, and `form-set-element-event`
 writes `{debounce, events}`.
 
+**Older forms really do carry the bare list, so every reader must accept both shapes.** In a
+workspace with forms built over several platform versions, the older ones stored every element
+event as a bare list. A reader that only looks for `value.events` sees those forms as having no
+element events at all, without any error: `form-digest` did exactly that until it was fixed, and
+one form with ten RUN_PROCESS buttons read as having none. When you count, map or strip a
+form's process calls (a duplicate that must call nothing, an audit), read both shapes, and check
+the result with a plain search for `"RUN_PROCESS"` in the DTO.
+
 ### Trigger → config key → event type
 
 | `on` | config key | `type` |
@@ -180,7 +188,7 @@ writes `{debounce, events}`.
 | click | `onClickEvents` | `CLICK` |
 | input / change | `onInputEvents` | `INPUT` |
 | focus / blur / hover | `onFocusEvents` / `onBlurEvents` / `onHoverEvents` | `FOCUS` / `BLUR` / `HOVER` |
-| ready | `onReadyEvents` | `READY` |
+| ready | `onReadyEvents` | `READY` (only `chat` has the slot; no other element template does, `file-upload`, `button`, `table` and `columns` included. For "run once when the form opens" use a form-level `FORM_LOAD` RUN_JAVASCRIPT in `data.events`) |
 | open / close | `onOpenEvents` / `onCloseEvents` | `SIDE_PANEL_OPEN` / `SIDE_PANEL_CLOSE` |
 | tabchange | `onTabChangeEvents` | `TAB_CHANGE` |
 | rowadded / rowdeleted | `onTableRowAddedEvents` / `onTableRowDeletedEvents` | `TABLE_ROW_ADDED` / `TABLE_ROW_DELETED` |

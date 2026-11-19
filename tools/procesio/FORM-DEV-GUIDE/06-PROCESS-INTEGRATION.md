@@ -135,6 +135,15 @@ id from the launch URL; `/variables` carries both ids. A required process input 
 is empty is refused at publish: `HTTP 400 statusCode 373 "Missing required input for variables:
 <name>"`, nothing launches.
 
+**A hand-made launch does not run, even from inside the form page (measured 2026-11-18).** The publish
+body is `[{"id": <process variable id>, "value": …}]` and the only header besides the content type is
+`formtemplateworkspaceid`; no cookie or token is involved. Replaying that pair with a fresh client-minted
+instance id answered `publish 200` and then `launch 500` (`statusCode 100`, "An unexpected error
+occurred.") for a process the form IS wired to as well as for one it is not, both from a plain HTTP client
+and from `fetch` inside the live public form with the page's own `connectionId`. So the test could not tell
+whether a public form can start a process it is not wired to. Do not rely on it either way: a form-facing
+process must check identity and rights itself, on the server, as if anyone could call it.
+
 A File output mapped to a control is fetched ONCE, right after the run, by
 `GET /api/formProcess/download` with no query string: the file is named by request HEADERS
 (`flowtemplateid`, `formtemplateid`, `instanceid`, `variableid`, `workspaceid`, `uploadfilepath` =
@@ -389,6 +398,29 @@ live (2026-11): with an address the mail action rejects, the child ended in stat
 in 50 with its output intact, and the visitor saw the normal confirmation. That failure is silent, so it shows
 only in the child's run list.
 
+### An OAuth sign-up page: the form never holds the client secret
+
+A public form that sends a company to a provider's OAuth consent page tends to carry the whole authorize
+URL as static text, `client_secret` included, so anyone who opens the form can read the application's secret.
+The authorize step needs only `client_id`, `response_type`, `redirect_uri` and `state`; the secret belongs in
+the code-for-token exchange, which runs in a process, from a credential.
+
+- **A process builds the link.** It draws a random `state`, stores only its SHA-256 hash with an expiry
+  (a quarter of an hour is plenty) and returns the URL. The return step checks the hash, accepts it once
+  (stamp a used-at column), and only then exchanges the code. Nothing in the form or in its outputs is a
+  secret, so the page can stay public.
+- **Point `redirect_uri` at the form's own public URL with a view parameter** (`?v=token`). The runtime reads
+  `code` and `state` from the address and fills the field itself, so "copy the link from your browser bar"
+  becomes a fallback rather than the flow. Verified live (2026-11, provider simulated): opening the form's
+  public URL with `code` and `state` in the query filled the field, and the registration completed without a
+  paste. A real provider also requires the URL to be registered as an allowed redirect.
+- **Rate-limit the start globally.** A page without accounts has nobody to limit per user, so cap starts per
+  hour in a setting and answer with a clear "try again later".
+- **Send no e-mail from the start step.** Anyone can type any address into a public form, so a start that
+  mails the address turns the form into a mail relay. Confirm on screen; let an administrator notify later.
+- **Test for leaks in the rendered page, not in the code you meant to ship:** search the live DOM for
+  `client_secret`, `access_token`, `refresh_token` and `Bearer` after each step.
+
 ### Availability a person can maintain: one table of weekdays, two of dates
 
 When a business opens on some weekdays with exceptions both ways, keep three stores: weekdays with an active tick
@@ -412,6 +444,11 @@ it in both places: a closed date beats everything, then an open date, then the w
   setting for the run, restore it in a `finally`, and read it back.
 
 ## Data store from a form (not an element - an event action)
+
+**Read a data store this way, never through a process.** A process that only reads rows for
+the form costs a process run per click: about 266 ms against about 30 ms in a production
+measurement, plus a process instance every time. Use a READ for one store with filters, or a
+saved query (below) for SQL.
 
 A form talks to a data store through an **event action**, not a dedicated element. On any
 element's `field-events`, add an `Event` with `action: "RUN_DATA_STORE_OPERATION"` and a

@@ -220,9 +220,11 @@ exercised live and the runtime diagnostics are clean. Screenshots alone are not 
 - **Theme + alignment (new):** if the form uses dark mode, toggle it and confirm the
   16-var palette applies; if it uses element alignment, confirm the `--fd/--jc/--ai`
   vars lay the container out - both only in a REAL browser (`form-theme-render`).
-- **Data Store trigger (new):** a `RUN_DATA_STORE_OPERATION` control must run its
-  READ/ADD/UPDATE/DELETE against the store and map the result back
-  (`form-datastore-trigger`). See the `datastore` guidance topic.
+- **Data Store trigger:** a `RUN_DATA_STORE_OPERATION` control must run its
+  READ/ADD/UPDATE/DELETE, or its saved QUERY, against the store and map the result back
+  (`form-datastore-trigger`). A form event that runs a process only to read a Data Store is
+  a design fault: replace it with this trigger (the process audit flags it as
+  `datastore-read-only`). See the `datastore` guidance topic.
 
 ### C2. Data Store (standalone)
 - Round-trip a store: add → filtered read → update-by-PK → delete, asserting

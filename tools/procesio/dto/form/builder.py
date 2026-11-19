@@ -27,6 +27,7 @@ import uuid
 from functools import lru_cache
 from pathlib import Path
 
+from tools.procesio import formlint
 from tools.procesio.client import VARIABLES_ONLY
 from tools.procesio.dto.form import fieldpath, queries as form_queries
 from tools.procesio.dto.framework import Component
@@ -412,11 +413,9 @@ def _resolve_late_field_refs(elements: list, ctx) -> None:
 
     for el in elements:
         for cfg in el.get("configs") or []:
-            val = cfg.get("value")
-            if not isinstance(val, dict):
-                continue
-            for ev in val.get("events") or []:
-                ecfg = (ev or {}).get("config") or {}
+            # {debounce, events} or a bare list of events (older / hand-written slots)
+            for ev in formlint.slot_events(cfg.get("key"), cfg.get("value")):
+                ecfg = ev.get("config") or {}
                 # A query event's left side is a parameter or output NAME (`count`, `rows`),
                 # never a field, even when a field happens to share it.
                 is_query = ecfg.get("operation") == "QUERY"
@@ -436,6 +435,14 @@ def _resolve_late_field_refs(elements: list, ctx) -> None:
                                 f"a query's rows cannot fill table {target!r}: only a dynamic "
                                 f"table (dynamic: true) takes them, through its row's source. "
                                 f"Written anywhere else the rows arrive with every cell empty.")
+                elif ev.get("action") == "RUN_PROCESS":
+                    # A process's list output fills a dynamic table the same way: through
+                    # its row's source (verified in the form runtime). The form side of a
+                    # process map is `right`.
+                    for row in ecfg.get("outputMap") or []:
+                        target = row.get("right")
+                        if isinstance(target, str) and target in row_sources:
+                            row["right"] = row_sources[target]
                 for key in ("inputMap", "outputMap", "mapping"):
                     fix(ecfg.get(key), sides)
 

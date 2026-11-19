@@ -10,6 +10,21 @@ there, not here.
 ## [Unreleased]
 
 ### Added
+- A form that needs Data Store rows reads them itself: a Data Store event on the element
+  (READ, or QUERY running one of the form's saved SQL queries), not a process. The guidance
+  says so wherever forms are built, and the agent's `audit` reports `datastore-read-only` for
+  a process that only reads a Data Store. Measured on production: a saved query answers in
+  about 30 ms in one call, the same read through a one-action process in about 270 ms, with a
+  process instance per click. Production keeps saved form queries now.
+- `node-edit-batch` applies several node edits to a process in one save (one validation, one
+  lint, one save), whole or not at all. Every node writer holds a lock on the process from its
+  read to its save, in a folder every tool call shares (`AAT_LOCK_DIR`).
+- `--brief` on the create and edit actions returns an outline instead of the whole object,
+  and `form-update --changes-only` lists what a save changes, value by value.
+- The MCP server can publish named tools with their own argument schemas beside the generic
+  ones (`AAT_MCP_SURFACE`: generic, typed or both; generic stays the default).
+- The form guide has a recipe for a full canvas app inside a form, and notes on showing PDFs
+  in your own layout and on checking identity on the server for form-facing processes.
 - `web`: a browser that cannot start because Windows blocks Playwright's Chromium comes back
   with the remedy in the error (`details.hint`).
 - The MCP bridge's turn log writes JSON lines with the same keys as the platform's services, and
@@ -98,6 +113,13 @@ there, not here.
 - Notes cover the Web-Api v2.79.1 and v2.80.0 step and the later production changes.
 
 ### Fixed
+- A process's list output mapped to a dynamic table by name now reaches the table's row
+  source. The builder wrote the bare name, so the table stayed empty with no error.
+- Form readers accept an event slot stored as a bare list: `form-digest` no longer reads an
+  older form as having no process calls, `form-set-element-chains` no longer crashes on one,
+  and the linter checks it.
+- A list for a repeatable argument (such as `--bind`) reaches the tool as one flag per item
+  when it comes from an MCP caller.
 - Canvas areas on a crowded canvas: a group's rectangles grow from its first action and never
   overlap each other or cover another area's action, a header that would run into the row above
   is trimmed instead of splitting the group, and an area drawn as more than 2 rectangles is

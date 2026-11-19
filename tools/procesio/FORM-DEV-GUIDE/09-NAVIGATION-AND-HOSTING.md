@@ -315,3 +315,52 @@ the platform root (`https://<app-host>`, for sign-in or platform admin), and **g
 tiles for forward navigation and `history.back()` for return, a portable pack needs no per-tenant
 URL anywhere. Before shipping, grep the exported forms for `forms.<host>/` and for any
 `admin/process/designer/<guid>` deep-link: both should be zero.
+
+## 10. Analytics on a form (GTM / GA4), conversions, and the `?embed` protocol (measured 2026-11-19)
+
+A customer's marketing team will ask for "our GTM container on the forms host" plus "a distinct
+thank-you page to count as a conversion". Both are possible per form; neither is an installation
+setting.
+
+**What the host allows.** The forms host answers with **no `Content-Security-Policy` and no
+`X-Frame-Options`** header (and no CSP `<meta>` in the shell), so a third-party script loads and
+the page can be framed. Re-check with `curl -sI https://<forms-host>/` before you promise it: a
+later release can add either header.
+
+**Where the tag goes.** There is no tracking field on the DTO and nothing per installation. Put
+the tag snippet in the **form-level JS runtime** ([02](02-CODE-INJECTION.md) §4: installer +
+guarded runtime in `window.parent.document`), so it runs on that one form only. Never ask for a tag
+in the shared host's `index.html`: it would run on every customer's forms.
+
+**There is no second URL to count.** Steps and post-submit sections are section/visibility swaps
+in one SPA route; the URL never changes. Count a conversion as a **`dataLayer` event** pushed when
+the success section becomes visible (the runtime's MutationObserver, fire once per page), plus,
+if the marketing side wants a "page", a **virtual `page_view`** with a synthetic `page_path`. A real
+thank-you form reached by `location.assign` ([§2](#2-navigating-from-one-form-to-another---the-proven-recipe))
+also works, but it throws away whatever the success section shows (a request number, a download),
+and anything passed to it in the URL lands in the analytics hit.
+
+**A GTM container is arbitrary JavaScript run by a third party** on a page that may collect ID
+documents, national ID numbers, bank details and signatures. Before installing one: push
+`gtm.allowlist` / `gtm.blocklist` (for example block `html`, `customScripts`, `nonGoogleScripts`)
+into `dataLayer` *before* the container loads, never push field values into `dataLayer`, and
+prefer a bare GA4 `gtag` (measurement id only) when that is all they need. Analytics cookies on
+an EU form need consent: the customer's cookie banner on their own site does not cover the forms
+host (another domain), so the form needs Consent Mode with `denied` defaults and its own banner,
+or the container must bring a CMP configured for the forms host.
+
+**GA4 cross-domain** still needs the GA4 tag on the forms host (the linker reads `_gl` on
+arrival). The linker adds `_gl` to the **query** (keep the default `url_position`; the hash of a
+`/forms/<id>#<workspaceId>` address is the workspace and must not be decorated). Verify in a
+browser that the form still opens with an extra `?_gl=…` before relying on it.
+
+**The `?embed` protocol (framing the form on the customer's own site).** Shell params: `embed`,
+`embedId`, `embedOrigin`, `embedHeader`, `embedTheme`, `embedAutoHeight`. The form posts
+`{source: "procesio-form", version: 1, embedId, type, payload}` to its parent, `type` one of
+`init` / `ready` / `resize` / `submit` / `error`; the host page may send `set-theme` / `measure`.
+`submit` (payload `formInstanceId`, `formTemplateId`, `success`, `messageType`) fires **only on
+the platform's native form submit**, and is not posted at all when no parent origin is known
+(neither `embedOrigin` nor a referrer). A form that finishes through RUN_PROCESS buttons never
+emits it: the form's own runtime must `postMessage` its conversion to the top window, with an
+explicit target origin. Embedding keeps third-party tags off the forms host completely (the
+customer's existing tags see their own page), at the cost of iframe layout and storage caveats.

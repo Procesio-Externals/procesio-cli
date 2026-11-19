@@ -86,6 +86,10 @@ the call's environment like everything else here (`form_code_keys.py`):
 python scripts/set-credential.py procesio form-code-key@Main-QA
 ```
 
+In a turn of the platform's assistant nobody can store a credential. There the key comes
+from the deployment, as the bare `form-code-key`: see "A secret that belongs to the
+installation" in `webplatform/aat_mcp/AAT-MCP-NOTES.md`.
+
 ## Tests / isolation
 
 The suite's autouse `_isolate_userdata` fixture (conftest) pins `AAT_USERDATA_DIR` to a

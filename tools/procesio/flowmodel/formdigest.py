@@ -35,6 +35,16 @@ def unwrap(obj) -> dict:
     return obj if isinstance(obj, dict) else {}
 
 
+def _event_list(value) -> list:
+    """An element's on<Trigger>Events value: {"events": [...]} on current forms, a bare list on
+    older ones. Reading only the dict shape drops every event of an older form silently."""
+    if isinstance(value, dict):
+        return value.get("events") or []
+    if isinstance(value, list):
+        return [ev for ev in value if isinstance(ev, dict)]
+    return []
+
+
 def _data(form: dict) -> dict:
     d = form.get("data") or form.get("Data") or {}
     return json.loads(d) if isinstance(d, str) else d
@@ -202,9 +212,9 @@ def render(form: dict, processes: dict | None = None) -> tuple[str, list[str]]:
             lines.append(" ".join(bits))
             for c in e.get("configs") or []:
                 v = c.get("value")
-                if _EVENT_KEY.match(c.get("key") or "") and isinstance(v, dict) and v.get("events"):
+                if _EVENT_KEY.match(c.get("key") or "") and _event_list(v):
                     trig = c["key"][2:-6]
-                    for ev in v["events"]:
+                    for ev in _event_list(v):
                         body = _event(ev, names, scripts)
                         lines.append(f"{'  ' * (depth + 1)}- on {trig}: {body[0]}")
                         lines.extend(f"{'  ' * (depth + 1)}{b}" for b in body[1:])
@@ -224,8 +234,8 @@ def process_links(form: dict) -> list[dict]:
     for e in data.get("elements") or []:
         for c in e.get("configs") or []:
             v = c.get("value")
-            if _EVENT_KEY.match(c.get("key") or "") and isinstance(v, dict):
-                for ev in v.get("events") or []:
+            if _EVENT_KEY.match(c.get("key") or ""):
+                for ev in _event_list(v):
                     if ev.get("action") == "RUN_PROCESS":
                         out.append({"process_id": (ev.get("config") or {}).get("processId"),
                                     "trigger": c["key"][2:-6], "element": _cfg(e, "name")})

@@ -112,9 +112,10 @@ The actions that carry most real systems, and the shapes they form:
   out contents instead of custom CSS.
 - **Trigger a Data Store operation like a process.** Besides `RUN_PROCESS`, a control can
   raise `RUN_DATA_STORE_OPERATION` (READ/ADD/UPDATE/DELETE) straight against a data store,
-  with input/output maps and (for every op except ADD) filters. Reach for it when the
-  form just needs to read or write a tenant table without authoring a process. See the
-  `datastore` topic.
+  with input/output maps and (for every op except ADD) filters, or QUERY to run one of the
+  form's saved SQL queries. Use it, not a process, whenever the form only reads or writes
+  Data Store rows: one call instead of a process run, about 9x faster in a production
+  measurement. See the `datastore` topic.
 
 ## 6. Shapes in the Process Designer: AREAS that name groups of actions
 

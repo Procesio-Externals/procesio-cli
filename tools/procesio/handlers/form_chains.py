@@ -48,7 +48,7 @@ from tools.procesio.dto.form import fieldpath
 from tools.procesio.errors import UsageError
 from tools.procesio.handlers.common import add_force_arg, add_profile_arg, guard_unchanged
 from tools.procesio.handlers.form_code import _fetch, build_put_body
-from tools.procesio.handlers.form_events import _cfg, _find_element, _resolve_trigger
+from tools.procesio.handlers.form_events import _cfg, _find_element, _resolve_trigger, _slot_data
 
 # Every operator seen in real form/process conditions (counted across exported workspaces).
 OPERATORS = (
@@ -246,8 +246,10 @@ def set_element_chains(client, args) -> dict:
         slot = _cfg(element, cfg_key)
         if slot is None:
             raise UsageError(f"{where}: element {chain['element']!r} has no {cfg_key!r} config")
-        current = slot.get("value") or {}
-        previous = list(current.get("events") or [])
+        # An older or hand-written form stores the slot as a bare list of events; read both
+        # shapes (the chain is written back as {debounce, events}).
+        current = _slot_data(slot.get("value"))
+        previous = [e for e in current.get("events") or [] if isinstance(e, dict)]
         by_id = {e.get("id"): e for e in previous}
 
         new_events, kept = [], []

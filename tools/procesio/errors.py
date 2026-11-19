@@ -116,6 +116,16 @@ class NotPersisted(Exception):
         self.details = details or {}
 
 
+class ProcessBusy(Exception):
+    """Another edit of the same process holds the writer lock and did not finish in the time
+    this call was willing to wait (handlers/editlock.py). Nothing was read or written, so the
+    call is safe to repeat. Maps to 'process_busy', exit code 1."""
+
+    def __init__(self, message: str, details: dict | None = None):
+        super().__init__(message)
+        self.details = details or {}
+
+
 _HTTP_CODES = {
     400: ("invalid_argument", "bad request - check the parameters/body"),
     401: ("auth_required", "authentication failed - token or api-key rejected"),
@@ -235,6 +245,8 @@ def classify(exc: Exception) -> tuple[str, str, dict, int]:
         return "validation_failed", str(exc), exc.report, 2
     if isinstance(exc, NotPersisted):
         return "not_persisted", str(exc), exc.details, 1
+    if isinstance(exc, ProcessBusy):
+        return "process_busy", str(exc), exc.details, 1
     if isinstance(exc, RemovalBlocked):
         return "removal_blocked", str(exc), exc.removed, 2
     if isinstance(exc, DocumentationMissing):

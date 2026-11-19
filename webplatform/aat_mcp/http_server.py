@@ -1,6 +1,7 @@
 """aat-mcp over HTTP (MCP Streamable-HTTP transport) - for containers / k8s, where
-opencode connects as a *remote* MCP client. Reuses server.handle() so stdio and HTTP
-share ONE dispatch + the same reversibility gate.
+opencode connects as a *remote* MCP client. Serves platform_server: the generic tools of
+server.py (the default, so stdio and HTTP share ONE dispatch + the same reversibility
+gate), the named tools of platform_surface.yaml, or both. AAT_MCP_SURFACE chooses.
 
 Endpoint: a single path (default /mcp). Client POSTs a JSON-RPC message (or a batch);
 the server replies with application/json. Notifications (no id) get 202 Accepted. On
@@ -30,13 +31,20 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import metrics  # noqa: E402  (runtime metrics on their own port; off unless AAT_METRICS_PORT is set)
+import platform_server  # noqa: E402  (the tools being served and their dispatch)
 import runtime_log  # noqa: E402  (the one writer of log lines)
-import server  # noqa: E402  (reuse handle/TOOLS/dispatch)
+import server  # noqa: E402  (the generic surface; its bridge binds who a request runs as)
 import turn_token as turn_token_reader  # noqa: E402
 
 PATH = "/mcp"
 HEALTH_PATH = "/health"  # what the liveness and readiness probes ask for
-_MCP_TOOL_NAMES = frozenset(t["name"] for t in server.TOOLS)  # the only values of the mcp_tool label
+
+
+def _mcp_tool_names() -> frozenset:
+    """The names of the tools being served: the only values of the `mcp_tool` metric label and
+    of the tool on an access line. Read from the served list, so a named tool is counted under
+    its own name and the set stays as large as that list, never larger."""
+    return frozenset(t["name"] for t in platform_server.TOOLS)
 
 
 def _log(text: str, *, fields: dict | None = None, level: str = runtime_log.INFO,
@@ -85,10 +93,16 @@ def _asked_for(message) -> tuple:
     params = message.get("params") if isinstance(message.get("params"), dict) else {}
     arguments = params.get("arguments") if isinstance(params.get("arguments"), dict) else {}
     tool = params.get("name")
-    out = [method, tool if isinstance(tool, str) and tool in _MCP_TOOL_NAMES else "other"]
-    target = (server.bridge._field(arguments.get("tool")) or server.bridge._field(arguments.get("agent"))
-              or server.bridge._field(arguments.get("name")))
-    action = server.bridge._field(arguments.get("action"))
+    known = isinstance(tool, str) and tool in _mcp_tool_names()
+    out = [method, tool if known else "other"]
+    # A named tool says in its declaration what it runs; a generic one is told in its arguments.
+    declared = platform_server.target_of(tool) if known else None
+    if declared is not None:
+        target, action = declared
+    else:
+        target = (server.bridge._field(arguments.get("tool")) or server.bridge._field(arguments.get("agent"))
+                  or server.bridge._field(arguments.get("name")))
+        action = server.bridge._field(arguments.get("action"))
     if target or action:
         out.append(target or "-")
     if action:
@@ -160,8 +174,9 @@ def _make_handler(token: str | None):
             self._asked = None  # a connection serves many requests: nothing is carried over
             # Health probe convenience + MCP: no server-initiated SSE stream offered.
             if self.path.rstrip("/") in ("", "/health", "/healthz"):
-                self._send(200, json.dumps({"ok": True, "server": server.SERVER_INFO,
-                                            "tools": [t["name"] for t in server.TOOLS]}
+                self._send(200, json.dumps({"ok": True, "server": platform_server.SERVER_INFO,
+                                            "surface": platform_server.MODE,
+                                            "tools": [t["name"] for t in platform_server.TOOLS]}
                                            ).encode())
                 return
             self._send(405, json.dumps({"error": "GET not supported; POST JSON-RPC to "
@@ -238,8 +253,8 @@ def _make_handler(token: str | None):
                         is_initialize = True
                     # Legacy era only: modern Streamable HTTP requires the Mcp-Method / Mcp-Name
                     # header rules, which this transport does not implement.
-                    with metrics.mcp_request(m, _MCP_TOOL_NAMES) as seen:
-                        resp = seen.response = server.handle(m, modern=False)
+                    with metrics.mcp_request(m, _mcp_tool_names()) as seen:
+                        resp = seen.response = platform_server.handle(m, modern=False)
                     if resp is not None:
                         responses.append(resp)
             finally:
@@ -269,8 +284,10 @@ def main() -> int:
     sys.excepthook = _log_uncaught("aat-mcp-http")
     threading.excepthook = _log_uncaught("aat-mcp-http")
     httpd = _Server((a.host, a.port), _make_handler(a.token or None))
-    _log(f"listening on http://{a.host}:{a.port}{PATH} (auth: {'on' if a.token else 'off'})",
-         fields={"Host": a.host, "Port": a.port, "Auth": bool(a.token)})
+    _log(f"listening on http://{a.host}:{a.port}{PATH} (auth: {'on' if a.token else 'off'}, "
+         f"surface: {platform_server.MODE}, {len(platform_server.TOOLS)} tools)",
+         fields={"Host": a.host, "Port": a.port, "Auth": bool(a.token),
+                 "Surface": platform_server.MODE, "Tools": len(platform_server.TOOLS)})
     # After the port is bound, and in the background: the health probe answers at once, and the
     # first tool call does not start the registry scan itself.
     server.bridge.warm_registry()

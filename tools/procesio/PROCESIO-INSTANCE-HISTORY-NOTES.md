@@ -37,6 +37,12 @@ the envelope can report `pageNumber: 0`.
 
 ## Traps (each cost a real diagnosis)
 
+- ⚠ **`timeConsumed` / `totalTimeConsumed` are billed MILLISECONDS, not wall time.** To know how
+  long an instance took, use `updatedOn - createdOn` on the row (a bridge that calls one
+  subprocess measured ~1.1-1.2 s). On a parent that runs a `Call Subprocess`, the two fields can
+  differ a lot (seen: 484 vs 37) while the wall time stays ~1.2 s; read that gap as time billed
+  elsewhere (most likely the child's), never as seconds of queueing. Reading them as tenths of a
+  second once produced a false "the platform queued the run for 45 s" diagnosis.
 - ⚠ **`filter` values are calendar buckets, not rolling windows.** `LastYear=13` is the
   **previous calendar year**, not "last 12 months"; `ThisYear=8` is the current year.
   A `/history` read with the wrong `filter` returns a well-formed **all-zero envelope
@@ -67,6 +73,13 @@ the envelope can report `pageNumber: 0`.
   action). `/output` (`GetInstanceOutput`) is deprecated ("Not used by FE+BE"); prefer
   `/status`. Casing: **live reads are camelCase; export bundles are PascalCase** - running
   one shape's keys against the other yields a census of zeros.
+- ✅ **With `isArchived=true` (the `get-instance-status` default) a recent finished run DOES carry
+  its values, in `defaultValue`.** Observed 2026-11-17 on runs one day old: INPUT (10) and OUTPUT
+  (30) variables held the run's real values (lists as JSON), and PROCESS (20) ones mostly too, before
+  any retention cleanup. That makes `/history` (filter `8`, this year) + one `/status --variables`
+  per run a complete read-only way to learn a process's real data shapes, without running anything.
+  Those values are production data and include whatever credential literals the process passes
+  around: mask them before saving, and never hand raw `/status` dumps to a report.
 
 ## Reading history from INSIDE a flow - binding matters
 

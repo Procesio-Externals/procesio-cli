@@ -1,0 +1,671 @@
+# The PLATFORM typed surface: the PROCESIO operations the platform's assistant gets as
+# named tools, each with its own argument schema.
+#
+# WHY THIS FILE EXISTS. The generic surface (server.py) offers a few tools that dispatch any
+# registered action. To use an action, a model first searches for it, then asks for its
+# arguments, then runs it. Each of those is a model round trip that does none of the work,
+# and the whole context is sent again with it. A named tool carries its name, its
+# description and its schema in the tool list, so the model calls it in one step and the
+# client checks the arguments before the call is made.
+#
+# It is a separate file from chat_surface.yaml on purpose. That one is a contract with
+# clients outside the company, and changes rarely. This list follows what the assistant
+# is measured to call, and must be free to change without moving that contract.
+#
+# WHAT GOES IN. An action earns a tool when the assistant calls it often: every tool
+# definition is sent with every model request, so a tool nobody calls costs context on
+# all of them. The long tail stays reachable through the generic tools, which this
+# surface is served beside (AAT_MCP_SURFACE=both).
+#
+# RULES, applied when adding an entry:
+#   - `target` is one registered action. A tool that needs several steps gets an action
+#     that does them (node-edit-batch), so this file never carries behaviour and the
+#     conformance tests can check every entry against the registry.
+#   - No workspace, environment or profile argument. A turn runs in one workspace with
+#     one credential, and the bridge refuses any other.
+#   - No argument that names a file. The model's files are not on this machine.
+#   - A JSON argument is declared as an `object` or an `array`, never as a string: the
+#     client then checks its shape. The bridge encodes it for the tool.
+#   - A list of texts is read by a tool in one of two ways: a flag given once per item
+#     (the manifest marks it repeatable), or one flag that takes a JSON list. Say
+#     `json: true` for the second, so the choice is written down.
+#   - `enum` lists the values a text may take, when the tool takes only those.
+#   - A tool over a writer that asks for documentation offers `doc`. Without it every
+#     call would be refused.
+#   - `fixed` holds flags that are always sent and that the caller cannot change.
+#   - A dry run must fit the answer limit. An answer over it is replaced by a message, and
+#     the model then sees nothing of what would be saved. Where the action's dry run
+#     returns the whole object, give the action a way to return less and send it as a
+#     `fixed` flag: what changes (form-update --changes-only), or an outline of the object
+#     (--brief on the create and edit actions). The same holds for the answer of a save
+#     that returns what it stored.
+#   - A change that shows outside the workspace says so in the description, and tells the
+#     model to ask the user first: publishing, opening a form to anonymous visitors,
+#     activating or deactivating a process.
+#   - `read_only: true` means the call changes nothing, anywhere.
+#
+# When this file and the registry disagree, CI fails (tests/test_platform_surface.py).
+
+surface_version: "0.1.0"
+
+# A result lands in the model's context and stays there for the rest of the turn. Above a
+# few tens of kilobytes the client also cuts it into a file, which the model then cannot
+# read back. Per-tool `max_response_bytes` overrides this.
+limits:
+  max_response_bytes: 24000
+
+tools:
+
+  # --- Processes: read --------------------------------------------------------
+  - name: procesio_list_processes
+    title: List processes
+    description: >
+      List the processes of the workspace, newest first. Use it to find the id of a
+      process before you read, edit or run it.
+    target: {tool: procesio, action: list-processes}
+    read_only: true
+    args:
+      - {flag: search, type: string, description: "Only processes whose name contains this text."}
+      - {flag: page, type: integer, description: "1-based page number."}
+      - {flag: page-size, type: integer, expose: page_size, description: "Processes per page."}
+
+  - name: procesio_read_process
+    title: Read a process
+    description: >
+      Read one process as text: its variables, its nodes in execution order, and each
+      node's parameters with ids resolved to names. This is the cheapest way to see what
+      a process does. Call procesio_list_node_parameters in the same step when you are
+      about to edit it.
+    target: {tool: procesio, action: flow-digest}
+    read_only: true
+    max_response_bytes: 40000
+    args:
+      - {flag: in, expose: id, type: string, required: true, description: "The process id."}
+
+  - name: procesio_list_node_parameters
+    title: List the parameters of a process's nodes
+    description: >
+      List the nodes of a process with each parameter's designer label, current value,
+      bound variables, and whether it can be edited as text. The labels and node names it
+      returns are what procesio_edit_process_nodes takes.
+    target: {tool: procesio, action: node-params}
+    read_only: true
+    max_response_bytes: 40000
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: node, type: string, description: "One node's name (canvas label) or id. Omit for every node."}
+
+  - name: procesio_get_process
+    title: Get a process definition
+    description: >
+      Get one process as structured data. Pass compact for a summary of nodes, edges and
+      variables. The full definition can be tens of kilobytes, so ask for it only when
+      you need to send it back with procesio_edit_process.
+    target: {tool: procesio, action: get-process}
+    read_only: true
+    max_response_bytes: 60000
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: compact, type: boolean, description: "Return the structural summary instead of the full definition."}
+
+  - name: procesio_validate_process
+    title: Validate a process
+    description: >
+      Run the checks that the Process Designer runs before it saves: unconnected nodes,
+      missing Start or Stop, empty required fields, leftover placeholders. Returns clean
+      true when nothing blocks a save.
+    target: {tool: procesio, action: process-fe-validate}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: include-be, type: boolean, expose: include_backend, description: "Also run the platform's own validator."}
+
+  # --- Processes: write -------------------------------------------------------
+  - name: procesio_create_process
+    title: Create a process
+    description: >
+      Create a process from one config that holds the WHOLE definition: variables,
+      actions, groups and edges. There is no step that adds a node afterwards. Load the
+      guidance topic playbook before your first use, and pass dry_run to see the
+      validation and an outline of what would be built. The answer never holds the whole
+      process: it lists the variables and the actions by name.
+    target: {tool: procesio, action: process-create}
+    read_only: false
+    fixed: {brief: true}
+    args:
+      - {flag: config, type: object, required: true, description: "The process definition."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and validate; create nothing."}
+
+  - name: procesio_edit_process
+    title: Replace a process definition
+    description: >
+      Replace the definition of an existing process. The config you send is the DESIRED
+      STATE and replaces everything: to add or change one item, send the whole
+      definition with that item changed. To change text or bindings inside nodes, use
+      procesio_edit_process_nodes instead, which does not need the whole definition.
+      The answer never holds the whole process: it lists the variables and the actions
+      by name.
+    target: {tool: procesio, action: process-edit}
+    read_only: false
+    fixed: {brief: true}
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: config, type: object, required: true, description: "The whole desired definition."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and report; change nothing."}
+      - {flag: allow-remove, type: boolean, expose: allow_remove, description: "Permit this edit to remove actions or variables the process has."}
+      - {flag: keep-layout, type: boolean, expose: keep_layout, description: "Keep the canvas positions and place only new actions."}
+
+  - name: procesio_edit_process_nodes
+    title: Change node parameters of a process
+    description: >
+      Make several changes to the parameters of a process's nodes in ONE save: set a
+      parameter's text, bind variables to its placeholders, add a binding, or replace a
+      literal. Put every change you intend into one call: each call validates and saves
+      the whole process. The list is applied whole or not at all, and a change that
+      cannot be applied is named by its position. A change alters what its node does, so
+      the documentation must stay true: give each change a doc for its node, and pass doc
+      for the process. A text replaces; true confirms that the current text is still right.
+    target: {tool: procesio, action: node-edit-batch}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: changes, type: array, items: object, required: true, schema_from_manifest: true,
+         description: "The changes, applied in order."}
+      - {flag: doc, type: object, description: 'Documentation for the whole list: {"process": "<the process purpose now>" or true}. It may also hold an "action" and an "area" that apply to every node whose change gives no doc of its own.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Apply and validate; save nothing."}
+
+  - name: procesio_set_query_node
+    title: Set the statement of a Query Store node
+    description: >
+      Replace the SQL statement of one Query Store node and its Data Store chips
+      together. Write the statement with {{ds:Store}} and {{col:Store.Column}} tokens.
+    target: {tool: procesio, action: node-set-query}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: node, type: string, required: true, description: "The Query Store node's name (canvas label) or id."}
+      - {flag: sql, type: string, required: true, description: "The statement, with {{ds:Store}} / {{col:Store.Column}} tokens."}
+      - {flag: params, type: object, description: 'The Parameters map {name: source}. A source is {"keep": true} or {"var": "<variable name>"}.'}
+      - {flag: doc, type: object, description: 'The documentation this change needs: {"action": "<the node purpose now>" or true, "area": {"text": "<the area text now>"} or true, "process": "<the process purpose now>" or true}. A text replaces; true confirms that the current text is still right.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Render and validate; save nothing."}
+
+  - name: procesio_list_action_types
+    title: List the action types a process can use
+    description: >
+      List the action types (node templates) of the platform, grouped by family, in a
+      compact view. Pass family to get one family's actions.
+    target: {tool: procesio, action: list-actions-catalog}
+    read_only: true
+    args:
+      - {flag: family, type: string, description: "Return only this family's actions."}
+      - {flag: filter, type: string, description: "The platform's own action filter value."}
+
+  - name: procesio_insert_process_node
+    title: Insert an action into a process
+    description: >
+      Insert ONE action into a live process, right after another one. The new node goes
+      between that node and its successor. It is refused when the node it follows has
+      more than one outgoing port. A new action needs its purpose, so pass doc.
+    target: {tool: procesio, action: node-insert}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: after, type: string, required: true, description: "The node to insert after: its name (canvas label) or id."}
+      - {flag: action, type: string, required: true, description: "The action type name from procesio_list_action_types, for example Data Store or Decisional."}
+      - {flag: name, type: string, description: "The canvas label of the new node. The default is the action type name."}
+      - {flag: params, type: object, description: "The parameters, as {property label: binding}."}
+      - {flag: doc, type: object, description: 'The documentation this change needs: {"action": "<the purpose of the new node>", "area": {"title": "<an existing area, or a new one>", "text": "<the text of a new area>"}, "process": "<the process purpose now>" or true}. true confirms that the current text is still right.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and validate; save nothing."}
+
+  - name: procesio_add_process_variable
+    title: Add a variable to a process
+    description: >
+      Add ONE variable to a live process. Nothing that exists is rewired. A name that the
+      process already has is refused. An input or an output changes what callers send
+      and receive, so pass doc with the process purpose.
+    target: {tool: procesio, action: variable-add}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: name, type: string, required: true, description: "The variable name. It must be new in the process."}
+      - {flag: data-type, expose: data_type, type: string, required: true, description: "An alias (string, integer, boolean, json, object, file, date, datetime, guid) or the id of a data type."}
+      - {flag: direction, type: string, required: true, enum: [input, process, output], description: "input = given when the process is run, process = internal, output = returned."}
+      - {flag: is-list, expose: is_list, type: boolean, description: "Make it a list."}
+      - {flag: default, type: string, description: "The default value."}
+      - {flag: required, type: boolean, description: "Mark an input as required."}
+      - {flag: doc, type: object, description: 'For an input or an output: {"process": "<the process purpose now>" or true}. true confirms that the current text is still right.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Add and validate; save nothing."}
+
+  - name: procesio_set_process_variable_type
+    title: Change the type of a process variable
+    description: >
+      Change the data type of ONE variable of a live process. An input or an output is
+      refused unless allow_contract_change is set, because callers depend on its shape.
+    target: {tool: procesio, action: variable-set-type}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: variable, type: string, required: true, description: "The variable name or id."}
+      - {flag: data-type, expose: data_type, type: string, required: true, description: "The id of the new data type, from procesio_list_data_types."}
+      - {flag: is-list, expose: is_list, type: string, enum: ["true", "false"], description: "Also set whether it is a list. Omit to keep it."}
+      - {flag: allow-contract-change, expose: allow_contract_change, type: boolean, description: "Permit the change on an input or an output variable."}
+      - {flag: doc, type: object, description: 'For an input or an output: {"process": "<the process purpose now>" or true}. true confirms that the current text is still right.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Change and validate; save nothing."}
+
+  - name: procesio_set_process_active
+    title: Activate or deactivate a process
+    description: >
+      Activate or deactivate a process. A process that is not active does not run, so
+      the change reaches everything that starts it, such as a schedule, a webhook or a
+      form. Ask the user before you change it, unless they asked for exactly that.
+    target: {tool: procesio, action: process-toggle-activation}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: state, type: string, required: true, enum: ["true", "false"], description: "true activates the process, false deactivates it."}
+
+  - name: procesio_get_process_payload
+    title: Get the input shape of a process
+    description: >
+      Get the shape of the payload that a run of the process expects: its input
+      variables. Use it before procesio_run_process_and_wait.
+    target: {tool: procesio, action: get-process-payload}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+
+  # --- Processes: run ---------------------------------------------------------
+  - name: procesio_run_process_and_wait
+    title: Run a process and wait for its result
+    description: >
+      Run a process and wait until it ends. Returns the instance id, the final status
+      and the output variables in one call, so no status polling is needed. Use it to
+      test a process. For a run that takes longer than the timeout, use
+      procesio_run_process and read the status later.
+    target: {tool: procesio, action: run-process}
+    read_only: false
+    fixed: {synchronous: true}
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: payload, type: object, description: "The input variables, by name."}
+      - {flag: timeout, type: integer, expose: timeout_seconds, description: "How long to wait, in seconds. Keep it under 150."}
+
+  - name: procesio_run_process
+    title: Start a process
+    description: >
+      Start a process and return its instance id without waiting. Read the result later
+      with procesio_get_instance_status.
+    target: {tool: procesio, action: run-process}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: payload, type: object, description: "The input variables, by name."}
+
+  - name: procesio_get_instance_status
+    title: Get the status of a process run
+    description: >
+      Get the status of one run (instance) of a process, with its variables or per-node
+      detail when asked. The process id is required too: the call fails without it.
+    target: {tool: procesio, action: get-instance-status}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The instance id."}
+      - {flag: flow-template-id, type: string, expose: process_id, required: true, description: "The id of the process the instance belongs to."}
+      - {flag: variables, type: boolean, description: "Include the variables."}
+      - {flag: actions, type: boolean, description: "Include per-node detail."}
+
+  - name: procesio_get_instance_output
+    title: Get the output of a process run
+    description: >
+      Get the output variables of one finished run (instance) of a process.
+    target: {tool: procesio, action: get-instance-output}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The instance id."}
+      - {flag: flow-template-id, type: string, expose: process_id, required: true, description: "The id of the process the instance belongs to."}
+
+  - name: procesio_list_instances
+    title: List the runs of a process
+    description: >
+      List the runs (instances) of one process, newest first.
+    target: {tool: procesio, action: list-instances}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The process id."}
+      - {flag: page, type: integer, description: "1-based page number."}
+      - {flag: page-size, type: integer, expose: page_size, description: "Runs per page."}
+      - {flag: status, type: string, description: "The platform's status filter value."}
+
+  # --- Forms ------------------------------------------------------------------
+  - name: procesio_list_forms
+    title: List forms
+    description: >
+      List the forms of the workspace. Use it to find the id of a form.
+    target: {tool: procesio, action: form-list}
+    read_only: true
+    args: []
+
+  - name: procesio_read_form
+    title: Read a form
+    description: >
+      Read one form as text: its structure, every element and event, and the process
+      maps with form fields and process variables resolved to names.
+    target: {tool: procesio, action: form-digest}
+    read_only: true
+    max_response_bytes: 40000
+    args:
+      - {flag: in, expose: id, type: string, required: true, description: "The form id."}
+      - {flag: processes, type: string, description: "Comma-separated ids of the processes the form runs, to name their variables."}
+
+  - name: procesio_get_form
+    title: Get a form definition
+    description: >
+      Get one form as structured data. Prefer procesio_read_form to understand a form;
+      use this when you need the definition itself.
+    target: {tool: procesio, action: form-get}
+    read_only: true
+    max_response_bytes: 60000
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+
+  - name: procesio_create_form
+    title: Create a form
+    description: >
+      Create a form from one config that holds the WHOLE definition: assignees, elements
+      and queries. Load the guidance topic forms before your first use, and pass dry_run
+      to see the validation and an outline of what would be built. The answer never holds
+      the whole form: it lists the elements by name. A form is created published and
+      open to anyone without a login, unless the config says otherwise: isPrivate true
+      keeps it behind a PROCESIO login, and publish false keeps it a draft. Ask the user
+      before you create a form that is open, unless they asked for exactly that.
+    target: {tool: procesio, action: form-create}
+    read_only: false
+    fixed: {brief: true}
+    args:
+      - {flag: config, type: object, required: true, description: "The form definition."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and validate; create nothing."}
+
+  - name: procesio_get_form_element_events
+    title: List the events of a form element
+    description: >
+      List the event handlers of one form element, by trigger. Every trigger the element
+      carries is a key of events, also when it has no handler yet: onClickEvents is the
+      trigger click.
+    target: {tool: procesio, action: form-get-element-events}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: element, type: string, required: true, description: "The element's id or its designer name."}
+
+  - name: procesio_set_form_element_event
+    title: Set an event of a form element
+    description: >
+      Wire one trigger of one form element to run a process, run JavaScript, or run a
+      Data Store operation. Only that element's events change. An element takes only the
+      triggers of its type, and any other trigger is refused: a button has only click,
+      and a number input has input, focus and blur. Read them first with
+      procesio_get_form_element_events. In a process map, both sides take names: a
+      process variable name and a form field name.
+    target: {tool: procesio, action: form-set-element-event}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: element, type: string, required: true, description: "The element's id or its designer name."}
+      - {flag: "on", type: string, required: true, description: "The trigger, by its short name: click, input, focus, blur. A special element has its own, such as tabchange on tabs, and ready exists only on a chat. It must be one that the element has: the key onInputEvents means input."}
+      - {flag: action, type: string, required: true, enum: [RUN_PROCESS, RUN_JAVASCRIPT, RUN_DATA_STORE_OPERATION], description: "What the trigger runs."}
+      - {flag: config, type: object, description: "The event config."}
+      - {flag: data-store-id, type: string, expose: data_store_id, description: "For a Data Store operation: the Data Store id."}
+      - {flag: operation, type: string, description: "For a Data Store operation: READ, ADD, UPDATE, DELETE or QUERY."}
+      - {flag: replace-action, type: string, expose: replace_action, description: "Replace only this trigger's events that run this action, and keep the others."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and report; change nothing."}
+
+  - name: procesio_get_form_element
+    title: Read the configs of a form element
+    description: >
+      Read the configs of one element of a form: its label, placeholder, default value,
+      required and visible flags, and the rest. Use it before you change an element, to
+      see the exact config keys it carries.
+    target: {tool: procesio, action: form-get-element}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: element, type: string, required: true, description: "The element's id or its designer name."}
+      - {flag: key, expose: keys, type: array, items: string, description: "Only these config keys. Omit for all of them."}
+
+  - name: procesio_set_form_element_config
+    title: Set configs of a form element
+    description: >
+      Set plain configs of ONE element of a form, such as its label, placeholder,
+      required or visible. Put every config of that element into one call. Only that
+      element changes, and the answer returns the previous values. Events go through
+      procesio_set_form_element_event. Change one form with one call after another, not
+      with several calls in the same step: a call is refused when the form changed since
+      it was read.
+    target: {tool: procesio, action: form-set-element-config}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: element, type: string, required: true, description: "The element's id or its designer name."}
+      - {flag: set, type: array, items: string, required: true, description: 'The configs to write, each as "key=value", for example "label=First name" or "required=true". A value that parses as JSON is stored as that type; any other value is stored as text.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report the change and the previous values; write nothing."}
+
+  - name: procesio_add_form_elements
+    title: Add elements to a form
+    description: >
+      Add one or more controls to a live form without rebuilding it: every existing
+      field, and every process map that uses one, stays as it is. Pass parent to place
+      them inside a container. Load the guidance topic forms-anatomy for the shape of an
+      element.
+    target: {tool: procesio, action: form-add-element}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: elements, type: array, items: object, required: true, description: "The elements to add, as authoring-config objects."}
+      - {flag: parent, type: string, description: "Place them inside this container, by element name or id."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report what would be added; save nothing."}
+
+  - name: procesio_set_form_element_chains
+    title: Rewrite event chains of form elements
+    description: >
+      Rewrite the ordered event chains of one or more elements of a form in ONE save.
+      Use it when the order of the events matters, or when several elements change
+      together. An event of a chain that you do not list is removed, and the answer
+      names it.
+    target: {tool: procesio, action: form-set-element-chains}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: plan, type: object, required: true, description: 'The plan: {"chains": [{"element": "<name or id>", "on": "<trigger>", "events": [...]}]}. An event is {"keep": "<existing event id>"} to keep an event as it is, {"map": {"set": {"<element>.<configKey>": value, "@<variable>": value}, "when": [{"field" or "variable": ..., "op": ..., "value": ...}], "match": "all" or "any"}} to set form data, {"js": "<code>"} to run JavaScript, or {"raw": {...}} for a complete event.'}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Resolve and report every chain; save nothing."}
+
+  - name: procesio_get_form_code
+    title: Read the CSS and JavaScript of a form
+    description: >
+      Read the global CSS and JavaScript of a form.
+    target: {tool: procesio, action: form-get-code}
+    read_only: true
+    max_response_bytes: 60000
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+
+  - name: procesio_set_form_code
+    title: Set the CSS and JavaScript of a form
+    description: >
+      Set the global CSS and JavaScript of a form. Only the code changes. A side that you
+      do not pass stays as it is, and the answer returns the previous code.
+    target: {tool: procesio, action: form-set-code}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: css, type: string, description: "The whole CSS source."}
+      - {flag: javascript, type: string, description: "The whole JavaScript source."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report the change and the previous code; write nothing."}
+
+  - name: procesio_get_form_queries
+    title: Read the saved queries of a form
+    description: >
+      Read the saved Data Store queries of a form: each statement, its bindings, its
+      parameters, and which elements run it. A query that no event runs comes back as a
+      warning, because the next save in the designer drops it.
+    target: {tool: procesio, action: form-get-queries}
+    read_only: true
+    args:
+      - {flag: form-id, expose: id, type: string, required: true, description: "The form id."}
+
+  - name: procesio_set_form_query
+    title: Add or change a saved query of a form
+    description: >
+      Add or change ONE saved Data Store query of a form. The other queries stay as they
+      are. The query is selected by query_id, else by name, and is created when nothing
+      matches. Wire it to an element event (operation QUERY) afterwards, or the next save
+      in the designer drops it.
+    target: {tool: procesio, action: form-set-saved-statement}
+    read_only: false
+    args:
+      - {flag: form-id, expose: id, type: string, required: true, description: "The form id."}
+      - {flag: query-id, expose: query_id, type: string, description: "The id of the query to change. With no match it is the id of the new query."}
+      - {flag: name, type: string, description: "The query name. It selects the query when query_id is not given; otherwise it renames the query."}
+      - {flag: sql, type: string, description: "The statement, with a numbered tag for each bound Data Store table or column and @name for each parameter."}
+      - {flag: bindings, type: array, items: object, description: 'One binding for each numbered tag: {"id", "type": "dataStoreTable", "dataStoreId"} or {"id", "type": "dataStoreColumn", "dataStoreId", "columnId"}.'}
+      - {flag: parameters, type: array, items: string, json: true, description: "The @names the statement takes. Omit to derive them from the statement."}
+      - {flag: timeout-seconds, expose: timeout_seconds, type: integer, description: "1 to 600. The default is 60."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report the change; write nothing."}
+
+  - name: procesio_update_form
+    title: Patch a form
+    description: >
+      Save a change to a live form by merging a patch into its data, or by changing its
+      name, its publication status or who can reach it. Elements, theme and code that
+      the patch does not name stay as they are. For one element, prefer the element
+      tools. The answer lists what changes, each path with its value before and after.
+      Publishing a form shows outside the workspace, and is_private false with status 1
+      opens it to anyone without a login. Ask the user before you do either, unless
+      they asked for exactly that.
+    target: {tool: procesio, action: form-update}
+    read_only: false
+    fixed: {changes-only: true}
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: data, type: object, description: "A JSON object merged into the form data (a merge patch)."}
+      - {flag: name, type: string, description: "The new name of the form."}
+      - {flag: status, type: integer, description: "1 = published, 0 = draft."}
+      - {flag: state, type: string, enum: ["true", "false"], description: "Whether the form is enabled."}
+      - {flag: is-private, expose: is_private, type: string, enum: ["true", "false"], description: "false with status 1 lets an anonymous visitor open the form; true keeps it behind a PROCESIO login."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Report what would change; save nothing."}
+
+  - name: procesio_edit_form
+    title: Replace a form definition
+    description: >
+      Replace the definition of an existing form. The config you send is the DESIRED
+      STATE and replaces everything: what you leave out is removed, and that is refused
+      unless allow_remove is set. To add controls without restating the form, use
+      procesio_add_form_elements. The answer never holds the whole form: it lists the
+      elements by name.
+    target: {tool: procesio, action: form-edit}
+    read_only: false
+    fixed: {brief: true}
+    args:
+      - {flag: id, type: string, required: true, description: "The form id."}
+      - {flag: config, type: object, required: true, description: "The whole desired definition."}
+      - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and report; change nothing."}
+      - {flag: allow-remove, type: boolean, expose: allow_remove, description: "Permit this edit to remove items the form has."}
+
+  # --- Data Store -------------------------------------------------------------
+  - name: procesio_list_data_stores
+    title: List Data Stores
+    description: >
+      List the Data Stores of the workspace. Use it to find the id of a Data Store.
+    target: {tool: procesio, action: datastore-list}
+    read_only: true
+    args:
+      - {flag: search, type: string, description: "Only Data Stores whose name contains this text."}
+      - {flag: page, type: integer, description: "1-based page number."}
+      - {flag: page-size, type: integer, expose: page_size, description: "Data Stores per page."}
+
+  - name: procesio_get_data_store_model
+    title: Get the columns of a Data Store
+    description: >
+      Get the data model behind one Data Store: its columns and their types.
+    target: {tool: procesio, action: datastore-get-data-model}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The Data Store id."}
+
+  - name: procesio_get_data_store_rows
+    title: Read rows of a Data Store
+    description: >
+      Read rows of one Data Store, with paging, simple filters and a sort.
+    target: {tool: procesio, action: datastore-get-rows}
+    read_only: true
+    args:
+      - {flag: id, type: string, required: true, description: "The Data Store id."}
+      - {flag: page, type: integer, description: "1-based page number."}
+      - {flag: page-size, type: integer, expose: page_size, description: "Rows per page."}
+      - {flag: filters, type: array, items: object, description: 'Conditions, each {"column", "operator", "value"}. Operators include equals, contains, startsWith.'}
+      - {flag: logic, type: string, enum: [and, or], description: "How the conditions combine. The default is and."}
+      - {flag: sort, type: object, description: 'The sort: {"column", "direction": "asc" or "desc"}.'}
+
+  - name: procesio_create_data_store
+    title: Create a Data Store
+    description: >
+      Create a Data Store with its columns. Each column takes the id of a data type;
+      find it with procesio_list_data_types.
+    target: {tool: procesio, action: datastore-create}
+    read_only: false
+    args:
+      - {flag: payload, type: object, required: true, description: 'The Data Store: {"name", "description"?, "columns"?: [{"name", "dataTypeId", "isList"?, "isPrimaryKey"?, "isRequired"?}]}.'}
+
+  - name: procesio_list_data_types
+    title: List data types
+    description: >
+      List the data types of the workspace with their ids: the primitive ones and the
+      data models. A variable, a Data Store column and a data model attribute each take
+      one of these ids.
+    target: {tool: procesio, action: list-datatypes}
+    read_only: true
+    args:
+      - {flag: search, type: string, description: "Only data types whose name contains this text."}
+      - {flag: page, type: integer, description: "1-based page number."}
+      - {flag: page-size, type: integer, expose: page_size, description: "Data types per page."}
+
+  - name: procesio_create_data_store_from_json
+    title: Create a Data Store from JSON
+    description: >
+      Create a Data Store whose columns are taken from a JSON sample, or from a URL that
+      returns JSON.
+    target: {tool: procesio, action: datastore-from-json}
+    read_only: false
+    args:
+      - {flag: payload, type: object, required: true, description: 'The request: {"name", "description"?, "content": "<raw JSON, or a URL that returns JSON>", "primaryKeyAttributeNames"?: [...]}.'}
+
+  - name: procesio_add_data_store_rows
+    title: Add rows to a Data Store
+    description: >
+      Insert rows into one Data Store. Read its columns first with
+      procesio_get_data_store_model: a row is keyed by their display names.
+    target: {tool: procesio, action: datastore-add-rows}
+    read_only: false
+    args:
+      - {flag: id, type: string, required: true, description: "The Data Store id."}
+      - {flag: rows, type: array, items: object, required: true, description: 'The rows, each keyed by the display name of the column: [{"Name": "...", "Status": "..."}].'}
+
+  # --- Workspace and guidance -------------------------------------------------
+  - name: procesio_list_workspaces
+    title: List workspaces
+    description: >
+      List the workspaces the current user can reach.
+    target: {tool: procesio, action: list-workspaces}
+    read_only: true
+    args: []
+
+  - name: procesio_get_guidance
+    title: Read the PROCESIO build guidance
+    description: >
+      Read one topic of the guidance on how to build and test in PROCESIO: the method,
+      the recipes and the known pitfalls. Load the topic that fits the task before you
+      build. Start with playbook for a process and forms for a form.
+    target: {agent: procesio, action: guidance}
+    read_only: true
+    max_response_bytes: 120000
+    args:
+      - {flag: topic, type: string, required: true, description: "Processes: playbook, best-practices, visual-organization, datastore, scheduling, environments, reliability, boundary. Forms: forms (the index), forms-anatomy, forms-process, forms-interaction, forms-code, forms-dom, forms-motion, forms-deploy, forms-redesign, forms-pitfalls. House style: patterns (the index), patterns-processes, patterns-forms, patterns-integrations, patterns-database, patterns-optimizing."}

@@ -8,8 +8,15 @@ MySQL (the statement rules are those of the Query Store action, `PROCESIO-QUERY-
 
 Verified against a live environment, 2026-11.
 
-**Not every environment has it yet.** Check before relying on it: on a build without saved
-form queries, `GET api/FormTemplate/{id}` has no `queries` key at all, there is no
+## Use it instead of a process for reads
+
+When a form only needs Data Store rows, a saved query (or a READ event) is the way, not a
+process with a Data Store or Query Store action. Measured on production (2026-11-19, a 200-row store, 50 rows returned, 25 runs each): a saved query answers in a median of 29 ms and a row READ in 33 ms, one call each; the same read through a one-action process takes a median of 266 ms over two calls (publish, then a synchronous launch) and leaves a process instance per click. In the browser the click took about 55-80 ms against 210-290 ms. A real process has more than one action, so the gap only grows. Verified end to end on
+production the same day: saved through `form-create`, kept by the server, run anonymously
+on a public form, and a click in the browser filled a dynamic table.
+
+**Older builds do not have it.** Production has had it since at least 2026-11-19. Check
+before relying on it elsewhere: on a build without saved form queries, `GET api/FormTemplate/{id}` has no `queries` key at all, there is no
 `api/Form/dataStore/query/{id}` route, and a save that carries `Queries` answers 200 and stores
 none. The form and its QUERY events are kept, pointing at a query that does not exist.
 `form-create` and `form-edit` compare the read-back with what they sent and warn ("did not
@@ -130,6 +137,8 @@ It is the existing Data Store event with a new operation. Exactly as a designer 
   `"dynamic": true` and its columns keyed by the returned names. The mapping survives a designer
   save. A write followed by the list query on the same trigger refreshes the table: the events
   of one trigger run in order.
+  - A process's list output (`RUN_PROCESS`) fills a dynamic table the same way, through the
+    row's source; the builder resolves a table name there too (verified in the form runtime).
   - A `rows` target that names a **static** table (or its row) is refused at build: a static row
     has no source to fill, so the save would succeed and the table would stay empty. A dynamic
     table nested in a section, column or tab is wired the same as a top-level one.

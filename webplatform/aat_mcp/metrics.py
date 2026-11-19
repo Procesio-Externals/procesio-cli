@@ -78,6 +78,12 @@ REFUSAL_CODES = frozenset({
     "workspace_out_of_turn", "procesio_key_unavailable",
 })
 
+# What a capabilities call asked for, and how it was answered (see capability_lookup).
+LOOKUP_MODES = frozenset({"list", "search", "action", "whole"})
+LOOKUP_OUTCOMES = frozenset({
+    "ok", "matched", "relaxed", "empty", "found", "unknown", "full", "index", "error",
+})
+
 _MCP_METHODS = frozenset({"initialize", "tools/list", "tools/call"})
 
 # Distinct (kind, tool, action) rows the per-action metric keeps. Past it a new pair is counted on its
@@ -317,6 +323,10 @@ TOOL_ERRORS = Counter(
 REFUSALS = Counter(
     REGISTRY, "procesio_aat_runtime_refusals_total",
     "Calls answered with a refusal before any tool or agent was started, by reason.", ("code",))
+CAPABILITY_LOOKUPS = Counter(
+    REGISTRY, "procesio_aat_runtime_capability_lookups_total",
+    "capabilities calls, by what was asked (list, search, action, whole) and how it was "
+    "answered. Every one is a model round trip that runs nothing.", ("mode", "outcome"))
 
 ACTION_ERRORS = Counter(
     REGISTRY, "procesio_aat_runtime_action_errors_total",
@@ -541,6 +551,22 @@ def refusal(code: str) -> None:
         return
     try:
         REFUSALS.add(1, _fixed(code, REFUSAL_CODES, OTHER))
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def capability_lookup(mode: str, outcome: str) -> None:
+    """Count one capabilities call.
+
+    `mode` is what was asked: `list` (everything), `search` (keywords), `action` (one
+    action's arguments) or `whole` (one tool or agent). `outcome` is how it was answered:
+    `ok`; `matched`, `relaxed` (some words were dropped) or `empty` for a search; `found` or
+    `unknown` for an action; `full` or `index` for a whole capability; `error`."""
+    if not _enabled:
+        return
+    try:
+        CAPABILITY_LOOKUPS.add(1, _fixed(mode, LOOKUP_MODES, OTHER),
+                               _fixed(outcome, LOOKUP_OUTCOMES, OTHER))
     except Exception:  # noqa: BLE001
         pass
 

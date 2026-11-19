@@ -595,3 +595,24 @@ def test_a_query_name_over_128_characters_is_refused():
     query = fq.from_config({"name": "n" * 129, "sql": SQL, "bindings": BINDINGS})
     (problem,) = fq.problems([query])
     assert "longer than 128" in problem
+
+
+def test_process_rows_mapped_to_a_dynamic_table_go_to_its_row_source():
+    """A RUN_PROCESS output reaches a table the same way a query's rows do: through the
+    dynamic row's source (verified in the form runtime, 2026-11). Named by the table, the
+    builder used to write the bare name, and the table stayed empty."""
+    cfg = {"name": "Stock", "elements": [
+        {"type": "input", "name": "category"},
+        {"type": "button", "name": "find", "events": [
+            {"on": "click", "do": "process", "processId": "P1", "syncRun": True,
+             "inputs": [{"to": "category", "from": "category"}],
+             "outputs": [{"to": "products", "from": "rows"}]}]},
+        _products_table()]}
+    ctx = {**_ctx(), "process_vars": {"P1": {"category": "v-cat", "rows": "v-rows"}}}
+    dto = fb.build(cfg, ctx)
+    row = next(e for e in dto["Data"]["elements"] if e["type"] == "dynamic-table-row")
+    source = next(c["id"] for c in row["configs"] if c["key"] == "sourceValue")
+    out = _click_config(dto)["config"]["outputMap"][0]
+
+    assert out == {"id": 0, "left": "v-rows", "right":
+                   f"{dto['Data']['dataModel']['id']}.{fb._FIELDS_NS}.{row['id']}.{source}"}

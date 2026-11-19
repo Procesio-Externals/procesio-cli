@@ -321,6 +321,15 @@ scrolled:
   `--container--failed`; no `src` yet shows `--container--empty-message`. "Empty" also shows
   briefly while a process-output file is still being fetched, so wait a few seconds before
   you treat it as final. Count rendered pages by counting the canvases.
+- **Showing a PDF inside your own layout without moving the viewer** (measured live
+  2026-11-16): park the native viewer off screen and keep it rendered, e.g. `position: fixed;
+  left: -14000px; width: 1180px; visibility: hidden` on its element, plus `max-height: none;
+  overflow: visible` on `--container--viewer`. `vue-pdf-embed` still draws every page, at the
+  parked width (canvases about 1140px wide for a 1180px box). Copy each page into your own
+  canvas with `drawImage`: the canvases are not tainted, so a loupe can read them too. pdf.js
+  paints into a canvas after creating it, so copy again for a few seconds after the page count
+  or sizes change. Several viewers fed by one process run can be parked side by side, one per
+  document. The renderer's nodes never move, so a later re-render cannot break on them.
 - Signature pad: `.form-builder--signature-pad` > `--canvas-wrapper` > `canvas`, then a
   footer with the platform's Clear button. The pad paints a white background into the canvas,
   so ink = any pixel clearly darker than white (sample a downscaled copy after `pointerup`

@@ -118,7 +118,6 @@ def test_search_finds_actions_across_capabilities():
     out = bridge.capabilities(search="datastore")
     names = {m["action"] for m in out["matches"]}
     assert names == {"datastore-create", "datastore-update", "datastore-get-rows"}
-    assert all("args" not in m for m in out["matches"])  # compact, not schemas
 
 
 def test_search_is_and_not_or():
@@ -155,6 +154,148 @@ def test_search_reports_total_when_capped(monkeypatch):
 def test_empty_search_is_a_readable_error():
     with pytest.raises(KeyError):
         bridge.capabilities(search="   ")
+
+
+# --- door 2a: the leading matches carry their arguments ---------------------
+#
+# A caller that searches runs one of the first matches next. With a compact match it has
+# to ask for the arguments first, which is one more round trip for every action it
+# discovers. So the first few matches carry them, inside a byte allowance: a search answer
+# stays in the caller's context, and it must not grow back into a schema dump.
+
+def _many(count, args=(("id", True),)):
+    return [_tool("t", [_action(f"form-op-{i}", "About a form.", args) for i in range(count)])]
+
+
+def test_the_leading_matches_carry_their_arguments(monkeypatch):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (_many(6), [], []))
+    out = bridge.capabilities(search="form")
+    assert out["count"] == 6
+    assert ["args" in m for m in out["matches"]] == [True, True, True, False, False, False]
+    assert out["matches"][0]["args"] == [
+        {"name": "id", "type": "string", "required": True, "description": ""}]
+
+
+def test_a_match_carries_what_the_one_action_lookup_returns():
+    """Otherwise the caller could not tell whether the lookup is still worth a call."""
+    match = bridge.capabilities(search="datastore create")["matches"][0]
+    looked_up = bridge.capabilities(name="bigtool", action="datastore-create")
+    assert match["args"] == looked_up["capability"]["action"]["args"]
+    assert match["description"] == looked_up["capability"]["action"]["description"]
+    assert [a["name"] for a in match["args"]] == ["payload", "workspace-id"]
+
+
+def test_a_match_with_arguments_has_its_whole_description(monkeypatch):
+    """A match is cut to its first 200 characters. One that is about to be run from the
+    search answer alone must not lose the rule its description ends with."""
+    rule = "The value must keep every placeholder it had."
+    long = "Set one parameter of a node. " + "More about what it does. " * 12 + rule
+    actions = [_action(f"node-set-{i}", long, [("id", True)]) for i in range(4)]
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: ([_tool("t", actions)], [], []))
+    matches = bridge.capabilities(search="node")["matches"]
+    assert [m["description"].endswith(rule) for m in matches] == [True, True, True, False]
+    assert len(matches[3]["description"]) == 200
+
+
+def test_a_whole_description_counts_against_the_allowance(monkeypatch):
+    long = "Set one parameter of a node. " + "x" * 600
+    actions = [_action("node-set-param", long, [("id", True)])]
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: ([_tool("t", actions)], [], []))
+    monkeypatch.setattr(bridge, "_SEARCH_ARGS_MAX_BYTES", 300)
+    match = bridge.capabilities(search="node")["matches"][0]
+    assert "args" not in match and len(match["description"]) == 200
+
+
+def test_an_agent_match_carries_its_arguments_too():
+    match = bridge.capabilities(search="guidance")["matches"][0]
+    assert match["kind"] == "agent"
+    assert [a["name"] for a in match["args"]] == ["topic"]
+
+
+def test_the_hint_says_a_match_with_arguments_is_ready_to_run():
+    hint = bridge.capabilities(search="datastore rows")["hint"]
+    assert "ready to run" in hint and "run_tool" in hint and "run_agent" in hint
+    assert "before running it" not in hint
+    assert "hyphens" in hint                       # the spelling rule travels with the args
+
+
+def test_a_structured_argument_keeps_its_schema(monkeypatch):
+    shape = {"type": "object", "properties": {"title": {"type": "string"}}}
+    action = _action("form-create", "Create a form.", [("payload", True)])
+    action["args"][0]["schema"] = shape
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: ([_tool("t", [action])], [], []))
+    assert bridge.capabilities(search="form")["matches"][0]["args"][0]["schema"] == shape
+
+
+def test_examples_are_named_and_stay_behind_the_lookup(monkeypatch):
+    action = _action("form-create", "Create a form.", [("payload", True)])
+    action["examples"] = [{"args": {"payload": {"title": "Leave request"}}}]
+    plain = _action("form-list", "List every form.")
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: ([_tool("t", [action, plain])], [], []))
+    by_action = {m["action"]: m for m in bridge.capabilities(search="form")["matches"]}
+    assert by_action["form-create"]["has_examples"] is True
+    assert "examples" not in by_action["form-create"]
+    assert "has_examples" not in by_action["form-list"]
+    assert "examples" in bridge.capabilities(search="form")["hint"]
+
+
+def test_an_argument_list_over_the_allowance_is_left_out(monkeypatch):
+    """The match stays, compact. A smaller list further down still fits."""
+    big = _action("form-create", "Create a form.", [("payload", True)])
+    big["args"][0]["description"] = "x" * 500
+    small = _action("form-list", "List every form.", [("page", False)])
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: ([_tool("t", [big, small])], [], []))
+    monkeypatch.setattr(bridge, "_SEARCH_ARGS_MAX_BYTES", 300)
+    out = bridge.capabilities(search="form")
+    by_action = {m["action"]: m for m in out["matches"]}
+    assert "args" not in by_action["form-create"]
+    assert [a["name"] for a in by_action["form-list"]["args"]] == ["page"]
+    assert "ready to run" in out["hint"]
+
+
+def test_the_allowance_is_for_the_whole_answer_not_for_each_match(monkeypatch):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (_many(3), [], []))
+    one_list = len(json.dumps(bridge._args_schema(_many(1)[0]["actions"][0]["args"])))
+    monkeypatch.setattr(bridge, "_SEARCH_ARGS_MAX_BYTES", 2 * one_list)
+    out = bridge.capabilities(search="form")
+    assert ["args" in m for m in out["matches"]] == [True, True, False]
+
+
+def test_when_no_list_fits_the_hint_still_sends_the_caller_to_the_lookup(monkeypatch):
+    monkeypatch.setattr(bridge, "_SEARCH_ARGS_MAX_BYTES", 1)
+    out = bridge.capabilities(search="datastore rows")
+    assert all("args" not in m for m in out["matches"])
+    assert "action=<action>" in out["hint"] and "before running it" in out["hint"]
+
+
+@pytest.mark.parametrize("value, carrying", [("0", 0), ("1", 1), ("5", 5), ("-2", 0),
+                                               ("many", 3), ("", 3)])
+def test_how_many_matches_carry_arguments_is_configurable(monkeypatch, value, carrying):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (_many(6), [], []))
+    monkeypatch.setenv("AAT_SEARCH_ARGS", value)
+    out = bridge.capabilities(search="form")
+    assert sum("args" in m for m in out["matches"]) == carrying
+    assert ("ready to run" in out["hint"]) is (carrying > 0)
+
+
+def test_an_argument_s_text_is_not_searched():
+    """Only the name and the description say what an action is for. `payload` is an
+    argument of three actions here and the subject of none."""
+    assert bridge.capabilities(search="payload")["count"] == 0
+
+
+def test_the_search_answer_stays_small_for_a_real_sized_action(monkeypatch):
+    """Twelve described arguments each, twenty matches: the answer is a few kilobytes,
+    because only the leading matches carry arguments and the allowance caps those."""
+    args = [{"name": f"arg-{i}", "type": "string", "required": i == 0,
+             "description": "what this argument is for, in a sentence of usual length"}
+            for i in range(12)]
+    actions = [{"name": f"form-op-{i}", "description": "About a form. " * 10, "args": args}
+               for i in range(40)]
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: ([_tool("t", actions)], [], []))
+    out = bridge.capabilities(search="form")
+    assert out["count"] == 20 and sum("args" in m for m in out["matches"]) == 3
+    assert len(json.dumps(out)) < 11_000
 
 
 # --- door 2b: a strict-AND miss relaxes instead of dead-ending -------------
@@ -247,6 +388,21 @@ def test_a_relaxation_that_explains_nothing_says_it_is_too_vague(monkeypatch):
     out = bridge.capabilities(search="form nosuchword")
     assert out["relaxed"] is True
     assert "too vague" in out["hint"].lower()
+    # A list the caller is told not to trust offers nothing to run.
+    assert all("args" not in m for m in out["matches"])
+
+
+def test_a_relaxed_top_match_carries_its_arguments_and_the_hint_says_so():
+    out = bridge.capabilities(search="datastore create template")
+    assert [a["name"] for a in out["matches"][0]["args"]] == ["payload", "workspace-id"]
+    assert "'args' are included" in out["hint"]
+    assert "capabilities name=" not in out["hint"]
+
+
+def test_a_relaxed_top_match_without_arguments_keeps_the_lookup_hint(monkeypatch):
+    monkeypatch.setenv("AAT_SEARCH_ARGS", "0")
+    out = bridge.capabilities(search="datastore create template")
+    assert "capabilities name=<name> action=<action>" in out["hint"]
 
 
 def test_action_without_name_falls_back_to_search():
@@ -413,6 +569,16 @@ def test_capabilities_call_threads_action_and_search_through():
                                      "arguments": {"search": "datastore rows"}}})
     payload = json.loads(resp["result"]["content"][0]["text"])
     assert payload["matches"][0]["action"] == "datastore-get-rows"
+    assert [a["name"] for a in payload["matches"][0]["args"]] == ["id"]
+
+
+def test_the_capabilities_description_says_a_search_match_is_ready_to_run():
+    """The description is what a model reads before its first call. If it only names the
+    one-action lookup as the way to learn arguments, the model makes that lookup."""
+    resp = server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+    caps = next(t for t in resp["result"]["tools"] if t["name"] == "capabilities")
+    assert "WITH their args" in caps["description"]
+    assert "no second lookup" in caps["description"]
 
 
 # --- against the real manifests ------------------------------------------

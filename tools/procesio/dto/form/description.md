@@ -55,7 +55,8 @@ fine), so forms are fully buildable server-side.
   inputs:[{to,from}],outputs`), **js** (`code`), **form** → EventAction.TRIGGER_FORM
   (`formId`,`mapping`), **datastore** → RUN_DATA_STORE_OPERATION (`dataStoreId`,
   `operation` READ/ADD/UPDATE/DELETE, `inputs`, `outputs`, `filters`), or with
-  `operation: "query"` one of the form's saved queries (next bullet). To show a query's rows
+  `operation: "query"` one of the form's saved queries (next bullet). Prefer it to a
+  `process` event whenever the form only reads Data Store rows: no process run, one call. To show a query's rows
   in a table, give the table's name as the `rows` output: it must be `"dynamic": true` with
   column `key`s equal to the returned column names (the Data Store display names).
   An INSERT must name `CreatedById` and `UpdatedById` and bind them to a parameter mapped from

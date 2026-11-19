@@ -66,3 +66,22 @@ def test_required_args_marked_required_in_manifest():
             f"action {name}: manifest-required but not an argparse flag: "
             f"{required_manifest - argparse_names}"
         )
+
+
+def test_a_flag_that_repeats_is_marked_repeatable_and_no_other_is():
+    """A caller that holds a list (an MCP client does) reads this mark to know that the
+    flag is given once per value. Without it the list arrives as one value, and the tool
+    reads the whole list as a single item."""
+    m = _manifest()
+    for name, defn in main.ACTIONS.items():
+        parser = argparse.ArgumentParser()
+        defn.add_args(parser)
+        repeats = set()
+        for action in parser._actions:
+            names = [o for o in action.option_strings if o.startswith("--") and o != "--help"]
+            if names and isinstance(action, argparse._AppendAction):
+                repeats.add(names[0][2:])
+        marked = {a.name for a in m.get_action(name).args if a.repeatable}
+        assert marked == repeats, (
+            f"action {name}: repeats in argparse {sorted(repeats)}, "
+            f"marked repeatable in the manifest {sorted(marked)}")

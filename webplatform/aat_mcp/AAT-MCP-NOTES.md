@@ -107,7 +107,7 @@ So `capabilities` answers narrowest-first:
 | call | returns | size (procesio) |
 |---|---|---|
 | `{}` | compact tool/agent/skill list | small |
-| `{search}` | matching ACTIONS, name+description only | ~0.3 KB |
+| `{search}` | matching ACTIONS; the first three carry their args and whole description, the rest name+description | ~1–8 KB |
 | `{name, action}` | that action's args + the literal call shape | ~1–2 KB |
 | `{name}` | full schema, **or** the action-name index if oversized | 11 KB (was 369 KB) |
 
@@ -128,6 +128,22 @@ Three rules that matter when touching this:
   `credential-list` for `list-credentials`; edit distance alone ranks those far apart,
   so `_suggest` compares singularized WORD SETS first and only then falls back to
   `difflib`.
+- **A search answers with what the caller needs next** (`_attach_args`). A lookup runs
+  nothing, yet it costs a whole model round trip, and the context is sent again with
+  it. A caller that searches then asks for the arguments of a leading match, so a
+  compact search answer makes every newly found action cost two round trips before
+  the call that does the work. The first `AAT_SEARCH_ARGS` matches (default 3, 0 turns
+  it off) therefore carry their args and their whole description, inside one byte
+  allowance for the answer (`_SEARCH_ARGS_MAX_BYTES`). Three things keep that from
+  growing back into a schema dump: only the leading matches carry them, an action
+  whose arguments do not fit stays compact, and a list judged too vague carries none.
+  Worked examples stay behind the one-action lookup; a match says `has_examples`.
+  Measured on `procesio` over twenty typical searches: the answer grows from about
+  2 KB to about 5 KB, and replaces a search plus a lookup that add up to about 6 KB.
+- **Count the lookups** (`procesio_aat_runtime_capability_lookups_total`, by `mode` and
+  `outcome`). Whether a change to discovery helped shows as fewer `mode="action"`
+  lookups for the same number of searches; a rising share of `relaxed` or `empty`
+  searches says that callers use words the catalog does not.
 
 Argument names are returned verbatim from the manifest (`workspace-id`, hyphenated).
 Returning the literal spelling is what stops the snake_case guessing — do not
@@ -183,6 +199,19 @@ normalize or prettify them.
   timing.
 - **Creds backend:** `registry` uses `tools/_lib/creds` (Windows Credential Manager
   today). Running the server on another OS needs the creds backend from spec 06.
+- **A secret that belongs to the installation, not to a user.** A tool of a turn gets
+  only what the turn's user can see: the bridge builds its secrets from that user's
+  credentials, and the process inherits nothing from the container. So a value that no
+  user credential carries reaches a tool only when the bridge hands it over on purpose.
+  The passphrase of a form's code is one. The installation's web app encrypts
+  `Data.code` (a form's CSS and JavaScript) with it. The deployment sets
+  `AAT_PROCESIO_FORM_CODE_KEY`, and `_procesio_profile` adds it as `form-code-key` to
+  the secrets of the procesio tool, and of no other tool. The bare name is the right
+  one, because a turn runs on the tool's default environment. Without the setting, the
+  actions that read or write form code answer `no form-code-key stored`. A wrong value
+  is worse than none: the tool writes a blob that the web app cannot open, and the form
+  shows blank with no error. Add another such value the same way: one named setting,
+  one tool, never the container's whole environment.
 
 ## Log lines
 
@@ -221,12 +250,59 @@ normalize or prettify them.
 - **Headless fail-safe:** `AAT_MCP_DENY_IRREVERSIBLE=1` makes even the confirmed tools
   refuse — matches `orchestrator drive`'s default when no human is in the seat.
 
-## Two surfaces over one substrate
+## The platform's typed surface
 
-There are two MCP servers here, on purpose. `server.py` offers six freeform tools that
+`platform_server.py` is what `http_server.py` serves. `AAT_MCP_SURFACE` chooses the tool
+list: `generic` (the default: `server.py`'s tools, exactly as before), `typed` (the named
+tools of `platform_surface.yaml`), or `both` (the named tools first, then the generic ones).
+
+**Why named tools.** With the generic tools a model does three things for each action it
+has not used yet: it searches, it asks for the arguments, and it runs the action. The first
+two run nothing, each is a model round trip, and the context is sent again with each. A
+named tool has its name, its description and its schema in the tool list, so the model
+calls it in one step and the client checks the arguments first. The generic tools stay for
+the long tail: hundreds of actions do not fit in a tool list.
+
+Rules that matter when touching it:
+
+- **A tool earns its place by being called.** Every definition is sent with every model
+  request. Choose the list from the per-action call counts
+  (`procesio_aat_runtime_action_duration_seconds_count`), not from what looks useful.
+- **One tool is one action.** A tool that needs several steps gets an ACTION that does
+  them (`node-edit-batch`), and the tool maps to it. The declaration then carries no
+  behaviour, and the conformance tests can check every entry against the registry.
+- **Shape the tool for the caller, in the declaration.** No workspace, environment or
+  profile argument (a turn has one of each). No argument that names a file (the model's
+  files are on another machine). A JSON argument is an `object` or an `array`, so the
+  client checks its shape. `fixed` sends a flag that the caller cannot change.
+- **A structured argument's schema has one home.** `schema_from_manifest: true` takes it
+  from the action's manifest, which takes it from the code that validates. A copy in the
+  declaration would drift.
+- **Every answer says `read_only` and `dry_run`.** A caller that must know whether a call
+  changed anything reads those. Inferring it from a tool's name and the layout of its
+  arguments stops working the moment the names are typed.
+- **An argument the tool does not declare is an error**, with the valid ones beside it.
+  The public surface drops such an argument; there the caller is a stranger. Here the
+  caller has the schema, and a dropped argument hides a mistake it should correct.
+- **Unknown setting, generic surface.** A typo in `AAT_MCP_SURFACE` must leave the
+  assistant with the tools it had.
+- **The Worker must agree.** Its instructions and its tool permissions depend on which
+  surface is served, so the Worker has the same setting. A named tool that the Worker does
+  not permit is refused by the client before it reaches this server.
+
+The snapshot (`platform_surface.snapshot.json`) makes a change to the list a reviewable
+diff. A turn starts a new client each time, so there is no client-side cache to mislead;
+the snapshot is for the reviewer.
+
+## Three surfaces over one substrate
+
+There are three tool surfaces here, on purpose. `server.py` offers six freeform tools that
 dispatch whatever the registry holds - right for an operator driving the framework.
 `chat_server.py` offers one named tool per operation, built from `chat_surface.yaml` -
-what a general chat client and a directory review both need.
+what a general chat client and a directory review both need. `platform_server.py` offers
+the named tools of `platform_surface.yaml` to the platform's assistant, beside the freeform
+ones (previous section). The two declared surfaces share `surface.py`, which turns a
+declaration into a tool list, and nothing else: neither imports the other.
 
 **A published tool list is a different kind of artefact from a registry.** The registry
 is the source of truth for what a tool IS, and a surface that derives from it tracks it

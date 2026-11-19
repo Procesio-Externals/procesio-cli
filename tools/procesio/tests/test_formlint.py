@@ -153,3 +153,29 @@ def test_form_level_events_are_checked_too():
             "elements": []}
     warns = formlint.lint_string_boolean_conditions(data)
     assert len(warns) == 1 and warns[0].startswith("form-level event")
+
+
+# -- trigger slots stored as a bare list of events (older / hand-written forms) ----
+
+def test_slot_events_reads_both_shapes_and_ignores_other_lists():
+    ev = {"action": "RUN_JAVASCRIPT", "config": {"code": "a()"}}
+    assert formlint.slot_events("onClickEvents", {"debounce": 0, "events": [ev]}) == [ev]
+    assert formlint.slot_events("onClickEvents", [ev, "junk"]) == [ev]
+    assert formlint.slot_events("onClickEvents", None) == []
+    # a select's options are a list of dicts too, and are not events
+    assert formlint.slot_events("options", [{"label": "A", "value": "a"}]) == []
+
+
+def test_conditions_in_a_bare_list_slot_are_checked():
+    data = _form_with_condition("False")
+    slot = data["elements"][0]["configs"][1]
+    slot["value"] = slot["value"]["events"]
+    warns = formlint.lint_string_boolean_conditions(data)
+    assert len(warns) == 1 and "isPJ IS_TRUE" in warns[0]
+
+
+def test_scripts_in_a_bare_list_slot_are_checked():
+    js = {"action": "RUN_JAVASCRIPT", "config": {"code": "document.querySelector('input[type=number]')"}}
+    data = {"elements": [_el("btn", configs=[_cfg("name", "go"), _cfg("onClickEvents", [js])])]}
+    warns = formlint.lint_event_scripts(data)
+    assert len(warns) == 1 and "type=number" in warns[0] and "'go'" in warns[0]
