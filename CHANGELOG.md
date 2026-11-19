@@ -15,6 +15,14 @@ there, not here.
   `load` fills tables and dropdowns with no click and no process. READ filters take a short
   form (`{"column", "op", "field" | "value"}`), and `rows` aimed at a dropdown fills its
   options. Every form action warns when the form is a draft, which its link does not serve.
+- Form Data Store writes are built and checked the way the form runtime runs them: `add`,
+  `update` and `delete` map columns to form values and return `success`. The build reads the
+  store's columns and refuses an unknown column, an update with no filter (it never changes
+  anything) or of a key column, and warns when a delete with no filter maps a non-key column.
+  The notes cover multi-statement saved queries run from a form.
+- A form build warns when a saved query with no `LIMIT`, or a READ above 200 / 100 rows, fills a
+  table or a dropdown (the backend does not limit a form read), and the notes give the
+  versions saved form queries need (Web-Api v3.3.0, form-runtime v1.34.0).
 - A form that needs Data Store rows reads them itself: a Data Store event on the element
   (READ, or QUERY running one of the form's saved SQL queries), not a process. The guidance
   says so wherever forms are built, and the agent's `audit` reports `datastore-read-only` for

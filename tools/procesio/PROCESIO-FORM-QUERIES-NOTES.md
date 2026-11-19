@@ -15,6 +15,15 @@ process with a Data Store or Query Store action. Measured on production (2026-11
 production the same day: saved through `form-create`, kept by the server, run anonymously
 on a public form, and a click in the browser filled a dynamic table.
 
+**Versions, final shape, row limits** (from the form-runtime team, 2026-11-19). The shape is
+final: `queryId` on the event, the queries on the form template. Saved queries need **Web-Api
+v3.3.0, form-runtime v1.34.0 and user-playground v1.117.0** (`procesio server-build` reads an
+installation's Web-Api version). The backend does not limit the rows a form read returns:
+keep **200 rows for a table or dynamic row and 100 for a dropdown, select or radio group**
+(`LIMIT` in a query, `countPerPage` on a READ). The builder warns when a query with no LIMIT,
+or a READ above those numbers, fills one of them. `sourceType` is mandatory for options built
+from rows: `JSON` (verified) or `static-list` both read a list of `{label, value}` objects.
+
 **Older builds do not have it.** Production has had it since at least 2026-11-19. Check
 before relying on it elsewhere: on a build without saved form queries, `GET api/FormTemplate/{id}` has no `queries` key at all, there is no
 `api/Form/dataStore/query/{id}` route, and a save that carries `Queries` answers 200 and stores
@@ -66,6 +75,55 @@ Built in the designer and run in the form runtime on production (2026-11-19):
 - **A designer tab open while the API writes keeps its old copy.** Navigating to the same
   designer URL does not reload it; its next Save sends the old template and drops what the
   API wrote, with no conflict. Reload the page before saving in the designer.
+
+## Add, Update, Delete (built in the designer, run in the form runtime on production, 2026-11-19)
+
+A row operation maps **a column (left) to a form value or a typed value (right)**, and its only
+output is `success`. The designer saves:
+
+```json
+{ "dataStoreId": "<store>", "operation": "ADD",
+  "inputMap":  [ { "id": 0, "left": "Sku", "right": "<form value path>" },
+                 { "id": 1, "left": "Category", "right": "test" } ],
+  "outputMap": [ { "id": 0, "left": "success", "right": "<form value path or empty>" } ],
+  "filters": [], "queryId": null, "areFiltersConfigured": true }
+```
+
+`left` is the column's display name; the designer lists only the store's own columns, never
+the system ones. A typed value on the right is stored as text and written as that value (a
+number column gets a number). Each operation is one call of about 80-200 ms.
+
+| Operation | What it does | Rules |
+|---|---|---|
+| **ADD** | writes ONE new row from the mapped columns | takes no filters. It fills `CreatedOn`, `UpdatedOn`, `CreatedById` and `UpdatedById` itself (with the form owner when the form is public): unlike a saved query, it needs no audit columns mapped. A key that already exists gives `success: false`. |
+| **UPDATE** | sets the mapped columns on the rows the filters match | **needs filters.** With none, the runtime targets the rows whose every mapped column already equals the new value, so nothing changes; and a mapped primary key column is refused by the server: `400`, code 502, "Primary key columns cannot be updated from this endpoint: <column>". Filter on the key, map only the columns that change. `UpdatedOn` / `UpdatedById` move. |
+| **DELETE** | deletes the rows the filters match | with no filter it deletes the rows whose every mapped column equals the mapped value: map only the key column(s), or one non-key column deletes every row that shares its value. |
+
+A failed operation shows the runtime's generic toast ("Something went wrong! The data store
+operation couldn't be completed. Check your configuration and try again."), whatever the
+cause. Map `success` to a field and show your own message from it.
+
+In a config: `{"on": "click", "do": "datastore", "operation": "add", "dataStoreId": "<id>",
+"inputs": [{"left": "Sku", "right": "<field>"}, {"left": "Category", "value": "test"}],
+"outputs": [{"left": "success", "right": "<field>"}]}`; `update` and `delete` take `filters`
+like a READ. `form-create` / `form-edit` read the columns of every store the form writes and
+refuse an unknown column, an UPDATE with no filter or of a key column, and warn about a DELETE
+with no filter that maps a non-key column.
+
+## A saved query with several statements
+
+Statements separated by `;` run in order as one call (about 100 ms), with no transaction. The
+form's `rows` / `count` come from the one statement that returns rows; put it last. Verified:
+`UPDATE ... SET Qty = Qty + 1 WHERE Sku = @sku; SELECT ... WHERE Sku = @sku` updated the row
+and showed it in a table with `count` = 1 (the rows returned, not the rows changed). A script
+whose statements all write returns the affected-row count instead.
+
+- **SQL writes do not maintain `UpdatedOn` / `UpdatedById`** (the row operations do). Set them
+  in the statement if the form relies on them.
+- Two row-returning statements are refused after the script ran (its writes are kept), and the
+  timeout bounds each row-returning statement, not the script (see "What surprises" below).
+- Use one for "change, then show the result" in a single click, instead of a write event and
+  a read event.
 
 ## The saved query
 

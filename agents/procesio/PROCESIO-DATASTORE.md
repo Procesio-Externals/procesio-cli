@@ -75,6 +75,16 @@ called on load: the rows are there when the form appears, with one call per read
 filters with conditions (`{"column": "Category", "op": "equals", "field": "category"}`); a
 QUERY takes parameters from fields or typed values.
 
+**Writes.** ADD / UPDATE / DELETE map columns to form values and return only `success`. An
+UPDATE needs filters and must not map a key column; a DELETE without filters deletes every row
+whose mapped columns all match, so map only the key. To change rows and show the result in
+one click, use one saved query with several statements (the write, then the SELECT last). A
+failed write shows only a generic toast: map `success` and show your own message.
+
+**Row limits.** The backend does not limit what a form read returns. Load at most 200 rows
+into a table and 100 into a dropdown (`LIMIT` in the query, `countPerPage` on a READ); page or
+filter for more. Saved queries need Web-Api v3.3.0 / form-runtime v1.34.0 or later.
+
 **Dropdowns.** Map `rows` to a select (or radio group) and alias the columns `value` and
 `label`; the builder sets the select's `sourceType`, without which the options stay empty.
 

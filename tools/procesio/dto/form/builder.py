@@ -376,6 +376,56 @@ def _ds_filters(filters, logic, ctx) -> list:
     return out
 
 
+# Row operations of a Data Store event. Verified in the form runtime on production
+# (2026-11-19): the inputMap maps a column display name (left) to a form value or a
+# literal (right); the only output is `success`. An ADD fills CreatedById / UpdatedById
+# itself. With no filter, UPDATE and DELETE target the rows whose EVERY mapped column
+# equals the mapped value (form-runtime buildDataStorePkFilter over the whole mapped row).
+_DS_WRITES = ("ADD", "UPDATE", "DELETE")
+
+
+def _ds_write_outputs(operation: str, outputs: list) -> list:
+    mapped = {row["left"]: row["right"] for row in outputs}
+    unknown = [n for n in mapped if n != "success"]
+    if unknown:
+        raise UsageError(f"an {operation} has only the `success` output, not {unknown}; "
+                         f"read the rows back with a READ or a query in the same trigger")
+    return [{"id": 0, "left": "success", "right": mapped.get("success") or ""}]
+
+
+def _check_ds_write(operation: str, store_id, inputs: list, filters, ctx) -> None:
+    """Refuse at build what the runtime or the server always refuses, and say what an
+    unfiltered DELETE will remove."""
+    columns = [row["left"] for row in inputs if row.get("left")]
+    if operation == "ADD" and filters:
+        raise UsageError("an ADD takes no filters: it writes one new row from its inputs")
+    if operation == "UPDATE" and not filters:
+        raise UsageError(
+            "an UPDATE needs `filters` to say which rows change. Without them the form "
+            "runtime targets the rows whose every mapped column already equals the new "
+            "value, so it changes nothing, and if a key column is mapped the server refuses "
+            "the call (\"Primary key columns cannot be updated from this endpoint\").")
+    known = (ctx.get("ds_columns") or {}).get(store_id)
+    if not known:
+        return
+    unknown = [c for c in columns if c not in known["names"]]
+    if unknown:
+        raise UsageError(f"Data Store {store_id} has no column {unknown}; its columns are "
+                         f"{known['names']} (display names)")
+    if operation == "UPDATE":
+        keys = [c for c in columns if c in known["pk"]]
+        if keys:
+            raise UsageError(f"an UPDATE cannot set primary key column {keys}: the server "
+                             f"refuses the call. Filter on the key instead and map only the "
+                             f"columns that change.")
+    if operation == "DELETE" and not filters:
+        extra = [c for c in columns if c not in known["pk"]]
+        if extra:
+            _warn(ctx, f"a DELETE with no filter removes every row whose {', '.join(columns)} "
+                       f"all equal the mapped values, not only one row: {extra} is not a key "
+                       f"column. Map only the key column(s), or add `filters`.")
+
+
 def _query_trigger(ev: dict, ctx) -> dict:
     """The RUN_DATA_STORE_OPERATION config that runs one of the form's saved queries, in
     the shape a designer save writes: no Data Store, no filters, the query by id, one
@@ -449,18 +499,26 @@ def _trigger(ev: dict, ctx) -> dict:
                                  f"{' | '.join(form_queries.OUTPUTS)}")
             outputs = [{"id": i, "left": n, "right": mapped.get(n) or ""}
                        for i, n in enumerate(form_queries.OUTPUTS)]
+        filters = ev.get("filters")
+        if operation in _DS_WRITES:
+            outputs = _ds_write_outputs(operation, outputs)
+            _check_ds_write(operation, ev.get("dataStoreId"), inputs, filters, ctx)
         cfg = {
             "dataStoreId": ev.get("dataStoreId"),
             "operation": operation or ev.get("operation"),
             "inputMap": inputs,
             "outputMap": outputs,
         }
-        filters = ev.get("filters")
         if filters is not None:
             cfg["filters"] = _ds_filters(filters, ev.get("logic"), ctx)
             cfg["areFiltersConfigured"] = bool(filters)
         else:
             cfg["areFiltersConfigured"] = bool(ev.get("areFiltersConfigured", False))
+        if operation in _DS_WRITES:
+            # as a designer save writes a row operation
+            cfg.setdefault("filters", [])
+            cfg["queryId"] = None
+            cfg["areFiltersConfigured"] = True
         return {"action": "RUN_DATA_STORE_OPERATION", "config": cfg}
     raise UsageError(
         f"unknown event trigger do={ev.get('do')!r} (use map|process|js|form|datastore)")
@@ -553,9 +611,13 @@ def _resolve_late_field_refs(elements: list, ctx, form_events: list | None = Non
             for row in (ecfg.get("outputMap") or []) if reads else []:
                 target = row.get("right")
                 if row.get("left") == "rows" and isinstance(target, str):
+                    limit = (_ROW_LIMIT_TABLE if target in row_sources
+                             else _ROW_LIMIT_OPTIONS if target in options else None)
                     hit = list_target(target, "a Data Store read's rows")
                     if hit:
                         row["right"] = hit
+                    if limit:
+                        _row_limit_check(ecfg, limit, target, ctx)
             filter_fields(ecfg.get("filters"))
         else:
             sides = ("left", "right")
@@ -577,6 +639,35 @@ def _resolve_late_field_refs(elements: list, ctx, form_events: list | None = Non
     for ev in form_events or []:
         if isinstance(ev, dict):
             resolve(ev)
+
+
+# Rows a form should load into one element. The backend does not limit what a form read
+# returns; these are the form-runtime team's numbers for a smooth form (2026-11-19).
+_ROW_LIMIT_TABLE = 200
+_ROW_LIMIT_OPTIONS = 100
+_LIMIT_CLAUSE = re.compile(r"\bLIMIT\b", re.IGNORECASE)
+
+
+def _row_limit_check(ecfg: dict, limit: int, target: str, ctx) -> None:
+    what = "a table" if limit == _ROW_LIMIT_TABLE else "a dropdown"
+    if ecfg.get("operation") == "QUERY":
+        query = form_queries.find(ctx.get("queries") or [], ecfg.get("queryId"))
+        sql = str((query or {}).get("value") or "")
+        if query and not _LIMIT_CLAUSE.search(form_queries.code_only(sql)):
+            _warn(ctx, f"query {query.get('name')!r} fills {what} ({target}) with no LIMIT, and "
+                       f"the backend returns every row. Add LIMIT {limit} (the form-runtime "
+                       f"team's limit for {what}).")
+        return
+    page = next((r.get("right") for r in ecfg.get("inputMap") or []
+                 if r.get("left") == "countPerPage"), None)
+    try:
+        size = int(str(page))
+    except (TypeError, ValueError):
+        return
+    if size > limit:
+        _warn(ctx, f"a READ fills {what} ({target}) with up to {size} rows per call "
+                   f"(countPerPage). Keep it at {limit} or fewer for {what}, and page or filter "
+                   f"for more.")
 
 
 # The form's own triggers (Data.events), as the designer saves them.
@@ -1281,6 +1372,34 @@ def _collect_process_ids(elements: list, out: set) -> None:
                 _collect_process_ids([col["cell"]], out)
 
 
+def _collect_write_stores(elements: list, out: set) -> None:
+    """Every Data Store an ADD / UPDATE / DELETE event writes, on elements (with their
+    children and table cells) and on the form itself."""
+    for e in elements or []:
+        for ev in e.get("events") or []:
+            if (str(ev.get("do") or "").lower() in ("datastore", "data_store", "run_data_store_operation",
+                                                     "run_data_store")
+                    and str(ev.get("operation") or "").upper() in _DS_WRITES
+                    and ev.get("dataStoreId")):
+                out.add(ev["dataStoreId"])
+        _collect_write_stores(e.get("children"), out)
+        _collect_write_stores([c["cell"] for c in e.get("columns") or [] if c.get("cell")], out)
+
+
+def _store_columns(client, store_id: str) -> dict:
+    """{names, pk}: the store's own columns (display names) and its primary key."""
+    try:
+        body = client.get(f"/api/DataStore/{store_id}")
+    except Exception as e:  # noqa: BLE001
+        raise UsageError(f"a Data Store event writes store {store_id!r}, which could not be "
+                         f"read ({e}); check the dataStoreId.")
+    if isinstance(body, dict) and isinstance(body.get("result"), dict):
+        body = body["result"]
+    cols = [c for c in (body.get("columns") or []) if isinstance(c, dict) and not c.get("isSystemColumn")]
+    return {"names": [c.get("name") for c in cols],
+            "pk": [c.get("name") for c in cols if c.get("isPrimaryKey")]}
+
+
 def _prepare_ctx(client, config: dict) -> dict:
     """Impure pre-build step (has the live client): resolve every process referenced by a
     RUN_PROCESS event to its variable name->id map, so the builder can wire inputMap/
@@ -1288,6 +1407,11 @@ def _prepare_ctx(client, config: dict) -> dict:
     Also records the call's environment, which decides the form-code-key."""
     env = getattr(client, "env", None)
     ctx: dict = {"form_code_env": env.get("name") if isinstance(env, dict) else None}
+    stores: set = set()
+    _collect_write_stores([*(config.get("elements") or []),
+                           {"events": config.get("events") or []}], stores)
+    if stores:
+        ctx["ds_columns"] = {sid: _store_columns(client, sid) for sid in sorted(stores)}
     pids: set = set()
     _collect_process_ids_config(config, pids)
     if not pids:
@@ -1365,7 +1489,9 @@ def _persist_check(dto, stored) -> list[str]:
     if not lost:
         return []
     why = ("this environment returns no `queries` at all, so its build does not have saved "
-           "form queries yet" if "queries" not in body else "another save may have replaced them")
+           "form queries yet (they need Web-Api v3.3.0, form-runtime v1.34.0 and "
+           "user-playground v1.117.0; `server-build` reads the Web-Api version)"
+           if "queries" not in body else "another save may have replaced them")
     return [f"the form was saved but the server did not keep its saved queries "
             f"{', '.join(map(repr, lost))}: {why}. Every QUERY event on the form points at a "
             f"query that does not exist."]
