@@ -497,6 +497,14 @@ form fills its tables and dropdowns when it opens, with no click and no process.
 takes `rows` through its `sourceValue` and needs `sourceType` set (`JSON`), or it stays empty;
 see `../PROCESIO-FORM-QUERIES-NOTES.md`, "On load, in a dropdown".
 
+### Add, Update, Delete
+
+The left of each input row is a column's display name, the right a form value or a typed value,
+and the only output is `success`. ADD fills the audit columns itself and takes no filters. An
+UPDATE needs filters (without them it changes nothing, and a mapped key column is refused); a
+DELETE with no filter deletes every row whose mapped columns all match. Full rules, and
+multi-statement saved queries: `../PROCESIO-FORM-QUERIES-NOTES.md`, "Add, Update, Delete".
+
 ### Saved queries: SQL from a form event
 
 The same event action takes a fifth operation, `QUERY`, that runs a **saved query** of the form

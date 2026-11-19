@@ -228,3 +228,125 @@ def test_process_ids_on_form_events_are_resolved_too():
     fb._collect_process_ids_config({"events": [{"on": "load", "do": "process", "processId": "P9"}],
                                     "elements": []}, out)
     assert out == {"P9"}
+
+
+# -- writes: ADD / UPDATE / DELETE ----------------------------------------------------
+# Verified on production 2026-11-19: Add fills CreatedById/UpdatedById itself; an Update
+# without a filter never works (the runtime matches by every mapped column, and the
+# server refuses a mapped key column: "Primary key columns cannot be updated from this
+# endpoint"); a Delete without a filter deletes by every mapped column.
+
+COLUMNS = {STORE: {"names": ["Sku", "Product", "Qty", "Category"], "pk": ["Sku"]}}
+
+
+def _write(op, **extra):
+    ev = {"on": "click", "do": "datastore", "operation": op, "dataStoreId": STORE,
+          "outputs": [{"left": "success", "right": "count"}], **extra}
+    cfg = _config([])
+    cfg["elements"].append({"type": "button", "name": "go", "events": [ev]})
+    return cfg
+
+
+def _go(dto):
+    return _cfg(_el(dto, "go"), "onClickEvents")["value"]["events"][0]["config"]
+
+
+def test_add_is_saved_as_the_designer_saves_it():
+    cfg = _write("add", inputs=[{"left": "Sku", "right": "category"},
+                                {"left": "Category", "value": "test"}])
+    dto = fb.build(cfg, _ctx(form_id="F1", ds_columns=COLUMNS))
+    c = _go(dto)
+    assert c["operation"] == "ADD" and c["filters"] == [] and c["queryId"] is None
+    assert c["areFiltersConfigured"] is True
+    assert c["inputMap"] == [{"id": 0, "left": "Sku", "right": fb_field(dto, "category")},
+                             {"id": 1, "left": "Category", "right": "test"}]
+    assert c["outputMap"] == [{"id": 0, "left": "success", "right": fb_field(dto, "count")}]
+
+
+def test_a_write_has_only_the_success_output():
+    with pytest.raises(UsageError, match="success"):
+        fb.build(_write("add", inputs=[{"left": "Sku", "right": "category"}],
+                        outputs=[{"left": "rows", "right": "products"}]), _ctx(form_id="F1"))
+
+
+def test_add_takes_no_filters():
+    with pytest.raises(UsageError, match="ADD takes no filters"):
+        fb.build(_write("add", inputs=[{"left": "Sku", "right": "category"}],
+                        filters=[{"column": "Sku", "op": "equals", "value": "x"}]), _ctx(form_id="F1"))
+
+
+def test_update_without_a_filter_is_refused():
+    with pytest.raises(UsageError, match="UPDATE needs `filters`"):
+        fb.build(_write("update", inputs=[{"left": "Product", "right": "category"}]),
+                 _ctx(form_id="F1"))
+
+
+def test_update_of_a_key_column_is_refused_when_the_store_is_known():
+    cfg = _write("update", inputs=[{"left": "Sku", "right": "category"}],
+                 filters=[{"column": "Sku", "op": "equals", "field": "category"}])
+    with pytest.raises(UsageError, match="primary key"):
+        fb.build(cfg, _ctx(form_id="F1", ds_columns=COLUMNS))
+
+
+def test_an_unknown_column_is_refused_when_the_store_is_known():
+    with pytest.raises(UsageError, match="Prodcut"):
+        fb.build(_write("add", inputs=[{"left": "Prodcut", "right": "category"}]),
+                 _ctx(form_id="F1", ds_columns=COLUMNS))
+
+
+def test_delete_without_a_filter_by_a_non_key_column_warns():
+    warnings: list = []
+    fb.build(_write("delete", inputs=[{"left": "Category", "right": "category"}]),
+             _ctx(form_id="F1", ds_columns=COLUMNS, _build_warnings=warnings))
+    assert any("every row whose" in w for w in warnings)
+    warnings.clear()
+    fb.build(_write("delete", inputs=[{"left": "Sku", "right": "category"}]),
+             _ctx(form_id="F1", ds_columns=COLUMNS, _build_warnings=warnings))
+    assert warnings == []
+
+
+def test_the_stores_a_form_writes_are_read_before_the_build():
+    class Client:
+        env = None
+        calls: list = []
+
+        def get(self, path, *a, **k):
+            self.calls.append(path)
+            return {"id": STORE, "columns": [
+                {"name": "Sku", "isPrimaryKey": True, "isSystemColumn": False},
+                {"name": "Qty", "isPrimaryKey": False, "isSystemColumn": False},
+                {"name": "CreatedOn", "isPrimaryKey": False, "isSystemColumn": True}]}
+    client = Client()
+    ctx = fb._prepare_ctx(client, _write("update", inputs=[], filters=[]))
+    assert client.calls == [f"/api/DataStore/{STORE}"]
+    assert ctx["ds_columns"][STORE] == {"names": ["Sku", "Qty"], "pk": ["Sku"]}
+
+
+# -- row limits (form-runtime team, 2026-11-19: the backend does not limit a form's rows;
+#    keep 200 for a table / dynamic row and 100 for a dropdown or radio group) ----------------
+
+def _warnings_for(cfg):
+    found: list = []
+    fb.build(cfg, _ctx(form_id="F1", _build_warnings=found))
+    return found
+
+
+def test_a_query_without_limit_filling_a_dropdown_warns_with_100():
+    ev = {"on": "load", "do": "datastore", "operation": "query", "query": "Product list",
+          "outputs": [{"left": "rows", "right": "productpick"}]}
+    found = _warnings_for(_config([ev], queries=[QUERY]))
+    assert any("LIMIT 100" in w and "Product list" in w for w in found)
+
+
+def test_a_query_with_limit_does_not_warn():
+    limited = {**QUERY, "sql": QUERY["sql"] + " LIMIT 100"}
+    ev = {"on": "load", "do": "datastore", "operation": "query", "query": "Product list",
+          "outputs": [{"left": "rows", "right": "productpick"}]}
+    assert not any("LIMIT" in w for w in _warnings_for(_config([ev], queries=[limited])))
+
+
+def test_a_read_of_1000_rows_into_a_table_warns_with_200():
+    found = _warnings_for(_config([_read()]))
+    assert any("countPerPage" in w and "200" in w for w in found)
+    small = _read(inputs=[{"left": "countPerPage", "value": "200"}])
+    assert not any("countPerPage" in w for w in _warnings_for(_config([small])))

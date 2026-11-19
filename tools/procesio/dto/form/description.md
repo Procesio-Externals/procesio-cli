@@ -73,6 +73,11 @@ fine), so forms are fully buildable server-side.
   `rows` (of a READ, a QUERY or a process) aimed at a `select` or `radiobox` fills its options
   and sets its `sourceType` to JSON; alias the columns `value` and `label`. A query parameter
   takes a typed value with `{"left":"@p","value":"50"}`.
+  Writes: `operation` `add` | `update` | `delete` with `inputs` `[{"left":"<column>","right":"<field>"}]`
+  (or `"value"` for a typed value) and the single output `success`. `add` takes no filters and
+  fills the audit columns itself; `update` needs `filters` and may not set a key column;
+  `delete` without filters deletes by every mapped column. The store's columns are read at
+  build, so an unknown column is refused.
 - **queries** - the form's saved Data Store queries (top-level `Queries` on the DTO):
   `"queries":[{"name":"Find product","sql":"SELECT Product, Qty FROM <%1%> WHERE Product = @product","bindings":[{"id":1,"type":"dataStoreTable","dataStoreId":"<store id>"}]}]`.
   `id` is generated when omitted (give it to keep it stable across edits), `parameters` is
