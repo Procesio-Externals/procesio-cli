@@ -278,11 +278,20 @@ def test_form_edit_stops_before_writing_when_the_live_form_cannot_be_read():
 
 
 def test_form_edit_with_queries_replaces_them_without_reading_the_live_form():
-    cfg = {**_plain_config(), "queries": []}
+    """Listing both `queries` and `events` leaves nothing to carry over from the live form."""
+    cfg = {**_plain_config(), "queries": [], "events": []}
     s = FakeSession(queue=[FakeResp(200, {}), FakeResp(200, _form(queries=[]))])
     _call("form-edit", ["--id", "F1", "--config", json.dumps(cfg)], s)
     assert [c["method"] for c in s.calls] == ["PUT", "GET"]
     assert s.calls[0]["json"]["Queries"] == []
+
+
+def test_form_edit_with_queries_still_reads_the_live_form_for_its_events():
+    cfg = {**_plain_config(), "queries": []}
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, {}), FakeResp(200, _form(queries=[]))])
+    _call("form-edit", ["--id", "F1", "--config", json.dumps(cfg)], s)
+    assert [c["method"] for c in s.calls] == ["GET", "PUT", "GET"]
+    assert s.calls[1]["json"]["Queries"] == []
 
 
 def test_form_edit_dry_run_previews_the_carried_queries():

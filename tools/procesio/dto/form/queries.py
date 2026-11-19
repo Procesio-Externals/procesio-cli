@@ -204,9 +204,18 @@ def check_parameter_names(query: dict, supplied) -> None:
             f"{', '.join(map(repr, declared)) or '(the query takes none)'}")
 
 
-def references(elements: list) -> dict:
-    """{queryId: [name of each element with an event that runs it]}."""
+_FORM_EVENT_LABEL = {"FORM_LOAD": "form onLoad", "FORM_BEFORE_SUBMIT": "form onBeforeSubmit",
+                     "FORM_AFTER_SUBMIT": "form onAfterSubmit"}
+
+
+def references(elements: list, form_events: list | None = None) -> dict:
+    """{queryId: [name of each element, or form trigger, with an event that runs it]}."""
     out: dict = {}
+    for ev in form_events or []:
+        qid = ((ev or {}).get("config") or {}).get("queryId") if isinstance(ev, dict) else None
+        label = _FORM_EVENT_LABEL.get((ev or {}).get("type"), "form event") if qid else None
+        if qid and label not in out.setdefault(qid, []):
+            out[qid].append(label)
     for el in elements or []:
         configs = el.get("configs") or []
         label = next((c.get("value") for c in configs if c.get("key") == "name"), None) or el.get("id")
@@ -220,17 +229,18 @@ def references(elements: list) -> dict:
     return out
 
 
-def unreferenced(queries: list, elements: list) -> list[dict]:
-    used = {str(k).lower() for k in references(elements)}
+def unreferenced(queries: list, elements: list, form_events: list | None = None) -> list[dict]:
+    used = {str(k).lower() for k in references(elements, form_events)}
     return [q for q in queries or [] if str(q.get("id") or "").lower() not in used]
 
 
-def unreferenced_warnings(queries: list, elements: list) -> list[str]:
+def unreferenced_warnings(queries: list, elements: list,
+                          form_events: list | None = None) -> list[str]:
     """A designer save sends only the queries some event runs, so one that no event runs
     does not survive the form being opened and saved in the designer."""
     return [f"query {q.get('name')!r} is run by no event: the next save from the designer "
-            f"drops it. Wire it to an element event (operation QUERY) to keep it."
-            for q in unreferenced(queries, elements)]
+            f"drops it. Wire it to an element or form event (operation QUERY) to keep it."
+            for q in unreferenced(queries, elements, form_events)]
 
 
 _INSERTS = re.compile(r"\b(INSERT|REPLACE)\s+INTO\b", re.IGNORECASE)
@@ -270,6 +280,6 @@ def spelling_warnings(queries: list) -> list[str]:
     return out
 
 
-def warnings(queries: list, elements: list) -> list[str]:
-    return (unreferenced_warnings(queries, elements) + audit_warnings(queries)
+def warnings(queries: list, elements: list, form_events: list | None = None) -> list[str]:
+    return (unreferenced_warnings(queries, elements, form_events) + audit_warnings(queries)
             + spelling_warnings(queries))

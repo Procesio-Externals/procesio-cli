@@ -471,6 +471,32 @@ a data store from a PROCESS (not a form) use the **Query Store** action (see
 types `data-store-mapper` / `data-store-decisional` (`FeComponentType` 46 / 47) with a
 richer decisional operator set (BETWEEN, IN/BELONGS, IS_EMPTY→IsNull, IS_NOT_EMPTY→IsNotNull).
 
+### Filters, on load, and a dropdown (captured from the designer, run in the runtime)
+
+A READ saves its filters as conditions, one per row. The column's display name is on the left,
+a form field's value path or a literal (as text) on the right, and `logicOperator` joins a
+condition to the NEXT one (1 = AND, 2 = OR, 0 on the last):
+
+```json
+{ "id": 0, "uid": "<guid>", "operator": "EQUALS",
+  "leftOperator":  {"variable": "", "attribute": {"id": "", "nextAttribute": null}, "value": "Category"},
+  "rightOperator": {"variable": "", "attribute": {"id": "", "nextAttribute": null}, "value": "<form value path>"},
+  "auxOperator":   {"variable": "", "attribute": {"id": "", "nextAttribute": null}, "value": ""},
+  "logicOperator": 1, "value": null, "rightOperandAsListRequired": false, "operandsAsListOptional": true }
+```
+
+Operators are the runtime's names: `EQUALS`, `DOES_NOT_EQUAL`, `GREATER_THAN(_OR_EQUAL_TO)`,
+`LESS_THAN(_OR_EQUAL_TO)`, `CONTAINS`, `DOES_NOT_CONTAIN`, `STARTS_WITH`, `ENDS_WITH`, `LIKE`,
+`NOT_LIKE`, `BETWEEN` / `IS_NOT_BETWEEN` (second value in `auxOperator`), `BELONGS` /
+`DOES_NOT_BELONG`, `IS_EMPTY`, `IS_NOT_EMPTY`, `IS_TRUE`, `IS_FALSE`. A designer READ always
+writes `page` and `countPerPage` inputs and all four outputs. In a config, write conditions as
+`{"column": "Category", "op": "equals", "field": "category"}` or `{..., "value": 10}`.
+
+The same event works as the form's own **onLoad** (top-level `events`, `Data.events`), so a
+form fills its tables and dropdowns when it opens, with no click and no process. A dropdown
+takes `rows` through its `sourceValue` and needs `sourceType` set (`JSON`), or it stays empty;
+see `../PROCESIO-FORM-QUERIES-NOTES.md`, "On load, in a dropdown".
+
 ### Saved queries: SQL from a form event
 
 The same event action takes a fifth operation, `QUERY`, that runs a **saved query** of the form

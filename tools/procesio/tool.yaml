@@ -2701,7 +2701,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-create
-  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements, queries in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object. Non-blocking lint findings come back as `warnings`.'
+  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements, queries, events in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string
@@ -2787,6 +2787,11 @@ actions:
         chainConfig:
           type: object
           description: 'multi-form ''app'' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)'
+        events:
+          type: array
+          items:
+            $ref: '#/$defs/formEvent'
+          description: 'the form''s own triggers (Data.events): each {on: load|beforesubmit|aftersubmit, do: map|process|js|form|datastore, ...}, same keys as an element event. on load + do datastore reads a Data Store when the form opens, with no click and no process. Listed = this list replaces them; omitted = form-create saves none and form-edit keeps the live ones'
       $defs:
         query:
           type: object
@@ -2917,6 +2922,57 @@ actions:
             configs:
               type: object
               description: 'advanced: set any element config key by name (e.g. a document-signing element''s templateSigners / templateSpots / document)'
+        formEvent:
+          type: object
+          required:
+          - do
+          properties:
+            'on':
+              type: string
+              enum:
+              - load
+              - beforesubmit
+              - aftersubmit
+              description: default load
+            do:
+              type: string
+              enum:
+              - map
+              - process
+              - js
+              - form
+              - datastore
+            processId:
+              type: string
+            formId:
+              type: string
+            dataStoreId:
+              type: string
+            operation:
+              type: string
+            query:
+              type: string
+            filters:
+              type: array
+            logic:
+              type: string
+              enum:
+              - and
+              - or
+              - AND
+              - OR
+            code:
+              type: string
+            syncRun:
+              type: boolean
+            mapLatestTriggerOnly:
+              type: boolean
+            inputs:
+              type: array
+            outputs:
+              type: array
+            mapping:
+              type: array
         event:
           type: object
           required:
@@ -2976,7 +3032,15 @@ actions:
               description: 'operation QUERY: the saved query''s name or id. inputs = [{left: <parameter exactly as declared, e.g. @product>, right: <form field>}]; outputs = [{left: rows|columns|count|success, right: <form field>}]'
             filters:
               type: array
-              description: 'datastore trigger: row filters (not for ADD)'
+              description: 'datastore trigger: row filters (not for ADD, not for QUERY). Each {column: <Data Store column display name>, op: equals|doesNotEqual|greaterThan|>=|contains|startsWith|between|in|isEmpty|isTrue|... , field: <form field> | value: <literal>, aux / auxField: second operand of between, logic: and|or (joins it to the next)}; a list in the designer shape (with leftOperator) is sent as it is'
+            logic:
+              type: string
+              enum:
+              - and
+              - or
+              - AND
+              - OR
+              description: 'datastore trigger: how filters join when a condition does not say'
             code:
               type: string
             syncRun:
@@ -3166,7 +3230,7 @@ actions:
     required: true
     description: form template id
 - name: form-edit
-  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements, queries), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO; --brief returns an outline of the object in place of the object. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`. Non-blocking lint findings come back as `warnings`.'
+  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements, queries, events), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO; --brief returns an outline of the object in place of the object. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string

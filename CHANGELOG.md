@@ -10,6 +10,11 @@ there, not here.
 ## [Unreleased]
 
 ### Added
+- Forms load their data when they open: a form config's top-level `events` are the form's own
+  triggers (`load`, `beforesubmit`, `aftersubmit`), and a Data Store READ or saved query on
+  `load` fills tables and dropdowns with no click and no process. READ filters take a short
+  form (`{"column", "op", "field" | "value"}`), and `rows` aimed at a dropdown fills its
+  options. Every form action warns when the form is a draft, which its link does not serve.
 - A form that needs Data Store rows reads them itself: a Data Store event on the element
   (READ, or QUERY running one of the form's saved SQL queries), not a process. The guidance
   says so wherever forms are built, and the agent's `audit` reports `datastore-read-only` for
@@ -113,6 +118,12 @@ there, not here.
 - Notes cover the Web-Api v2.79.1 and v2.80.0 step and the later production changes.
 
 ### Fixed
+- `form-edit` kept none of a form's own events (onLoad, before and after submit), so editing a
+  form whose designer had added one deleted it with no warning. It keeps them now unless the
+  config lists `events`.
+- A Data Store event no longer reads the left side of its maps as a form field, so a field
+  named like an output (`count`) stays as it is; and a saved query run only by a form-level
+  event is no longer reported as run by none.
 - A process's list output mapped to a dynamic table by name now reaches the table's row
   source. The builder wrote the bare name, so the table stayed empty with no error.
 - Form readers accept an event slot stored as a bare list: `form-digest` no longer reads an

@@ -69,6 +69,15 @@ Two ways, both an element event with the action `RUN_DATA_STORE_OPERATION`:
   `form-set-element-event --operation QUERY`. Full contract:
   `tools/procesio/PROCESIO-FORM-QUERIES-NOTES.md`.
 
+**When the form opens.** Put the read on the form's own onLoad (config top-level
+`"events": [{"on": "load", "do": "datastore", ...}]`), not on a button and not in a process
+called on load: the rows are there when the form appears, with one call per read. A READ
+filters with conditions (`{"column": "Category", "op": "equals", "field": "category"}`); a
+QUERY takes parameters from fields or typed values.
+
+**Dropdowns.** Map `rows` to a select (or radio group) and alias the columns `value` and
+`label`; the builder sets the select's `sourceType`, without which the options stay empty.
+
 To show the rows in a table, map `rows` to the table's name: the table must be
 `"dynamic": true` and its column keys must equal the returned column names (the store's
 display names). The builder writes the dynamic row's source path, which is the only target
