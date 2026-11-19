@@ -111,3 +111,18 @@ returns a **list of row objects keyed by column letter** (`{A,B,C,D,…}`), **ro
 header row**, and numeric-looking cells arrive as **JS numbers**. Read the header row to map
 column-name → letter so the flow is robust to column reordering and can detect optional
 columns.
+
+## `crypto` inside the sandbox: typed arrays from the script are rejected, `Buffer` is reachable (measured 2026-11)
+
+- **A `Uint8Array` built in the script is not a TypedArray to `crypto`.** The script runs in its own
+  context, so `crypto.scryptSync(pw, new Uint8Array(...), ...)` fails with `The "salt" argument must be
+  of type string or an instance of ArrayBuffer, Buffer, TypedArray, or DataView. Received an instance of
+  Uint8Array`. The same holds for any `crypto` call that takes bytes (`timingSafeEqual`, `createHmac` keys).
+- **`Buffer` is not a global, but its class is reachable** through any value `crypto` returns:
+  `const Buf = crypto.randomBytes(1).constructor; const salt = Buf.from(hex, 'hex');`. Values that
+  `crypto` returns (`randomBytes`, `scryptSync`, digests) are real Buffers and keep `.toString('hex')` /
+  `.toString('base64')`.
+- **Cost:** `crypto.scryptSync(password, salt16, 64, {N: 16384, r: 8, p: 1, maxmem: 64 MB})` took 55 ms in
+  a Node action, so password hashing in a form-facing process fits well inside a normal run.
+- Compare secrets in constant time on the hex strings (XOR over every character) when you cannot get two
+  Buffers of equal length into `timingSafeEqual`.

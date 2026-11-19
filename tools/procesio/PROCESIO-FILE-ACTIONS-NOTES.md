@@ -17,6 +17,17 @@ empty-shape section there) and `PROCESIO-GET-FILE-DATA-NOTES.md`.
 
 - **Export To XLSX** names its only sheet `Sheet1` and writes text cells as inline strings
   (`t="str"`), numbers as numbers, with a header row when `Export header` is on.
+  Measured 2026-11-08 (a form's "Export to Excel"):
+  - **An empty list fails the action** (status 90, `Input list is null. Please add items to it.`),
+    so a filter that matches nothing has no file. Return one placeholder row under the same keys
+    (for example "No results for these filters" in the first column) instead of `[]`.
+  - **A date-looking STRING becomes a real date cell**, styled `dd/mm/yyyy hh:mm:ss`, and it is
+    parsed US-style: `05.11.2026 10:43` (5 November) was stored as 11 May. Pass ISO local time
+    (`2026-11-05T10:43:00`, no offset), which lands on the right day and time. Digit-only text
+    such as `1234567890` stays text.
+  - `Column order` (one key per line) fixes the column order; do not rely on the object's key
+    order. (Export To CSV did not honour the same setting in a test, see below.)
+  - The sheet XML uses the `x:` namespace prefix (`<x:row>`, `<x:c>`), which a regex reader must allow for.
 - **Apply Formula** writes the SAME formula text into every cell of the range: `=D2*2` on
   `C2:C5` puts `=D2*2` in all four cells, it does not shift references the way Excel's fill does.
   It writes only into cells that already exist; cells the sheet does not have are skipped

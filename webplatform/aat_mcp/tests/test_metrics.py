@@ -181,6 +181,7 @@ def test_the_live_output_is_well_formed(on, monkeypatch):
         P + "tool_calls_in_progress": "gauge",
         P + "tool_errors_total": "counter",
         P + "refusals_total": "counter",
+        P + "capability_lookups_total": "counter",
         P + "action_errors_total": "counter",
         P + "action_in_progress": "gauge",
         P + "action_oldest_in_progress_age_seconds": "gauge",
@@ -620,6 +621,69 @@ def test_an_unlisted_refusal_code_is_counted_as_other(on):
     assert _samples()[P + 'refusals_total{code="other"}'] == 2
 
 
+# --- capability lookups ---------------------------------------------------------------------
+#
+# A lookup runs nothing: it is a round trip a caller spends on finding out what to call. The
+# count by what was asked and how it was answered is what shows whether a change to discovery
+# removed any.
+
+def _lookups() -> dict[str, float]:
+    prefix = P + "capability_lookups_total"
+    return {k[len(prefix):]: v for k, v in _samples().items() if k.startswith(prefix)}
+
+
+def test_each_capabilities_call_is_counted_by_what_it_asked_and_how_it_was_answered(on, monkeypatch):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (FAKE_TOOLS, FAKE_AGENTS, []))
+    bridge.capabilities()
+    bridge.capabilities(search="export")
+    bridge.capabilities(search="export nosuchword")
+    bridge.capabilities(search="nosuchword")
+    bridge.capabilities(action="export")                    # no name: answered by a search
+    bridge.capabilities(name="bigtool", action="export")
+    bridge.capabilities(name="bigtool", action="exprot")
+    bridge.capabilities(name="bigtool")
+    assert _lookups() == {
+        '{mode="list",outcome="ok"}': 1,
+        '{mode="search",outcome="matched"}': 2,
+        '{mode="search",outcome="relaxed"}': 1,
+        '{mode="search",outcome="empty"}': 1,
+        '{mode="action",outcome="found"}': 1,
+        '{mode="action",outcome="unknown"}': 1,
+        '{mode="whole",outcome="full"}': 1,
+    }
+
+
+def test_a_capability_answered_with_its_index_is_counted_as_one(on, monkeypatch):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (FAKE_TOOLS, FAKE_AGENTS, []))
+    monkeypatch.setenv("AAT_CAPABILITIES_MAX_BYTES", "10")
+    assert bridge.capabilities(name="bigtool")["capability"]["truncated"] is True
+    assert _lookups() == {'{mode="whole",outcome="index"}': 1}
+
+
+def test_a_lookup_that_raises_is_counted_and_still_raises(on, monkeypatch):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (FAKE_TOOLS, FAKE_AGENTS, []))
+    with pytest.raises(KeyError):
+        bridge.capabilities(name="ghost")
+    with pytest.raises(KeyError):
+        bridge.capabilities(search="   ")
+    assert _lookups() == {'{mode="whole",outcome="error"}': 1,
+                          '{mode="search",outcome="error"}': 1}
+
+
+def test_a_lookup_label_outside_the_fixed_sets_is_counted_as_other(on):
+    metrics.capability_lookup("something-new", "ok")
+    metrics.capability_lookup("search", ["not", "a", "string"])
+    assert _lookups() == {'{mode="other",outcome="ok"}': 1,
+                          '{mode="search",outcome="other"}': 1}
+
+
+def test_a_lookup_is_not_counted_while_recording_is_off(monkeypatch):
+    monkeypatch.setattr(bridge, "_scan_registry", lambda: (FAKE_TOOLS, FAKE_AGENTS, []))
+    metrics.reset()
+    bridge.capabilities(search="export")
+    assert _lookups() == {}
+
+
 # --- the codes the label is checked against ---------------------------------------------------
 
 def test_every_code_this_server_produces_is_a_known_error_code():
@@ -673,8 +737,8 @@ def test_an_exception_during_dispatch_is_an_error_and_still_raised(on):
 
 
 def test_the_mcp_tool_label_set_is_the_published_tools():
-    assert http_server._MCP_TOOL_NAMES == {"capabilities", "run_tool", "run_tool_confirmed",
-                                           "run_agent", "run_agent_confirmed", "get_skill"}
+    assert http_server._mcp_tool_names() == {"capabilities", "run_tool", "run_tool_confirmed",
+                                             "run_agent", "run_agent_confirmed", "get_skill"}
 
 
 def _post(port, body, token=None):

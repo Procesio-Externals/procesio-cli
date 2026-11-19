@@ -32,6 +32,12 @@ _GUID_RE = re.compile(
 _SECRET_KEYWORDS = ("password", "passwd", "apikey", "api_key", "api-key",
                     "secret", "client_secret", "bearer ", "authorization")
 _TOKEN_RE = re.compile(r"^[A-Za-z0-9+/_=-]{24,}$")
+# A process whose only work is reading a Data Store: a form should read those rows itself.
+_SQL_READ = re.compile(r"\bselect\b", re.I)
+_SQL_WRITE = re.compile(r"\b(insert|update|delete|replace|create|alter|drop|truncate|"
+                        r"merge|call|grant|revoke|load|rename|set)\b", re.I)
+_DS_READ_OP = "selectrows"
+_DS_WRITE_OPS = {"insertrows", "updaterows", "deleterows"}
 
 
 def ci(d, *names):
@@ -114,6 +120,42 @@ def _datastore_masquerade(flow: dict) -> list[dict]:
     return out
 
 
+def _param_texts(a: dict) -> list[str]:
+    params = ci(a, "parameters")
+    return [str(ci(p, "value")) for p in (params if isinstance(params, list) else [])
+            if isinstance(p, dict) and isinstance(ci(p, "value"), str)]
+
+
+def _reads_only(a: dict) -> bool | None:
+    """True when this action reads a Data Store and writes nothing, False when it is a
+    Data Store action that writes, None when it is not a Data Store action at all."""
+    template = _template(a).strip().lower()
+    texts = _param_texts(a)
+    if template == "query store":
+        from tools.procesio.dto.form.queries import code_only
+        code = " ".join(code_only(t) for t in texts)
+        return bool(_SQL_READ.search(code)) and not _SQL_WRITE.search(code)
+    if template == "data store":
+        ops = {t.strip().lower() for t in texts}
+        return _DS_READ_OP in ops and not (ops & _DS_WRITE_OPS)
+    return None
+
+
+def _datastore_read_only(nonstructural: list[dict]) -> list[dict]:
+    """A process whose every action only reads a Data Store. Called from a form, it is
+    a whole process run per click for what the form can do itself."""
+    if not nonstructural or not all(_reads_only(a) for a in nonstructural):
+        return []
+    return [_f("practice", "info", "datastore-read-only",
+               "this process only reads a Data Store. If a form calls it to show or check "
+               "those rows, read them in the form instead: a Data Store event on the element "
+               "(operation READ, or QUERY running a saved query, SQL stored on the form). It "
+               "runs no process: one call of about 40-80 ms against a process run per click "
+               "(measured on production: about 220-270 ms for a one-action process, more as "
+               "actions are added, and a process instance every time).",
+               "best-practices 9; PROCESIO-DATASTORE forms")]
+
+
 def correctness_findings(flow: dict) -> list[dict]:
     """Designer-vs-runtime parity checks only (what `verify` gates on)."""
     findings: list[dict] = list(_datastore_masquerade(flow))
@@ -189,6 +231,7 @@ def _practice_findings(flow: dict) -> tuple[list[dict], dict]:
                            "best-practices 5"))
 
     findings.extend(_secret_smells(nonstructural))
+    findings.extend(_datastore_read_only(nonstructural))
 
     summary = {
         "action_count": len(_actions(flow)),

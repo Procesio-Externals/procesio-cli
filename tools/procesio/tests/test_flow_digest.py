@@ -200,3 +200,20 @@ def test_form_digest_accepts_bare_string_map_sides():
     assert "RUN_PROCESS → **Parent** (sync)" in md
     assert "in: `payload` ← `rows_ready`" in md
     assert "out: `rows_ready` ← `rows`" in md
+
+
+def test_form_digest_reads_events_stored_as_a_bare_list():
+    # Older forms store an element's on<Trigger>Events value as a bare list of
+    # events, not {"events": [...]}. Both the digest and the process map must see them,
+    # otherwise a form with ten RUN_PROCESS buttons reads as having none.
+    run = {"type": "CLICK", "action": "RUN_PROCESS", "config": {
+        "processId": PARENT, "syncRun": False, "inputMap": [], "outputMap": []}}
+    form = {"id": "f", "name": "Old form", "data": {
+        "variables": [], "dataModel": {"id": "dm", "name": "form", "attributes": []},
+        "elements": [{"id": "btn", "type": "button", "parentId": None,
+                      "configs": [{"key": "name", "value": "validate-button"},
+                                  {"key": "onClickEvents", "value": [run]}]}]}}
+    md, _ = formdigest.render(form, {PARENT: _parent()})
+    assert "on Click: RUN_PROCESS → **Parent** (async)" in md
+    assert formdigest.process_links(form) == [
+        {"process_id": PARENT, "trigger": "Click", "element": "validate-button"}]

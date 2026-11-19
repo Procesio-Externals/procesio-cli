@@ -267,7 +267,7 @@ actions:
     required: false
     description: 'name of the copy (default: the source credential''s name)'
 - name: credential-create
-  description: Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.
+  description: Create a PROCESIO credential from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object.
   args:
   - name: profile
     type: string
@@ -326,6 +326,10 @@ actions:
     type: boolean
     required: false
     description: build + validate the DTO and return it without creating
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: force
     type: boolean
     required: false
@@ -363,7 +367,7 @@ actions:
     required: true
     description: credential id
 - name: credential-edit
-  description: 'Edit a PROCESIO credential (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the fields you want to change. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
+  description: 'Edit a PROCESIO credential (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the fields you want to change. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -394,6 +398,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: allow-remove
     type: boolean
     required: false
@@ -1089,7 +1097,7 @@ actions:
     required: true
     description: inner model id to promote/clone
 - name: datatype-create
-  description: 'Create a PROCESIO datatype from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of attributes in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
+  description: 'Create a PROCESIO datatype from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of attributes in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -1205,6 +1213,10 @@ actions:
     type: boolean
     required: false
     description: build + validate the DTO and return it without creating
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: force
     type: boolean
     required: false
@@ -1278,7 +1290,7 @@ actions:
     required: true
     description: attribute id or current name
 - name: datatype-edit
-  description: 'Edit a PROCESIO datatype (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD or change one item, GET the datatype, append yours to the matching list (attributes), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
+  description: 'Edit a PROCESIO datatype (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD or change one item, GET the datatype, append yours to the matching list (attributes), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -1309,6 +1321,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: allow-remove
     type: boolean
     required: false
@@ -2238,7 +2254,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: document-create
-  description: 'Create a PROCESIO document from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
+  description: 'Create a PROCESIO document from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -2339,6 +2355,10 @@ actions:
     type: boolean
     required: false
     description: build + validate the DTO and return it without creating
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: force
     type: boolean
     required: false
@@ -2377,7 +2397,7 @@ actions:
     required: true
     description: document template id
 - name: document-edit
-  description: 'Edit a PROCESIO document (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD or change one item, GET the document, append yours to the matching list (variables), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
+  description: 'Edit a PROCESIO document (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action - to ADD or change one item, GET the document, append yours to the matching list (variables), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -2408,6 +2428,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: allow-remove
     type: boolean
     required: false
@@ -2677,7 +2701,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-create
-  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements, queries in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating. Non-blocking lint findings come back as `warnings`.'
+  description: 'Create a PROCESIO form from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of assignees, elements, queries in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string
@@ -2973,6 +2997,10 @@ actions:
     type: boolean
     required: false
     description: build + validate the DTO and return it without creating
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: force
     type: boolean
     required: false
@@ -3138,7 +3166,7 @@ actions:
     required: true
     description: form template id
 - name: form-edit
-  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements, queries), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`. Non-blocking lint findings come back as `warnings`.'
+  description: 'Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use form-add-element; otherwise GET the form, append yours to the matching list (assignees, elements, queries), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). To move ONE field without restating the rest, use form-update instead - it deep-merges a patch. --dry-run previews the DTO; --brief returns an outline of the object in place of the object. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`. Non-blocking lint findings come back as `warnings`.'
   args:
   - name: profile
     type: string
@@ -3169,6 +3197,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: allow-remove
     type: boolean
     required: false
@@ -3255,6 +3287,7 @@ actions:
     type: string
     required: false
     description: 'only return this config key (repeatable; default: all)'
+    repeatable: true
 - name: form-get-element-events
   description: List one element's event handlers, by trigger.
   args:
@@ -3456,10 +3489,12 @@ actions:
     type: string
     required: false
     description: key=value to write (repeatable); the value is parsed as JSON when it parses, otherwise stored as a plain string. A value that LOOKS like JSON (true/42/[..]) is stored as that type — for a literal string that looks like JSON, use --set-file (always a string)
+    repeatable: true
   - name: set-file
     type: string
     required: false
     description: key=path to write a config's value from a file (repeatable) — for long HTML labels
+    repeatable: true
   - name: dry-run
     type: boolean
     required: false
@@ -3630,7 +3665,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-update
-  description: 'Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data patch into its Data (and/or override --name/--status/--state/--is-private), then PUT the server-accepted PascalCase DTO. Preserves elements/theme/code (never rebuilds like form-edit). Last-write-wins guard (--force); --dry-run previews the DTO.'
+  description: 'Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data patch into its Data (and/or override --name/--status/--state/--is-private), then PUT the server-accepted PascalCase DTO. Preserves elements/theme/code (never rebuilds like form-edit). Last-write-wins guard (--force); --dry-run previews the DTO, and --changes-only lists what changes instead.'
   args:
   - name: profile
     type: string
@@ -3676,6 +3711,10 @@ actions:
     type: boolean
     required: false
     description: build the PUT DTO and return it without saving (GET only)
+  - name: changes-only
+    type: boolean
+    required: false
+    description: report what changes as a list of paths, each with its value before and after (long values are described, not printed); a --dry-run then leaves out the whole DTO, which for a real form is too long to read
   - name: force
     type: boolean
     required: false
@@ -7646,6 +7685,7 @@ actions:
     type: string
     required: false
     description: INDEX=variable or INDEX=variable.Attribute (repeatable). The attribute is resolved BY NAME against the variable's model, so a typo is refused rather than written
+    repeatable: true
   - name: find
     type: string
     required: false
@@ -7701,6 +7741,7 @@ actions:
     type: string
     required: true
     description: 'INDEX=variable: bind the value''s <%%N%%> placeholder N to a process variable (name or id). Repeatable. The value''s placeholder set must equal the bound set.'
+    repeatable: true
   - name: find
     type: string
     required: false
@@ -7752,6 +7793,95 @@ actions:
     type: boolean
     required: false
     description: delete + heal + validate but do not PUT
+  - name: doc
+    type: string
+    required: false
+    description: 'documentation this change needs, as JSON: {"action": "<purpose>"|true, "area": {"title": "...", "text": "..."}|true, "process": "<purpose>"|true}; a text replaces, true confirms the current one is still right. The error lists what this change requires'
+  - name: doc-file
+    type: string
+    required: false
+    description: path to a UTF-8 JSON file for --doc
+  - name: allow-undocumented
+    type: boolean
+    required: false
+    description: save even when the documentation this change needs is missing; the gaps come back under `documentation`
+- name: node-edit-batch
+  description: 'Make SEVERAL node-parameter changes on a live process in ONE save: each change is a set (as node-set-param), a bind (as node-bind-var), an add-binding (as node-add-binding) or a replace-text (as node-replace-text), on any node of the process. The changes are applied in order to one copy of the process, then the designer layer is regenerated -> validate + flow-lint -> PUT, once for the whole list. Use it instead of several single edits: each of those validates and saves the whole process again. All or nothing: a change that cannot be applied refuses the whole list and names its position, and nothing is written. Documentation as for the single writers: a change carries its node''s {action, area} under `doc`, --doc carries {process} and may carry an action and an area for every node whose change gives none; a text replaces, true confirms. --dry-run previews.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: process (project) id
+  - name: changes
+    type: string
+    required: false
+    description: the changes as a JSON list; each is {op, node, ...} with op one of set | bind | add-binding | replace-text
+    schema:
+      type: array
+      minItems: 1
+      description: The changes, applied in order to one copy of the process and saved once.
+      items:
+        type: object
+        required:
+        - op
+        - node
+        properties:
+          op:
+            enum:
+            - set
+            - bind
+            - add-binding
+            - replace-text
+            description: set = one parameter's literal text (as node-set-param). bind = bind every <%N%> of a string parameter (as node-bind-var). add-binding = add placeholders to a parameter and keep the bindings it has (as node-add-binding). replace-text = replace an exact literal in the node (as node-replace-text).
+          node:
+            type: string
+            description: the node's actionName (canvas label) or id
+          property:
+            type: string
+            description: the parameter's designer label or its id. Required for set, bind and add-binding; narrows replace-text to one parameter.
+          value:
+            type: string
+            description: 'set: the new literal text. Keep every <%N%> placeholder that the old value had.'
+          bind:
+            type: array
+            items:
+              type: string
+            description: 'bind: INDEX=variable for every <%N%> in the value. add-binding: INDEX=variable or INDEX=variable.Attribute for each placeholder to add.'
+          find:
+            type: string
+            description: 'replace-text: the exact literal to replace. bind and add-binding: an optional literal to replace first.'
+          replace:
+            type: string
+            description: the replacement for find
+          expect:
+            type: integer
+            description: 'replace-text: refuse unless this many replacements are made'
+          allow_binding_change:
+            type: boolean
+            description: 'set and replace-text: permit a different <%N%> placeholder set'
+          doc:
+            type: object
+            description: 'the documentation this change needs for its node: {"action": "<the action''s purpose now>" or true, "area": {"text": "<the area''s text now>"} or true}. A text replaces; true confirms that the current one is still right. Without it, the action and area given in --doc apply.'
+  - name: changes-file
+    type: string
+    required: false
+    description: read the changes JSON from a file (needed above the argv limit)
+  - name: dry-run
+    type: boolean
+    required: false
+    description: apply + normalize + validate but do not PUT
   - name: doc
     type: string
     required: false
@@ -7865,6 +7995,7 @@ actions:
     type: string
     required: false
     description: 'limit the rebuild to this node (actionName or id); repeatable. Default: every node without a designer layer'
+    repeatable: true
   - name: dry-run
     type: boolean
     required: false
@@ -10675,7 +10806,7 @@ actions:
     required: false
     description: compose and return the request without sending it
 - name: process-create
-  description: 'Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables, actions, groups, edges, webhooks in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.'
+  description: 'Create a PROCESIO process from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later: put all of variables, actions, groups, edges, webhooks in it up front. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -11119,6 +11250,10 @@ actions:
     type: boolean
     required: false
     description: build + validate the DTO and return it without creating
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: force
     type: boolean
     required: false
@@ -11190,7 +11325,7 @@ actions:
     required: true
     description: process (project) id
 - name: process-edit
-  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, groups, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`.'
+  description: 'Edit a PROCESIO process (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. There is NO add / insert / append action (no add-node either: a node IS an entry in actions) - to ADD or change one item, GET the process, append yours to the matching list (variables, actions, groups, edges, webhooks), and send the WHOLE config back. Batch freely: N items cost the same single call as 1. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO; --brief returns an outline of the object in place of the object. If the live resource cannot be read, the edit stops before writing; --dry-run still previews and names the failure in `live_read_failed`.'
   args:
   - name: profile
     type: string
@@ -11221,6 +11356,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: allow-remove
     type: boolean
     required: false
@@ -12350,6 +12489,7 @@ actions:
     type: string
     required: false
     description: VARNAME=PATH for a File input variable (repeatable)
+    repeatable: true
   - name: payload
     type: string
     required: false
@@ -12428,6 +12568,7 @@ actions:
     type: string
     required: false
     description: bind a local file to a File input variable; repeatable
+    repeatable: true
   - name: payload
     type: string
     required: false
@@ -13012,7 +13153,7 @@ actions:
     required: false
     description: which flow when the bundle has more than one
 - name: webhook-create
-  description: Create a PROCESIO webhook from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating.
+  description: Create a PROCESIO webhook from a validated config (build->validate->POST->re-GET). --config carries the WHOLE definition in ONE call - not a skeleton to fill in later. There is no separate add/insert step afterwards. --dry-run previews the DTO without creating; --brief returns an outline of the object in place of the object.
   args:
   - name: profile
     type: string
@@ -13084,6 +13225,10 @@ actions:
     type: boolean
     required: false
     description: build + validate the DTO and return it without creating
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: force
     type: boolean
     required: false
@@ -13120,7 +13265,7 @@ actions:
     required: true
     description: webhook id
 - name: webhook-edit
-  description: 'Edit a PROCESIO webhook (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the fields you want to change. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO.'
+  description: 'Edit a PROCESIO webhook (--id required). DESIRED STATE: the --config you send REPLACES the whole definition - send the COMPLETE config every time, not only the fields you want to change. Anything you omit is REMOVED (refused unless --allow-remove). --dry-run previews the DTO; --brief returns an outline of the object in place of the object.'
   args:
   - name: profile
     type: string
@@ -13151,6 +13296,10 @@ actions:
     type: boolean
     required: false
     description: build the DTO and return it without editing
+  - name: brief
+    type: boolean
+    required: false
+    description: 'leave the built or saved object out of the answer and return an outline of it under `summary`: its short fields, and for each list the count and the names of its items. The validation, documentation and warnings stay. For a caller whose answer is limited in size: the whole object of a real resource does not fit'
   - name: allow-remove
     type: boolean
     required: false

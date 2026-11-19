@@ -689,3 +689,37 @@ Verified 2026-10-22:
   frame's centre, so an overlay pulse at `50% 50%` lands on the pin tip.
 - **Directions link:** `https://www.google.com/maps/dir/?api=1&destination=<query>`.
 
+
+## A full canvas app inside a form (game, simulator, visualizer) - verified live 2026-11-19
+
+A self-contained interactive canvas (a real-time loop that reads the keyboard and the mouse) runs
+fine on the public forms host from form-level code. The rules that made it work:
+
+- **Mount it in a paragraph, not on `body`.** Author `<div class="x-mount">…</div>` as the
+  paragraph's HTML; DOMPurify keeps the class. The runtime finds `.x-mount` and appends its own root
+  there, so the app sits inside the form container and the scoped form CSS still reaches it. Fall back
+  to a fixed overlay on `body` only if the mount never appears (after a few seconds).
+- **Build the DOM once and re-attach the same node.** The renderer can rebuild the paragraph, which
+  throws away whatever you put in it. Keep the root element (canvas included) in the parent-page
+  runtime and, from a coalesced `MutationObserver`, append that SAME node to the new `.x-mount`.
+  The app's state lives in the runtime's closure, so a rebuild costs nothing and resets nothing.
+- **Inject the app's own `<style>` into `document.head` from the runtime.** It is not scoped, so it
+  styles the root wherever it ends up (including `:fullscreen`). Keep the form CSS for the
+  first-frame look (the placeholder and the dark page background via the `data:` `@import`).
+- **Take keys from a focusable canvas (`tabIndex = 0`), not from `document`.** Listening on the
+  document would swallow keys from every other control on the form. Focus the canvas on click,
+  `preventDefault` only the keys the app uses (arrows and Space would otherwise scroll the
+  `.form-builder-view--content` scroller), and pause on `blur`. While pointer lock is active,
+  read `movementX` from `document` and forward keys from a capture listener.
+- **Render at a low fixed internal resolution and let CSS scale it** (`image-rendering:
+  pixelated`). Writing pixels into one `ImageData` per frame at a few hundred pixels wide costs a
+  few milliseconds; scaling is free on the compositor. Pause the loop when `document.hidden` or when
+  the root is detached (`isConnected`), and create the `AudioContext` on the first click (browsers
+  refuse it before a user gesture).
+- **Size:** about 54 KB of form JavaScript was accepted and served without trouble. Generate
+  textures and sprites in code (offscreen canvas, then `getImageData`) instead of embedding images,
+  so the whole app stays one file inside `Data.code`.
+- **Test it in a replica first:** a page with a fake `.form-builder--paragraph`, the installer run
+  from a hidden `srcdoc` iframe (the way the renderer runs it), the iframe cloned twice to prove that
+  a re-trigger installs nothing twice, and the paragraph's `innerHTML` replaced to prove the
+  re-attach. Then open the minted URL headless and check that `.x-mount .<root>` exists.

@@ -34,6 +34,7 @@ Create or change a PROCESIO form and prove the user-visible behavior, process tr
 - For native synchronous result rendering, preserve existing direct process outputs and caller semantics. When the runtime writer consumes a variable-instance collection, use a compatible response envelope rather than replacing the established structured response.
 - Never persist an access token or credential as a form default, in plaintext JavaScript, or in screenshots/logs.
 - For a document-signing element, store the PDF with `form-signing-upload-document`, give every signer a SIGNATURE spot, and send the envelope yourself when the submission is made over the API (the element never sends it). The procesio tool's form development guide (its document-signing chapter) has the lifecycle and error codes.
+- When a form event runs a process only to read Data Store rows, build a Data Store event on the element instead (READ, or QUERY with a saved query) and keep processes for work the form cannot do. The process audit reports such a process as `datastore-read-only`.
 - For a form with saved Data Store queries, read them first and confirm every query is run by an element event: a designer save drops one that is not, and a save that omits the list deletes them all. Running a saved query is a mutation that needs approval, because the stored statement can write; the SQL is first checked when it runs. The procesio tool's form-queries note has the shapes and errors.
 
 ## Verify

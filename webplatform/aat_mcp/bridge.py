@@ -404,6 +404,11 @@ def _secrets_from_credential(manifest, values: dict[str, str],
 # assistant API key; the tool resolves it as its default, exactly as it would a locally stored one.
 _PROCESIO_PROFILE = "platform"
 
+# The passphrase the installation's web app encrypts a form's CSS and JavaScript with (Data.code).
+# It belongs to the installation, not to a user, so no credential of the turn can carry it: the
+# deployment gives it to this server, and a turn hands it to the procesio tool beside the profile.
+_FORM_CODE_KEY_ENV = "AAT_PROCESIO_FORM_CODE_KEY"
+
 
 def _procesio_profile(manifest, key: "turn_credentials.ProcesioKey",
                       secrets: dict[str, dict[str, str]]) -> None:
@@ -427,6 +432,11 @@ def _procesio_profile(manifest, key: "turn_credentials.ProcesioKey",
         "default-profile": _PROCESIO_PROFILE,
         f"cred-{_PROCESIO_PROFILE}": json.dumps(profile),
     }
+    # The tool reads the bare name for its default environment, and a turn always runs on that
+    # one. Without the setting nothing is added, and the tool says which key it lacks.
+    form_code_key = (os.environ.get(_FORM_CODE_KEY_ENV) or "").strip()
+    if form_code_key:
+        secrets[manifest.name]["form-code-key"] = form_code_key
 
 
 def _candidates(manifest, key: "turn_credentials.ProcesioKey",
@@ -712,8 +722,30 @@ def _args_schema(arglist) -> list[dict]:
         # from validation errors - one layer per attempt, several turns per action.
         if arg.get("schema"):
             spec["schema"] = arg["schema"]
+        # Said only when true: the caller may then pass a list, one value per item.
+        if arg.get("repeatable"):
+            spec["repeatable"] = True
         out.append(spec)
     return out
+
+
+def _repeatable_args(kind: str, name: str, action: str | None) -> frozenset:
+    """The arguments of one action that its manifest marks as repeatable.
+
+    Read from the one manifest, never from a registry scan: this runs at the start of every
+    call, and a scan there would be paid by the caller. Never raises: an unknown name or a
+    manifest that cannot be read yields nothing, and the call then fails on its own terms."""
+    try:
+        manifest = registry.get_tool(name) if kind == "tool" else registry.get_agent(name)
+        args = manifest.args
+        if action:
+            for candidate in manifest.actions or []:
+                if candidate.name == action:
+                    args = candidate.args
+                    break
+        return frozenset(a.name for a in (args or []) if getattr(a, "repeatable", False))
+    except Exception:  # noqa: BLE001
+        return frozenset()
 
 
 def _full(entry: dict, kind: str) -> dict:
@@ -964,6 +996,57 @@ def _degraded(entry: dict, kind: str, size: int, limit: int) -> dict:
 
 _DESTRUCTIVE = {"delete", "remove", "destroy", "drop", "purge", "uninstall"}
 
+# How many leading search matches carry their argument list, and how many bytes those lists
+# may add to one answer. Both are small on purpose: a search answer stays in the caller's
+# context for the rest of the session, so it must not grow into the schema dump that the
+# compact listing exists to avoid.
+_DEFAULT_SEARCH_ARGS = 3
+_SEARCH_ARGS_MAX_BYTES = 6_000
+
+
+def _search_args_count() -> int:
+    """How many leading search matches carry their argument list. 0 turns it off."""
+    try:
+        return max(0, int(os.environ.get("AAT_SEARCH_ARGS", _DEFAULT_SEARCH_ARGS)))
+    except ValueError:
+        return _DEFAULT_SEARCH_ARGS
+
+
+def _attach_args(rows: list[tuple[dict, dict]]) -> int:
+    """Give the leading matches their argument list. Returns how many got one.
+
+    `rows` pairs each match with the manifest action it came from, best first. A match that
+    gets its arguments also gets its WHOLE description, in place of the cut one: it is about
+    to be run from this answer alone, and the rules of an action (what a value must contain,
+    what the action refuses) are as often in the end of its description as in the start.
+
+    What does not fit in what is left of the byte allowance is left out, and that match
+    stays compact: the caller can still ask for it by name."""
+    left = _SEARCH_ARGS_MAX_BYTES
+    carried = 0
+    for match, action in rows[:_search_args_count()]:
+        args = _args_schema(action.get("args"))
+        description = action.get("description", "") or ""
+        size = (len(json.dumps(args, ensure_ascii=False))
+                + len(description) - len(match["description"]))
+        if size > left:
+            continue
+        match["description"] = description
+        match["args"] = args
+        # The worked examples stay behind the one-action lookup; say that they exist.
+        if action.get("examples"):
+            match["has_examples"] = True
+        left -= size
+        carried += 1
+    return carried
+
+
+_READY_HINT = ("A match that carries 'args' is ready to run: call run_tool (run_agent for "
+               "kind=agent) with that action, using each arg 'name' EXACTLY as spelled "
+               "(hyphens, not underscores). Call capabilities with name=<name> and "
+               "action=<action> only for a match without 'args', or to see an action's "
+               "examples.")
+
 
 def _search_actions(query: str, kind: str | None = None, name: str | None = None,
                     limit: int = 20) -> dict:
@@ -971,8 +1054,10 @@ def _search_actions(query: str, kind: str | None = None, name: str | None = None
     when `name` is given, otherwise across every tool and agent.
 
     AND semantics FIRST: an action matches when every token appears somewhere in
-    '<capability>.<action> <description>'. Matches come back COMPACT (no arg schemas) -
-    the caller then asks for the one it wants by action name.
+    '<capability>.<action> <description>'. Matches come back COMPACT, except that the
+    leading few carry their argument list (see _attach_args). A caller that searches
+    nearly always runs one of the first matches next, and without the arguments it has
+    to ask for them first: one more round trip for every action it discovers.
 
     When AND finds nothing the search RELAXES instead of returning an empty list, and
     says which words it had to drop. A strict-AND miss is not "no such action", it is
@@ -1007,7 +1092,8 @@ def _search_actions(query: str, kind: str | None = None, name: str | None = None
     # One pass, scoring every action by HOW MANY informative tokens it carries. The strict
     # answer is the full-count group; a relaxation is the next count down, i.e. the largest
     # subset of the query that matches anything - no subset enumeration needed.
-    candidates: list[tuple[int, float, int, dict]] = []     # (hits, precision, score, match)
+    # (hits, precision, score, match, the manifest action the match came from)
+    candidates: list[tuple[int, float, int, dict, dict]] = []
     for pool, pool_kind in pools:
         for entry in pool:
             if entry.get("error"):
@@ -1047,7 +1133,7 @@ def _search_actions(query: str, kind: str | None = None, name: str | None = None
                     "name": entry["name"],
                     "action": action,
                     "description": desc[:200],
-                }))
+                }, a))
 
     if not candidates:
         return {
@@ -1059,10 +1145,10 @@ def _search_actions(query: str, kind: str | None = None, name: str | None = None
                      "own catalog action (for procesio, list-actions-catalog)."),
         }
 
-    best = max(h for h, _, _, _ in candidates)
-    group = [(p, s, m) for h, p, s, m in candidates if h == best]
+    best = max(c[0] for c in candidates)
+    group = [(p, s, m, a) for h, p, s, m, a in candidates if h == best]
     group.sort(key=lambda g: (-g[0], -g[1], g[2]["name"], g[2]["action"]))
-    matches = [m for _, _, m in group[:limit]]
+    matches = [m for _, _, m, _ in group[:limit]]
 
     # A relaxation that survived only on a CAPABILITY NAME found nothing: "procesio
     # form-validate" unscoped kept every procesio action alive on the word "procesio"
@@ -1090,13 +1176,18 @@ def _search_actions(query: str, kind: str | None = None, name: str | None = None
                      f"list-actions-catalog)."),
         }
 
+    # A list too vague to be an answer (see below) carries no arguments: they would invite
+    # the caller to run something from a list that it is told not to trust.
+    too_vague = best < len(informative) and len(group) > 3 * limit
+    ready = 0 if too_vague else _attach_args([(m, a) for _, _, m, a in group[:limit]])
     out = {
         "query": query,
         "count": len(matches),
         "total_matches": len(group),
         "matches": matches,
-        "hint": ("Call capabilities with name=<name> and action=<action> for that "
-                 "action's full arg schema before running it."),
+        "hint": _READY_HINT if ready else (
+            "Call capabilities with name=<name> and action=<action> for that "
+            "action's full arg schema before running it."),
     }
     if best < len(informative):
         # Name the dropped words explicitly. A "closest match" that does not say what was
@@ -1111,13 +1202,18 @@ def _search_actions(query: str, kind: str | None = None, name: str | None = None
         out["relaxed"] = True
         out["matched_terms"] = [t for t in informative if t not in dropped]
         out["dropped_terms"] = dropped
+        read_top = (
+            "Read the top one before rephrasing - rephrasing rarely helps here. Its 'args' "
+            "are included, and a match that carries 'args' can be run as it is."
+            if "args" in top else
+            "Read the top one with capabilities name=<name> action=<action> before "
+            "rephrasing - rephrasing rarely helps here.")
         out["hint"] = (
             f"No action matches ALL of {informative}; these match "
             f"{out['matched_terms']} (ignoring {dropped}) and are ordered closest-first. "
             f"A dropped word is usually the TARGET SYSTEM's vocabulary rather than AAT's. "
-            f"Read the top one with capabilities name=<name> action=<action> before "
-            f"rephrasing - rephrasing rarely helps here.")
-        if len(group) > 3 * limit:
+            f"{read_top}")
+        if too_vague:
             out["hint"] = (
                 f"Too vague: {len(group)} actions match only {out['matched_terms']} "
                 f"(ignoring {dropped}), so this list is not an answer. Add a word that "
@@ -1157,17 +1253,48 @@ def action_help(name: str, action: str | None, kind: str | None = None) -> dict 
             ]}
 
 
+def _lookup_outcome(mode: str, answer: dict) -> str:
+    """How a capabilities call was answered, as the metric names it."""
+    if mode == "search":
+        if not answer.get("count"):
+            return "empty"
+        return "relaxed" if answer.get("relaxed") else "matched"
+    if mode == "action":
+        return "unknown" if "unknown_action" in answer else "found"
+    if mode == "whole":
+        return "index" if (answer.get("capability") or {}).get("truncated") else "full"
+    return "ok"
+
+
 def capabilities(kind: str | None = None, name: str | None = None,
                  action: str | None = None, search: str | None = None,
                  full: bool = False) -> dict:
     """Discover AAT capabilities, narrowest door first.
 
-    - search              -> keyword search over actions (optionally within `name`)
+    - search              -> keyword search over actions (optionally within `name`);
+                             the leading matches carry their arg schema
     - name + action       -> that ONE action's arg schema
     - name                -> the full schema, or its action index if oversized
     - neither             -> the compact tool/agent/skill list (the router map),
                              trimmed unless `full` asks for the longer line
+
+    Each call is counted by what it asked and how it was answered: a lookup runs nothing,
+    so the count says how much of a session goes to finding out what to call.
     """
+    # An action without a capability name is answered by a search (see _capabilities).
+    mode = ("search" if search or (action and not name)
+            else "action" if action else "whole" if name else "list")
+    try:
+        answer = _capabilities(kind, name, action, search, full)
+    except Exception:
+        metrics.capability_lookup(mode, "error")
+        raise
+    metrics.capability_lookup(mode, _lookup_outcome(mode, answer))
+    return answer
+
+
+def _capabilities(kind: str | None, name: str | None, action: str | None,
+                  search: str | None, full: bool) -> dict:
     tools, agents, skills = _scan_registry()
 
     if search:
@@ -1351,7 +1478,8 @@ def _measured(kind: str):
 def run_tool(tool: str, action: str | None, args: dict[str, Any] | None,
              credential: str | None = None) -> dict:
     """Execute a tool. args is a JSON object -> --flags via runner.flags_from
-    (dict/list values are JSON-encoded into ONE argv element; no shell). Host-only
+    (dict/list values are JSON-encoded into ONE argv element, except a list for an argument
+    the manifest marks repeatable, which becomes one flag per item; no shell). Host-only
     tools are delegated to the host-runner when AAT_HOST_RUNNER_URL is set.
 
     credential: inside a PROCESIO turn, the name of the PROCESIO credential to use when several
@@ -1365,7 +1493,8 @@ def run_tool(tool: str, action: str | None, args: dict[str, Any] | None,
             wu["action"] = action
         if os.environ.get("AAT_HOST_RUNNER_URL") and _is_host_only("tool", tool):
             return _delegate("tool", tool, action, args)
-        argv = ([action] if action else []) + runner.flags_from(args)
+        argv = ([action] if action else []) + runner.flags_from(
+            args, _repeatable_args("tool", tool, action))
         turn_token = _turn_token_ctx.get()
         if turn_token:
             refusal = _workspace_refusal("tool", tool, args, action)
@@ -1394,7 +1523,8 @@ def run_agent(agent: str, action: str | None, args: dict[str, Any] | None,
             wu["action"] = action
         if os.environ.get("AAT_HOST_RUNNER_URL") and _is_host_only("agent", agent):
             return _delegate("agent", agent, action, args)
-        argv = ([action] if action else []) + runner.flags_from(args)
+        argv = ([action] if action else []) + runner.flags_from(
+            args, _repeatable_args("agent", agent, action))
         turn_token = _turn_token_ctx.get()
         if turn_token:
             refusal = _workspace_refusal("agent", agent, args, action)

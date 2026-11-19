@@ -192,7 +192,7 @@ def test_the_shared_protocol_module_imports_neither_surface():
 def test_the_published_surface_reaches_only_the_shared_substrate():
     """Whatever this surface imports is what a change elsewhere can reach it through.
     Keeping the list short is the isolation; asserting it is what keeps it short."""
-    allowed = {"bridge", "gate", "protocol", "yaml", "json", "os", "sys", "pathlib", "__future__"}
+    allowed = {"bridge", "gate", "protocol", "surface", "os", "sys", "pathlib", "__future__"}
     assert _imports(_HERE / "chat_server.py") <= allowed
 
 

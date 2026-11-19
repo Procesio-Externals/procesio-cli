@@ -22,16 +22,18 @@ from __future__ import annotations
 import argparse
 import copy
 import json
+import re
 
 from tools.procesio.actiondef import ActionDef
-from tools.procesio.client import VARIABLES_ONLY
+from tools.procesio.client import VARIABLES_ONLY, parse_json_arg
 from tools.procesio.dto.process import docwrite
 from tools.procesio.dto.process.builder import fetch_datastore_meta, render_query_tokens
 from tools.procesio.dto.process.normalize import (align_node_shapes, normalize_designer_layer,
                                                    rebuild_missing_designer_config)
-from tools.procesio.errors import ProcesioAPIError, UsageError
+from tools.procesio.errors import DocumentationMissing, ProcesioAPIError, UsageError
 from tools.procesio.flowmodel import nodeparam
 from tools.procesio.handlers.common import add_profile_arg
+from tools.procesio.handlers.editlock import serialized
 from tools.procesio.handlers.fevalidate import run_fe_validation, save_flow
 from tools.procesio.handlers.flowlint import _template_sidepanel_ids, lint_flow_dto
 
@@ -473,6 +475,26 @@ def process_rename(client, args) -> dict:
     return _gate_and_put(client, flow, args, result, block_on_lint=False)
 
 
+def _variable_bindings(flow: dict, process_id: str, specs) -> dict:
+    """`INDEX=variable` specs -> {index: variable id}, for node-bind-var."""
+    bindings = {}
+    for spec in specs or []:
+        if "=" not in spec:
+            raise UsageError(f"--bind must be 'INDEX=variable', got: {spec}")
+        idx, name = spec.split("=", 1)
+        try:
+            idx = int(idx.strip())
+        except ValueError:
+            raise UsageError(f"--bind index must be an integer, got: {idx}")
+        var = nodeparam.find_variable(flow, name.strip())
+        if not var:
+            raise UsageError(f"--bind variable not found in process {process_id}: {name.strip()}")
+        bindings[idx] = var.get("id")
+    if not bindings:
+        raise UsageError("at least one --bind INDEX=variable is required")
+    return bindings
+
+
 def node_bind_var(client, args) -> dict:
     flow = _fetch_flow(client, args.id)
     node = nodeparam.find_node(flow, args.node)
@@ -483,21 +505,7 @@ def node_bind_var(client, args) -> dict:
         raise UsageError(
             f"property not found on node '{args.node}': {args.property} "
             f"(run node-params --node '{args.node}' to list the labels)")
-    bindings = {}
-    for spec in args.bind or []:
-        if "=" not in spec:
-            raise UsageError(f"--bind must be 'INDEX=variable', got: {spec}")
-        idx, name = spec.split("=", 1)
-        try:
-            idx = int(idx.strip())
-        except ValueError:
-            raise UsageError(f"--bind index must be an integer, got: {idx}")
-        var = nodeparam.find_variable(flow, name.strip())
-        if not var:
-            raise UsageError(f"--bind variable not found in process {args.id}: {name.strip()}")
-        bindings[idx] = var.get("id")
-    if not bindings:
-        raise UsageError("at least one --bind INDEX=variable is required")
+    bindings = _variable_bindings(flow, args.id, args.bind)
     try:
         change = nodeparam.bind_param_var(node, param, bindings, find=args.find, replace=args.replace)
     except ValueError as e:
@@ -872,6 +880,31 @@ def _resolve_attr(client, flow: dict, varname: str, attrname: str) -> tuple[str,
     raise UsageError(f"{varname!r} has no attribute {attrname!r}; it has: {known}")
 
 
+def _attribute_bindings(client, flow: dict, specs) -> dict:
+    """`INDEX=variable` or `INDEX=variable.Attribute` specs -> {index: {variableId,
+    attributeId}}, for node-add-binding."""
+    bindings = {}
+    for spec in specs or []:
+        if "=" not in spec:
+            raise UsageError(f"--bind must be 'INDEX=variable[.Attribute]', got: {spec}")
+        idx, ref = spec.split("=", 1)
+        try:
+            idx = int(idx.strip())
+        except ValueError:
+            raise UsageError(f"--bind index must be an integer, got: {idx}")
+        ref = ref.strip()
+        if "." in ref:
+            varname, _, attrname = ref.partition(".")
+            vid, aid = _resolve_attr(client, flow, varname, attrname)
+            bindings[idx] = {"variableId": vid, "attributeId": aid}
+        else:
+            var = nodeparam.find_variable(flow, ref)
+            if not var:
+                raise UsageError(f"--bind references unknown variable {ref!r}")
+            bindings[idx] = {"variableId": var["id"], "attributeId": None}
+    return bindings
+
+
 def node_add_binding(client, args) -> dict:
     """Add bindings to ONE node parameter, with an optional literal edit in the same write.
 
@@ -890,26 +923,7 @@ def node_add_binding(client, args) -> dict:
             f"property not found on node '{args.node}': {args.property} "
             f"(run node-params --node '{args.node}' to list the labels)")
 
-    bindings = {}
-    for spec in args.bind or []:
-        if "=" not in spec:
-            raise UsageError(f"--bind must be 'INDEX=variable[.Attribute]', got: {spec}")
-        idx, ref = spec.split("=", 1)
-        try:
-            idx = int(idx.strip())
-        except ValueError:
-            raise UsageError(f"--bind index must be an integer, got: {idx}")
-        ref = ref.strip()
-        if "." in ref:
-            varname, _, attrname = ref.partition(".")
-            vid, aid = _resolve_attr(client, flow, varname, attrname)
-            bindings[idx] = {"variableId": vid, "attributeId": aid}
-        else:
-            var = nodeparam.find_variable(flow, ref)
-            if not var:
-                raise UsageError(f"--bind references unknown variable {ref!r}")
-            bindings[idx] = {"variableId": var["id"], "attributeId": None}
-
+    bindings = _attribute_bindings(client, flow, args.bind)
     try:
         change = nodeparam.add_param_bindings(node, param, bindings,
                                               find=args.find, replace=args.replace)
@@ -938,6 +952,267 @@ def _addbinding_args(p: argparse.ArgumentParser) -> None:
                    help="edit + validate but do not PUT")
 
 
+# -- several edits in one save ------------------------------------------------------------------
+#
+# Each surgical writer above validates and saves the whole process for ONE change. A caller
+# with six changes pays for six validations and six saves, and when it sends them together
+# they also slow each other down. The batch applies every change to one copy of the process
+# and then runs the shared tail once: one validation, one lint, one save.
+#
+# All or nothing. A change that cannot be applied refuses the whole list before anything is
+# validated or saved, and names its position. A half-applied list would leave the caller to
+# work out which of its changes landed.
+#
+# Documentation, as for every writer here (docwrite.py): each node that a change alters needs
+# its purpose and its area's text restated or confirmed, and the process needs its own. A
+# change carries its node's part under `doc`; --doc carries the process's part, and may carry
+# an `action` and an `area` that stand for every node whose change gives none. The texts are
+# checked for all the nodes before anything is refused, so one answer lists everything that is
+# missing.
+
+BATCH_OPS = ("set", "bind", "add-binding", "replace-text")
+
+CHANGES_SCHEMA = {
+    "type": "array",
+    "minItems": 1,
+    "description": "The changes, applied in order to one copy of the process and saved once.",
+    "items": {
+        "type": "object",
+        "required": ["op", "node"],
+        "properties": {
+            "op": {"enum": list(BATCH_OPS),
+                   "description": "set = one parameter's literal text (as node-set-param). "
+                                  "bind = bind every <%N%> of a string parameter (as node-bind-var). "
+                                  "add-binding = add placeholders to a parameter and keep the "
+                                  "bindings it has (as node-add-binding). replace-text = replace an "
+                                  "exact literal in the node (as node-replace-text)."},
+            "node": {"type": "string", "description": "the node's actionName (canvas label) or id"},
+            "property": {"type": "string",
+                         "description": "the parameter's designer label or its id. Required for "
+                                        "set, bind and add-binding; narrows replace-text to one "
+                                        "parameter."},
+            "value": {"type": "string",
+                      "description": "set: the new literal text. Keep every <%N%> placeholder "
+                                     "that the old value had."},
+            "bind": {"type": "array", "items": {"type": "string"},
+                     "description": "bind: INDEX=variable for every <%N%> in the value. "
+                                    "add-binding: INDEX=variable or INDEX=variable.Attribute for "
+                                    "each placeholder to add."},
+            "find": {"type": "string",
+                     "description": "replace-text: the exact literal to replace. bind and "
+                                    "add-binding: an optional literal to replace first."},
+            "replace": {"type": "string", "description": "the replacement for find"},
+            "expect": {"type": "integer",
+                       "description": "replace-text: refuse unless this many replacements are made"},
+            "allow_binding_change": {
+                "type": "boolean",
+                "description": "set and replace-text: permit a different <%N%> placeholder set"},
+            "doc": {
+                "type": "object",
+                "description": "the documentation this change needs for its node: "
+                               "{\"action\": \"<the action's purpose now>\" or true, "
+                               "\"area\": {\"text\": \"<the area's text now>\"} or true}. "
+                               "A text replaces; true confirms that the current one is still "
+                               "right. Without it, the action and area given in --doc apply."},
+        },
+    },
+}
+
+
+def _batch_changes(args) -> list:
+    raw = args.changes
+    if getattr(args, "changes_file", None):
+        if raw is not None:
+            raise UsageError("pass either --changes or --changes-file, not both")
+        import io as _io
+        raw = _io.open(args.changes_file, encoding="utf-8").read()
+    changes = parse_json_arg(raw, "changes")
+    if not isinstance(changes, list) or not changes:
+        raise UsageError("--changes must be a JSON list with at least one change")
+    return changes
+
+
+def _text(change: dict, key: str, op: str, *, required: bool = True):
+    value = change.get(key)
+    if value is None:
+        if required:
+            raise UsageError(f"{op} needs '{key}'")
+        return None
+    if not isinstance(value, str):
+        raise UsageError(f"'{key}' must be text, got {type(value).__name__}")
+    return value
+
+
+def _bind_specs(change: dict, op: str) -> list:
+    specs = change.get("bind")
+    if isinstance(specs, str):
+        specs = [specs]
+    if not isinstance(specs, list) or not all(isinstance(s, str) for s in specs):
+        raise UsageError(f"{op} needs 'bind': a list of INDEX=variable texts")
+    return specs
+
+
+_FLAG = re.compile(r"--([a-z][a-z-]*)")
+
+
+def _as_keys(message: str) -> str:
+    """A refusal written for a single writer names its flags (`--allow-binding-change`,
+    `--bind`). In a list the same things are keys of a change, so the message says the key:
+    a caller that is told to pass a flag the batch does not have cannot act on it."""
+    return _FLAG.sub(lambda m: "'" + m.group(1).replace("-", "_") + "'", message)
+
+
+def _apply_change(client, flow: dict, process_id: str, change) -> dict:
+    """Apply one change of a batch to `flow` in place. Returns what it did.
+
+    The four operations are the ones the single-change writers make, through the same
+    functions, so a change means the same thing here as there."""
+    if not isinstance(change, dict):
+        raise UsageError("a change must be a JSON object")
+    op = change.get("op")
+    if op not in BATCH_OPS:
+        raise UsageError(f"'op' must be one of {', '.join(BATCH_OPS)}, got {op!r}")
+    label = _text(change, "node", op)
+    node = nodeparam.find_node(flow, label)
+    if not node:
+        raise UsageError(f"node not found in process {process_id}: {label}")
+    done = {"op": op, "node": node.get("actionName"), "node_id": node.get("id")}
+
+    if op == "replace-text":
+        find, replace = _text(change, "find", op), _text(change, "replace", op)
+        if not change.get("allow_binding_change") and ("<%" in find or "<%" in replace):
+            raise UsageError(
+                "find/replace touch a <%N%> placeholder, which binds variable[] positionally; "
+                "set allow_binding_change only when variable[] is being rewritten too")
+        hits = nodeparam.replace_text(node, find, replace,
+                                      property_key=_text(change, "property", op, required=False))
+        total = sum(h["count"] for h in hits)
+        expect = change.get("expect")
+        if expect is not None and total != expect:
+            raise UsageError(f"expected {expect} replacements, found {total}")
+        if not hits:
+            raise UsageError(f"the literal to replace is not present: {find!r}")
+        done.update(replacements=total, leaves_changed=len(hits), changed=True)
+        return done
+
+    key = _text(change, "property", op)
+    param = nodeparam.find_param(node, key)
+    if param is None:
+        raise UsageError(f"property not found on node '{label}': {key} "
+                         f"(node-params --node '{label}' lists the labels)")
+    done["property"] = param.get("tabPropertyId")
+    if op == "set":
+        done.update(nodeparam.set_param_value(
+            node, param, _text(change, "value", op),
+            allow_binding_change=bool(change.get("allow_binding_change"))))
+    elif op == "bind":
+        done.update(nodeparam.bind_param_var(
+            node, param, _variable_bindings(flow, process_id, _bind_specs(change, op)),
+            find=_text(change, "find", op, required=False),
+            replace=_text(change, "replace", op, required=False)))
+    else:
+        done.update(nodeparam.add_param_bindings(
+            node, param, _attribute_bindings(client, flow, _bind_specs(change, op)),
+            find=_text(change, "find", op, required=False),
+            replace=_text(change, "replace", op, required=False)))
+    done.setdefault("changed", True)
+    return done
+
+
+def node_edit_batch(client, args) -> dict:
+    changes = _batch_changes(args)
+    flow = _fetch_flow(client, args.id)
+    applied = []
+    for index, change in enumerate(changes):
+        try:
+            applied.append({"index": index, **_apply_change(client, flow, args.id, change)})
+        except (UsageError, ValueError) as e:
+            where = f"change {index}"
+            if isinstance(change, dict) and change.get("op"):
+                where += f" ({change.get('op')} on node {change.get('node')!r})"
+            raise UsageError(f"{where}: {_as_keys(str(e))}. Nothing was written: the list is "
+                             f"applied whole or not at all.") from e
+    result = {"id": args.id, "title": flow.get("title"), "changes": applied,
+              "changed": sum(1 for a in applied if a.get("changed"))}
+    before = _BEFORE.pop(args.id, None) or flow
+    if not result["changed"]:
+        result["note"] = "every value was already set; nothing to PUT"
+        result["put"] = False
+        return result
+    result["documentation"] = _document_batch(before, flow, changes, applied, args)
+    result["normalized"] = normalize_designer_layer(flow)
+    return _gate_and_put(client, flow, args, result)
+
+
+def _document_batch(before: dict, flow: dict, changes: list, applied: list, args) -> dict:
+    """Ask for the documentation of every node the list changed, and write it onto `flow`.
+
+    One node at a time through docwrite.apply, as a single writer would, with two differences.
+    Nothing is refused until every node was checked, so the answer lists all that is missing
+    instead of the first. And each node is checked against the flow as the node before it left
+    it: the area shapes are rebuilt on every call, and from the first copy a later node would
+    undo the area text an earlier one set."""
+    shared = docwrite.parse(args)
+    enforce = not getattr(args, "dry_run", False)
+    allow = bool(getattr(args, "allow_undocumented", False))
+    own: dict = {}                       # node id -> the doc of its changes, a later one winning
+    order: list = []
+    for done in applied:
+        if not done.get("changed"):
+            continue
+        node_id = done["node_id"]
+        given = changes[done["index"]].get("doc")
+        if given is not None and not isinstance(given, dict):
+            raise UsageError(f"change {done['index']}: 'doc' must be a JSON object with action and/or area")
+        if node_id not in own:
+            own[node_id] = {}
+            order.append((node_id, done["node"]))
+        own[node_id].update(given or {})
+
+    reports, missing = [], []
+    snapshot = before
+    for node_id, label in order:
+        doc = {**shared, **own[node_id]}
+        report = docwrite.apply(snapshot, flow, {"kind": "behaviour", "node": node_id}, doc,
+                                allow=True, enforce=False)
+        report["node"] = label
+        reports.append(report)
+        for finding in report.get("findings") or []:
+            # The process is asked for once, whatever the number of nodes.
+            if finding["doc_key"] == "process" and any(m["doc_key"] == "process" for m in missing):
+                continue
+            missing.append({**finding, "node": label})
+        snapshot = copy.deepcopy(flow)
+
+    out = {"change": "behaviour", "nodes": reports, "findings": missing, "documented": not missing}
+    if missing and enforce and not allow:
+        per_node = sorted({m["node"] for m in missing if m["doc_key"] != "process"})
+        parts = []
+        if per_node:
+            parts.append("a 'doc' with action and area on the changes of " + ", ".join(map(repr, per_node)))
+        if any(m["doc_key"] == "process" for m in missing):
+            parts.append("--doc with process")
+        raise DocumentationMissing(
+            "refusing to save: these changes need documentation that was not given ("
+            + ", ".join(sorted({m["code"] for m in missing})) + "). Give " + " and ".join(parts)
+            + " - a text replaces, true confirms the current one - or --allow-undocumented to save "
+            "anyway. An action and an area given in --doc apply to every node whose change gives none.",
+            out)
+    return out
+
+
+def _batch_args(p: argparse.ArgumentParser) -> None:
+    add_profile_arg(p)
+    p.add_argument("--id", required=True, help="process (project) id")
+    p.add_argument("--changes",
+                   help="the changes as a JSON list; each is {op, node, ...} with op one of "
+                        "set | bind | add-binding | replace-text")
+    p.add_argument("--changes-file", dest="changes_file",
+                   help="read the changes JSON from a file (needed above the argv limit)")
+    p.add_argument("--dry-run", dest="dry_run", action="store_true",
+                   help="apply + normalize + validate but do not PUT")
+
+
 def _with_doc(add):
     """Argument set of a writer that changes what a process does: its own, plus --doc."""
     def _args(p: argparse.ArgumentParser) -> None:
@@ -953,6 +1228,21 @@ ACTIONS = {
                     "graph: the new node takes the anchor's successor and the anchor is repointed at "
                     "it -> validate + flow-lint -> PUT. Refuses an anchor with more than one outgoing "
                     "port (which branch it belongs on is a design decision). --dry-run previews."),
+    "node-edit-batch": ActionDef(
+        func=node_edit_batch, add_args=_with_doc(_batch_args), needs_client=True,
+        arg_schemas={"changes": CHANGES_SCHEMA},
+        description="Make SEVERAL node-parameter changes on a live process in ONE save: each "
+                    "change is a set (as node-set-param), a bind (as node-bind-var), an "
+                    "add-binding (as node-add-binding) or a replace-text (as node-replace-text), "
+                    "on any node of the process. The changes are applied in order to one copy of "
+                    "the process, then the designer layer is regenerated -> validate + flow-lint "
+                    "-> PUT, once for the whole list. Use it instead of several single edits: "
+                    "each of those validates and saves the whole process again. All or nothing: "
+                    "a change that cannot be applied refuses the whole list and names its "
+                    "position, and nothing is written. Documentation as for the single writers: "
+                    "a change carries its node's {action, area} under `doc`, --doc carries "
+                    "{process} and may carry an action and an area for every node whose change "
+                    "gives none; a text replaces, true confirms. --dry-run previews."),
     "node-params": ActionDef(
         func=node_params, add_args=_params_args, needs_client=True,
         description="List a live process's nodes with each runtime parameter's designer label, "
@@ -1071,3 +1361,13 @@ ACTIONS = {
                     "cosmetic (wiring is by id), so this is the safe way to give a '... (Copy)' from "
                     "duplicate-process a real name without a desired-state rebuild. --dry-run previews."),
 }
+
+
+# Every writer in this module reads the whole process and saves the whole process, so two of
+# them that run together on one process keep the last save and lose the other change. Each
+# holds the process's writer lock from its read to its save (handlers/editlock.py). The one
+# action that only reads is left as it is.
+_READ_ONLY = {"node-params"}
+for _name, _defn in ACTIONS.items():
+    if _name not in _READ_ONLY:
+        _defn.func = serialized(_defn.func)

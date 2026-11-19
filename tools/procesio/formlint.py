@@ -65,6 +65,24 @@ def _cfg(element: dict, key: str):
     return None
 
 
+_EVENT_KEY = re.compile(r"^on[A-Z]\w*Events$")
+
+
+def slot_events(key: Any, value: Any) -> list:
+    """The events in an element's trigger slot (`onClickEvents`, `onInputEvents`, ...).
+
+    The slot holds `{debounce, events: [...]}` on current forms and a bare list of events on
+    older or hand-written ones; the runtime runs both. A reader that only knows the dict shape
+    skips every event of such a form and reports nothing. A bare list counts only under an
+    event key, because other configs (a select's options) are lists too."""
+    if isinstance(value, dict):
+        events = value.get("events")
+        return [ev for ev in events if isinstance(ev, dict)] if isinstance(events, list) else []
+    if isinstance(value, list) and isinstance(key, str) and _EVENT_KEY.match(key):
+        return [ev for ev in value if isinstance(ev, dict)]
+    return []
+
+
 def _label(element: dict) -> str:
     """Best identifier for a message: the designer name, else the element id."""
     name = _cfg_value(element, "name")
@@ -195,10 +213,11 @@ def lint_string_boolean_conditions(data: Any) -> list[str]:
         if not isinstance(e, dict):
             continue
         for c in e.get("configs") or []:
-            if (isinstance(c, dict) and str(c.get("key", "")).startswith("on")
-                    and isinstance(c.get("value"), dict)):
-                out += string_boolean_conditions(c["value"].get("events"), variables,
-                                                 f"element {_label(e)} {c.get('key')}")
+            if isinstance(c, dict) and str(c.get("key", "")).startswith("on"):
+                events = slot_events(c.get("key"), c.get("value"))
+                if events:
+                    out += string_boolean_conditions(events, variables,
+                                                     f"element {_label(e)} {c.get('key')}")
     return out
 
 
@@ -412,10 +431,8 @@ def lint_event_scripts(data: Any) -> list[str]:
     out: list[str] = []
     for el in _elements(data):
         for c in el.get("configs") or []:
-            val = c.get("value")
-            events = val.get("events") if isinstance(val, dict) else None
-            for ev in events if isinstance(events, list) else []:
-                if isinstance(ev, dict) and ev.get("action") == "RUN_JAVASCRIPT":
+            for ev in slot_events(c.get("key"), c.get("value")):
+                if ev.get("action") == "RUN_JAVASCRIPT":
                     code = (ev.get("config") or {}).get("code")
                     for w in lint_form_code_runtime(None, code, f"the {c.get('key')} script of {_label(el)}"):
                         if w not in out:

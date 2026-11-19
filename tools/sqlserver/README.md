@@ -153,6 +153,61 @@ straight to that DB — no `USE`, which the read-only guard blocks anyway). Omit
 use the profile's `--database`, or the login's default DB if the profile has none.
 Prefer one named profile per database instead? That still works — both styles are fine.
 
+## Gotchas (measured)
+
+- **`sql_variant` columns fail the whole query.** pyodbc cannot read ODBC type -16,
+  so a result column of type `sql_variant` (`SERVERPROPERTY(...)`, `SQL_VARIANT_PROPERTY`,
+  `sys.extended_properties.value`, some `sys.*` catalog columns) raises
+  `ODBC SQL type -16 is not yet supported` instead of returning rows. Cast it in the SQL:
+  `CAST(SERVERPROPERTY('EngineEdition') AS int)`, `CAST(value AS nvarchar(4000))`.
+- **In a `LIKE` character class, put a literal hyphen FIRST, not last.** Measured on Azure
+  SQL with a `_BIN` collation: `col LIKE N'%[^A-Za-z0-9_-]%'` flagged every base64url token
+  that contained `_` or `-` as invalid, while `N'%[^-A-Za-z0-9_]%'` accepted them and still
+  rejected a space. Test a character-class check against real samples before trusting it.
+- **`/*` inside a block comment opens a NESTED comment.** T-SQL nests block comments, so a
+  path or glob written in a comment (`folder/*`, `DEMO/Auth/*`) swallows the closing `*/`
+  and the batch fails with `Missing end comment mark '*/'`. Write `folder/...` in comments.
+- **One failed query can make the next calls fail with `Connection is busy with results
+  for another command`.** Seen through `scripts/run-tool.py`: after a query failed while
+  its rows were being read, several later, valid queries on the same profile failed with
+  that error, then calls worked again. Likely cause (not yet confirmed in code): the warm
+  toolrunner reuses the same worker LIFO, and ODBC connection pooling inside that worker
+  hands back a connection that still holds the failed statement's results. If a valid
+  query fails with this message right after an error, rerun it with `AAT_RUNNER_DIRECT=1`
+  (fresh process) before suspecting the SQL.
+- **`LINENO` is a reserved word.** A column alias such as `lineNo` (any casing) fails the batch with
+  `Incorrect syntax near the keyword 'lineNo'` (error 156), and the message points at the alias, not
+  at the cause. Rename it (`seqNo`) or bracket it. The same happens with other reserved words that
+  read like ordinary names; when error 156 names an identifier, check the reserved-word list first.
+- **`CONVERT(VARCHAR(20), <date>, 126)` cuts the milliseconds down to a trailing dot.** Style 126
+  writes `yyyy-mm-ddThh:mi:ss.mmm` for `datetime` and `datetime2(n>0)` and drops the fraction only
+  when it is zero, so a 20-character target ends in `ss.`, which JavaScript `Date.parse` rejects
+  (`NaN`, the UI shows a dash). It hides in testing: values cast to `DATETIME2(0)` or stored with zero
+  milliseconds parse fine, while columns defaulted with `GETDATE()` do not. Azure SQL Database also
+  runs in UTC, so an ISO string without `Z` is read by a browser as local time and shown hours off.
+  Build every timestamp an API returns in one scalar function:
+  `CONVERT(VARCHAR(19), CAST(SWITCHOFFSET(@d, '+00:00') AS DATETIME2(0)), 126) + 'Z'` with
+  `@d DATETIMEOFFSET` (a `datetime` or `datetime2` argument converts as UTC, a `datetimeoffset` keeps
+  its instant).
+- **Azure SQL Database has no `master.dbo.spt_values`.** The usual number-table trick
+  (`SELECT number FROM master.dbo.spt_values WHERE type = 'P'`) fails there with `Invalid object
+  name`, because a user database cannot reach `master` objects. Use an inline
+  `(VALUES (1),(2),…) AS n(i)` for a short fixed range, or `GENERATE_SERIES` on compatibility level
+  160 and up.
+- **`EXEC` parameters take only constants and variables, never expressions.**
+  `EXEC p @X = CASE … END` or `@X = CONCAT(…)` fails with `Incorrect syntax near …`. Compute the value
+  into a variable first, then pass the variable. Related: `DECLARE @x INT = col FROM t` is not valid
+  either; declare first, then `SELECT @x = col FROM t`.
+- **`FOR JSON` leaves out NULL columns.** A column whose value is NULL is simply missing from the
+  output object, so a client that reads `obj["field"]` gets a missing-key error instead of `null`.
+  Add `INCLUDE_NULL_VALUES` when the consumer expects every key, or read optional fields with a
+  default (`.get(...)` in Python, `?? null` in JavaScript).
+- **Long test runs over a remote connection can drop with `08S01 Communication link failure`.**
+  Seen in a suite of a few dozen sequential calls against Azure SQL Database; a rerun passed with no
+  change. The risk is the cleanup: a `finally:` block that restores settings on the same dead
+  connection fails too and leaves test data behind. Snapshot what the test changes before it starts,
+  and after an `08S01` check that state on a fresh connection before rerunning.
+
 ## add-profile options
 
 | flag | default | notes |

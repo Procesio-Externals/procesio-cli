@@ -71,6 +71,11 @@ class ArgSpec(BaseModel):
     # Aliased: the manifest key stays `schema`, but a field literally named `schema`
     # shadows BaseModel.schema() and pydantic warns on every import.
     json_schema: dict | None = Field(default=None, alias="schema")
+    # The flag may be given several times, one value each (argparse `action="append"`).
+    # `type` cannot say this: an `array` argument is as often ONE flag that takes a JSON
+    # list. A caller that holds a list of values has to know which of the two the tool
+    # expects, or it sends the list as one value and the tool reads it as a single item.
+    repeatable: bool = False
 
 
 class SecretSpec(BaseModel):

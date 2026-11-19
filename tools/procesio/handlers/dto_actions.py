@@ -4,7 +4,8 @@ One pair per registered component (dto/registry.py). Each:
   - validates --config against the component's JSON Schema (fail-fast),
   - builds the full DTO by merging onto the golden template (pure),
   - --dry-run: returns the built DTO (+ validate@source oracle if any), sends nothing,
-  - otherwise create (POST) or edit (desired-state), then re-GET and return it.
+  - otherwise create (POST) or edit (desired-state), then re-GET and return it,
+  - --brief: returns an outline of that DTO or resource in its place (`_outline`).
 """
 from __future__ import annotations
 
@@ -35,6 +36,67 @@ def _load_config(args) -> dict:
     return cfg
 
 
+# An outline is read, not replayed: past these it stops being short.
+MAX_NAMES = 100
+MAX_TEXT = 120
+OUTLINE_DEPTH = 3
+_NAME_KEYS = ("Name", "name", "ActionName", "actionName", "Title", "title")
+
+
+def _item_name(item):
+    """What a list item is called, when it says so: its own name field, or - for a form
+    element, which keeps its name among its configs - the value of the `name` config."""
+    if not isinstance(item, dict):
+        return None
+    for key in _NAME_KEYS:
+        value = item.get(key)
+        if isinstance(value, str) and value:
+            return value[:MAX_TEXT]
+    for cfg in item.get("configs") or []:
+        if (isinstance(cfg, dict) and cfg.get("key") == "name"
+                and isinstance(cfg.get("value"), str) and cfg["value"]):
+            return cfg["value"][:MAX_TEXT]
+    return None
+
+
+def _outline(value, depth: int = OUTLINE_DEPTH):
+    """A built DTO or a fetched resource, short enough to read whole.
+
+    The whole object of a real process or form runs to tens of kilobytes. A caller that is
+    given a limited answer then gets none of it, and loses the validation report that came
+    with it. The outline keeps what a reader checks a build by: the short fields as they
+    are, and for every list its count and the names of its items. Long text and anything
+    deeper than `depth` is described, not printed."""
+    if isinstance(value, dict):
+        if depth <= 0:
+            return {"keys": len(value)}
+        return {key: _outline(item, depth - 1) for key, item in value.items()}
+    if isinstance(value, list):
+        out: dict = {"count": len(value)}
+        names = [name for name in map(_item_name, value) if name]
+        if names:
+            out["names"] = names[:MAX_NAMES]
+            if len(names) > MAX_NAMES:
+                out["names_not_listed"] = len(names) - MAX_NAMES
+        return out
+    if isinstance(value, str) and len(value) > MAX_TEXT:
+        return {"text_chars": len(value)}
+    return value
+
+
+def _shown(key: str, value, args) -> dict:
+    """`value` under `key`, or its outline under `summary` when the caller asked for --brief."""
+    if getattr(args, "brief", False):
+        return {"summary": _outline(value)}
+    return {key: value}
+
+
+_BRIEF_HELP = ("leave the built or saved object out of the answer and return an outline of it "
+               "under `summary`: its short fields, and for each list the count and the names of "
+               "its items. The validation, documentation and warnings stay. For a caller whose "
+               "answer is limited in size: the whole object of a real resource does not fit")
+
+
 def _add_gate_args(p: argparse.ArgumentParser) -> None:
     """Shared save-gate flags (process only enforces them; harmless elsewhere)."""
     p.add_argument("--force", action="store_true",
@@ -49,6 +111,7 @@ def _create_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--config-file", dest="config_file", help="path to a JSON config file")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="build + validate the DTO and return it without creating")
+    p.add_argument("--brief", action="store_true", help=_BRIEF_HELP)
     _add_gate_args(p)
 
 
@@ -59,6 +122,7 @@ def _edit_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--config-file", dest="config_file", help="path to a JSON config file")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="build the DTO and return it without editing")
+    p.add_argument("--brief", action="store_true", help=_BRIEF_HELP)
     # Separate from --force on purpose: --force answers "save it even though it is
     # invalid"; this answers "yes, delete what the config leaves out". A create has
     # nothing to remove, so the flag is only offered on edit.
@@ -112,7 +176,7 @@ def _make_create(component):
         # designer save would rename, phantom parents, ...). Reported, never enforced.
         warnings = (component.lint(dto) if component.lint else []) + ctx["_build_warnings"]
         if args.dry_run:
-            out = {"dry_run": True, "component": component.name, "dto": dto,
+            out = {"dry_run": True, "component": component.name, **_shown("dto", dto, args),
                    "validation": oracle}
             if documentation is not None:
                 out["documentation"] = documentation
@@ -124,8 +188,8 @@ def _make_create(component):
             component.after_save(dto)
         rid = component.extract_id(resp, dto)
         verified = framework.run_get(component, client, rid, ctx) if rid else None
-        out = {"created": True, "component": component.name, "id": rid,
-               "validation": oracle, "result": verified if verified is not None else resp}
+        out = {"created": True, "component": component.name, "id": rid, "validation": oracle,
+               **_shown("result", verified if verified is not None else resp, args)}
         if isinstance(resp, dict) and resp.get("_capture"):   # AUTO webhook listen+capture log
             out["capture"] = resp["_capture"]
         if documentation is not None:
@@ -164,7 +228,7 @@ def _make_edit(component):
             # Build it the way the EDIT would, so the preview shows the ids the edit would keep.
             dto = framework.build_edit_dto(component, client, args.id, config, ctx)
             out = {"dry_run": True, "edit": True, "component": component.name,
-                   "id": args.id, "dto": dto}
+                   "id": args.id, **_shown("dto", dto, args)}
             documentation = _doc_report(component, ctx, enforce=False)
             if documentation is not None:
                 out["documentation"] = documentation
@@ -182,7 +246,8 @@ def _make_edit(component):
         resp = component.edit(client, args.id, config, ctx)
         if component.after_save:
             component.after_save(resp)
-        out = {"edited": True, "component": component.name, "id": args.id, "result": resp}
+        out = {"edited": True, "component": component.name, "id": args.id,
+               **_shown("result", resp, args)}
         documentation = _doc_report(component, ctx, enforce=False)
         if documentation is not None:
             out["documentation"] = documentation
@@ -266,7 +331,8 @@ def build_actions() -> dict[str, ActionDef]:
                 f"in ONE call - not a skeleton to fill in later"
                 + (f": put all of {listed} in it up front" if lists else "")
                 + ". There is no separate add/insert step afterwards. "
-                f"--dry-run previews the DTO without creating."
+                f"--dry-run previews the DTO without creating; --brief returns an outline "
+                f"of the object in place of the object."
                 + (" Non-blocking lint findings come back as `warnings`." if comp.lint else "")
             ),
             arg_schemas=arg_schemas, examples=examples,
@@ -301,7 +367,8 @@ def build_actions() -> dict[str, ActionDef]:
                 + (f" To move ONE field without restating the rest, use "
                    f"{comp.patch_action} instead - it deep-merges a patch."
                    if getattr(comp, "patch_action", "") else "")
-                + " --dry-run previews the DTO."
+                + " --dry-run previews the DTO; --brief returns an outline of the object in "
+                  "place of the object."
                 + (" If the live resource cannot be read, the edit stops before writing; --dry-run "
                    "still previews and names the failure in `live_read_failed`."
                    if comp.edit_ctx else "")

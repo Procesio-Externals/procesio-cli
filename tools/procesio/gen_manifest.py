@@ -61,6 +61,11 @@ def _action_args(defn) -> list[dict]:
         schema = (getattr(defn, "arg_schemas", None) or {}).get(name)
         if schema:
             spec["schema"] = schema
+        # A flag that may be given several times says so. A caller that holds a list
+        # (an MCP client does) otherwise sends it as one value, and the tool reads the
+        # whole list as a single item.
+        if isinstance(action, argparse._AppendAction):
+            spec["repeatable"] = True
         out.append(spec)
     return out
 

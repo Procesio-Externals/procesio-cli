@@ -412,6 +412,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `node-add-binding` | `--id`, `--node`, `--property` | Add bindings to ONE node parameter, optionally editing its text in the same write - the edit neither node-bind-var nor node-replace-text can make.… |
 | `node-bind-var` | `--id`, `--node`, `--property`, `--bind` | Bind a process variable into one node parameter's value: set its variable[] so a <%N%> placeholder actually substitutes at runtime. --bind INDEX=variable… |
 | `node-delete` | `--id`, `--node` | Delete ONE action from a live process and heal the graph: every port that pointed at it is re-pointed at its successor (or dropped when it has none) ->… |
+| `node-edit-batch` | `--id` | Make SEVERAL node-parameter changes on a live process in ONE save: each change is a set (as node-set-param), a bind (as node-bind-var), an add-binding (as… |
 | `node-insert` | `--id`, `--after`, `--action` | Insert ONE action into a live process immediately after another, rewiring the graph: the new node takes the anchor's successor and the anchor is repointed at… |
 | `node-params` | `--id` | List a live process's nodes with each runtime parameter's designer label, current value, editability and bound variables (read-only). |
 | `node-repair-designer` | `--id` | Repair a live process the designer cannot open (blank canvas, instance view will not draw): rebuild customData.configuration for every node that has none from… |

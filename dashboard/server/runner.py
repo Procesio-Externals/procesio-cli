@@ -46,12 +46,24 @@ def python_exe() -> str:
     return str(VENV_PY) if VENV_PY.exists() else sys.executable
 
 
-def flags_from(args: dict[str, Any] | None) -> list[str]:
+def _flag_value(value: Any) -> str:
+    """One value as one argv element. A dict or a list is JSON (some tools take JSON)."""
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False)
+    return str(value)
+
+
+def flags_from(args: dict[str, Any] | None, repeatable=()) -> list[str]:
     """Turn {name: value} into ['--name', 'value', ...].
 
     Booleans become a bare flag when True and are dropped when False (the common
     argparse store_true convention). Everything else is stringified. Values that
-    are dict/list are JSON-encoded (some tools take JSON string args)."""
+    are dict/list are JSON-encoded (some tools take JSON string args).
+
+    `repeatable` names the flags the tool accepts several times, one value each (the
+    manifest marks them). A list given for one of those becomes one flag per item. For
+    any other name a list is still ONE JSON value, because many tools take a JSON list
+    in a single flag and the value alone cannot say which of the two is meant."""
     out: list[str] = []
     for k, v in (args or {}).items():
         flag = f"--{k}"
@@ -59,9 +71,11 @@ def flags_from(args: dict[str, Any] | None) -> list[str]:
             if v:
                 out.append(flag)
             continue
-        if isinstance(v, (dict, list)):
-            v = json.dumps(v, ensure_ascii=False)
-        out.extend([flag, str(v)])
+        if k in repeatable and isinstance(v, list):
+            for item in v:
+                out.extend([flag, _flag_value(item)])
+            continue
+        out.extend([flag, _flag_value(v)])
     return out
 
 
@@ -80,6 +94,9 @@ _SAFE_ENV_NAMES = {
     "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "http_proxy", "https_proxy", "no_proxy",
     "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
     "AAT_USERDATA_DIR",
+    # Where tools keep the locks they share (tools/procesio/handlers/editlock.py). An isolated
+    # call gets a temp folder of its own, so a lock kept there is seen by no other call.
+    "AAT_LOCK_DIR",
 }
 _SAFE_ENV_PREFIXES = ("LC_", "PYTHON", "XDG_")
 

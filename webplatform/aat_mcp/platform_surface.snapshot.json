@@ -1,0 +1,1588 @@
+[
+  {
+    "name": "procesio_list_processes",
+    "title": "List processes",
+    "description": "List the processes of the workspace, newest first. Use it to find the id of a process before you read, edit or run it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Only processes whose name contains this text."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Processes per page."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List processes",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_read_process",
+    "title": "Read a process",
+    "description": "Read one process as text: its variables, its nodes in execution order, and each node's parameters with ids resolved to names. This is the cheapest way to see what a process does. Call procesio_list_node_parameters in the same step when you are about to edit it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read a process",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_node_parameters",
+    "title": "List the parameters of a process's nodes",
+    "description": "List the nodes of a process with each parameter's designer label, current value, bound variables, and whether it can be edited as text. The labels and node names it returns are what procesio_edit_process_nodes takes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "node": {
+          "type": "string",
+          "description": "One node's name (canvas label) or id. Omit for every node."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "List the parameters of a process's nodes",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_process",
+    "title": "Get a process definition",
+    "description": "Get one process as structured data. Pass compact for a summary of nodes, edges and variables. The full definition can be tens of kilobytes, so ask for it only when you need to send it back with procesio_edit_process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "compact": {
+          "type": "boolean",
+          "description": "Return the structural summary instead of the full definition."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Get a process definition",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_validate_process",
+    "title": "Validate a process",
+    "description": "Run the checks that the Process Designer runs before it saves: unconnected nodes, missing Start or Stop, empty required fields, leftover placeholders. Returns clean true when nothing blocks a save.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "include_backend": {
+          "type": "boolean",
+          "description": "Also run the platform's own validator."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Validate a process",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_create_process",
+    "title": "Create a process",
+    "description": "Create a process from one config that holds the WHOLE definition: variables, actions, groups and edges. There is no step that adds a node afterwards. Load the guidance topic playbook before your first use, and pass dry_run to see the validation and an outline of what would be built. The answer never holds the whole process: it lists the variables and the actions by name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object",
+          "description": "The process definition."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Build and validate; create nothing."
+        }
+      },
+      "required": [
+        "config"
+      ]
+    },
+    "annotations": {
+      "title": "Create a process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_edit_process",
+    "title": "Replace a process definition",
+    "description": "Replace the definition of an existing process. The config you send is the DESIRED STATE and replaces everything: to add or change one item, send the whole definition with that item changed. To change text or bindings inside nodes, use procesio_edit_process_nodes instead, which does not need the whole definition. The answer never holds the whole process: it lists the variables and the actions by name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "config": {
+          "type": "object",
+          "description": "The whole desired definition."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Build and report; change nothing."
+        },
+        "allow_remove": {
+          "type": "boolean",
+          "description": "Permit this edit to remove actions or variables the process has."
+        },
+        "keep_layout": {
+          "type": "boolean",
+          "description": "Keep the canvas positions and place only new actions."
+        }
+      },
+      "required": [
+        "id",
+        "config"
+      ]
+    },
+    "annotations": {
+      "title": "Replace a process definition",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_edit_process_nodes",
+    "title": "Change node parameters of a process",
+    "description": "Make several changes to the parameters of a process's nodes in ONE save: set a parameter's text, bind variables to its placeholders, add a binding, or replace a literal. Put every change you intend into one call: each call validates and saves the whole process. The list is applied whole or not at all, and a change that cannot be applied is named by its position. A change alters what its node does, so the documentation must stay true: give each change a doc for its node, and pass doc for the process. A text replaces; true confirms that the current text is still right.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "changes": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The changes, applied in order.",
+          "items": {
+            "type": "object",
+            "required": [
+              "op",
+              "node"
+            ],
+            "properties": {
+              "op": {
+                "enum": [
+                  "set",
+                  "bind",
+                  "add-binding",
+                  "replace-text"
+                ],
+                "description": "set = one parameter's literal text (as node-set-param). bind = bind every <%N%> of a string parameter (as node-bind-var). add-binding = add placeholders to a parameter and keep the bindings it has (as node-add-binding). replace-text = replace an exact literal in the node (as node-replace-text)."
+              },
+              "node": {
+                "type": "string",
+                "description": "the node's actionName (canvas label) or id"
+              },
+              "property": {
+                "type": "string",
+                "description": "the parameter's designer label or its id. Required for set, bind and add-binding; narrows replace-text to one parameter."
+              },
+              "value": {
+                "type": "string",
+                "description": "set: the new literal text. Keep every <%N%> placeholder that the old value had."
+              },
+              "bind": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "bind: INDEX=variable for every <%N%> in the value. add-binding: INDEX=variable or INDEX=variable.Attribute for each placeholder to add."
+              },
+              "find": {
+                "type": "string",
+                "description": "replace-text: the exact literal to replace. bind and add-binding: an optional literal to replace first."
+              },
+              "replace": {
+                "type": "string",
+                "description": "the replacement for find"
+              },
+              "expect": {
+                "type": "integer",
+                "description": "replace-text: refuse unless this many replacements are made"
+              },
+              "allow_binding_change": {
+                "type": "boolean",
+                "description": "set and replace-text: permit a different <%N%> placeholder set"
+              },
+              "doc": {
+                "type": "object",
+                "description": "the documentation this change needs for its node: {\"action\": \"<the action's purpose now>\" or true, \"area\": {\"text\": \"<the area's text now>\"} or true}. A text replaces; true confirms that the current one is still right. Without it, the action and area given in --doc apply."
+              }
+            }
+          }
+        },
+        "doc": {
+          "type": "object",
+          "description": "Documentation for the whole list: {\"process\": \"<the process purpose now>\" or true}. It may also hold an \"action\" and an \"area\" that apply to every node whose change gives no doc of its own."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Apply and validate; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "changes"
+      ]
+    },
+    "annotations": {
+      "title": "Change node parameters of a process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_query_node",
+    "title": "Set the statement of a Query Store node",
+    "description": "Replace the SQL statement of one Query Store node and its Data Store chips together. Write the statement with {{ds:Store}} and {{col:Store.Column}} tokens.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "node": {
+          "type": "string",
+          "description": "The Query Store node's name (canvas label) or id."
+        },
+        "sql": {
+          "type": "string",
+          "description": "The statement, with {{ds:Store}} / {{col:Store.Column}} tokens."
+        },
+        "params": {
+          "type": "object",
+          "description": "The Parameters map {name: source}. A source is {\"keep\": true} or {\"var\": \"<variable name>\"}."
+        },
+        "doc": {
+          "type": "object",
+          "description": "The documentation this change needs: {\"action\": \"<the node purpose now>\" or true, \"area\": {\"text\": \"<the area text now>\"} or true, \"process\": \"<the process purpose now>\" or true}. A text replaces; true confirms that the current text is still right."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Render and validate; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "node",
+        "sql"
+      ]
+    },
+    "annotations": {
+      "title": "Set the statement of a Query Store node",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_action_types",
+    "title": "List the action types a process can use",
+    "description": "List the action types (node templates) of the platform, grouped by family, in a compact view. Pass family to get one family's actions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "family": {
+          "type": "string",
+          "description": "Return only this family's actions."
+        },
+        "filter": {
+          "type": "string",
+          "description": "The platform's own action filter value."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List the action types a process can use",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_insert_process_node",
+    "title": "Insert an action into a process",
+    "description": "Insert ONE action into a live process, right after another one. The new node goes between that node and its successor. It is refused when the node it follows has more than one outgoing port. A new action needs its purpose, so pass doc.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "after": {
+          "type": "string",
+          "description": "The node to insert after: its name (canvas label) or id."
+        },
+        "action": {
+          "type": "string",
+          "description": "The action type name from procesio_list_action_types, for example Data Store or Decisional."
+        },
+        "name": {
+          "type": "string",
+          "description": "The canvas label of the new node. The default is the action type name."
+        },
+        "params": {
+          "type": "object",
+          "description": "The parameters, as {property label: binding}."
+        },
+        "doc": {
+          "type": "object",
+          "description": "The documentation this change needs: {\"action\": \"<the purpose of the new node>\", \"area\": {\"title\": \"<an existing area, or a new one>\", \"text\": \"<the text of a new area>\"}, \"process\": \"<the process purpose now>\" or true}. true confirms that the current text is still right."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Build and validate; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "after",
+        "action"
+      ]
+    },
+    "annotations": {
+      "title": "Insert an action into a process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_add_process_variable",
+    "title": "Add a variable to a process",
+    "description": "Add ONE variable to a live process. Nothing that exists is rewired. A name that the process already has is refused. An input or an output changes what callers send and receive, so pass doc with the process purpose.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "name": {
+          "type": "string",
+          "description": "The variable name. It must be new in the process."
+        },
+        "data_type": {
+          "type": "string",
+          "description": "An alias (string, integer, boolean, json, object, file, date, datetime, guid) or the id of a data type."
+        },
+        "direction": {
+          "type": "string",
+          "description": "input = given when the process is run, process = internal, output = returned.",
+          "enum": [
+            "input",
+            "process",
+            "output"
+          ]
+        },
+        "is_list": {
+          "type": "boolean",
+          "description": "Make it a list."
+        },
+        "default": {
+          "type": "string",
+          "description": "The default value."
+        },
+        "required": {
+          "type": "boolean",
+          "description": "Mark an input as required."
+        },
+        "doc": {
+          "type": "object",
+          "description": "For an input or an output: {\"process\": \"<the process purpose now>\" or true}. true confirms that the current text is still right."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Add and validate; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "data_type",
+        "direction"
+      ]
+    },
+    "annotations": {
+      "title": "Add a variable to a process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_process_variable_type",
+    "title": "Change the type of a process variable",
+    "description": "Change the data type of ONE variable of a live process. An input or an output is refused unless allow_contract_change is set, because callers depend on its shape.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "variable": {
+          "type": "string",
+          "description": "The variable name or id."
+        },
+        "data_type": {
+          "type": "string",
+          "description": "The id of the new data type, from procesio_list_data_types."
+        },
+        "is_list": {
+          "type": "string",
+          "description": "Also set whether it is a list. Omit to keep it.",
+          "enum": [
+            "true",
+            "false"
+          ]
+        },
+        "allow_contract_change": {
+          "type": "boolean",
+          "description": "Permit the change on an input or an output variable."
+        },
+        "doc": {
+          "type": "object",
+          "description": "For an input or an output: {\"process\": \"<the process purpose now>\" or true}. true confirms that the current text is still right."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Change and validate; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "variable",
+        "data_type"
+      ]
+    },
+    "annotations": {
+      "title": "Change the type of a process variable",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_process_active",
+    "title": "Activate or deactivate a process",
+    "description": "Activate or deactivate a process. A process that is not active does not run, so the change reaches everything that starts it, such as a schedule, a webhook or a form. Ask the user before you change it, unless they asked for exactly that.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "state": {
+          "type": "string",
+          "description": "true activates the process, false deactivates it.",
+          "enum": [
+            "true",
+            "false"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "state"
+      ]
+    },
+    "annotations": {
+      "title": "Activate or deactivate a process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_process_payload",
+    "title": "Get the input shape of a process",
+    "description": "Get the shape of the payload that a run of the process expects: its input variables. Use it before procesio_run_process_and_wait.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Get the input shape of a process",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_run_process_and_wait",
+    "title": "Run a process and wait for its result",
+    "description": "Run a process and wait until it ends. Returns the instance id, the final status and the output variables in one call, so no status polling is needed. Use it to test a process. For a run that takes longer than the timeout, use procesio_run_process and read the status later.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "payload": {
+          "type": "object",
+          "description": "The input variables, by name."
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "How long to wait, in seconds. Keep it under 150."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Run a process and wait for its result",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_run_process",
+    "title": "Start a process",
+    "description": "Start a process and return its instance id without waiting. Read the result later with procesio_get_instance_status.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "payload": {
+          "type": "object",
+          "description": "The input variables, by name."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Start a process",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_instance_status",
+    "title": "Get the status of a process run",
+    "description": "Get the status of one run (instance) of a process, with its variables or per-node detail when asked. The process id is required too: the call fails without it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The instance id."
+        },
+        "process_id": {
+          "type": "string",
+          "description": "The id of the process the instance belongs to."
+        },
+        "variables": {
+          "type": "boolean",
+          "description": "Include the variables."
+        },
+        "actions": {
+          "type": "boolean",
+          "description": "Include per-node detail."
+        }
+      },
+      "required": [
+        "id",
+        "process_id"
+      ]
+    },
+    "annotations": {
+      "title": "Get the status of a process run",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_instance_output",
+    "title": "Get the output of a process run",
+    "description": "Get the output variables of one finished run (instance) of a process.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The instance id."
+        },
+        "process_id": {
+          "type": "string",
+          "description": "The id of the process the instance belongs to."
+        }
+      },
+      "required": [
+        "id",
+        "process_id"
+      ]
+    },
+    "annotations": {
+      "title": "Get the output of a process run",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_instances",
+    "title": "List the runs of a process",
+    "description": "List the runs (instances) of one process, newest first.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The process id."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Runs per page."
+        },
+        "status": {
+          "type": "string",
+          "description": "The platform's status filter value."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "List the runs of a process",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_forms",
+    "title": "List forms",
+    "description": "List the forms of the workspace. Use it to find the id of a form.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "List forms",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_read_form",
+    "title": "Read a form",
+    "description": "Read one form as text: its structure, every element and event, and the process maps with form fields and process variables resolved to names.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "processes": {
+          "type": "string",
+          "description": "Comma-separated ids of the processes the form runs, to name their variables."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read a form",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_form",
+    "title": "Get a form definition",
+    "description": "Get one form as structured data. Prefer procesio_read_form to understand a form; use this when you need the definition itself.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Get a form definition",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_create_form",
+    "title": "Create a form",
+    "description": "Create a form from one config that holds the WHOLE definition: assignees, elements and queries. Load the guidance topic forms before your first use, and pass dry_run to see the validation and an outline of what would be built. The answer never holds the whole form: it lists the elements by name. A form is created published and open to anyone without a login, unless the config says otherwise: isPrivate true keeps it behind a PROCESIO login, and publish false keeps it a draft. Ask the user before you create a form that is open, unless they asked for exactly that.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object",
+          "description": "The form definition."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Build and validate; create nothing."
+        }
+      },
+      "required": [
+        "config"
+      ]
+    },
+    "annotations": {
+      "title": "Create a form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_form_element_events",
+    "title": "List the events of a form element",
+    "description": "List the event handlers of one form element, by trigger. Every trigger the element carries is a key of events, also when it has no handler yet: onClickEvents is the trigger click.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "element": {
+          "type": "string",
+          "description": "The element's id or its designer name."
+        }
+      },
+      "required": [
+        "id",
+        "element"
+      ]
+    },
+    "annotations": {
+      "title": "List the events of a form element",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_form_element_event",
+    "title": "Set an event of a form element",
+    "description": "Wire one trigger of one form element to run a process, run JavaScript, or run a Data Store operation. Only that element's events change. An element takes only the triggers of its type, and any other trigger is refused: a button has only click, and a number input has input, focus and blur. Read them first with procesio_get_form_element_events. In a process map, both sides take names: a process variable name and a form field name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "element": {
+          "type": "string",
+          "description": "The element's id or its designer name."
+        },
+        "on": {
+          "type": "string",
+          "description": "The trigger, by its short name: click, input, focus, blur. A special element has its own, such as tabchange on tabs, and ready exists only on a chat. It must be one that the element has: the key onInputEvents means input."
+        },
+        "action": {
+          "type": "string",
+          "description": "What the trigger runs.",
+          "enum": [
+            "RUN_PROCESS",
+            "RUN_JAVASCRIPT",
+            "RUN_DATA_STORE_OPERATION"
+          ]
+        },
+        "config": {
+          "type": "object",
+          "description": "The event config."
+        },
+        "data_store_id": {
+          "type": "string",
+          "description": "For a Data Store operation: the Data Store id."
+        },
+        "operation": {
+          "type": "string",
+          "description": "For a Data Store operation: READ, ADD, UPDATE, DELETE or QUERY."
+        },
+        "replace_action": {
+          "type": "string",
+          "description": "Replace only this trigger's events that run this action, and keep the others."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Build and report; change nothing."
+        }
+      },
+      "required": [
+        "id",
+        "element",
+        "on",
+        "action"
+      ]
+    },
+    "annotations": {
+      "title": "Set an event of a form element",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_form_element",
+    "title": "Read the configs of a form element",
+    "description": "Read the configs of one element of a form: its label, placeholder, default value, required and visible flags, and the rest. Use it before you change an element, to see the exact config keys it carries.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "element": {
+          "type": "string",
+          "description": "The element's id or its designer name."
+        },
+        "keys": {
+          "type": "array",
+          "description": "Only these config keys. Omit for all of them.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "element"
+      ]
+    },
+    "annotations": {
+      "title": "Read the configs of a form element",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_form_element_config",
+    "title": "Set configs of a form element",
+    "description": "Set plain configs of ONE element of a form, such as its label, placeholder, required or visible. Put every config of that element into one call. Only that element changes, and the answer returns the previous values. Events go through procesio_set_form_element_event. Change one form with one call after another, not with several calls in the same step: a call is refused when the form changed since it was read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "element": {
+          "type": "string",
+          "description": "The element's id or its designer name."
+        },
+        "set": {
+          "type": "array",
+          "description": "The configs to write, each as \"key=value\", for example \"label=First name\" or \"required=true\". A value that parses as JSON is stored as that type; any other value is stored as text.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report the change and the previous values; write nothing."
+        }
+      },
+      "required": [
+        "id",
+        "element",
+        "set"
+      ]
+    },
+    "annotations": {
+      "title": "Set configs of a form element",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_add_form_elements",
+    "title": "Add elements to a form",
+    "description": "Add one or more controls to a live form without rebuilding it: every existing field, and every process map that uses one, stays as it is. Pass parent to place them inside a container. Load the guidance topic forms-anatomy for the shape of an element.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "elements": {
+          "type": "array",
+          "description": "The elements to add, as authoring-config objects.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "parent": {
+          "type": "string",
+          "description": "Place them inside this container, by element name or id."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report what would be added; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "elements"
+      ]
+    },
+    "annotations": {
+      "title": "Add elements to a form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_form_element_chains",
+    "title": "Rewrite event chains of form elements",
+    "description": "Rewrite the ordered event chains of one or more elements of a form in ONE save. Use it when the order of the events matters, or when several elements change together. An event of a chain that you do not list is removed, and the answer names it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "plan": {
+          "type": "object",
+          "description": "The plan: {\"chains\": [{\"element\": \"<name or id>\", \"on\": \"<trigger>\", \"events\": [...]}]}. An event is {\"keep\": \"<existing event id>\"} to keep an event as it is, {\"map\": {\"set\": {\"<element>.<configKey>\": value, \"@<variable>\": value}, \"when\": [{\"field\" or \"variable\": ..., \"op\": ..., \"value\": ...}], \"match\": \"all\" or \"any\"}} to set form data, {\"js\": \"<code>\"} to run JavaScript, or {\"raw\": {...}} for a complete event."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Resolve and report every chain; save nothing."
+        }
+      },
+      "required": [
+        "id",
+        "plan"
+      ]
+    },
+    "annotations": {
+      "title": "Rewrite event chains of form elements",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_form_code",
+    "title": "Read the CSS and JavaScript of a form",
+    "description": "Read the global CSS and JavaScript of a form.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read the CSS and JavaScript of a form",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_form_code",
+    "title": "Set the CSS and JavaScript of a form",
+    "description": "Set the global CSS and JavaScript of a form. Only the code changes. A side that you do not pass stays as it is, and the answer returns the previous code.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "css": {
+          "type": "string",
+          "description": "The whole CSS source."
+        },
+        "javascript": {
+          "type": "string",
+          "description": "The whole JavaScript source."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report the change and the previous code; write nothing."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Set the CSS and JavaScript of a form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_form_queries",
+    "title": "Read the saved queries of a form",
+    "description": "Read the saved Data Store queries of a form: each statement, its bindings, its parameters, and which elements run it. A query that no event runs comes back as a warning, because the next save in the designer drops it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read the saved queries of a form",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_set_form_query",
+    "title": "Add or change a saved query of a form",
+    "description": "Add or change ONE saved Data Store query of a form. The other queries stay as they are. The query is selected by query_id, else by name, and is created when nothing matches. Wire it to an element event (operation QUERY) afterwards, or the next save in the designer drops it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "query_id": {
+          "type": "string",
+          "description": "The id of the query to change. With no match it is the id of the new query."
+        },
+        "name": {
+          "type": "string",
+          "description": "The query name. It selects the query when query_id is not given; otherwise it renames the query."
+        },
+        "sql": {
+          "type": "string",
+          "description": "The statement, with a numbered tag for each bound Data Store table or column and @name for each parameter."
+        },
+        "bindings": {
+          "type": "array",
+          "description": "One binding for each numbered tag: {\"id\", \"type\": \"dataStoreTable\", \"dataStoreId\"} or {\"id\", \"type\": \"dataStoreColumn\", \"dataStoreId\", \"columnId\"}.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "parameters": {
+          "type": "array",
+          "description": "The @names the statement takes. Omit to derive them from the statement.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "timeout_seconds": {
+          "type": "integer",
+          "description": "1 to 600. The default is 60."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report the change; write nothing."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Add or change a saved query of a form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_update_form",
+    "title": "Patch a form",
+    "description": "Save a change to a live form by merging a patch into its data, or by changing its name, its publication status or who can reach it. Elements, theme and code that the patch does not name stay as they are. For one element, prefer the element tools. The answer lists what changes, each path with its value before and after. Publishing a form shows outside the workspace, and is_private false with status 1 opens it to anyone without a login. Ask the user before you do either, unless they asked for exactly that.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "data": {
+          "type": "object",
+          "description": "A JSON object merged into the form data (a merge patch)."
+        },
+        "name": {
+          "type": "string",
+          "description": "The new name of the form."
+        },
+        "status": {
+          "type": "integer",
+          "description": "1 = published, 0 = draft."
+        },
+        "state": {
+          "type": "string",
+          "description": "Whether the form is enabled.",
+          "enum": [
+            "true",
+            "false"
+          ]
+        },
+        "is_private": {
+          "type": "string",
+          "description": "false with status 1 lets an anonymous visitor open the form; true keeps it behind a PROCESIO login.",
+          "enum": [
+            "true",
+            "false"
+          ]
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Report what would change; save nothing."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Patch a form",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_edit_form",
+    "title": "Replace a form definition",
+    "description": "Replace the definition of an existing form. The config you send is the DESIRED STATE and replaces everything: what you leave out is removed, and that is refused unless allow_remove is set. To add controls without restating the form, use procesio_add_form_elements. The answer never holds the whole form: it lists the elements by name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The form id."
+        },
+        "config": {
+          "type": "object",
+          "description": "The whole desired definition."
+        },
+        "dry_run": {
+          "type": "boolean",
+          "description": "Build and report; change nothing."
+        },
+        "allow_remove": {
+          "type": "boolean",
+          "description": "Permit this edit to remove items the form has."
+        }
+      },
+      "required": [
+        "id",
+        "config"
+      ]
+    },
+    "annotations": {
+      "title": "Replace a form definition",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_data_stores",
+    "title": "List Data Stores",
+    "description": "List the Data Stores of the workspace. Use it to find the id of a Data Store.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Only Data Stores whose name contains this text."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Data Stores per page."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List Data Stores",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_data_store_model",
+    "title": "Get the columns of a Data Store",
+    "description": "Get the data model behind one Data Store: its columns and their types.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The Data Store id."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Get the columns of a Data Store",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_data_store_rows",
+    "title": "Read rows of a Data Store",
+    "description": "Read rows of one Data Store, with paging, simple filters and a sort.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The Data Store id."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Rows per page."
+        },
+        "filters": {
+          "type": "array",
+          "description": "Conditions, each {\"column\", \"operator\", \"value\"}. Operators include equals, contains, startsWith.",
+          "items": {
+            "type": "object"
+          }
+        },
+        "logic": {
+          "type": "string",
+          "description": "How the conditions combine. The default is and.",
+          "enum": [
+            "and",
+            "or"
+          ]
+        },
+        "sort": {
+          "type": "object",
+          "description": "The sort: {\"column\", \"direction\": \"asc\" or \"desc\"}."
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "annotations": {
+      "title": "Read rows of a Data Store",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_create_data_store",
+    "title": "Create a Data Store",
+    "description": "Create a Data Store with its columns. Each column takes the id of a data type; find it with procesio_list_data_types.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "type": "object",
+          "description": "The Data Store: {\"name\", \"description\"?, \"columns\"?: [{\"name\", \"dataTypeId\", \"isList\"?, \"isPrimaryKey\"?, \"isRequired\"?}]}."
+        }
+      },
+      "required": [
+        "payload"
+      ]
+    },
+    "annotations": {
+      "title": "Create a Data Store",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_data_types",
+    "title": "List data types",
+    "description": "List the data types of the workspace with their ids: the primitive ones and the data models. A variable, a Data Store column and a data model attribute each take one of these ids.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "type": "string",
+          "description": "Only data types whose name contains this text."
+        },
+        "page": {
+          "type": "integer",
+          "description": "1-based page number."
+        },
+        "page_size": {
+          "type": "integer",
+          "description": "Data types per page."
+        }
+      }
+    },
+    "annotations": {
+      "title": "List data types",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_create_data_store_from_json",
+    "title": "Create a Data Store from JSON",
+    "description": "Create a Data Store whose columns are taken from a JSON sample, or from a URL that returns JSON.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "type": "object",
+          "description": "The request: {\"name\", \"description\"?, \"content\": \"<raw JSON, or a URL that returns JSON>\", \"primaryKeyAttributeNames\"?: [...]}."
+        }
+      },
+      "required": [
+        "payload"
+      ]
+    },
+    "annotations": {
+      "title": "Create a Data Store from JSON",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_add_data_store_rows",
+    "title": "Add rows to a Data Store",
+    "description": "Insert rows into one Data Store. Read its columns first with procesio_get_data_store_model: a row is keyed by their display names.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The Data Store id."
+        },
+        "rows": {
+          "type": "array",
+          "description": "The rows, each keyed by the display name of the column: [{\"Name\": \"...\", \"Status\": \"...\"}].",
+          "items": {
+            "type": "object"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "rows"
+      ]
+    },
+    "annotations": {
+      "title": "Add rows to a Data Store",
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_list_workspaces",
+    "title": "List workspaces",
+    "description": "List the workspaces the current user can reach.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    },
+    "annotations": {
+      "title": "List workspaces",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  },
+  {
+    "name": "procesio_get_guidance",
+    "title": "Read the PROCESIO build guidance",
+    "description": "Read one topic of the guidance on how to build and test in PROCESIO: the method, the recipes and the known pitfalls. Load the topic that fits the task before you build. Start with playbook for a process and forms for a form.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "Processes: playbook, best-practices, visual-organization, datastore, scheduling, environments, reliability, boundary. Forms: forms (the index), forms-anatomy, forms-process, forms-interaction, forms-code, forms-dom, forms-motion, forms-deploy, forms-redesign, forms-pitfalls. House style: patterns (the index), patterns-processes, patterns-forms, patterns-integrations, patterns-database, patterns-optimizing."
+        }
+      },
+      "required": [
+        "topic"
+      ]
+    },
+    "annotations": {
+      "title": "Read the PROCESIO build guidance",
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    }
+  }
+]

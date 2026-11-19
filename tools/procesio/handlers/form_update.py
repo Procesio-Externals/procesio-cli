@@ -43,6 +43,63 @@ def _deep_merge(target, patch):
     return out
 
 
+# A preview is read by a person or a model, not replayed: past these it stops being readable.
+MAX_CHANGES = 50
+MAX_VALUE_CHARS = 300
+_ABSENT = object()
+
+
+def _brief(value):
+    """`value` itself when it is short, or what it is when it is long."""
+    text = json.dumps(value, ensure_ascii=False)
+    if len(text) <= MAX_VALUE_CHARS:
+        return value
+    if isinstance(value, list):
+        return {"long": "array", "items": len(value), "chars": len(text)}
+    if isinstance(value, dict):
+        return {"long": "object", "keys": sorted(map(str, value))[:20], "chars": len(text)}
+    return {"long": "text", "chars": len(text), "starts": str(value)[:120]}
+
+
+def _diff(before, after, path: str, out: list) -> None:
+    """Append one entry per value that differs, at the deepest path that names it.
+
+    Objects are compared key by key, and arrays of the same length item by item, so a change
+    to one config of one element is one short entry. An array whose length changed is one
+    entry: its items no longer line up, and guessing which moved would report noise."""
+    if before == after:
+        return
+    if isinstance(before, dict) and isinstance(after, dict):
+        for key in sorted(set(before) | set(after), key=str):
+            _diff(before.get(key, _ABSENT), after.get(key, _ABSENT),
+                  f"{path}.{key}" if path else str(key), out)
+        return
+    if isinstance(before, list) and isinstance(after, list) and len(before) == len(after):
+        for index, (old, new) in enumerate(zip(before, after)):
+            _diff(old, new, f"{path}[{index}]", out)
+        return
+    change = {"path": path}
+    if before is not _ABSENT:
+        change["before"] = _brief(before)
+    if after is not _ABSENT:
+        change["after"] = _brief(after)
+    out.append(change)
+
+
+def _changes(form: dict, body: dict) -> dict:
+    """What a save of `body` changes in `form`: the top-level fields, then the Data."""
+    found: list = []
+    for field, source in (("Name", "name"), ("Status", "status"), ("State", "state"),
+                          ("IsPrivate", "isPrivate")):
+        _diff(form.get(source), body.get(field), field, found)
+    _diff(form.get("data") or {}, body.get("Data") or {}, "Data", found)
+    report = {"changes": found[:MAX_CHANGES], "change_count": len(found)}
+    if len(found) > MAX_CHANGES:
+        report["changes_note"] = (f"the first {MAX_CHANGES} of {len(found)} changes are listed; "
+                                  f"a narrower patch gives a list you can read whole")
+    return report
+
+
 def _load_patch(args) -> dict | None:
     raw = None
     if args.data_file:
@@ -99,8 +156,11 @@ def form_update(client, args) -> dict:
     }
     if lints:
         result["lints"] = lints
+    if args.changes_only:
+        result.update(_changes(form, body))
     if args.dry_run:
-        result["dto"] = body
+        if not args.changes_only:
+            result["dto"] = body
         return result
     guard = guard_unchanged(lambda: _fetch(client, args.id), form, force=args.force)
     client.put("/api/FormTemplate", body)
@@ -221,6 +281,10 @@ def _update_args(p: argparse.ArgumentParser) -> None:
                         "visitor on its custom URL; true keeps it behind a PROCESIO login")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="build the PUT DTO and return it without saving (GET only)")
+    p.add_argument("--changes-only", dest="changes_only", action="store_true",
+                   help="report what changes as a list of paths, each with its value before "
+                        "and after (long values are described, not printed); a --dry-run then "
+                        "leaves out the whole DTO, which for a real form is too long to read")
     add_force_arg(p)
 
 
@@ -264,7 +328,8 @@ ACTIONS = {
             "Safely save an arbitrary change to a LIVE form: GET it, deep-merge a --data "
             "patch into its Data (and/or override --name/--status/--state/--is-private), then PUT the "
             "server-accepted PascalCase DTO. Preserves elements/theme/code (never rebuilds "
-            "like form-edit). Last-write-wins guard (--force); --dry-run previews the DTO."
+            "like form-edit). Last-write-wins guard (--force); --dry-run previews the DTO, and "
+            "--changes-only lists what changes instead."
         ),
     ),
 }

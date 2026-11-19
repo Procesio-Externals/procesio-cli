@@ -89,3 +89,58 @@ def test_inline_secret_flagged_but_guid_credential_is_not():
     secret_findings = [f for f in audit.audit_process(flow)["findings"]
                        if f["code"] == "possible-inline-secret"]
     assert all(f["action"] != "Send Email" for f in secret_findings)
+
+
+# -- a process that only reads a Data Store ----------------------------------
+
+def _query_store(sql):
+    return action("Query Store", name="Read stock",
+                  params=[{"Value": sql, "Variable": []}, {"Value": "60"}],
+                  settings=[{"value": sql}])
+
+
+def _data_store(operation):
+    return action("Data Store", name="Read stock",
+                  params=[{"Value": "store-guid"}, {"Value": operation}],
+                  settings=[{"value": operation}])
+
+
+def _read_only_hits(*acts):
+    flow = {"Title": "Reader", "Description": "reads", "Actions": [START, *acts, STOP]}
+    return [f for f in audit.audit_process(flow)["findings"]
+            if f["code"] == "datastore-read-only"]
+
+
+def test_a_process_that_only_selects_from_a_data_store_points_to_the_form_trigger():
+    hits = _read_only_hits(_query_store("SELECT Sku, Qty FROM <%0%>\nWHERE <%1%> = @c"))
+    assert hits and hits[0]["severity"] == "info"
+    assert "saved query" in hits[0]["message"] and "form" in hits[0]["message"]
+
+
+def test_a_data_store_select_rows_node_counts_as_a_read():
+    assert _read_only_hits(_data_store("SelectRows"))
+
+
+def test_a_read_with_a_cte_and_comments_is_still_a_read():
+    sql = "-- latest first\nWITH t AS (SELECT * FROM <%0%>) SELECT * FROM t ORDER BY 1"
+    assert _read_only_hits(_query_store(sql))
+
+
+def test_a_write_is_not_flagged():
+    assert not _read_only_hits(_query_store("UPDATE <%0%> SET Qty = 0 WHERE Sku = @s"))
+    assert not _read_only_hits(_query_store("SELECT 1; DELETE FROM <%0%>"))
+    assert not _read_only_hits(_data_store("InsertRows"))
+
+
+def test_a_word_like_update_inside_a_literal_does_not_make_it_a_write():
+    assert _read_only_hits(_query_store("SELECT * FROM <%0%> WHERE Note = 'update me'"))
+
+
+def test_a_read_followed_by_other_work_is_not_flagged():
+    other = action("Call API", params=[{"Value": "https://x"}], settings=[{"value": "u"}])
+    assert not _read_only_hits(_query_store("SELECT * FROM <%0%>"), other)
+
+
+def test_a_process_with_no_data_store_action_is_not_flagged():
+    add = action("Add", params=[{"Value": "1"}], settings=[{"value": "1"}])
+    assert not _read_only_hits(add)

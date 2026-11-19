@@ -35,10 +35,16 @@ _SKIP = re.compile(
 _AT_NAME = re.compile(r"(?<![@\w])@[A-Za-z_][A-Za-z0-9_]*")
 
 
+def code_only(sql: str) -> str:
+    """The statement with its string literals, quoted identifiers and comments blanked,
+    so a scan for keywords or parameters reads only the code."""
+    return _SKIP.sub(" ", sql or "")
+
+
 def sql_parameters(sql: str) -> list[str]:
     """The `@name`s a statement uses, in order of first appearance, each once."""
     out: list[str] = []
-    for name in _AT_NAME.findall(_SKIP.sub(" ", sql or "")):
+    for name in _AT_NAME.findall(code_only(sql)):
         if name not in out:
             out.append(name)
     return out

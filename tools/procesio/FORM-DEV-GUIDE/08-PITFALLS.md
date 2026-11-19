@@ -14,6 +14,30 @@ scope is a throwaway sandbox iframe, destroyed and rebuilt on every re-trigger.
 `window.parent.document`. Installer + runtime, two layers, two guards
 ([02](02-CODE-INJECTION.md) §4).
 
+### A write is saved on the server, but its answer never reaches the page
+**Cause.** Seen once with a full-page runtime that calls processes through a bridge: the start of an approval
+was written (the next person got the task), yet the page stayed on the form with the button idle and no
+message, so the person would have pressed again. Two exact reruns of the same steps answered in 2-3 s, and the
+instance no longer appeared in the listing, so the cause was not found.
+**Rule.** Treat a lost answer as "maybe saved". Give the client wait a generous ceiling (90 s rather than
+60 s), and when a WRITE times out say so: "reload to check whether it was saved before sending again",
+not "try again". Make every write safe to repeat on the server (a filtered unique index or a state guard that
+answers a conflict, not a duplicate). When diagnosing, log the page state every 100 ms after the click (view,
+busy flag, toasts, alerts) instead of one screenshot after a long wait: a toast lives a few seconds and the
+alert may sit outside the captured area.
+
+### Typing in a field, then clicking a button does nothing (the first time)
+**Cause.** A runtime that redraws the page from state (`innerHTML`) and redraws on a text field's `change`
+event. `change` fires on blur, and the blur comes from the `mousedown` on the button the person is clicking:
+the redraw replaces the button before `mouseup`, so the browser sends the click to a common ancestor and the
+delegated handler finds no action. Measured on a cancel panel: the reason was typed, the confirm button was
+pressed and nothing happened; the same click worked when the field had not been edited just before. The same
+shape hides wherever a quantity, comment or error-clearing handler redraws on `change`.
+**Rule.** Never redraw synchronously from a text field's `change`. Store the value on `input` and defer any
+`change`-driven redraw by ~250 ms (one shared timer), so the click lands first and the redraw follows. Selects
+and checkboxes are safe: their `change` fires on selection, not on blur. Test it the way a person does: type,
+then click the button directly, without blurring first.
+
 ### Doubled toasts / doubled ripples / the process launches twice
 **Cause.** The file re-ran and installed a second copy of everything.
 **Rule.** Guard the installer on a DOM id **and** the payload on a `window` flag.
@@ -567,6 +591,33 @@ branch or from the page, so nothing chosen from a removed file stays on screen.
 
 ## CSS
 
+### A design system drawn by the runtime breaks on the live form but not in the replica
+**Cause.** The forms host loads Bootstrap 5 (`/assets/index-*.css`) on the same page, and a design system
+with generic class names collides with it. Measured on forms.procesio.app with a full-page UI drawn over a
+public form: `.row > *` gave every child of a `.row` `width: 100%` (chips and buttons stretched, label and
+value split onto two lines), `.row` added `flex-wrap` and negative margins, `.col` added side padding and
+`flex-grow`, `.modal` and `.toast:not(.show)` are `display: none` (dialogs and toasts existed in the DOM
+with a 0×0 box), and `.card`, `.alert`, `.h1`-`.h3`, `.mark` picked up display, margins and padding. A
+replica without the host stylesheet showed none of it.
+**Rule.** Prefixing every class is the clean fix for new work. For an existing design, put a reset layer
+BEFORE the design CSS with the same specificity as Bootstrap (one class): it is later in the document than
+Bootstrap, so it wins, and the design's own rules come after it, so they win over the reset. `.toast` needs
+two classes (`.app .toast`), because `.toast:not(.show)` is (0,2,0). Bootstrap's `.card` is also
+`display: flex; flex-direction: column`, so an inline `display:flex; align-items:center` on a design card
+stacks its children and centers them horizontally instead of laying them out in a row: set
+`flex-direction: row` explicitly on any card meant as a row. Load the host stylesheets in the
+replica (the `link rel=stylesheet` hrefs of the live page, saved locally) so it shows what the live form
+shows, and check sizes in the live run (`getBoundingClientRect`), since a 0×0 element still "exists".
+
+### After "Sign out", the next account sees the previous account's data for a moment
+**Cause.** A runtime that draws a whole app keeps each screen's last answer in memory so it can redraw without
+a new call. On sign-out it cleared the session token and the profile but not those caches, so the next person to
+sign in on the same tab saw the previous person's list (an admin's pending requests, measured in a replica) until
+their own call answered about two seconds later.
+**Rule.** Sign-out resets every per-user cache, not only the token: keep them in one place and reset that place
+in the same function that clears the session. Test it: sign in as A, open a data screen, sign out, sign in as B,
+and assert right after B's sign-in that nothing of A's is on the page.
+
 ### The page will not scroll; the bottom of the form is unreachable
 **Cause.** `overflow: hidden` on `.form-builder--form`.
 **Rule.** Never. Clip with a **background** instead - backgrounds honour
@@ -583,6 +634,25 @@ for `position: fixed` descendants.
 the gradient simply slid away.
 **Rule.** `repeat-x`, gradient starting and ending on the same colour, travel
 exactly one tile per cycle.
+
+### A rule's font (or animation) is right in the replica and missing on the live form
+**Symptom.** Small labels render at the page's 16px, a big number comes out at body size, an
+entrance animation never plays, only on the live form. Other declarations of the same rule
+(colour, spacing) do apply.
+**Cause.** The renderer scopes the form CSS by re-serializing every rule through the CSSOM
+(each selector becomes `sel:where([data-form-css-scope="…"], [data-form-css-scope="…"] *)`).
+A shorthand that holds a `var()` is "pending substitution": once a later longhand of the same
+property in the same rule overrides part of it, the browser can no longer serialize the
+shorthand and drops it. Measured 2026-11-16: `font: 800 24px/1 var(--font); font-variant-numeric:
+tabular-nums` arrived as `font-variant-numeric` alone, so the element fell back to the page font.
+Same for `animation: … var(--ease) …; animation-delay: …`. A replica that loads the CSS as a
+plain stylesheet never shows it.
+**Rule.** In one rule, never follow a `var()` shorthand with one of its own longhands. Write
+longhands (`font-weight`, `font-size`, `line-height`, `font-family`), or put everything in the
+shorthand (the delay goes inside `animation`). A build can expand every `font:` shorthand into
+longhands and refuse the other cases; check a live rule with
+`[...document.styleSheets].flatMap(s => [...s.cssRules]).find(r => r.selectorText?.startsWith('<sel>')).style.cssText`.
+To find the rule that sets a computed value, match every CSSOM rule with `el.matches(r.selectorText)`.
 
 ### A CSS rule has no effect on the form's own markup
 **Cause.** The form author wrote an inline `style` attribute; an inline declaration
@@ -650,6 +720,31 @@ that a narrow-screen media query comes after the wider one in the file: a
 ### The dropzone stays stuck in the drag state
 **Cause.** `dragleave` fires on children; targeted removal missed.
 **Rule.** On `dragleave`/`drop`, sweep **all** zones.
+
+### A wide table fits in the replica and overflows on the live form
+**Cause.** The live page loads the design's web fonts; a local replica that cannot reach them falls back to
+a narrower system font. A line-decision table that measured 0 px of horizontal overflow in the replica
+overflowed by about 30 px live, enough to push the last column (the row's action buttons) out of view.
+An input inside a table cell widens its whole column to the input's width, so a quantity field that is
+wider than the numbers above it adds the difference to the table.
+**Rule.** Measure the overflow on the live form, per scroll container: `el.scrollWidth - el.clientWidth`
+for each table wrapper, in every state that adds controls (a split row, an error line). Keep row actions
+inside an existing cell rather than in an extra column, and size in-cell inputs to the column's content.
+
+### A scripted test clicks a list of buttons and only the first click counts
+**Cause.** A runtime that redraws the page on every state change (`innerHTML` from state) replaces the
+DOM on the first click, so the remaining elements of a `querySelectorAll` list taken before it are
+detached nodes: clicking them does nothing and throws nothing.
+**Rule.** In test scripts, query again before each click
+(`for (i...) document.querySelectorAll(sel)[i].click()`), never iterate a list captured before the first
+click. The same applies to any handle kept across a click in `web run` steps.
+
+### `wait_for` on the success state passes before the action finishes
+**Cause.** The selector chosen for "done" (a success icon class) is also used elsewhere on the same
+screen, for example in a status card, so `wait_for` matches at once and the next step runs while the
+call is still in flight.
+**Rule.** Give each terminal state its own marker class (`.p3-done`, `.start-done`) and wait on that, then
+read its text to assert which outcome arrived.
 
 ---
 

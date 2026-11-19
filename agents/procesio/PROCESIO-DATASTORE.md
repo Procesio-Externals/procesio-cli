@@ -54,6 +54,26 @@ the tool's bundled catalog from `/api/Actions` after a platform release.
 
 ## Forms - the Data Store trigger
 
+**The rule: a form that needs Data Store rows reads them itself.** Do not build a process
+whose job is to read a Data Store for a form. Measured on production (2026-11-19, a 200-row store, 50 rows returned, 25 runs each): a saved query answers in a median of 29 ms and a row READ in 33 ms, one call each; the same read through a one-action process takes a median of 266 ms over two calls (publish, then a synchronous launch) and leaves a process instance per click. In the browser the click took about 55-80 ms against 210-290 ms. A real process has more than one action, so the gap only grows. The process audit reports
+such a process as `datastore-read-only`.
+
+Two ways, both an element event with the action `RUN_DATA_STORE_OPERATION`:
+
+- **READ** (also ADD/UPDATE/DELETE) - point-and-click on ONE store, with filters.
+- **QUERY** - runs one of the form's **saved queries**: MySQL stored on the form template,
+  bound to Data Store tables and columns, with `@name` parameters mapped from form fields.
+  Use it for joins, several stores, aggregates, sorting, or anything a filter cannot say.
+  Build it in the form config (`queries` plus an event `{do: datastore, operation: query,
+  query: <name>}`), or on a live form with `form-set-saved-statement` and
+  `form-set-element-event --operation QUERY`. Full contract:
+  `tools/procesio/PROCESIO-FORM-QUERIES-NOTES.md`.
+
+To show the rows in a table, map `rows` to the table's name: the table must be
+`"dynamic": true` and its column keys must equal the returned column names (the store's
+display names). The builder writes the dynamic row's source path, which is the only target
+that fills the cells. A process's list output reaches a table the same way.
+
 A form element can trigger a Data Store operation the same way it triggers a process
 (RUN_PROCESS). The event action is **`RUN_DATA_STORE_OPERATION`**; wire it surgically
 with `procesio form-set-element-event --action RUN_DATA_STORE_OPERATION --data-store-id

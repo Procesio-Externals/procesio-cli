@@ -215,3 +215,25 @@ def test_is_true_on_a_string_default_variable_is_reported_but_not_refused():
                         ["--id", "F1", "--plan", json.dumps(plan), "--dry-run"],
                         client_builder=_builder(sess))
     assert "warnings" not in out
+
+
+def test_a_slot_stored_as_a_bare_list_is_read_and_written_back_as_debounce_events():
+    # Older and hand-written forms store onClickEvents as a bare list of events. Reading it
+    # as {debounce, events} crashed with AttributeError before any check ran.
+    form = _form()
+    slot = form["data"]["elements"][0]["configs"][2]
+    slot["value"] = slot["value"]["events"]
+    sess = FakeSession(queue=[FakeResp(200, form), FakeResp(200, {})])
+    out = main.dispatch("form-set-element-chains",
+                        ["--id", "F1", "--plan", json.dumps({"chains": [
+                            {"element": "validate", "on": "click",
+                             "events": [{"keep": "ev-js2"}, {"js": "c()"}]}]})],
+                        client_builder=_builder(sess))
+    put = sess.calls[-1]
+    el = next(e for e in put["json"]["Data"]["elements"] if e["id"] == "btn")
+    value = next(c for c in el["configs"] if c["key"] == "onClickEvents")["value"]
+    assert value["debounce"] == 0
+    assert [e.get("id") for e in value["events"]][0] == "ev-js2"
+    assert value["events"][1]["config"] == {"code": "c()"}
+    report = out["chains"][0]
+    assert report["kept"] == ["ev-js2"] and report["dropped"] == ["ev-js1", "ev-map"]

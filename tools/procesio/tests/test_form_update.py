@@ -157,3 +157,91 @@ def test_is_private_can_be_put_back():
     form = {"id": "f1", "name": "F", "data": {"elements": []}, "isPrivate": False,
             "type": 1, "status": 1, "state": True, "assignees": [], "customUrl": None}
     assert build_put_body(form, is_private=True)["IsPrivate"] is True
+
+
+# --- --changes-only: a preview a reader can take in --------------------------------------
+
+def _element(index: int, label: str = "Label") -> dict:
+    return {"id": f"el{index}", "type": "input",
+            "configs": [{"key": "name", "value": f"field{index}"},
+                        {"key": "label", "value": label},
+                        {"key": "tooltip", "value": "x" * 400}]}
+
+
+def _big_form(count: int = 120) -> dict:
+    return _form(data={"code": "ENC", "hideBranding": False,
+                       "elements": [_element(i) for i in range(count)]})
+
+
+def test_changes_only_dry_run_lists_the_change_and_leaves_the_dto_out():
+    s = FakeSession(queue=[FakeResp(200, _form())])
+    out = _call("form-update", ["--id", "F1", "--data", '{"hideBranding": true}',
+                                "--dry-run", "--changes-only"], s)
+    assert "dto" not in out and out["dry_run"] is True and out["applied"] is False
+    assert out["changes"] == [{"path": "Data.hideBranding", "before": False, "after": True}]
+    assert out["change_count"] == 1
+    assert len(s.calls) == 1 and s.calls[0]["method"] == "GET"
+
+
+def test_changes_only_stays_small_on_a_form_whose_dto_is_not():
+    """The whole DTO of a real form runs to tens of kilobytes, past what a reader of the
+    preview is given. The list of changes does not grow with the form."""
+    import json
+    form = _big_form()
+    assert len(json.dumps(form)) > 56_000
+    out = _call("form-update", ["--id", "F1", "--data", '{"hideBranding": true}',
+                                "--dry-run", "--changes-only"],
+                FakeSession(queue=[FakeResp(200, form)]))
+    assert len(json.dumps(out)) < 1_000
+
+
+def test_a_change_inside_one_element_is_named_by_its_path():
+    import json
+    form = _big_form(3)
+    elements = [_element(0), _element(1, "First name"), _element(2)]
+    out = _call("form-update", ["--id", "F1", "--data", json.dumps({"elements": elements}),
+                                "--dry-run", "--changes-only"],
+                FakeSession(queue=[FakeResp(200, form)]))
+    assert out["changes"] == [{"path": "Data.elements[1].configs[1].value",
+                               "before": "Label", "after": "First name"}]
+
+
+def test_an_array_that_changed_length_is_one_entry_and_a_long_value_is_described():
+    import json
+    form = _big_form(3)
+    out = _call("form-update", ["--id", "F1", "--data", json.dumps({"elements": [_element(0)]}),
+                                "--dry-run", "--changes-only"],
+                FakeSession(queue=[FakeResp(200, form)]))
+    (change,) = out["changes"]
+    assert change["path"] == "Data.elements"
+    assert change["before"]["long"] == "array" and change["before"]["items"] == 3
+    assert change["after"]["long"] == "array" and change["after"]["items"] == 1
+
+
+def test_publishing_and_opening_a_form_show_as_top_level_changes():
+    s = FakeSession(queue=[FakeResp(200, {**_form(status=0), "isPrivate": True})])
+    out = _call("form-update", ["--id", "F1", "--status", "1", "--is-private", "false",
+                                "--dry-run", "--changes-only"], s)
+    assert out["changes"] == [{"path": "Status", "before": 0, "after": 1},
+                              {"path": "IsPrivate", "before": True, "after": False}]
+
+
+def test_a_long_list_of_changes_is_cut_and_says_so():
+    import json
+    from tools.procesio.handlers import form_update
+    form = _big_form(80)
+    elements = [_element(i, f"New {i}") for i in range(80)]
+    out = _call("form-update", ["--id", "F1", "--data", json.dumps({"elements": elements}),
+                                "--dry-run", "--changes-only"],
+                FakeSession(queue=[FakeResp(200, form)]))
+    assert out["change_count"] == 80
+    assert len(out["changes"]) == form_update.MAX_CHANGES
+    assert "first 50 of 80" in out["changes_note"]
+
+
+def test_changes_only_on_a_real_save_reports_what_was_saved():
+    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, {})])
+    out = _call("form-update", ["--id", "F1", "--data", '{"hideBranding": true}',
+                                "--changes-only"], s)
+    assert out["applied"] is True and "dto" not in out
+    assert out["changes"] == [{"path": "Data.hideBranding", "before": False, "after": True}]
