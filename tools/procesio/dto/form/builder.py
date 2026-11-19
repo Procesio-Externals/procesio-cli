@@ -300,6 +300,82 @@ def _ds_map(rows) -> list:
     return out
 
 
+# Data Store event filters, as the designer saves them (captured on production 2026-11-19):
+# one condition per row, the column's display name on the left, a form field's value path
+# or a literal (as text) on the right, and `logicOperator` joining a condition to the NEXT
+# one (1 = AND, 2 = OR, 0 on the last). Operator names are the form runtime's
+# DataStoreOperator (form-runtime services/dataStore/dataStoreOperators.ts).
+_DS_OPERATORS = {
+    "EQUALS": "EQUALS", "=": "EQUALS", "==": "EQUALS", "EQ": "EQUALS",
+    "DOESNOTEQUAL": "DOES_NOT_EQUAL", "NOTEQUALS": "DOES_NOT_EQUAL", "NOTEQUAL": "DOES_NOT_EQUAL",
+    "!=": "DOES_NOT_EQUAL", "<>": "DOES_NOT_EQUAL", "NE": "DOES_NOT_EQUAL",
+    "GREATERTHAN": "GREATER_THAN", ">": "GREATER_THAN", "GT": "GREATER_THAN",
+    "GREATERTHANOREQUALTO": "GREATER_THAN_OR_EQUAL_TO", "GREATERTHANOREQUAL": "GREATER_THAN_OR_EQUAL_TO",
+    ">=": "GREATER_THAN_OR_EQUAL_TO", "GTE": "GREATER_THAN_OR_EQUAL_TO",
+    "LESSTHAN": "LESS_THAN", "<": "LESS_THAN", "LT": "LESS_THAN",
+    "LESSTHANOREQUALTO": "LESS_THAN_OR_EQUAL_TO", "LESSTHANOREQUAL": "LESS_THAN_OR_EQUAL_TO",
+    "<=": "LESS_THAN_OR_EQUAL_TO", "LTE": "LESS_THAN_OR_EQUAL_TO",
+    "CONTAINS": "CONTAINS", "DOESNOTCONTAIN": "DOES_NOT_CONTAIN", "NOTCONTAINS": "DOES_NOT_CONTAIN",
+    "STARTSWITH": "STARTS_WITH", "ENDSWITH": "ENDS_WITH", "LIKE": "LIKE", "NOTLIKE": "NOT_LIKE",
+    "BETWEEN": "BETWEEN", "ISNOTBETWEEN": "IS_NOT_BETWEEN", "NOTBETWEEN": "IS_NOT_BETWEEN",
+    "BELONGS": "BELONGS", "IN": "BELONGS", "DOESNOTBELONG": "DOES_NOT_BELONG", "NOTIN": "DOES_NOT_BELONG",
+    "ISEMPTY": "IS_EMPTY", "ISNULL": "IS_EMPTY", "ISNOTEMPTY": "IS_NOT_EMPTY", "ISNOTNULL": "IS_NOT_EMPTY",
+    "ISTRUE": "IS_TRUE", "ISFALSE": "IS_FALSE",
+}
+_DS_LOGIC = {"AND": 1, "OR": 2}
+# A form field named on the right of a filter, resolved to its value path once every field
+# is known (a filter may name a field declared after the element that carries the event).
+_FIELD_REF = "\x00field:"
+
+
+def _ds_operand(value="") -> dict:
+    return {"variable": "", "attribute": {"id": "", "nextAttribute": None}, "value": value}
+
+
+def _ds_filter_side(cond: dict, field_key: str, value_key: str) -> str:
+    if cond.get(field_key) not in (None, ""):
+        return _FIELD_REF + str(cond[field_key])
+    value = cond.get(value_key)
+    if value is None:
+        return ""
+    return json.dumps(value) if isinstance(value, (list, dict)) else (
+        str(value).lower() if isinstance(value, bool) else str(value))
+
+
+def _ds_filters(filters, logic, ctx) -> list:
+    """Compact conditions -> the designer's filter list. A condition is {column, op, value |
+    field, aux | auxField, logic?}; `logic` (and | or) joins it to the next one and defaults
+    to the event's `logic`, then AND. A list already in the designer shape (it has
+    `leftOperator`) is sent as it is."""
+    if not isinstance(filters, list):
+        raise UsageError("`filters` must be a list of conditions")
+    if not filters or any(isinstance(f, dict) and "leftOperator" in f for f in filters):
+        return filters
+    default = str(logic or "and").strip().upper()
+    out = []
+    for i, cond in enumerate(filters):
+        if not isinstance(cond, dict) or not cond.get("column"):
+            raise UsageError(f"filter {i} needs a `column` (the Data Store column's display name)")
+        raw_op = str(cond.get("op") or cond.get("operator") or "equals")
+        op = _DS_OPERATORS.get(raw_op.replace("_", "").replace(" ", "").upper())
+        if not op:
+            raise UsageError(f"filter {i}: unknown operator {raw_op!r}; use one of "
+                             f"{sorted(set(_DS_OPERATORS.values()))}")
+        join = str(cond.get("logic") or default).strip().upper()
+        if join not in _DS_LOGIC:
+            raise UsageError(f"filter {i}: logic must be `and` or `or`, not {join.lower()!r}")
+        out.append({
+            "id": i, "uid": _new_id(ctx), "operator": op,
+            "leftOperator": _ds_operand(str(cond["column"])),
+            "rightOperator": _ds_operand(_ds_filter_side(cond, "field", "value")),
+            "auxOperator": _ds_operand(_ds_filter_side(cond, "auxField", "aux")),
+            "logicOperator": _DS_LOGIC[join] if i < len(filters) - 1 else 0,
+            "value": None, "rightOperandAsListRequired": op in ("BELONGS", "DOES_NOT_BELONG"),
+            "operandsAsListOptional": True,
+        })
+    return out
+
+
 def _query_trigger(ev: dict, ctx) -> dict:
     """The RUN_DATA_STORE_OPERATION config that runs one of the form's saved queries, in
     the shape a designer save writes: no Data Store, no filters, the query by id, one
@@ -351,17 +427,37 @@ def _trigger(ev: dict, ctx) -> dict:
         # READ/ADD/UPDATE/DELETE; filters apply to every op except ADD. The map item is
         # {id, left, right} (DataStoreMapItem); the operation wire encoding + map
         # orientation must be re-verified live. See PROCESIO-RESOURCE-MODEL-NOTES.md.
-        if str(ev.get("operation") or "").strip().upper() == "QUERY":
+        operation = str(ev.get("operation") or "").strip().upper()
+        if operation == "QUERY":
             return _query_trigger(ev, ctx)
+        inputs = _ds_map(ev.get("inputs") or ev.get("inputMap"))
+        outputs = _ds_map(ev.get("outputs") or ev.get("outputMap"))
+        if operation == "READ":
+            # as a designer save writes a READ: page and countPerPage always present, and
+            # all four outputs with an empty right side for the ones not mapped
+            given = {row["left"]: row["right"] for row in inputs}
+            inputs = [{"id": 0, "left": "page", "right": str(given.pop("page", "1"))},
+                      {"id": 1, "left": "countPerPage",
+                       "right": str(given.pop("countPerPage", "1000"))}]
+            if given:
+                raise UsageError(f"a READ takes only page and countPerPage as inputs, not "
+                                 f"{sorted(given)}; filter rows with `filters`")
+            mapped = {row["left"]: row["right"] for row in outputs}
+            unknown = [n for n in mapped if n not in form_queries.OUTPUTS]
+            if unknown:
+                raise UsageError(f"a READ has no output {unknown}; use "
+                                 f"{' | '.join(form_queries.OUTPUTS)}")
+            outputs = [{"id": i, "left": n, "right": mapped.get(n) or ""}
+                       for i, n in enumerate(form_queries.OUTPUTS)]
         cfg = {
             "dataStoreId": ev.get("dataStoreId"),
-            "operation": ev.get("operation"),
-            "inputMap": _ds_map(ev.get("inputs") or ev.get("inputMap")),
-            "outputMap": _ds_map(ev.get("outputs") or ev.get("outputMap")),
+            "operation": operation or ev.get("operation"),
+            "inputMap": inputs,
+            "outputMap": outputs,
         }
         filters = ev.get("filters")
         if filters is not None:
-            cfg["filters"] = filters
+            cfg["filters"] = _ds_filters(filters, ev.get("logic"), ctx)
             cfg["areFiltersConfigured"] = bool(filters)
         else:
             cfg["areFiltersConfigured"] = bool(ev.get("areFiltersConfigured", False))
@@ -386,9 +482,9 @@ def _apply_events(spec: dict, configs: list, ctx) -> None:
         _set_config(configs, key, {"debounce": 0, "events": objs}, ctx)
 
 
-def _resolve_late_field_refs(elements: list, ctx) -> None:
-    """Second pass over built elements: resolve event map rows that named a form field
-    declared AFTER the element carrying the event.
+def _resolve_late_field_refs(elements: list, ctx, form_events: list | None = None) -> None:
+    """Second pass, over every event of the form (element slots and the form's own
+    `Data.events`): resolve map rows that named a form field declared AFTER the event.
 
     `ctx['field_paths']` is filled as elements are built, so a trigger placed above its
     target fields keeps the raw field NAME in the map instead of the value-path. That is
@@ -399,8 +495,7 @@ def _resolve_late_field_refs(elements: list, ctx) -> None:
     paths = ctx.get("field_paths") or {}
     row_sources = ctx.get("row_source_paths") or {}
     tables = ctx.get("table_rows") or {}
-    if not paths and not row_sources and not tables:
-        return
+    options = ctx.get("option_sources") or {}
 
     def fix(rows, sides) -> None:
         for row in rows or []:
@@ -411,43 +506,104 @@ def _resolve_late_field_refs(elements: list, ctx) -> None:
                 if isinstance(v, str) and v in paths:
                     row[side] = paths[v]
 
+    def list_target(target: str, what: str):
+        """A list of rows reaches a dynamic table through its row's source, and a dropdown
+        through its own source (which then needs a source type to build options)."""
+        if target in row_sources:
+            return row_sources[target]
+        if target in options:
+            path, source_type, source_value = options[target]
+            if not source_type.get("value"):
+                source_type["value"] = "JSON"
+            if not isinstance(source_value.get("value"), list):
+                # declares the source in the data model as the list of options it becomes
+                source_value["value"] = []
+            return path
+        if target in tables:
+            raise UsageError(
+                f"{what} cannot fill table {target!r}: only a dynamic table (dynamic: true) "
+                f"takes them, through its row's source. Written anywhere else the rows "
+                f"arrive with every cell empty.")
+        return None
+
+    def filter_fields(conds) -> None:
+        for cond in conds or []:
+            if not isinstance(cond, dict):
+                continue
+            for side in ("rightOperator", "auxOperator"):
+                operand = cond.get(side)
+                v = operand.get("value") if isinstance(operand, dict) else None
+                if isinstance(v, str) and v.startswith(_FIELD_REF):
+                    name = v[len(_FIELD_REF):]
+                    if name not in paths:
+                        raise UsageError(f"a Data Store filter names form field {name!r}, "
+                                         f"which the form does not have")
+                    operand["value"] = paths[name]
+            filter_fields(cond.get("value") if isinstance(cond.get("value"), list) else None)
+
+    def resolve(ev: dict) -> None:
+        ecfg = ev.get("config") or {}
+        action = ev.get("action")
+        if action == "RUN_DATA_STORE_OPERATION":
+            # The left side of a Data Store map is a Data Store name (page, countPerPage,
+            # a column, a parameter, rows / count ...), never a form field, even when a
+            # field happens to share it.
+            sides = ("right",)
+            reads = ecfg.get("operation") in ("QUERY", "READ")
+            for row in (ecfg.get("outputMap") or []) if reads else []:
+                target = row.get("right")
+                if row.get("left") == "rows" and isinstance(target, str):
+                    hit = list_target(target, "a Data Store read's rows")
+                    if hit:
+                        row["right"] = hit
+            filter_fields(ecfg.get("filters"))
+        else:
+            sides = ("left", "right")
+            if action == "RUN_PROCESS":
+                # A process's list output fills a table or a dropdown the same way (verified
+                # in the form runtime for a table). The form side of a process map is `right`.
+                for row in ecfg.get("outputMap") or []:
+                    target = row.get("right")
+                    if isinstance(target, str) and (target in row_sources or target in options):
+                        row["right"] = list_target(target, "a process output")
+        for key in ("inputMap", "outputMap", "mapping"):
+            fix(ecfg.get(key), sides)
+
     for el in elements:
         for cfg in el.get("configs") or []:
             # {debounce, events} or a bare list of events (older / hand-written slots)
             for ev in formlint.slot_events(cfg.get("key"), cfg.get("value")):
-                ecfg = ev.get("config") or {}
-                # A query event's left side is a parameter or output NAME (`count`, `rows`),
-                # never a field, even when a field happens to share it.
-                is_query = ecfg.get("operation") == "QUERY"
-                sides = ("right",) if is_query else ("left", "right")
-                if is_query:
-                    # A table shows a query's rows only through its dynamic row's source:
-                    # written to the table's or the row's value, the rows arrive with every
-                    # cell empty and no error.
-                    for row in ecfg.get("outputMap") or []:
-                        target = row.get("right")
-                        if row.get("left") != "rows" or not isinstance(target, str):
-                            continue
-                        if target in row_sources:
-                            row["right"] = row_sources[target]
-                        elif target in tables:
-                            raise UsageError(
-                                f"a query's rows cannot fill table {target!r}: only a dynamic "
-                                f"table (dynamic: true) takes them, through its row's source. "
-                                f"Written anywhere else the rows arrive with every cell empty.")
-                elif ev.get("action") == "RUN_PROCESS":
-                    # A process's list output fills a dynamic table the same way: through
-                    # its row's source (verified in the form runtime). The form side of a
-                    # process map is `right`.
-                    for row in ecfg.get("outputMap") or []:
-                        target = row.get("right")
-                        if isinstance(target, str) and target in row_sources:
-                            row["right"] = row_sources[target]
-                for key in ("inputMap", "outputMap", "mapping"):
-                    fix(ecfg.get(key), sides)
+                resolve(ev)
+    for ev in form_events or []:
+        if isinstance(ev, dict):
+            resolve(ev)
+
+
+# The form's own triggers (Data.events), as the designer saves them.
+_FORM_EVENT_TYPE = {"load": "FORM_LOAD", "beforesubmit": "FORM_BEFORE_SUBMIT",
+                    "aftersubmit": "FORM_AFTER_SUBMIT"}
+
+
+def _form_events(specs, ctx) -> list:
+    """Config `events` -> `Data.events`: [{id, type, action, config}], one per trigger, in
+    the order given. Same `do` vocabulary as an element event."""
+    out = []
+    for ev in specs or []:
+        on = str(ev.get("on") or "load").strip().lower().replace("_", "").replace(" ", "")
+        if on not in _FORM_EVENT_TYPE:
+            raise UsageError(f"{ev.get('on')!r} is not a form-level event; use one of "
+                             f"{sorted(_FORM_EVENT_TYPE)} (element triggers go on the element)")
+        obj = {"id": _new_id(ctx), "type": _FORM_EVENT_TYPE[on]}
+        obj.update(_trigger(ev, ctx))
+        out.append(obj)
+    return out
 
 
 _HEADER = {"heading"}
+# Elements whose options come from `sourceType` + `sourceValue`. The runtime builds an
+# option from each item as {name: item.label or item.name, value: item.value}
+# (ui-builder js/model/config/option.ts), and only when a source type is set.
+_OPTION_KINDS = {"select", "radiobox"}
 _FOOTER = {"button"}
 _CLEAR_DEFAULT = ("placeholder", "tooltip", "info-text")  # reset golden leftovers
 
@@ -530,6 +686,14 @@ def _build_element(spec: dict, ctx: dict, out: list) -> dict:
     elif "options" in spec:
         _set_config(configs, "sourceType", "static-list", ctx)
         _set_config(configs, "sourceValue", _options(spec["options"]), ctx)
+    if kind in _OPTION_KINDS and ctx.get("form_id"):
+        # a Data Store read or a process can fill these options at run time: `rows` aimed
+        # at the element writes its source (see _resolve_late_field_refs)
+        src_val = next((c for c in configs if c.get("key") == "sourceValue"), None)
+        src_type = next((c for c in configs if c.get("key") == "sourceType"), None)
+        if src_val is not None and src_type is not None:
+            ctx.setdefault("option_sources", {})[field] = (
+                fieldpath.build(ctx["dm_root_id"], el["id"], src_val["id"]), src_type, src_val)
     _apply_events(spec, configs, ctx)
     _apply_element_style(spec, kind, configs, ctx)
     _apply_element_classes(spec, configs, ctx)
@@ -1012,6 +1176,7 @@ def build(config: dict, ctx: dict) -> dict:
     # lost, so the query wiring would never see that table.
     ctx["row_source_paths"] = {}
     ctx["table_rows"] = {}
+    ctx["option_sources"] = {}
     # The PUT replaces the whole template, so a save without `Queries` deletes them. A
     # config that lists `queries` decides them; one that does not keeps whatever the edit
     # read from the live form, and a create sends none.
@@ -1024,11 +1189,20 @@ def build(config: dict, ctx: dict) -> dict:
     elements: list = []
     for e in config.get("elements", []):
         _build_element(e, ctx, elements)
-    _resolve_late_field_refs(elements, ctx)
+    # The form's own triggers (onLoad, before / after submit). A config that lists `events`
+    # decides them; one that does not keeps the live form's (an edit) or the shell's (a
+    # create), because the PUT replaces the whole template and would drop them.
+    if "events" in config:
+        form_events = _form_events(config["events"], ctx)
+    elif ctx.get("live_events") is not None:
+        form_events = ctx["live_events"]
+    else:
+        form_events = shell.get("events", [])
+    _resolve_late_field_refs(elements, ctx, form_events)
     data = {
         "code": _build_code(config, ctx),
         "theme": _apply_theme(shell.get("theme"), config.get("theme")),
-        "events": shell.get("events", []),
+        "events": form_events,
         "images": shell.get("images", {"logo": None, "header": None}),
         "elements": elements,
         "messages": shell.get("messages"),
@@ -1090,6 +1264,12 @@ def build(config: dict, ctx: dict) -> dict:
     return dto
 
 
+def _collect_process_ids_config(config: dict, out: set) -> None:
+    """Every process a RUN_PROCESS event names, on the elements and on the form itself."""
+    _collect_process_ids(config.get("elements"), out)
+    _collect_process_ids([{"events": config.get("events") or []}], out)
+
+
 def _collect_process_ids(elements: list, out: set) -> None:
     for e in elements or []:
         for ev in e.get("events") or []:
@@ -1109,7 +1289,7 @@ def _prepare_ctx(client, config: dict) -> dict:
     env = getattr(client, "env", None)
     ctx: dict = {"form_code_env": env.get("name") if isinstance(env, dict) else None}
     pids: set = set()
-    _collect_process_ids(config.get("elements"), pids)
+    _collect_process_ids_config(config, pids)
     if not pids:
         return ctx
     pvars: dict = {}
@@ -1137,23 +1317,28 @@ def _extract_id(resp, dto):
     return dto.get("Id") if isinstance(dto, dict) else None
 
 
-def _live_queries(client, resource_id) -> list:
+def _live_form(client, resource_id) -> dict:
     body = client.get(f"/api/FormTemplate/{resource_id}")
     if isinstance(body, dict) and isinstance(body.get("result"), dict):
         body = body["result"]
     if not isinstance(body, dict) or "data" not in body:
-        raise UsageError(f"could not read form {resource_id!r} to keep its saved queries; "
-                         f"nothing was written")
-    return body.get("queries") or []
+        raise UsageError(f"could not read form {resource_id!r} to keep its saved queries "
+                         f"and form events; nothing was written")
+    return body
 
 
 def _edit_ctx(client, resource_id, config, ctx):
-    """What an edit carries over from the LIVE form: its saved queries, unless the config
-    lists `queries` itself. Shared with the dry-run preview."""
+    """What an edit carries over from the LIVE form: its saved queries and its own events
+    (onLoad, before / after submit), each unless the config lists it. Shared with the
+    dry-run preview."""
     ctx = dict(ctx)
     ctx["form_id"] = resource_id
-    if "queries" not in config:
-        ctx["live_queries"] = _live_queries(client, resource_id)
+    if "queries" not in config or "events" not in config:
+        live = _live_form(client, resource_id)
+        if "queries" not in config:
+            ctx["live_queries"] = live.get("queries") or []
+        if "events" not in config:
+            ctx["live_events"] = (live.get("data") or {}).get("events") or []
     return ctx
 
 
@@ -1194,7 +1379,15 @@ def _lint(resource) -> list[str]:
     data = resource.get("Data") or resource.get("data")
     queries = resource.get("Queries") or resource.get("queries")
     elements = data.get("elements") if isinstance(data, dict) else []
-    return formlint.lint_form_data(data) + form_queries.warnings(queries, elements)
+    events = data.get("events") if isinstance(data, dict) else []
+    out = formlint.lint_form_data(data) + form_queries.warnings(queries, elements, events)
+    status = resource.get("Status", resource.get("status"))
+    if status == 0:
+        out.append("the form is a draft (status 0, what a Save in the designer leaves): it is "
+                   "not reachable by its link, which answers \"Form not found\", until it is "
+                   "published (Publish in the designer, or a form-edit / form-create with "
+                   "publish left on)")
+    return out
 
 
 COMPONENT = Component(

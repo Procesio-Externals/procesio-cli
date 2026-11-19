@@ -42,6 +42,11 @@ def _elements(form: dict) -> list:
     return (form.get("data") or {}).get("elements") or []
 
 
+def _form_events(form: dict) -> list:
+    """The form's own triggers (onLoad, before / after submit): they can run a query too."""
+    return (form.get("data") or {}).get("events") or []
+
+
 def _save(client, args, form: dict, queries: list) -> dict:
     guard = guard_unchanged(lambda: _fetch(client, args.form_id), form, force=args.force)
     client.put("/api/FormTemplate", build_put_body({**form, "queries": queries}))
@@ -59,11 +64,11 @@ def _stored(client, form_id: str) -> list | None:
 def get_queries(client, args) -> dict:
     form = _fetch(client, args.form_id)
     queries = _queries(form)
-    used = form_queries.references(_elements(form))
+    used = form_queries.references(_elements(form), _form_events(form))
     out = {"id": args.form_id, "name": form.get("name"), "count": len(queries),
            "queries": queries,
            "run_by": {q.get("id"): used.get(q.get("id"), []) for q in queries}}
-    warnings = form_queries.warnings(queries, _elements(form))
+    warnings = form_queries.warnings(queries, _elements(form), _form_events(form))
     if warnings:
         out["warnings"] = warnings
     return out
@@ -129,11 +134,11 @@ def set_saved_statement(client, args) -> dict:
             current["timeoutSeconds"] = None
 
     form_queries.check(queries)
-    run_by = form_queries.references(_elements(form)).get(current.get("id"), [])
+    run_by = form_queries.references(_elements(form), _form_events(form)).get(current.get("id"), [])
     result = {"id": args.form_id, "name": form.get("name"),
               "created": previous is None, "query": current, "previous": previous,
               "query_count": len(queries), "run_by": run_by}
-    warnings = form_queries.warnings([current], _elements(form))
+    warnings = form_queries.warnings([current], _elements(form), _form_events(form))
     if warnings:
         result["warnings"] = warnings
     if args.dry_run:
@@ -154,7 +159,7 @@ def delete_saved_statement(client, args) -> dict:
     form = _fetch(client, args.form_id)
     queries = _queries(form)
     target = form_queries.resolve(queries, args.query_id)
-    run_by = form_queries.references(_elements(form)).get(target.get("id"), [])
+    run_by = form_queries.references(_elements(form), _form_events(form)).get(target.get("id"), [])
     if run_by and not args.allow_referenced:
         raise UsageError(
             f"query {target.get('name')!r} is still run by an event on {', '.join(map(str, run_by))}; "

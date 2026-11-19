@@ -250,11 +250,13 @@ def test_builder_trigger_datastore_branch():
     from tools.procesio.dto.form.builder import _trigger
     got = _trigger({"do": "datastore", "dataStoreId": "D1", "operation": "READ",
                     "inputs": [{"left": "page", "right": "root.p.val"}],
-                    "filters": [{"displayName": "S", "operator": 1}]}, {})
+                    "filters": [{"column": "S", "op": "equals", "value": "x"}]}, {})
     assert got["action"] == "RUN_DATA_STORE_OPERATION"
     assert got["config"]["dataStoreId"] == "D1"
-    assert got["config"]["inputMap"] == [{"id": 0, "left": "page", "right": "root.p.val"}]
+    assert got["config"]["inputMap"] == [{"id": 0, "left": "page", "right": "root.p.val"},
+                                         {"id": 1, "left": "countPerPage", "right": "1000"}]
     assert got["config"]["areFiltersConfigured"] is True
+    assert got["config"]["filters"][0]["leftOperator"]["value"] == "S"
 
 
 # -- the form side of a map row: resolved, or refused -----------------------

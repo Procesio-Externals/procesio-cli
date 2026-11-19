@@ -22,7 +22,8 @@
     "code": {"type": "object", "description": "alternative to css/javascript: {\"css\":\"...\",\"javascript\":\"...\"}"},
     "elements": {"type": "array", "items": {"$ref": "#/$defs/element"}},
     "queries": {"type": "array", "items": {"$ref": "#/$defs/query"}, "description": "the form's saved Data Store queries (top-level Queries). Listed = this list replaces them; omitted = form-create saves none and form-edit keeps the live ones. Run one from an element event: {on, do: datastore, operation: QUERY, query: <name or id>}. A query no event runs is dropped by the next designer save."},
-    "chainConfig": {"type": "object", "description": "multi-form 'app' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)"}
+    "chainConfig": {"type": "object", "description": "multi-form 'app' dashboard: {columns:[...]} composing several forms into one navigable application (Data.chainConfig)"},
+    "events": {"type": "array", "items": {"$ref": "#/$defs/formEvent"}, "description": "the form's own triggers (Data.events): each {on: load|beforesubmit|aftersubmit, do: map|process|js|form|datastore, ...}, same keys as an element event. on load + do datastore reads a Data Store when the form opens, with no click and no process. Listed = this list replaces them; omitted = form-create saves none and form-edit keeps the live ones"}
   },
   "$defs": {
     "query": {
@@ -74,6 +75,20 @@
         "configs": {"type": "object", "description": "advanced: set any element config key by name (e.g. a document-signing element's templateSigners / templateSpots / document)"}
       }
     },
+    "formEvent": {
+      "type": "object",
+      "required": ["do"],
+      "properties": {
+        "on": {"type": "string", "enum": ["load", "beforesubmit", "aftersubmit"], "description": "default load"},
+        "do": {"type": "string", "enum": ["map", "process", "js", "form", "datastore"]},
+        "processId": {"type": "string"}, "formId": {"type": "string"},
+        "dataStoreId": {"type": "string"}, "operation": {"type": "string"}, "query": {"type": "string"},
+        "filters": {"type": "array"}, "logic": {"type": "string", "enum": ["and", "or", "AND", "OR"]},
+        "code": {"type": "string"}, "syncRun": {"type": "boolean"},
+        "mapLatestTriggerOnly": {"type": "boolean"},
+        "inputs": {"type": "array"}, "outputs": {"type": "array"}, "mapping": {"type": "array"}
+      }
+    },
     "event": {
       "type": "object",
       "required": ["on", "do"],
@@ -84,7 +99,8 @@
         "dataStoreId": {"type": "string", "description": "datastore trigger: target data store id"},
         "operation": {"type": "string", "description": "datastore trigger: READ|ADD|UPDATE|DELETE, or QUERY to run one of the form's saved queries (then no dataStoreId or filters)"},
         "query": {"type": "string", "description": "operation QUERY: the saved query's name or id. inputs = [{left: <parameter exactly as declared, e.g. @product>, right: <form field>}]; outputs = [{left: rows|columns|count|success, right: <form field>}]"},
-        "filters": {"type": "array", "description": "datastore trigger: row filters (not for ADD)"},
+        "filters": {"type": "array", "description": "datastore trigger: row filters (not for ADD, not for QUERY). Each {column: <Data Store column display name>, op: equals|doesNotEqual|greaterThan|>=|contains|startsWith|between|in|isEmpty|isTrue|... , field: <form field> | value: <literal>, aux / auxField: second operand of between, logic: and|or (joins it to the next)}; a list in the designer shape (with leftOperator) is sent as it is"},
+        "logic": {"type": "string", "enum": ["and", "or", "AND", "OR"], "description": "datastore trigger: how filters join when a condition does not say"},
         "code": {"type": "string"}, "syncRun": {"type": "boolean"},
         "mapLatestTriggerOnly": {"type": "boolean"},
         "inputs": {"type": "array"}, "outputs": {"type": "array"}, "mapping": {"type": "array"}

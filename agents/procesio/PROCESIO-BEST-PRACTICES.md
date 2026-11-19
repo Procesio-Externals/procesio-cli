@@ -125,8 +125,9 @@ Use the `sql-server-optimizer` skill for any SQL in a SQL action. Core rules:
   form's saved queries (SQL stored on the form, with `@name` parameters, joins and several
   stores). It runs no process, uses no execution capacity and answers in one call. Keep a
   process for work a form cannot do: other systems, documents, emails, approvals, logic over
-  several steps. The `audit` finding `datastore-read-only` marks a process that only reads a
-  Data Store. Measured on production (2026-11-19, a 200-row store, 50 rows returned, 25 runs each): a saved query answers in a median of 29 ms and a row READ in 33 ms, one call each; the same read through a one-action process takes a median of 266 ms over two calls (publish, then a synchronous launch) and leaves a process instance per click. In the browser the click took about 55-80 ms against 210-290 ms. A real process has more than one action, so the gap only grows.
+  several steps. Data the form needs when it opens goes on the form's onLoad event, and a
+  dropdown's options come from the same read. The `audit` finding `datastore-read-only` marks
+  a process that only reads a Data Store. Measured on production (2026-11-19, a 200-row store, 50 rows returned, 25 runs each): a saved query answers in a median of 29 ms and a row READ in 33 ms, one call each; the same read through a one-action process takes a median of 266 ms over two calls (publish, then a synchronous launch) and leaves a process instance per click. In the browser the click took about 55-80 ms against 210-290 ms. A real process has more than one action, so the gap only grows.
 - **>=90% of clicks under 1s.** Limit calls to processes (Forms have features that
   avoid most calls). When you must call a process, keep it to a minimum number of
   actions (1 ideal, 3 still ok, 5 bad, >5 really bad) and optimize it for speed

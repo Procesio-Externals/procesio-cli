@@ -31,6 +31,42 @@ Three different things, do not confuse them:
   more stores, with parameters.
 - **Query Store action** - SQL from a PROCESS step, not from a form.
 
+## On load, in a dropdown, and what the designer saves
+
+Built in the designer and run in the form runtime on production (2026-11-19):
+
+- **A form loads its data with no click.** The form's own triggers (Form settings > Events:
+  onLoad, onBeforeSubmit, onAfterSubmit) take a Data store operation like any element. They
+  are saved in `Data.events` as `{id, type, action, config}`, `type` = `FORM_LOAD` /
+  `FORM_BEFORE_SUBMIT` / `FORM_AFTER_SUBMIT`, with the same `RUN_DATA_STORE_OPERATION` config
+  an element event has. Several onLoad events all run when the form opens (a READ and a QUERY
+  together: two calls, about 60-110 ms each). In a config: top-level `"events": [{"on": "load",
+  "do": "datastore", ...}]`.
+- **A dropdown takes rows too.** `rows` mapped to a select's `sourceValue` fills its options,
+  but only if the select has a `sourceType` (`JSON`): with none, the runtime builds no option
+  and the dropdown says "No data available", with no error. **The designer does not set it**
+  when you map rows to the select, so a form built only in the designer gets an empty
+  dropdown. Each row becomes `{name: row.label or row.name, value: row.value}`, so alias the
+  columns: `SELECT Sku AS value, Product AS label ...` (an alias that matches no column keeps
+  its own spelling). The builder sets `sourceType` when `rows` names a select or radio group.
+- **A parameter can take a typed value**, not only a form field: the designer stores it as
+  plain text on the right (`{"left": "@minqty", "right": "50"}`). In a config:
+  `{"left": "@minqty", "value": "50"}`.
+- **"Execute query" makes a new query per event**, named "Query N" until renamed: the
+  designer has no list of the form's existing queries to pick from. A table or a column goes
+  into the SQL as a chip, inserted with Ctrl+I or the Insert key in the query editor (typing a
+  table name gives plain text, which the save accepts and the run cannot resolve).
+- **Save in the designer makes the form a draft, and a draft is offline.** Save sends the
+  whole template with `status: 0`; the public link then answers "Form not found" and the
+  anonymous read `GET api/FormTemplate/{workspaceId}/{id}` 400, code 501 "User is not
+  authorized for the requested action.", for a public form. Publish is the same PUT with
+  `status: 1`. `form-create` and `form-edit` publish unless the config says
+  `"publish": false`; the surgical writers keep the status they read, and every form action's
+  `warnings` say when the form is a draft.
+- **A designer tab open while the API writes keeps its old copy.** Navigating to the same
+  designer URL does not reload it; its next Save sends the old template and drops what the
+  API wrote, with no conflict. Reload the page before saving in the designer.
+
 ## The saved query
 
 `GET api/FormTemplate/{id}` (designer route, authenticated, `workspaceId` header) returns a

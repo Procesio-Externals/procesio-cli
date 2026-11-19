@@ -62,6 +62,17 @@ fine), so forms are fully buildable server-side.
   An INSERT must name `CreatedById` and `UpdatedById` and bind them to a parameter mapped from
   a form field holding a user id (a read-only field with a default, or a user picker): nothing
   supplies them to a form query.
+- **form events** - top-level `events`: the form's own triggers, saved in `Data.events`.
+  `[{"on":"load","do":"datastore","operation":"read","dataStoreId":"<id>","filters":[{"column":"Category","op":"equals","field":"category"},{"column":"Qty","op":">=","value":90}],"outputs":[{"left":"rows","right":"<dynamic table>"},{"left":"count","right":"<field>"}]}]`.
+  `on` = `load` (default) | `beforesubmit` | `aftersubmit`; `do` is the same vocabulary as an
+  element event. Listed = replaces them; omitted = form-create saves none and form-edit keeps
+  the live ones (a designer-made onLoad survives an API edit). Filters: `column`, `op`
+  (equals, doesNotEqual, >, >=, <, <=, contains, startsWith, endsWith, like, between, in,
+  notIn, isEmpty, isNotEmpty, isTrue, isFalse), `field` or `value`, `aux`/`auxField` for
+  between, `logic` and|or. A READ takes only `page`/`countPerPage` inputs (defaults 1 / 1000).
+  `rows` (of a READ, a QUERY or a process) aimed at a `select` or `radiobox` fills its options
+  and sets its `sourceType` to JSON; alias the columns `value` and `label`. A query parameter
+  takes a typed value with `{"left":"@p","value":"50"}`.
 - **queries** - the form's saved Data Store queries (top-level `Queries` on the DTO):
   `"queries":[{"name":"Find product","sql":"SELECT Product, Qty FROM <%1%> WHERE Product = @product","bindings":[{"id":1,"type":"dataStoreTable","dataStoreId":"<store id>"}]}]`.
   `id` is generated when omitted (give it to keep it stable across edits), `parameters` is
