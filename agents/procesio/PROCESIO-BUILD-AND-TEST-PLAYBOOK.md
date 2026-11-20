@@ -217,6 +217,10 @@ exercised live and the runtime diagnostics are clean. Screenshots alone are not 
 - **CSS/JS gotcha:** form CSS/JS lives in encrypted `Data.code`; never force a font on
   `#app *` (breaks Material-Icons glyphs); the form JS runs in `iframe.trigger-sandbox`
   (use `window.parent.document`). See `tools/procesio/dto/form/FORM-STYLING-NOTES.md`.
+- **Embedded in another page:** run `procesio form-embed --id <form>` (embeddable? what the
+  runtime supports, field names, trigger ids, a snippet), serve the snippet or `--out` page
+  over http(s), and confirm `ready`, the prefill, and `submit` with a submission id. See
+  `tools/procesio/FORM-DEV-GUIDE/12-EMBEDDING.md`.
 - **Theme + alignment (new):** if the form uses dark mode, toggle it and confirm the
   16-var palette applies; if it uses element alignment, confirm the `--fd/--jc/--ai`
   vars lay the container out - both only in a REAL browser (`form-theme-render`).

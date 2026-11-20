@@ -56,6 +56,7 @@ Load only the playbook that matches the requested outcome:
 | Create, change, validate, run, or audit a process; gate sensitive response acquisition | `references/process-lifecycle.md` |
 | Diagnose a failed, silent, or incorrect process run | `references/process-debugging.md` |
 | Build or change a form and verify it as a user | `references/form-e2e.md` |
+| Embed a form in another web page or application | `references/form-embed.md` |
 | Generate, install, test, and improve a custom-action connector | `references/connector-lifecycle.md` |
 | Move resources across workspaces or installations | `references/transport-environments.md` |
 | Create or change schedules and webhook triggers | `references/schedules-webhooks.md` |
