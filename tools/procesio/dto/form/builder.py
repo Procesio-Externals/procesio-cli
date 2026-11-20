@@ -569,8 +569,9 @@ def _resolve_late_field_refs(elements: list, ctx, form_events: list | None = Non
         through its own source (which then needs a source type to build options)."""
         if target in row_sources:
             return row_sources[target]
-        if target in options:
-            path, source_type, source_value = options[target]
+        named = next((n for n, o in options.items() if o[0] == target), None)
+        if target in options or named:
+            path, source_type, source_value = options[target if target in options else named]
             if not source_type.get("value"):
                 source_type["value"] = "JSON"
             if not isinstance(source_value.get("value"), list):
@@ -668,6 +669,55 @@ def _row_limit_check(ecfg: dict, limit: int, target: str, ctx) -> None:
         _warn(ctx, f"a READ fills {what} ({target}) with up to {size} rows per call "
                    f"(countPerPage). Keep it at {limit} or fewer for {what}, and page or filter "
                    f"for more.")
+
+
+def _element_configs_by_name(elements) -> dict:
+    out = {}
+    for e in elements or []:
+        cfgs = e.get("configs") or []
+        name = next((c.get("value") for c in cfgs if c.get("key") == "name"), None)
+        if name and e.get("id"):
+            out[name] = (e["id"], {c.get("key"): c.get("id") for c in cfgs if c.get("id")})
+    return out
+
+
+def _remap_live_events(events, old_elements, new_elements, ctx) -> list:
+    """A form's own events kept by an edit name fields by value path
+    (<root>.<fields>.<element id>.<config id>), and the rebuild gives every element new
+    ids. Map each old element's paths to the new element of the same name, config by
+    config; warn about a path whose element the edit removed."""
+    old = _element_configs_by_name(old_elements)
+    new = _element_configs_by_name(new_elements)
+    pairs = {}
+    for name, (oid, ocfg) in old.items():
+        if name in new:
+            nid, ncfg = new[name]
+            for key, ocid in ocfg.items():
+                if key in ncfg:
+                    pairs[f"{oid}.{ocid}"] = f"{nid}.{ncfg[key]}"
+
+    def walk(v):
+        if isinstance(v, str):
+            for o, n in pairs.items():
+                if o in v:
+                    v = v.replace(o, n)
+            return v
+        if isinstance(v, list):
+            return [walk(x) for x in v]
+        if isinstance(v, dict):
+            return {k: walk(x) for k, x in v.items()}
+        return v
+
+    out = walk(copy.deepcopy(events or []))
+    prefix = f"{ctx.get('dm_root_id')}.{_FIELDS_NS}."
+    live_ids = {e.get("id") for e in new_elements or []}
+    stale = set(re.findall(re.escape(prefix) + r"([0-9a-fA-F-]{36})", json.dumps(out)))
+    gone = sorted(stale - live_ids)
+    if gone:
+        _warn(ctx, f"a form-level event (onLoad / submit) still names element(s) {gone} that "
+                   f"this edit does not have: those maps now point at nothing. List the form's "
+                   f"`events` in the config to rebuild them.")
+    return out
 
 
 # The form's own triggers (Data.events), as the designer saves them.
@@ -1286,7 +1336,9 @@ def build(config: dict, ctx: dict) -> dict:
     if "events" in config:
         form_events = _form_events(config["events"], ctx)
     elif ctx.get("live_events") is not None:
-        form_events = ctx["live_events"]
+        # the rebuild gives every element a new id: point the kept events at them
+        form_events = _remap_live_events(ctx["live_events"], ctx.get("live_elements"),
+                                         elements, ctx)
     else:
         form_events = shell.get("events", [])
     _resolve_late_field_refs(elements, ctx, form_events)
@@ -1463,6 +1515,7 @@ def _edit_ctx(client, resource_id, config, ctx):
             ctx["live_queries"] = live.get("queries") or []
         if "events" not in config:
             ctx["live_events"] = (live.get("data") or {}).get("events") or []
+            ctx["live_elements"] = (live.get("data") or {}).get("elements") or []
     return ctx
 
 

@@ -196,6 +196,7 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-digest` | `--in` | Readable Markdown digest of forms: structure tree, every element / form-level event, RUN_PROCESS input/output maps with form paths and process variables… |
 | `form-duplicate` | `--id` | POST /api/FormTemplate/{id}/duplicate. |
 | `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |
+| `form-embed` | `--id` | Embed a form in another web page with the PROCESIO form SDK: checks the form can be embedded (public, published, enabled) and what the environment's form… |
 | `form-get` | `--id` | Get one resource by id (GET /api/FormTemplate/{id}). |
 | `form-get-code` | `--id` | Read a form's global CSS + JavaScript (decrypts Data.code). |
 | `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (id or name). |

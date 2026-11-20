@@ -35,6 +35,8 @@ routing:
   - what is this process for / read a process's documented purpose, action purposes and canvas areas
   - which processes in this workspace are undocumented / map a workspace I do not know
   - see a process in the designer / screenshot a process canvas / check how the areas and actions look
+  - embed a procesio form in a website / another web app / a portal
+  - procesio form sdk / embed code for a form / iframe a procesio form
   - list forms / list documents; get or toggle a process; AI Decisional
   - switch procesio environment / work on PROCESIO Main-QA / Main-DEV / a client env
   - list / add / set the default procesio environment (<Client>-<ENV>); bind a credential to an environment
@@ -3278,6 +3280,41 @@ actions:
     required: false
     description: skip the advisory data-type-mismatch (warning) layer in the gate
   examples: *id008
+- name: form-embed
+  description: 'Embed a form in another web page with the PROCESIO form SDK: checks the form can be embedded (public, published, enabled) and what the environment''s form runtime supports (the embed bridge; the page''s requests), lists the field names for values/setValues and the trigger ids for runTrigger, and returns a ready snippet (html, module, react) or, with --out, a complete test page. Read-only.'
+  args:
+  - name: profile
+    type: string
+    required: false
+    description: credential profile name (defaults to the stored default profile)
+  - name: workspace-id
+    type: string
+    required: false
+    description: workspace GUID to scope this call (sets/overrides the workspaceid header)
+  - name: environment
+    type: string
+    required: false
+    description: PROCESIO environment for this call, e.g. Main-QA (defaults to the credential's binding, else the default environment / Main-PROD)
+  - name: id
+    type: string
+    required: true
+    description: form template id
+  - name: framework
+    type: string
+    required: false
+    description: 'snippet flavour: a <script> page (default), an ES module, or a React component'
+  - name: values
+    type: string
+    required: false
+    description: 'JSON {field name: value} to prefill, checked against the form''s fields'
+  - name: sdk-url
+    type: string
+    required: false
+    description: 'where the page loads the SDK''s UMD build from (default: the npm CDN)'
+  - name: out
+    type: string
+    required: false
+    description: also write a complete test page here (open it over http(s))
 - name: form-get
   description: Get one resource by id (GET /api/FormTemplate/{id}).
   args:

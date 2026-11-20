@@ -65,7 +65,8 @@ def collect_actions() -> dict[str, ActionDef]:
     from tools.procesio.handlers import (
         auth_actions, catalog, customaction_ops, datastore_ops, datatype_ops,
         dto_actions, environment_admin, files,
-        flowgraph, form_chains, form_code, form_element, form_events, form_queries, form_signing,
+        flowgraph, form_chains, form_code, form_element, form_embed, form_events, form_queries,
+        form_signing,
         form_update, formprocess, generic,
         layout, usageguide,
         process_docs, process_layout, process_naming, process_screenshot, processes,
@@ -106,6 +107,8 @@ def collect_actions() -> dict[str, ActionDef]:
     curated.update(process_docs.ACTIONS)
     # See a live process in the Process Designer (headless, the profile's own sign-in).
     curated.update(process_screenshot.ACTIONS)
+    # What a web page needs to embed a form with the PROCESIO form SDK.
+    curated.update(form_embed.ACTIONS)
     # Bulk-rename a live process's canvas actions (default "Node"/"Call API" labels).
     curated.update(process_naming.ACTIONS)
     # CRUD-parity + verification oracles: get/delete/list, validate, credential/action test, import.

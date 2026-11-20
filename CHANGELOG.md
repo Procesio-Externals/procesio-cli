@@ -10,6 +10,11 @@ there, not here.
 ## [Unreleased]
 
 ### Added
+- Embedding forms in other web pages with the PROCESIO form SDK: `form-embed` checks a form
+  can be embedded (public, published, enabled) and what the environment's form runtime
+  supports, lists the field names to prefill and the trigger ids a page can run, and returns a
+  snippet (html, module, react) or a complete test page. The form guide's chapter 12 and the
+  procesio-cli skill cover options, events, prefill, page requests and testing.
 - Forms load their data when they open: a form config's top-level `events` are the form's own
   triggers (`load`, `beforesubmit`, `aftersubmit`), and a Data Store READ or saved query on
   `load` fills tables and dropdowns with no click and no process. READ filters take a short
@@ -126,6 +131,9 @@ there, not here.
 - Notes cover the Web-Api v2.79.1 and v2.80.0 step and the later production changes.
 
 ### Fixed
+- `form-edit` kept a form's own events but left them pointing at the elements it replaced,
+  so an onLoad read filled nothing after an edit. It now points them at the rebuilt elements by
+  name, and warns about one whose element is gone.
 - `form-edit` kept none of a form's own events (onLoad, before and after submit), so editing a
   form whose designer had added one deleted it with no warning. It keeps them now unless the
   config lists `events`.

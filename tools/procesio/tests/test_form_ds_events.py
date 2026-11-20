@@ -350,3 +350,37 @@ def test_a_read_of_1000_rows_into_a_table_warns_with_200():
     assert any("countPerPage" in w and "200" in w for w in found)
     small = _read(inputs=[{"left": "countPerPage", "value": "200"}])
     assert not any("countPerPage" in w for w in _warnings_for(_config([small])))
+
+
+# -- form-edit gives elements new ids: the kept form events must follow them --------------
+
+def test_kept_form_events_are_remapped_to_the_rebuilt_elements():
+    """Seen on production: an onLoad READ kept by form-edit still pointed at the old table
+    row and field ids, so after the edit it filled nothing, with no error."""
+    cfg = _config([_read()])
+    old = fb.build(cfg, _ctx(form_id="F1"))
+    live_events = old["Data"]["events"]
+    edit_cfg = {k: v for k, v in cfg.items() if k != "events"}
+    cnt = itertools.count(500)
+    new = fb.build(edit_cfg, {"new_id": lambda: f"00000000-0000-0000-0000-{next(cnt):012d}",
+                              "form_id": "F1", "live_events": live_events,
+                              "live_elements": old["Data"]["elements"]})
+    out = new["Data"]["events"][0]["config"]["outputMap"]
+    row = next(e for e in new["Data"]["elements"] if e["type"] == "dynamic-table-row")
+    assert out[0]["right"] == _path(new, row, "sourceValue")
+    assert out[2]["right"] == fb_field(new, "count")
+
+
+def test_a_kept_event_filling_a_dropdown_keeps_its_source_type():
+    ev = {"on": "load", "do": "datastore", "operation": "query", "query": "Product list",
+          "outputs": [{"left": "rows", "right": "productpick"}]}
+    cfg = _config([ev], queries=[QUERY])
+    old = fb.build(cfg, _ctx(form_id="F1"))
+    edit_cfg = {k: v for k, v in cfg.items() if k != "events"}
+    cnt = itertools.count(700)
+    new = fb.build(edit_cfg, {"new_id": lambda: f"00000000-0000-0000-0000-{next(cnt):012d}",
+                              "form_id": "F1", "live_events": old["Data"]["events"],
+                              "live_elements": old["Data"]["elements"]})
+    pick = _el(new, "productpick")
+    assert new["Data"]["events"][0]["config"]["outputMap"][0]["right"] == _path(new, pick, "sourceValue")
+    assert _cfg(pick, "sourceType")["value"] == "JSON"
