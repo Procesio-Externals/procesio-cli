@@ -198,9 +198,9 @@ Stored in the OS credential store, never in files. Missing ones are reported by 
 | `form-edit` | `--id` | Edit a PROCESIO form (--id required). DESIRED STATE: the --config you send REPLACES the whole definition. To ADD one item WITHOUT restating the rest, use… |
 | `form-embed` | `--id` | Embed a form in another web page with the PROCESIO form SDK: checks the form can be embedded (public, published, enabled) and what the environment's form… |
 | `form-get` | `--id` | Get one resource by id (GET /api/FormTemplate/{id}). |
-| `form-get-code` | `--id` | Read a form's global CSS + JavaScript (decrypts Data.code). |
-| `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (id or name). |
-| `form-get-element-events` | `--id`, `--element` | List one element's event handlers, by trigger. |
+| `form-get-code` | `--id` | Read a form's global CSS + JavaScript (decrypts Data.code). The answer carries a `note` on where that JavaScript runs (a sandbox iframe, not the page), and… |
+| `form-get-element` | `--id`, `--element` | Read one element's configs from a live form (by its id, name or DOM id). |
+| `form-get-element-events` | `--id`, `--element` | List one element's event handlers, by trigger. When one of them is a RUN_JAVASCRIPT script, the answer carries a `note` on where the script runs (a sandbox… |
 | `form-get-queries` | `--form-id` | Read a form's saved Data Store queries (SQL, tag bindings, declared parameters, timeout) and which elements run each one. A query no event runs comes back… |
 | `form-list` | — | List forms (GET /api/FormTemplate/all/basic). |
 | `form-run-saved-statement` | `--form-id`, `--query-id` | RUN one of a form's saved Data Store queries the way the form does (POST api/Form/dataStore/query/{id}). NOT read-only: the statement can be an INSERT, UPDATE… |

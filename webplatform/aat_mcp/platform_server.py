@@ -157,6 +157,43 @@ def _usage_error(spec: dict, message: str, stated: dict) -> tuple[dict, bool]:
                     "it again."}, True
 
 
+def shape_topics(spec: dict) -> dict:
+    """{the name a caller uses: the guidance topic that serves that argument's shape}.
+
+    For an argument whose schema is too large for the tool list (`shape_topic` in the
+    declaration). Empty for every other tool."""
+    return {surface.exposed_name(a): a["shape_topic"]
+            for a in (spec.get("args") or []) if a.get("shape_topic")}
+
+
+def guidance_tool() -> str | None:
+    """The named tool that serves the guidance topics, read from the declaration."""
+    for spec in SURFACE["tools"]:
+        target = spec["target"]
+        if target.get("agent") and target.get("action") == "guidance":
+            return spec["name"]
+    return None
+
+
+def _failure_hint(spec: dict) -> str:
+    """What a failed call tells the model to do next.
+
+    For most tools the whole contract is in the tool list, so a lookup is a wasted step and
+    the hint says so. A tool with a `shape_topic` argument is the exception: the shape of
+    that argument is NOT in the tool list, and a hint that sends the model back to the tool
+    list leaves it to learn the shape from validation errors, one layer per attempt. There
+    the hint names the topic that holds the shape."""
+    start = "This call failed - it does not mean you lack access. Read the error"
+    shapes = shape_topics(spec)
+    if not shapes:
+        return (f"{start}, correct the arguments against this tool's schema, and call it "
+                "again. The schema is in the tool list: do not look it up.")
+    where = "; ".join(f"`{arg}` is the guidance topic {topic}" for arg, topic in shapes.items())
+    return (f"{start} and correct the arguments. The shape of {where}. It is not in the tool "
+            f"list: if you have not loaded that topic in this conversation, load it now with "
+            f"{guidance_tool()}, then call this tool again. Do not guess property names.")
+
+
 def call_typed(name: str, arguments: dict | None) -> tuple[dict, bool]:
     """Run one named tool. Returns (payload, is_error). Never raises."""
     spec = _BY_NAME[name]
@@ -200,9 +237,7 @@ def call_typed(name: str, arguments: dict | None) -> tuple[dict, bool]:
         if code not in server._FINAL_REFUSAL_CODES:
             # A refusal that no retry can fix reaches the model as it is. Anything else gets
             # the one sentence that keeps a model from concluding it has no access.
-            res["hint"] = ("This call failed - it does not mean you lack access. Read the "
-                           "error, correct the arguments against this tool's schema, and call "
-                           "it again. The schema is in the tool list: do not look it up.")
+            res["hint"] = _failure_hint(spec)
         return res, True
     return {**stated, **surface.cap(res, spec, MAX_RESPONSE_BYTES)}, False
 

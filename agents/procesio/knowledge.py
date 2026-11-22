@@ -6,6 +6,7 @@ source of truth; this module just reads them.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 KB_DIR = Path(__file__).resolve().parent
@@ -87,21 +88,94 @@ TOPICS: dict[str, tuple[str | Path, str]] = {
                             "Changing a workspace someone else built: audit, speed, recoverable failures, safe rollout"),
 }
 
+# The SHAPE of the one `config` object that a whole-definition writer takes (process-create /
+# process-edit, form-create / form-edit). A caller that reaches the writer through a named
+# tool sees `config` as a bare object: the schema is too large to send with every model
+# request, so it is served here, on demand, and the tool names this topic.
+#
+# Measured cost of a writer whose shape the caller cannot read: the caller guesses field
+# names (`name` for `title`, `data_type` for `type`, `is_list` for `isList`) and learns the
+# shape from validation errors, one layer per attempt.
+#
+# Generated, never written down: the schema is the file the component validates against and
+# the example is the fixture its tests build, the same two the action's manifest publishes.
+# A copy in a markdown file would drift from the code that refuses a config.
+#
+# topic -> (component folder under tools/procesio/dto, what the config builds, human label)
+CONFIG_DIR = KB_DIR.parents[1] / "tools" / "procesio" / "dto"
+CONFIG_TOPICS: dict[str, tuple[str, str, str]] = {
+    "process-config": ("process", "process",
+                       "The shape of the config that process-create and process-edit take: "
+                       "the JSON Schema and a config that works"),
+    "form-config": ("form", "form",
+                    "The shape of the config that form-create and form-edit take: "
+                    "the JSON Schema and a config that works"),
+}
+
+
+def config_shape(topic: str) -> dict:
+    """The schema and the worked example behind one config topic, as data.
+
+    {"schema": <the component's config.schema.json>, "example": <its first fixture, or None>,
+     "source": <the schema file>}. Raises KeyError for a topic that is not a config topic."""
+    folder, _, _ = CONFIG_TOPICS[topic]
+    schema_path = CONFIG_DIR / folder / "config.schema.json"
+    if not schema_path.exists():
+        raise FileNotFoundError(f"knowledge file missing: {schema_path}")
+    example = None
+    # The first fixture in name order: the rule the manifest uses for its own example.
+    for fixture in sorted((CONFIG_DIR / folder / "fixtures").glob("*.config.json")):
+        example = json.loads(fixture.read_text(encoding="utf-8"))
+        break
+    return {"schema": json.loads(schema_path.read_text(encoding="utf-8")),
+            "example": example, "source": schema_path}
+
+
+def _config_content(topic: str, shape: dict) -> str:
+    _, what, _ = CONFIG_TOPICS[topic]
+    parts = [
+        f"# The `config` of a {what}",
+        "",
+        f"The create and the edit action of a {what} take ONE JSON object, `config`, in the "
+        "shape below. Use the property names exactly as the schema spells them: where the "
+        "schema says `additionalProperties: false`, a property it does not list is refused.",
+        "",
+        f"This is an authoring shape. It is NOT the object that reading a {what} returns from "
+        "the platform, so do not send that object back as `config`.",
+    ]
+    if shape["example"] is not None:
+        parts += ["", "## A config that works", "", "```json",
+                  json.dumps(shape["example"], ensure_ascii=False, indent=2), "```"]
+    parts += ["", "## The schema", "", "```json",
+              json.dumps(shape["schema"], ensure_ascii=False, separators=(",", ":")), "```", ""]
+    return "\n".join(parts)
+
+
 # `topic=all` concatenates everything it lists, so the form guide's chapters stay out of
 # it: they would multiply that payload sixfold and bury the process guidance most callers
 # actually asked for. The `forms` index IS included - it is small and it advertises the
 # chapters, which is exactly what a caller who did not know they existed needs.
 _ALL_EXCLUDED = {t for t in TOPICS if t.startswith(("forms-", "patterns-"))}
+# The config shapes are never in `all` either (they are not in TOPICS): each is ten kilobytes
+# of schema that only a caller about to write that one object needs.
 
 
 def topics() -> list[str]:
-    return list(TOPICS.keys())
+    return list(TOPICS.keys()) + list(CONFIG_TOPICS.keys())
 
 
 def load(topic: str) -> dict:
+    if topic in CONFIG_TOPICS:
+        shape = config_shape(topic)
+        return {
+            "topic": topic,
+            "label": CONFIG_TOPICS[topic][2],
+            "source": str(shape["source"]),
+            "content": _config_content(topic, shape),
+        }
     if topic not in TOPICS:
         raise KeyError(
-            f"unknown topic: {topic}. Known: {', '.join(TOPICS)}")
+            f"unknown topic: {topic}. Known: {', '.join(topics())}")
     filename, label = TOPICS[topic]
     path = filename if isinstance(filename, Path) else KB_DIR / filename
     if not path.exists():

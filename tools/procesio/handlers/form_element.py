@@ -159,7 +159,8 @@ def _get_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="form template id")
     p.add_argument("--element", required=True,
-                   help="element id, or its `name` config as the designer shows it")
+                   help="element id, its `name` config as the designer shows it, or its `id` "
+                        "config (the DOM id the element carries on the page)")
     p.add_argument("--key", action="append",
                    help="only return this config key (repeatable; default: all)")
 
@@ -168,7 +169,8 @@ def _set_args(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="form template id")
     p.add_argument("--element", required=True,
-                   help="element id, or its `name` config as the designer shows it")
+                   help="element id, its `name` config as the designer shows it, or its `id` "
+                        "config (the DOM id the element carries on the page)")
     p.add_argument("--set", action="append",
                    help="key=value to write (repeatable); the value is parsed as JSON "
                         "when it parses, otherwise stored as a plain string. A value that "
@@ -185,7 +187,7 @@ def _set_args(p: argparse.ArgumentParser) -> None:
 ACTIONS = {
     "form-get-element": ActionDef(
         func=get_element, add_args=_get_args, needs_client=True,
-        description="Read one element's configs from a live form (id or name).",
+        description="Read one element's configs from a live form (by its id, name or DOM id).",
     ),
     "form-set-element-config": ActionDef(
         func=set_element_config, add_args=_set_args, needs_client=True,

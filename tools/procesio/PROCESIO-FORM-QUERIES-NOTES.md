@@ -93,6 +93,34 @@ output is `success`. The designer saves:
 the system ones. A typed value on the right is stored as text and written as that value (a
 number column gets a number). Each operation is one call of about 80-200 ms.
 
+**A form value and a typed value share the right side, and only its shape tells them apart.**
+The form runtime reads as a form value a chain of ids that starts at a form variable: the
+form's data model root, then the fields container, the element and its value config (four
+ids), or the root and attribute ids of the instance tree. Every other text is sent as written
+(form-runtime `getFormVariablesAttributeValue`; it reads each id chain inside a longer text
+too). This holds for a row operation's inputs, a query's parameters and a filter's right side.
+So nothing reports a path that is nearly right:
+
+- a field NAME on the right is sent as that word;
+- a path built from the form's id and the words `fields` and `value` is sent as that text
+  (seen in the request body), and a number column then answers `400`, code 502, "Data Store row value for column '<column>'
+  (Integer): value '<the path>' is not a valid Integer", which names the value and not the map.
+
+`form-set-element-event` resolves the right side before it writes, as `form-create` and
+`form-edit` do: a field name, an element id, `Element.config`, `@variable` and a data-model
+name path (`instance.currentUser.id`) become the id path, and a path is checked against the
+live form and refused with the correct one. An input that names nothing on the form stays a
+typed value and is listed in the answer's `typed_values`; a number is not listed. In
+`Element.config` the element is found by its id, then its name, then its DOM id (the `id`
+config). A DOM id counts only when the word after the dot is one of that element's configs,
+because a new element starts with its type's word as its DOM id: on a form with one image,
+`image.png` is a typed value and `image.src` is the config. A DOM id that several elements
+carry is refused, with their names. A spelling
+that differs from a field's name only in letter case is refused. To send a text that equals a
+field's name, give `value` in place of `right`. An output's right side is always a place on
+the form, and `rows` takes a table's name (see "Showing the rows in a table" below). A filter's
+right side is only checked, never resolved from a name: a filter value may equal a field's name.
+
 | Operation | What it does | Rules |
 |---|---|---|
 | **ADD** | writes ONE new row from the mapped columns | takes no filters. It fills `CreatedOn`, `UpdatedOn`, `CreatedById` and `UpdatedById` itself (with the form owner when the form is public): unlike a saved query, it needs no audit columns mapped. A key that already exists gives `success: false`. |
@@ -178,6 +206,17 @@ other top-level keys).
   empty text, a missing or duplicate id or name.
 - ⚠ **The SQL itself is not checked at save.** A syntax error, a wrong column or a statement the
   Data-Store service refuses surfaces only when the query runs. Run it once after saving.
+- **A statement written for SQL Server is the usual way to get there.** MySQL refuses it, and
+  the run answers without the place: 400 "The query contains invalid SQL syntax." for a syntax
+  error, and one of the service's general sentences for an unknown function. `form-create`,
+  `form-edit`, `form-set-saved-statement` and `form-get-queries` therefore warn about the SQL
+  Server spellings MySQL refuses, each with its MySQL form: `SELECT TOP n`, `[bracketed]` names,
+  `OFFSET .. ROWS FETCH NEXT`, `WITH (NOLOCK)`, `OUTPUT INSERTED`, the `dbo.` prefix, `NEWID()`,
+  `GETDATE()` and its siblings, `ISNULL(a, b)`, `LEN()`, `IIF()`, `DATEADD()`, a three-argument
+  `DATEDIFF`, `TRY_CAST` / `TRY_CONVERT`, `CONVERT(type, value)` and a `CAST` to `INT`,
+  `VARCHAR` or another SQL Server type. The list lives in `dto/form/queries.py`
+  (`dialect_warnings`). It is a list of known spellings, not a parser: a clean result does not
+  mean the statement runs.
 - The tool checks the local half before sending (tags against bindings, parameter names, timeout,
   duplicate ids and names) and reports it in the same `queries[i] '<name>': ...` form. Workspace
   facts (does the store exist, is the column on it, same database) are the server's to check.
@@ -218,7 +257,10 @@ It is the existing Data Store event with a new operation. Exactly as a designer 
   "outputs": [{"left": "rows", "right": "<field name>"}]}`. The builder resolves the query name
   to its id and field names to value paths, and fails on an unknown query, an undeclared
   parameter or an unknown output. On a live form, `form-set-element-event --action
-  RUN_DATA_STORE_OPERATION --operation QUERY` does the same for one element.
+  RUN_DATA_STORE_OPERATION --operation QUERY` does the same for one element: the query name,
+  the parameter names and the form side of each row (see "A form value and a typed value share
+  the right side" above). It refuses `rows` mapped to a table's or a row's `value` and names
+  the row's source path.
 - **Showing the rows in a table** takes two things, both verified in the form runtime:
   - `rows` is mapped to the **source value of the table's dynamic row** (the row element's
     `sourceValue`), not to the table's `value` and not to the row's `value`. Either of the other

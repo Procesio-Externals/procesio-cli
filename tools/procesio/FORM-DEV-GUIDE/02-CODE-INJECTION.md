@@ -76,11 +76,18 @@ the form container onto `<html>`. Then `:root:where([attr])` matches and every e
 the page matches `[attr] *`:
 
 ```js
-var host = document.querySelector('[data-form-css-scope]');
-if (host && !document.documentElement.hasAttribute('data-form-css-scope'))
-  document.documentElement.setAttribute('data-form-css-scope',
-                                        host.getAttribute('data-form-css-scope'));
+var W = window.parent && window.parent !== window ? window.parent : window;
+var D = W.document;   // the page that shows the form, wherever this runs
+var host = D.querySelector('[data-form-css-scope]');
+if (host && !D.documentElement.hasAttribute('data-form-css-scope'))
+  D.documentElement.setAttribute('data-form-css-scope',
+                                 host.getAttribute('data-form-css-scope'));
 ```
+
+The container and `<html>` are in the page, not in the sandbox the form code runs in (§3),
+so the lookup goes through the page's document. Written with `D`, the snippet gives the
+same result pasted into the form code and inside the parent-page runtime of §4, where
+`W` is `window` itself.
 
 Run it inside the same "wait until the form's elements exist" loop the code already
 uses: the attribute only appears once the form has rendered. Setting the attribute only

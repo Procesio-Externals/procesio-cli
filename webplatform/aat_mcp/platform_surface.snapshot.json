@@ -83,7 +83,7 @@
   {
     "name": "procesio_get_process",
     "title": "Get a process definition",
-    "description": "Get one process as structured data. Pass compact for a summary of nodes, edges and variables. The full definition can be tens of kilobytes, so ask for it only when you need to send it back with procesio_edit_process.",
+    "description": "Get one process as structured data, in the platform's own format. Pass compact for a summary of nodes, edges and variables. The full definition can be tens of kilobytes, and it is NOT a config: procesio_edit_process refuses it. To understand a process, use procesio_read_process.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -139,13 +139,13 @@
   {
     "name": "procesio_create_process",
     "title": "Create a process",
-    "description": "Create a process from one config that holds the WHOLE definition: variables, actions, groups and edges. There is no step that adds a node afterwards. Load the guidance topic playbook before your first use, and pass dry_run to see the validation and an outline of what would be built. The answer never holds the whole process: it lists the variables and the actions by name.",
+    "description": "Create a process from one config that holds the WHOLE definition: variables, actions, groups and edges. There is no step that adds a node afterwards. The shape of config is not in this tool list: before your first use, load the guidance topics process-config (the schema and a working example) and playbook with procesio_get_guidance. Do not guess property names. Pass dry_run to see the validation and an outline of what would be built. The answer never holds the whole process: it lists the variables and the actions by name.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "config": {
           "type": "object",
-          "description": "The process definition."
+          "description": "The process definition, in the shape of the guidance topic process-config."
         },
         "dry_run": {
           "type": "boolean",
@@ -167,7 +167,7 @@
   {
     "name": "procesio_edit_process",
     "title": "Replace a process definition",
-    "description": "Replace the definition of an existing process. The config you send is the DESIRED STATE and replaces everything: to add or change one item, send the whole definition with that item changed. To change text or bindings inside nodes, use procesio_edit_process_nodes instead, which does not need the whole definition. The answer never holds the whole process: it lists the variables and the actions by name.",
+    "description": "Replace the definition of an existing process. The config you send is the DESIRED STATE and replaces everything: to add or change one item, send the whole definition with that item changed. The config has the shape of the guidance topic process-config, the same as for procesio_create_process: load it with procesio_get_guidance before your first use. No tool returns a live process in that shape, and what procesio_get_process returns is refused. So for a change to a live process, prefer the tools that do not need the whole definition: procesio_edit_process_nodes, procesio_insert_process_node and procesio_add_process_variable. The answer never holds the whole process: it lists the variables and the actions by name.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -177,7 +177,7 @@
         },
         "config": {
           "type": "object",
-          "description": "The whole desired definition."
+          "description": "The whole desired definition, in the shape of the guidance topic process-config."
         },
         "dry_run": {
           "type": "boolean",
@@ -829,13 +829,13 @@
   {
     "name": "procesio_create_form",
     "title": "Create a form",
-    "description": "Create a form from one config that holds the WHOLE definition: assignees, elements and queries. Load the guidance topic forms before your first use, and pass dry_run to see the validation and an outline of what would be built. The answer never holds the whole form: it lists the elements by name. A form is created published and open to anyone without a login, unless the config says otherwise: isPrivate true keeps it behind a PROCESIO login, and publish false keeps it a draft. Ask the user before you create a form that is open, unless they asked for exactly that.",
+    "description": "Create a form from one config that holds the WHOLE definition: assignees, elements and queries. The shape of config is not in this tool list: before your first use, load the guidance topics form-config (the schema and a working example) and forms with procesio_get_guidance. Do not guess property names. Pass dry_run to see the validation and an outline of what would be built. The answer never holds the whole form: it lists the elements by name. A form is created published and open to anyone without a login, unless the config says otherwise: isPrivate true keeps it behind a PROCESIO login, and publish false keeps it a draft. Ask the user before you create a form that is open, unless they asked for exactly that.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "config": {
           "type": "object",
-          "description": "The form definition."
+          "description": "The form definition, in the shape of the guidance topic form-config."
         },
         "dry_run": {
           "type": "boolean",
@@ -1298,7 +1298,7 @@
   {
     "name": "procesio_edit_form",
     "title": "Replace a form definition",
-    "description": "Replace the definition of an existing form. The config you send is the DESIRED STATE and replaces everything: what you leave out is removed, and that is refused unless allow_remove is set. To add controls without restating the form, use procesio_add_form_elements. The answer never holds the whole form: it lists the elements by name.",
+    "description": "Replace the definition of an existing form. The config you send is the DESIRED STATE and replaces everything: what you leave out is removed, and that is refused unless allow_remove is set. The config has the shape of the guidance topic form-config, the same as for procesio_create_form: load it with procesio_get_guidance before your first use. What procesio_get_form returns is not a config. To add controls without restating the form, use procesio_add_form_elements. The answer never holds the whole form: it lists the elements by name.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1308,7 +1308,7 @@
         },
         "config": {
           "type": "object",
-          "description": "The whole desired definition."
+          "description": "The whole desired definition, in the shape of the guidance topic form-config."
         },
         "dry_run": {
           "type": "boolean",
@@ -1564,13 +1564,13 @@
   {
     "name": "procesio_get_guidance",
     "title": "Read the PROCESIO build guidance",
-    "description": "Read one topic of the guidance on how to build and test in PROCESIO: the method, the recipes and the known pitfalls. Load the topic that fits the task before you build. Start with playbook for a process and forms for a form.",
+    "description": "Read one topic of the guidance on how to build and test in PROCESIO: the method, the recipes and the known pitfalls. Load the topic that fits the task before you build. Start with playbook for a process and forms for a form. Before you create or replace a whole definition, also load the shape of its config: process-config or form-config.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "topic": {
           "type": "string",
-          "description": "Processes: playbook, best-practices, visual-organization, datastore, scheduling, environments, reliability, boundary. Forms: forms (the index), forms-anatomy, forms-process, forms-interaction, forms-code, forms-dom, forms-motion, forms-deploy, forms-redesign, forms-pitfalls. House style: patterns (the index), patterns-processes, patterns-forms, patterns-integrations, patterns-database, patterns-optimizing."
+          "description": "Config shapes (JSON Schema and a working example): process-config, form-config. Processes: playbook, best-practices, visual-organization, datastore, scheduling, environments, reliability, boundary. Forms: forms (the index), forms-anatomy, forms-process, forms-interaction, forms-code, forms-dom, forms-motion, forms-deploy, forms-redesign, forms-pitfalls. House style: patterns (the index), patterns-processes, patterns-forms, patterns-integrations, patterns-database, patterns-optimizing."
         }
       },
       "required": [

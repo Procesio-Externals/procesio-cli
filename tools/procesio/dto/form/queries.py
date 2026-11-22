@@ -280,6 +280,108 @@ def spelling_warnings(queries: list) -> list[str]:
     return out
 
 
+# SQL Server spellings and what MySQL takes instead. A Data Store is MySQL-backed, the save
+# does not read the statement, and a run that MySQL refuses answers "invalid SQL syntax" or a
+# general sentence, without naming the place. Each entry is refused by a stock MySQL 8: a
+# syntax error (1064), an unknown function (1305) or a wrong argument count (1582). `{0}` is the spelling
+# found, and the second text is what MySQL takes. A spelling MySQL accepts with another meaning
+# is left out on purpose.
+_TSQL_CAST_TYPES = r"(?:INT|BIGINT|SMALLINT|TINYINT|BIT|N?VARCHAR|UNIQUEIDENTIFIER|DATETIME2)"
+_MYSQL_CAST_TYPES = "SIGNED, UNSIGNED, DECIMAL, CHAR, DATE or DATETIME"
+_TSQL_SPELLINGS = tuple((re.compile(p, re.IGNORECASE), label, mysql) for p, label, mysql in (
+    (r"\bSELECT\s+(?:DISTINCT\s+)?TOP\b", "SELECT TOP n", "LIMIT n at the end of the statement"),
+    (r"\[[^\]\n]*\]", "[bracketed] names",
+     "a <%N%> tag for a Data Store table or column, backticks for any other name"),
+    (r"\bOFFSET\s+\S+\s+ROWS?\b", "OFFSET n ROWS FETCH NEXT m ROWS ONLY", "LIMIT m OFFSET n"),
+    (r"\bWITH\s*\(\s*NOLOCK\s*\)", "WITH (NOLOCK)", "nothing, leave it out"),
+    (r"\bOUTPUT\s+(?:INSERTED|DELETED)\b", "OUTPUT INSERTED / DELETED",
+     "a SELECT as the last statement of the query"),
+    (r"(?<![\w.])dbo\s*\.", "the dbo. schema prefix", "nothing, leave it out"),
+    (r"\b(NEWID)\s*\(", "{0}()",
+     "UUID(), but a Guid column takes a parameter and not a function result"),
+    (r"\b(GETDATE|SYSDATETIME)\s*\(", "{0}()", "NOW()"),
+    (r"\b(GETUTCDATE|SYSUTCDATETIME)\s*\(", "{0}()", "UTC_TIMESTAMP()"),
+    (r"\b(SCOPE_IDENTITY)\s*\(", "{0}()", "LAST_INSERT_ID()"),
+    (r"\b(LEN)\s*\(", "{0}()", "CHAR_LENGTH()"),
+    (r"\b(IIF)\s*\(", "{0}()", "IF(condition, a, b)"),
+    (r"\b(DATEADD)\s*\(", "{0}()", "DATE_ADD(date, INTERVAL n unit)"),
+    (r"\b(TRY_CAST|TRY_CONVERT)\s*\(", "{0}()", f"CAST(value AS {_MYSQL_CAST_TYPES})"),
+    (r"\bCONVERT\s*\(\s*(" + _TSQL_CAST_TYPES + r")\b", "CONVERT({0}, value)",
+     f"CAST(value AS {_MYSQL_CAST_TYPES})"),
+))
+# A name both servers have, refused only for the SQL Server argument count.
+_TSQL_ARGUMENT_COUNTS = (
+    ("ISNULL", 2, "ISNULL(value, fallback)", "IFNULL(value, fallback) or COALESCE"),
+    ("DATEDIFF", 3, "DATEDIFF(unit, a, b)", "TIMESTAMPDIFF(unit, a, b)"),
+)
+# CAST exists on both servers; only the target type differs. It is read from the end of the
+# call, so an expression with its own parentheses in front of AS does not hide the type.
+_TSQL_CAST_TARGET = re.compile(r"\bAS\s+(" + _TSQL_CAST_TYPES + r")\s*(?:\([^()]*\))?\s*$",
+                               re.IGNORECASE)
+
+
+def _call_arguments(code: str, open_paren: int) -> list[str] | None:
+    """The top-level arguments of the call opened at `open_paren`; None when the parenthesis
+    never closes."""
+    depth, start, out = 0, open_paren + 1, []
+    for i in range(open_paren, len(code)):
+        ch = code[i]
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+            if depth == 0:
+                out.append(code[start:i])
+                return [] if len(out) == 1 and not out[0].strip() else out
+        elif ch == "," and depth == 1:
+            out.append(code[start:i])
+            start = i + 1
+    return None
+
+
+def _calls(code: str, name: str):
+    """The argument list of every closed call of `name` in `code`."""
+    for match in re.finditer(rf"\b{name}\s*\(", code, re.IGNORECASE):
+        arguments = _call_arguments(code, match.end() - 1)
+        if arguments is not None:
+            yield arguments
+
+
+def _tsql_spellings(sql: str) -> list[str]:
+    code = code_only(sql)
+    found: list[str] = []
+
+    def add(label: str, mysql: str) -> None:
+        item = f"{label} (MySQL: {mysql})"
+        if item not in found:
+            found.append(item)
+
+    for pattern, label, mysql in _TSQL_SPELLINGS:
+        for match in pattern.finditer(code):
+            add(label.format(match.group(1).upper() if match.groups() else ""), mysql)
+    for name, count, label, mysql in _TSQL_ARGUMENT_COUNTS:
+        if any(len(arguments) == count for arguments in _calls(code, name)):
+            add(label, mysql)
+    for arguments in _calls(code, "CAST"):
+        target = _TSQL_CAST_TARGET.search(arguments[-1]) if arguments else None
+        if target:
+            add(f"CAST(... AS {target.group(1).upper()})", _MYSQL_CAST_TYPES)
+    return found
+
+
+def dialect_warnings(queries: list) -> list[str]:
+    """A statement written for SQL Server is saved as it is and refused by MySQL at every run.
+    The run does not say where, so name each spelling and its MySQL form at the write."""
+    out = []
+    for q in queries or []:
+        found = _tsql_spellings(str(q.get("value") or ""))
+        if found:
+            out.append(f"query {q.get('name')!r} uses SQL Server spellings, and a Data Store runs "
+                       f"MySQL: {'; '.join(found)}. The save accepts the text and the run is "
+                       f"refused without naming the place, so run the query once after saving it.")
+    return out
+
+
 def warnings(queries: list, elements: list, form_events: list | None = None) -> list[str]:
     return (unreferenced_warnings(queries, elements, form_events) + audit_warnings(queries)
-            + spelling_warnings(queries))
+            + spelling_warnings(queries) + dialect_warnings(queries))

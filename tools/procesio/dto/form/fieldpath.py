@@ -19,6 +19,8 @@ is before the write.
 """
 from __future__ import annotations
 
+import re
+
 from tools.procesio.errors import UsageError
 
 # The platform's "fields" container id. Constant across every form (verified against real
@@ -30,6 +32,21 @@ FIELDS_NS = "11223344-5566-7788-99aa-aabbccddeeff"
 VALUE_CONFIG_KEY = {"file-viewer": "src"}
 
 SEGMENTS = 4
+
+# A Data Store event keeps a typed value and a form value in the same place: the right side of
+# a map row is text, and the form runtime reads as a form value only the parts of it that are a
+# chain of ids starting at a form variable (form-runtime getFormVariablesAttributeValue). Any
+# other text is sent as it is written. So the question "is this a path or a value" has to be
+# answered here, from the text alone.
+_GUID = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+_GUID_ONLY = re.compile(rf"^{_GUID}$")
+_ID_CHAIN = re.compile(rf"{_GUID}(?:\.{_GUID})+")
+_DOTTED_TOKEN = re.compile(r"^[\w-]+(?:\.[\w-]+)+$")
+
+# Where a list of rows lands. A table shows them through its dynamic row's source, a dropdown
+# through its own; both are the `sourceValue` config.
+SOURCE_KEY = "sourceValue"
+_TABLE, _DYNAMIC_ROW, _STATIC_ROW = "table", "dynamic-table-row", "static-table-row"
 
 
 def value_key(el_type) -> str:
@@ -58,12 +75,16 @@ def _config_id(element: dict, key: str):
     return None
 
 
-def _name_of(element: dict):
+def _config_text(element: dict, key: str):
     for c in element.get("configs") or []:
-        if c.get("key") == "name":
+        if c.get("key") == key:
             v = str(c.get("value") or "").strip()
             return v or None
     return None
+
+
+def _name_of(element: dict):
+    return _config_text(element, "name")
 
 
 class LiveForm:
@@ -76,6 +97,9 @@ class LiveForm:
         self.elements = data.get("elements") or []
         self.by_id: dict[str, dict] = {}
         self.by_name: dict[str, list[dict]] = {}
+        # The `id` config: the DOM id the element carries on the page. It is the handle a caller
+        # holds after reading the form's script, where the name never appears.
+        self.by_dom_id: dict[str, list[dict]] = {}
         for el in self.elements:
             eid = el.get("id")
             if not eid:
@@ -84,6 +108,9 @@ class LiveForm:
             name = _name_of(el)
             if name:
                 self.by_name.setdefault(name, []).append(el)
+            dom_id = _config_text(el, "id")
+            if dom_id:
+                self.by_dom_id.setdefault(dom_id, []).append(el)
         # Form variables (Offer_ID, isConfirmed…) are mapped by their own id, and the form's
         # data model also carries the platform's `instance` tree (instance.currentUser.email…),
         # addressed as root.<attr id>.<attr id>…; both are as valid on a map row as a field.
@@ -195,6 +222,25 @@ class LiveForm:
                              f"it has: {keys}")
         return build(self.root_id, str(el["id"]), str(cid))
 
+    def dom_id_config_path(self, ref: str, key: str, where: str):
+        """`<DOM id>.<config key>` -> that config's path, or None when the text is not one.
+
+        An element's id and name are tried before this, as everywhere else. A DOM id counts
+        only when `key` is a config of an element that carries it: a new element starts with
+        its type's word as its DOM id (`image`, `button`, `input`), so `image.png` on a form
+        with one image is far more often a typed value than a config. Several elements may
+        share a DOM id; that is refused, never guessed."""
+        carriers = self.by_dom_id.get(ref) or []
+        if not any(_config_id(e, key) for e in carriers):
+            return None
+        if len(carriers) > 1:
+            names = ", ".join(repr(_name_of(e) or e.get("id")) for e in carriers[:8])
+            raise UsageError(
+                f"{where}: {len(carriers)} elements carry the DOM id {ref!r} in their `id` "
+                f"config ({names}); write {key!r} after the element's name or its element id "
+                f"instead")
+        return self.config_path(str(carriers[0]["id"]), key)
+
     def check(self, path: str, where: str) -> None:
         """Raise unless `path` addresses a real value-bearing field of THIS form.
 
@@ -271,6 +317,9 @@ class LiveForm:
             ref, key = value.split(".")
             if ref in self.by_id or ref in self.by_name:   # Paragraph9.label, Section3.visible
                 return self.config_path(ref, key)
+            by_dom_id = self.dom_id_config_path(ref, key, where)
+            if by_dom_id is not None:
+                return by_dom_id
         mp = self.model_path(value)
         if mp is not None:
             return mp
@@ -282,3 +331,155 @@ class LiveForm:
             f"data-model path (instance.currentUser.email) nor a full value path. "
             f"Fields that can carry a value: {', '.join(self.field_names()) or '(none)'}; "
             f"variables: {', '.join(sorted(self.variables)) or '(none)'}")
+
+    # -- the form side of a Data Store event ------------------------------------------------
+    #
+    # A process map row has a form value on its right and nothing else, so `resolve` can refuse
+    # whatever is not one. A Data Store row cannot: its right side is a form value OR a typed
+    # value ("50", "open"), and the runtime tells them apart by shape alone. A path that is
+    # nearly right is therefore not an error anywhere: the runtime sends its text as the value.
+
+    def _is_path_attempt(self, text: str) -> bool:
+        """One dotted token written as a path, right or wrong: it carries an id or an element
+        of this form, or starts at the form's root. `10.0.0.1` and `v1.2` are typed values."""
+        if not _DOTTED_TOKEN.match(text):
+            return False
+        parts = text.split(".")
+        return (parts[0] == self.root_id
+                or any(_GUID_ONLY.match(p) or p in self.by_id for p in parts))
+
+    def _check_chain(self, path: str, where: str) -> None:
+        if self._model_ids_ok(path) or path.split(".")[0] in self.variable_ids:
+            return
+        self.check(path, where)
+
+    def check_embedded(self, text, where: str) -> None:
+        """Raise when a text holds a path the runtime will not read as one. Text with no path
+        in it passes: this never decides that a typed value is wrong."""
+        if not isinstance(text, str) or not text.strip():
+            return
+        text = text.strip()
+        if self._is_path_attempt(text):
+            self._check_chain(text, where)
+            return
+        for chain in _ID_CHAIN.findall(text):     # "Score: <path>": the runtime reads each part
+            self._check_chain(chain, where)
+
+    def resolve_input(self, value, where: str) -> tuple:
+        """The right side of a Data Store INPUT row (a column's or a parameter's value) ->
+        (the text to store, what it is: field | variable | model | typed | empty).
+
+        A field NAME, an element id, `Element.config`, `@variable` and a data-model name path
+        (instance.currentUser.id) are built into the id path the runtime reads. A path is
+        checked against the live form. Anything else is a typed value and is kept as written,
+        except the spelling that is one letter case away from a field: nobody types that on
+        purpose, and stored as text it would be written into every row."""
+        if not isinstance(value, str):
+            return value, "typed"
+        text = value.strip()
+        if not text:
+            return "", "empty"
+        if text in self.by_name:
+            return self.path_for_name(text), "field"
+        if text.startswith("@"):
+            var = self.variables.get(text[1:])
+            if var is None:
+                raise UsageError(
+                    f"{where}: {text!r} names no form variable (variables: "
+                    f"{', '.join(sorted(self.variables)) or 'none'}). To send the text itself, "
+                    f"pass it as `value` instead of `right`.")
+            return str(var["id"]), "variable"
+        if text in self.variable_ids:
+            return text, "variable"
+        if text in self.by_id:
+            return self.config_path(text, value_key(self.by_id[text].get("type"))), "field"
+        if self._model_ids_ok(text):
+            return text, "model"
+        if text.count(".") == 1:
+            ref, key = text.split(".")
+            if ref in self.by_id or ref in self.by_name:
+                return self.config_path(ref, key), "field"
+            by_dom_id = self.dom_id_config_path(ref, key, where)
+            if by_dom_id is not None:
+                return by_dom_id, "field"
+        named = self.model_path(text)
+        if named is not None:
+            return named, "model"
+        if self._is_path_attempt(text):
+            self._check_chain(text, where)
+            return text, "field"
+        self.check_embedded(text, where)
+        near = sorted(n for n in self.by_name if n.casefold() == text.casefold())
+        if near:
+            raise UsageError(
+                f"{where}: {text!r} is not a field on this form, but {near[0]!r} is. Spell the "
+                f"name as the form has it, or pass the text as `value` instead of `right` to "
+                f"send it as a typed value.")
+        return value, "typed"
+
+    def _named_element(self, text: str):
+        """(the element a right side names, the config id it names or None): by name, by id,
+        or as the third segment of a four-segment path."""
+        if text in self.by_name or text in self.by_id:
+            return self.element(text), None
+        parts = text.split(".")
+        if len(parts) == SEGMENTS and parts[2] in self.by_id:
+            return self.by_id[parts[2]], parts[3]
+        return None, None
+
+    def resolve_rows_target(self, value, where: str) -> tuple:
+        """Where a list of rows goes -> (the path to store, warnings).
+
+        A table shows rows through the `sourceValue` of its DYNAMIC ROW and a dropdown through
+        its own. Mapped to a table's or a row's `value`, every result adds a row with all cells
+        empty and nothing reports it, so a table, its row or a path into either is turned into,
+        or checked against, the one path that works."""
+        text = str(value).strip()
+        element, config_id = self._named_element(text)
+        if element is None:
+            return self.resolve(text, where), []
+        name = _name_of(element) or element.get("id")
+        if element.get("type") == _STATIC_ROW:
+            raise UsageError(f"{where}: {name!r} is a static table row, which has no source to "
+                             f"fill. Rows go to the table's dynamic row.")
+        if element.get("type") == _TABLE:
+            rows = [e for e in self.elements
+                    if e.get("parentId") == element.get("id") and e.get("type") == _DYNAMIC_ROW]
+            if not rows:
+                raise UsageError(
+                    f"{where}: table {name!r} has no dynamic row, so it cannot show a list of "
+                    f"rows. Give the table a dynamic row first.")
+            if len(rows) > 1:
+                names = ", ".join(repr(_name_of(r) or r.get("id")) for r in rows)
+                raise UsageError(f"{where}: table {name!r} has {len(rows)} dynamic rows "
+                                 f"({names}); name the one that takes the rows.")
+            element = rows[0]
+        source_id = _config_id(element, SOURCE_KEY)
+        if element.get("type") == _DYNAMIC_ROW:
+            if not source_id:
+                raise UsageError(
+                    f"{where}: dynamic row {_name_of(element) or element.get('id')!r} has no "
+                    f"{SOURCE_KEY!r} config, so no list can be mapped to it. Rebuild the table "
+                    f"with form-edit, which declares it.")
+            right = build(self.root_id, str(element["id"]), str(source_id))
+            if config_id is not None and text != right:
+                raise UsageError(
+                    f"{where}: {text!r} is not where a list of rows goes. A table shows rows "
+                    f"through its dynamic row's {SOURCE_KEY!r}; mapped to the table's or the "
+                    f"row's `value`, each result adds a row with every cell empty.\n"
+                    f"  correct path: {right}\n  or just pass the name: {name}")
+            return right, []
+        if config_id is not None:                 # a full path to another control: as written
+            self.check(text, where)
+            return text, []
+        if not source_id:                         # a plain field, by name: its value
+            return self.config_path(text, value_key(element.get("type"))), []
+        source_type = next((c for c in element.get("configs") or []
+                            if c.get("key") == "sourceType"), None)
+        warnings = []
+        if not (source_type or {}).get("value"):
+            warnings.append(
+                f"{name!r} takes the rows as its options, but it has no source type, so the "
+                f"runtime builds no option and the control says \"No data available\". Set its "
+                f"`sourceType` config to JSON.")
+        return build(self.root_id, str(element["id"]), str(source_id)), warnings

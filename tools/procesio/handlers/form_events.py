@@ -142,21 +142,41 @@ def _backfill_slot(element: dict, key: str) -> dict:
     return slot
 
 
+def _cfg_text(element: dict, key: str) -> str:
+    c = _cfg(element, key)
+    return str(c.get("value") or "").strip() if c else ""
+
+
 def _find_element(elements: list, ref: str) -> dict:
-    """Match by element id first, then by its `name` config (what the designer shows)."""
+    """Match by element id first, then by its `name` config (what the designer shows), then by
+    its `id` config.
+
+    The `id` config is the DOM id the element carries on the page, so it is the handle a caller
+    holds after reading the form's script or markup, where the `name` never appears. The name is
+    tried first because field paths and event maps are built from it. A new element of a type
+    starts with that type's default DOM id, so several may share one: that is refused, never
+    guessed.
+    """
     for e in elements:
         if e.get("id") == ref:
             return e
-    hits = []
-    for e in elements:
-        c = _cfg(e, "name")
-        if c and str(c.get("value") or "").strip() == ref:
-            hits.append(e)
-    if len(hits) == 1:
-        return hits[0]
-    if not hits:
-        raise UsageError(f"no element with id or name {ref!r} on this form")
-    raise UsageError(f"{len(hits)} elements are named {ref!r}; pass the element id instead")
+    named = [e for e in elements if _cfg_text(e, "name") == ref]
+    if len(named) == 1:
+        return named[0]
+    if named:
+        raise UsageError(f"{len(named)} elements are named {ref!r}; pass the element id instead")
+    by_dom_id = [e for e in elements if _cfg_text(e, "id") == ref]
+    if len(by_dom_id) == 1:
+        return by_dom_id[0]
+    if by_dom_id:
+        names = ", ".join(repr(_cfg_text(e, "name") or e.get("id")) for e in by_dom_id[:8])
+        raise UsageError(
+            f"{len(by_dom_id)} elements carry the DOM id {ref!r} in their `id` config ({names}); "
+            f"pass the element's name or its element id instead")
+    known = ", ".join(sorted(n for n in (_cfg_text(e, "name") for e in elements) if n)[:20])
+    raise UsageError(
+        f"no element with id, name or DOM id {ref!r} on this form. An id that a script or the "
+        f"markup of a label creates is not a form element. Element names here: {known or 'none'}")
 
 
 def _process_vars(client, process_id: str) -> dict:
@@ -263,6 +283,107 @@ def _resolve_maps(config: dict, client, form: dict | None = None) -> dict:
     return out
 
 
+def _typed(value) -> str:
+    """A typed value as the designer stores it on the right of a Data Store row: text."""
+    if isinstance(value, bool):
+        return str(value).lower()
+    if isinstance(value, (list, dict)):
+        return json.dumps(value)
+    return "" if value is None else str(value)
+
+
+def _is_plain_literal(text: str) -> bool:
+    """A number or a boolean: text nobody meant as a field name, so not worth reporting."""
+    text = text.strip().lower()
+    if text in ("true", "false"):
+        return True
+    try:
+        float(text)
+    except ValueError:
+        return False
+    return True
+
+
+def _check_filter_paths(filters, live: fieldpath.LiveForm, where: str = "filter") -> None:
+    """A filter's right side is a typed value or a form value path, in the same text. Names
+    are not resolved here (a filter value that equals a field's name is a value); a path is
+    checked, because a wrong one is compared as text and matches no row."""
+    for i, cond in enumerate(filters or []):
+        if not isinstance(cond, dict):
+            continue
+        for side in ("rightOperator", "auxOperator"):
+            operand = cond.get(side)
+            if isinstance(operand, dict):
+                live.check_embedded(operand.get("value"), f"{where} {i} {side}")
+        if isinstance(cond.get("value"), list):
+            _check_filter_paths(cond["value"], live, f"{where} {i} group")
+
+
+def _resolve_ds_maps(config: dict, form: dict) -> tuple:
+    """Resolve the form side of a Data Store event -> (config, typed values, warnings).
+
+    The right side of a row is text, and the form runtime reads as a form value only a chain
+    of ids that starts at the form's data model. Any other text is sent as written. So a field
+    NAME, or a path built from names, was saved without complaint and then written into the
+    Data Store as the value itself, or refused by a typed column with no word about the map.
+    Here an input's right side is resolved to the id path (a field name, `@variable`,
+    `Element.config`, instance.currentUser.id), a path is checked against the live form, and
+    what is left is a typed value, reported so a misspelled field name cannot pass unseen.
+    `value` in place of `right` states a typed value outright. An output's right side is
+    always a place on the form; a list of rows goes to the source of a table's dynamic row.
+    """
+    live = fieldpath.LiveForm(form)
+    out = dict(config)
+    typed, warnings = [], []
+    reads = str(out.get("operation") or "").upper() in ("READ", "QUERY")
+
+    inputs = []
+    for i, row in enumerate(out.get("inputMap") or []):
+        if not isinstance(row, dict):
+            raise UsageError(f"inputMap row {i} must be an object {{left, right}}")
+        row = dict(row)
+        where = f"inputMap row {i} ({_plain(row.get('left'))!r})"
+        if "value" in row:
+            literal = row.pop("value")
+            if row.get("right") not in (None, ""):
+                raise UsageError(f"{where}: give `right` (a form value) or `value` (a typed "
+                                 f"value), not both")
+            row["right"] = _typed(literal)
+        elif isinstance(row.get("right"), str):
+            row["right"], kind = live.resolve_input(row["right"], where)
+            if kind == "typed" and not _is_plain_literal(row["right"]):
+                typed.append({"left": _plain(row.get("left")), "value": row["right"]})
+        else:
+            row["right"] = _typed(row.get("right"))
+        row.setdefault("id", i)
+        inputs.append(row)
+    out["inputMap"] = inputs
+
+    outputs = []
+    for i, row in enumerate(out.get("outputMap") or []):
+        if not isinstance(row, dict):
+            raise UsageError(f"outputMap row {i} must be an object {{left, right}}")
+        row = dict(row)
+        left, right = _plain(row.get("left")), row.get("right")
+        where = f"outputMap row {i} ({left!r})"
+        if right in (None, ""):
+            row["right"] = ""                     # an output the designer lists and leaves unmapped
+        elif not isinstance(right, str):
+            raise UsageError(f"{where}: the right side is a form field (its name) or a value "
+                             f"path, not {right!r}")
+        elif left == "rows" and reads:
+            row["right"], found = live.resolve_rows_target(right, where)
+            warnings.extend(found)
+        else:
+            row["right"] = live.resolve(right.strip(), where)
+        row.setdefault("id", i)
+        outputs.append(row)
+    out["outputMap"] = outputs
+
+    _check_filter_paths(out.get("filters"), live)
+    return out, typed, warnings
+
+
 def set_element_event(client, args) -> dict:
     cfg_key, default_type = _resolve_trigger(args.on)
     action = args.action.strip().upper()
@@ -289,6 +410,7 @@ def set_element_event(client, args) -> dict:
     elements = form["data"].get("elements") or []
     element = _find_element(elements, args.element)
 
+    typed_values, map_warnings = [], []
     if action == "RUN_PROCESS":
         # `form` is the live DTO fetched above: passing it is what lets the form side of each
         # row be resolved and checked, not merely copied.
@@ -321,6 +443,8 @@ def set_element_event(client, args) -> dict:
         if str(ev_config.get("operation")).upper() not in ("ADD", "QUERY"):
             ev_config.setdefault("filters", [])
             ev_config.setdefault("areFiltersConfigured", bool(ev_config.get("filters")))
+        # fails loudly before any write, as the RUN_PROCESS branch does
+        ev_config, typed_values, map_warnings = _resolve_ds_maps(ev_config, form)
     elif not ev_config.get("code"):
         raise UsageError("RUN_JAVASCRIPT config needs a 'code' string")
 
@@ -386,11 +510,27 @@ def set_element_event(client, args) -> dict:
     }
     if warning:
         result["warning"] = warning
+    if action == "RUN_JAVASCRIPT":
+        # the script is saved whatever it holds, and a mistake in it shows no error on the form
+        from tools.procesio import formlint
+        where = f"the {cfg_key} script of {args.element!r}"
+        script_warnings = (formlint.lint_form_code_runtime(None, ev_config.get("code"), where)
+                           + formlint.lint_form_code_sandbox(ev_config.get("code"), where))
+        if script_warnings:
+            result["warnings"] = script_warnings
     if backfilled:
         result["note"] = (
             f"{args.element!r} was saved before its {', '.join(backfilled)} slot existed, so the "
             f"slot was added from the element template (the form runtime and designer do the "
             f"same on load/save); every other config is unchanged.")
+    if typed_values:
+        result["typed_values"] = typed_values
+        result["typed_values_note"] = (
+            "These right sides name no field, variable or path of this form, so the form sends "
+            "each one as written, as a typed value. To send a form value instead, pass the "
+            "field's name.")
+    if map_warnings:
+        result["warnings"] = map_warnings
     if args.dry_run:
         return {"dry_run": True, "event": event, **result}
 
@@ -408,15 +548,30 @@ def get_element_events(client, args) -> dict:
         k = c.get("key") or ""
         if "vent" in k:
             out[k] = _slot_data(c.get("value")).get("events") or []
-    return {"id": args.id, "element": args.element, "elementId": element.get("id"),
-            "type": element.get("type"), "events": out}
+    result = {"id": args.id, "element": args.element, "elementId": element.get("id"),
+              "type": element.get("type")}
+    scripts = [(k, (ev.get("config") or {}).get("code")) for k, events in out.items()
+               for ev in events if isinstance(ev, dict) and ev.get("action") == "RUN_JAVASCRIPT"]
+    if scripts:
+        # before `events`: a caller that keeps only the start of a long answer still gets it
+        from tools.procesio import formlint
+        result["note"] = formlint.SANDBOX_NOTE
+        warnings = []
+        for key, code in scripts:
+            for w in formlint.lint_form_code_sandbox(code, f"the {key} script of {args.element!r}"):
+                if w not in warnings:
+                    warnings.append(w)
+        if warnings:
+            result["warnings"] = warnings
+    return {**result, "events": out}
 
 
 def _common(p: argparse.ArgumentParser) -> None:
     add_profile_arg(p)
     p.add_argument("--id", required=True, help="form template id")
     p.add_argument("--element", required=True,
-                   help="element id, or its designer 'name' (e.g. doccipf)")
+                   help="element id, its designer 'name' (e.g. doccipf), or its `id` config "
+                        "(the DOM id the element carries on the page)")
 
 
 def _set_args(p: argparse.ArgumentParser) -> None:
@@ -451,7 +606,10 @@ def _set_args(p: argparse.ArgumentParser) -> None:
 ACTIONS = {
     "form-get-element-events": ActionDef(
         func=get_element_events, add_args=_common, needs_client=True,
-        description="List one element's event handlers, by trigger.",
+        description="List one element's event handlers, by trigger. When one of them is a "
+                    "RUN_JAVASCRIPT script, the answer carries a `note` on where the script runs "
+                    "(a sandbox iframe, not the page), and `warnings` when a script works on the "
+                    "DOM only through its own `document`.",
     ),
     "form-set-element-event": ActionDef(
         func=set_element_event, add_args=_set_args, needs_client=True,
@@ -459,7 +617,8 @@ ACTIONS = {
                     "RUN_DATA_STORE_OPERATION in place (surgical: only that element's event "
                     "config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take "
                     "NAMES: left = a process variable name, right = a form FIELD name, a form "
-                    "variable (@Offer_ID), an element config (Paragraph9.label) or a data-model "
+                    "variable (@Offer_ID), an element config (Paragraph9.label; the element by its name, id or "
+                    "DOM id) or a data-model "
                     "path (instance.currentUser.email) - each "
                     "is resolved to the id/value-path the runtime needs. Do NOT hand-build "
                     "the form value path; if you pass one it is CHECKED against the live form "
@@ -468,9 +627,17 @@ ACTIONS = {
                     "--data-store-id + --operation; operation QUERY runs a saved query of the "
                     "form instead (queryId or query name in --config, inputMap left = the "
                     "parameter exactly as declared, outputMap left = rows|columns|count|success). "
+                    "In a DataStore op the right side takes the same NAMES and is resolved and "
+                    "checked the same way; an input's right side that names nothing on the form "
+                    "is kept as a typed value and listed in `typed_values` (pass `value` in "
+                    "place of `right` to state a typed value), and `rows` takes a table's name "
+                    "and is written to its dynamic row's source. "
                     "An element saved before the trigger "
                     "existed (e.g. an approval control from before Sep 2025, no "
                     "onBeforeApprove slot) gets the missing slot added from the element "
-                    "template, listed in `backfilled`.",
+                    "template, listed in `backfilled`. A RUN_JAVASCRIPT script runs in a hidden "
+                    "sandbox iframe, not in the page: reach the form through "
+                    "window.parent.document. Returns `warnings` when the script works on the DOM "
+                    "only through its own `document`.",
     ),
 }

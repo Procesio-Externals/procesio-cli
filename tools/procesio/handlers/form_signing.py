@@ -92,8 +92,9 @@ def _upload_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--file", required=True,
                    help=f"local PDF to store (at most {MAX_SIGNING_DOCUMENT_MB} MB)")
     p.add_argument("--element",
-                   help="document-signing element id or `name` config; when given, its "
-                        "`document` config is set to the stored file {fileId, name}")
+                   help="document-signing element id, `name` config or `id` config (its DOM "
+                        "id); when given, its `document` config is set to the stored file "
+                        "{fileId, name}")
     p.add_argument("--dry-run", dest="dry_run", action="store_true",
                    help="check the PDF and the element, upload nothing")
     add_force_arg(p)

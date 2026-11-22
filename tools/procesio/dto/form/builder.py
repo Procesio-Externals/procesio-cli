@@ -940,7 +940,8 @@ def _build_code(config: dict, ctx: dict) -> str:
         return ""
     # the saved blob is encrypted, so a lint of the DTO cannot read it: check it here
     from tools.procesio import formlint
-    for w in formlint.lint_form_code_scope(css, js) + formlint.lint_form_code_runtime(css, js):
+    for w in (formlint.lint_form_code_scope(css, js) + formlint.lint_form_code_runtime(css, js)
+              + formlint.lint_form_code_sandbox(js)):
         _warn(ctx, w)
     key = ctx.get("form_code_key")
     if not key:

@@ -478,6 +478,62 @@ def test_minimize_crossings_reduces_and_stays_local():
     assert run(50.0) == base                                       # heavy penalty pins everything
 
 
+def test_minimize_crossings_incremental_count_keeps_the_same_moves():
+    """Phase B keeps a running crossing total and recounts only the moved node's own edges. That
+    must choose exactly the moves a full recount of every edge pair chose: the expected positions
+    below are what the full-recount version produced on this same input (C and E move)."""
+    nodes = [{"id": x, "w": 48, "h": 48} for x in ("A", "B", "C", "D", "E", "F")]
+    typed = [("A", "B", 0), ("C", "D", 0), ("E", "F", 0)]
+    DX, DY = engine.DEFAULTS["DX"], engine.DEFAULTS["DY"]
+    P = {"A": {"x": 0.0, "y": 0.0}, "B": {"x": 6 * DX, "y": 0.0},
+         "C": {"x": 5 * DX, "y": -0.5 * DY}, "D": {"x": 6 * DX, "y": 0.5 * DY},
+         "E": {"x": 2 * DX, "y": -1.0 * DY}, "F": {"x": 3 * DX, "y": 1.0 * DY}}
+    engine._minimize_crossings(P, [dict(n) for n in nodes], typed, dict(engine.DEFAULTS),
+                               movable={"C", "D", "E", "F"})
+    assert P == {"A": {"x": 0.0, "y": 0.0}, "B": {"x": 6 * DX, "y": 0.0},
+                 "C": {"x": 5 * DX, "y": 0.5 * DY}, "D": {"x": 6 * DX, "y": 0.5 * DY},
+                 "E": {"x": 2 * DX, "y": 0.0}, "F": {"x": 3 * DX, "y": 1.0 * DY}}
+
+
+def test_minimize_crossings_skipped_above_the_node_cap():
+    """Above MINCROSS_MAX_NODES movable nodes the pass is skipped and the base layout comes back
+    unchanged. Even counted incrementally it grows roughly with the square of the flow, and a large
+    process must still save inside the tool's time limit; only its canvas keeps more crossings."""
+    nodes = [{"id": x, "w": 48, "h": 48} for x in ("A", "B", "C", "D")]
+    typed = [("A", "B", 0), ("C", "D", 0)]
+    DX, DY = engine.DEFAULTS["DX"], engine.DEFAULTS["DY"]
+    base = {"A": {"x": 0.0, "y": 0.0}, "B": {"x": 6 * DX, "y": 0.0},
+            "C": {"x": 5 * DX, "y": -0.5 * DY}, "D": {"x": 6 * DX, "y": 0.5 * DY}}
+    o = dict(engine.DEFAULTS)
+    o["MINCROSS_MAX_NODES"] = 1                                    # 2 movable nodes > 1
+    P = copy.deepcopy(base)
+    engine._minimize_crossings(P, [dict(n) for n in nodes], typed, o, movable={"C", "D"})
+    assert P == base                                               # the crossing is left in place
+    assert engine.DEFAULTS["MINCROSS_MAX_NODES"] >= 150            # the size seen in real saves
+
+
+def test_minimize_crossings_cap_counts_the_work_set_not_every_movable_node():
+    """The cap bounds Phase B's actual work set `order` (free, edge-bearing nodes), not raw
+    `movable`: an isolated node has no crossings to fix and costs Phase B nothing, so it must not
+    count toward MINCROSS_MAX_NODES. Five movable nodes, four edge-bearing: a cap of four still
+    RUNS the pass (C and E move). Keyed on `movable` (five > four) it would have wrongly skipped."""
+    nodes = [{"id": x, "w": 48, "h": 48} for x in ("A", "B", "C", "D", "E", "F", "G")]
+    typed = [("A", "B", 0), ("C", "D", 0), ("E", "F", 0)]         # G is isolated (no edges)
+    DX, DY = engine.DEFAULTS["DX"], engine.DEFAULTS["DY"]
+    P = {"A": {"x": 0.0, "y": 0.0}, "B": {"x": 6 * DX, "y": 0.0},
+         "C": {"x": 5 * DX, "y": -0.5 * DY}, "D": {"x": 6 * DX, "y": 0.5 * DY},
+         "E": {"x": 2 * DX, "y": -1.0 * DY}, "F": {"x": 3 * DX, "y": 1.0 * DY},
+         "G": {"x": 10 * DX, "y": 5 * DY}}
+    o = dict(engine.DEFAULTS)
+    o["MINCROSS_MAX_NODES"] = 4                                    # 5 movable, 4 edge-bearing
+    engine._minimize_crossings(P, [dict(n) for n in nodes], typed, o,
+                               movable={"C", "D", "E", "F", "G"})
+    assert P == {"A": {"x": 0.0, "y": 0.0}, "B": {"x": 6 * DX, "y": 0.0},
+                 "C": {"x": 5 * DX, "y": 0.5 * DY}, "D": {"x": 6 * DX, "y": 0.5 * DY},
+                 "E": {"x": 2 * DX, "y": 0.0}, "F": {"x": 3 * DX, "y": 1.0 * DY},
+                 "G": {"x": 10 * DX, "y": 5 * DY}}          # ran: C/E moved; isolated G untouched
+
+
 def test_minimize_crossings_never_worse_on_corpus():
     """On every real export flow, the optional pass must never INCREASE crossings vs base
     (the render-faithful count, area nodes attached at their frame top-left)."""

@@ -24,7 +24,8 @@ def _guidance(args) -> dict:
 def _args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--topic", default="all",
                    help="playbook | best-practices | visual-organization | datastore | "
-                        "scheduling | environments | boundary | all (default all)")
+                        "scheduling | environments | boundary | all (default all); "
+                        "process-config | form-config for the shape of a writer's config")
 
 
 ACTIONS = {

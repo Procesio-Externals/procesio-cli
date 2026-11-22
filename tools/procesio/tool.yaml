@@ -3335,7 +3335,7 @@ actions:
     required: true
     description: form template id
 - name: form-get-code
-  description: Read a form's global CSS + JavaScript (decrypts Data.code).
+  description: Read a form's global CSS + JavaScript (decrypts Data.code). The answer carries a `note` on where that JavaScript runs (a sandbox iframe, not the page), and `warnings` when the stored JavaScript works on the DOM only through its own `document`.
   args:
   - name: profile
     type: string
@@ -3362,7 +3362,7 @@ actions:
     required: false
     description: also write the JavaScript to this file
 - name: form-get-element
-  description: Read one element's configs from a live form (id or name).
+  description: Read one element's configs from a live form (by its id, name or DOM id).
   args:
   - name: profile
     type: string
@@ -3383,14 +3383,14 @@ actions:
   - name: element
     type: string
     required: true
-    description: element id, or its `name` config as the designer shows it
+    description: element id, its `name` config as the designer shows it, or its `id` config (the DOM id the element carries on the page)
   - name: key
     type: string
     required: false
     description: 'only return this config key (repeatable; default: all)'
     repeatable: true
 - name: form-get-element-events
-  description: List one element's event handlers, by trigger.
+  description: List one element's event handlers, by trigger. When one of them is a RUN_JAVASCRIPT script, the answer carries a `note` on where the script runs (a sandbox iframe, not the page), and `warnings` when a script works on the DOM only through its own `document`.
   args:
   - name: profile
     type: string
@@ -3411,7 +3411,7 @@ actions:
   - name: element
     type: string
     required: true
-    description: element id, or its designer 'name' (e.g. doccipf)
+    description: element id, its designer 'name' (e.g. doccipf), or its `id` config (the DOM id the element carries on the page)
 - name: form-get-queries
   description: 'Read a form''s saved Data Store queries (SQL, tag bindings, declared parameters, timeout) and which elements run each one. A query no event runs comes back under `warnings`: a designer save drops it.'
   args:
@@ -3482,7 +3482,7 @@ actions:
     required: false
     description: form instance the run belongs to (formInstanceId header)
 - name: form-set-code
-  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back after the write and fails with not_persisted if the server kept other code (PROCESIO has been seen answering 2xx while dropping the form''s Data). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open. Returns `warnings` when the code mounts UI on document.body or styles :root/html/body without propagating the form''s CSS scope attribute (those styles do not apply).'
+  description: 'Set a form''s global CSS + JavaScript in place (surgical: only Data.code changes; omitted side is preserved; returns the previous code). Reads the form back after the write and fails with not_persisted if the server kept other code (PROCESIO has been seen answering 2xx while dropping the form''s Data). --clear removes the code entirely WITHOUT decrypting it, which is the only repair for a blob the stored form-code-key cannot open. The JavaScript runs in a hidden sandbox iframe, not in the page: reach the form through window.parent.document. Returns `warnings` when the code works on the DOM only through its own `document` (nothing it does is visible), or mounts UI on document.body or styles :root/html/body without propagating the form''s CSS scope attribute (those styles do not apply).'
   args:
   - name: profile
     type: string
@@ -3585,7 +3585,7 @@ actions:
   - name: element
     type: string
     required: true
-    description: element id, or its `name` config as the designer shows it
+    description: element id, its `name` config as the designer shows it, or its `id` config (the DOM id the element carries on the page)
   - name: set
     type: string
     required: false
@@ -3605,7 +3605,7 @@ actions:
     required: false
     description: overwrite even if the resource changed since it was read (skip the optimistic-concurrency check)
 - name: form-set-element-event
-  description: 'Wire one element''s trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element''s event config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take NAMES: left = a process variable name, right = a form FIELD name, a form variable (@Offer_ID), an element config (Paragraph9.label) or a data-model path (instance.currentUser.email) - each is resolved to the id/value-path the runtime needs. Do NOT hand-build the form value path; if you pass one it is CHECKED against the live form and refused when wrong, because a wrong path is saved without any error and the control then launches nothing. A DataStore op takes --data-store-id + --operation; operation QUERY runs a saved query of the form instead (queryId or query name in --config, inputMap left = the parameter exactly as declared, outputMap left = rows|columns|count|success). An element saved before the trigger existed (e.g. an approval control from before Sep 2025, no onBeforeApprove slot) gets the missing slot added from the element template, listed in `backfilled`.'
+  description: 'Wire one element''s trigger to RUN_PROCESS / RUN_JAVASCRIPT / RUN_DATA_STORE_OPERATION in place (surgical: only that element''s event config changes). In a RUN_PROCESS inputMap/outputMap BOTH sides take NAMES: left = a process variable name, right = a form FIELD name, a form variable (@Offer_ID), an element config (Paragraph9.label; the element by its name, id or DOM id) or a data-model path (instance.currentUser.email) - each is resolved to the id/value-path the runtime needs. Do NOT hand-build the form value path; if you pass one it is CHECKED against the live form and refused when wrong, because a wrong path is saved without any error and the control then launches nothing. A DataStore op takes --data-store-id + --operation; operation QUERY runs a saved query of the form instead (queryId or query name in --config, inputMap left = the parameter exactly as declared, outputMap left = rows|columns|count|success). In a DataStore op the right side takes the same NAMES and is resolved and checked the same way; an input''s right side that names nothing on the form is kept as a typed value and listed in `typed_values` (pass `value` in place of `right` to state a typed value), and `rows` takes a table''s name and is written to its dynamic row''s source. An element saved before the trigger existed (e.g. an approval control from before Sep 2025, no onBeforeApprove slot) gets the missing slot added from the element template, listed in `backfilled`. A RUN_JAVASCRIPT script runs in a hidden sandbox iframe, not in the page: reach the form through window.parent.document. Returns `warnings` when the script works on the DOM only through its own `document`.'
   args:
   - name: profile
     type: string
@@ -3626,7 +3626,7 @@ actions:
   - name: element
     type: string
     required: true
-    description: element id, or its designer 'name' (e.g. doccipf)
+    description: element id, its designer 'name' (e.g. doccipf), or its `id` config (the DOM id the element carries on the page)
   - name: 'on'
     type: string
     required: true
@@ -3756,7 +3756,7 @@ actions:
   - name: element
     type: string
     required: false
-    description: document-signing element id or `name` config; when given, its `document` config is set to the stored file {fileId, name}
+    description: document-signing element id, `name` config or `id` config (its DOM id); when given, its `document` config is set to the stored file {fileId, name}
   - name: dry-run
     type: boolean
     required: false

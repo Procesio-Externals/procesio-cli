@@ -301,7 +301,8 @@ Applies to EVERY field reference: visibility toggles, submit-button hide/show, f
   and overwrite its text - `cloneNode(true)` carries the scope attributes, the exact inner markup
   and the theme, for free:
   ```js
-  var tpl = document.querySelector(".pds-c-message-info:not(.my-widget)");
+  var D = window.parent.document;   // the page; the sandbox's own `document` holds no form node
+  var tpl = D.querySelector(".pds-c-message-info:not(.my-widget)");
   var node = tpl ? tpl.cloneNode(true) : buildFallback();   // fallback: also set inline display:flex
   node.classList.add("my-widget");
   ```

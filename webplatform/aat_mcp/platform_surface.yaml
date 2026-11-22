@@ -26,6 +26,12 @@
 #   - No argument that names a file. The model's files are not on this machine.
 #   - A JSON argument is declared as an `object` or an `array`, never as a string: the
 #     client then checks its shape. The bridge encodes it for the tool.
+#   - The schema of a structured argument must REACH the caller. When the action's
+#     manifest publishes one, the argument either takes it into the tool list
+#     (`schema_from_manifest: true`, for a small one) or names the guidance topic that
+#     serves it (`shape_topic`, for one too large to send with every model request).
+#     The tool's description then tells the caller to load that topic, and a failed call
+#     names it again. An argument with neither is a shape the caller has to guess.
 #   - A list of texts is read by a tool in one of two ways: a flag given once per item
 #     (the manifest marks it repeatable), or one flag that takes a JSON list. Say
 #     `json: true` for the second, so the choice is written down.
@@ -98,9 +104,10 @@ tools:
   - name: procesio_get_process
     title: Get a process definition
     description: >
-      Get one process as structured data. Pass compact for a summary of nodes, edges and
-      variables. The full definition can be tens of kilobytes, so ask for it only when
-      you need to send it back with procesio_edit_process.
+      Get one process as structured data, in the platform's own format. Pass compact
+      for a summary of nodes, edges and variables. The full definition can be tens of
+      kilobytes, and it is NOT a config: procesio_edit_process refuses it. To understand
+      a process, use procesio_read_process.
     target: {tool: procesio, action: get-process}
     read_only: true
     max_response_bytes: 60000
@@ -125,15 +132,18 @@ tools:
     title: Create a process
     description: >
       Create a process from one config that holds the WHOLE definition: variables,
-      actions, groups and edges. There is no step that adds a node afterwards. Load the
-      guidance topic playbook before your first use, and pass dry_run to see the
+      actions, groups and edges. There is no step that adds a node afterwards. The shape
+      of config is not in this tool list: before your first use, load the guidance topics
+      process-config (the schema and a working example) and playbook with
+      procesio_get_guidance. Do not guess property names. Pass dry_run to see the
       validation and an outline of what would be built. The answer never holds the whole
       process: it lists the variables and the actions by name.
     target: {tool: procesio, action: process-create}
     read_only: false
     fixed: {brief: true}
     args:
-      - {flag: config, type: object, required: true, description: "The process definition."}
+      - {flag: config, type: object, required: true, shape_topic: process-config,
+         description: "The process definition, in the shape of the guidance topic process-config."}
       - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and validate; create nothing."}
 
   - name: procesio_edit_process
@@ -141,16 +151,21 @@ tools:
     description: >
       Replace the definition of an existing process. The config you send is the DESIRED
       STATE and replaces everything: to add or change one item, send the whole
-      definition with that item changed. To change text or bindings inside nodes, use
-      procesio_edit_process_nodes instead, which does not need the whole definition.
-      The answer never holds the whole process: it lists the variables and the actions
-      by name.
+      definition with that item changed. The config has the shape of the guidance topic
+      process-config, the same as for procesio_create_process: load it with
+      procesio_get_guidance before your first use. No tool returns a live process in that
+      shape, and what procesio_get_process returns is refused. So for a change to a live
+      process, prefer the tools that do not need the whole definition:
+      procesio_edit_process_nodes, procesio_insert_process_node and
+      procesio_add_process_variable. The answer never holds the whole process: it lists
+      the variables and the actions by name.
     target: {tool: procesio, action: process-edit}
     read_only: false
     fixed: {brief: true}
     args:
       - {flag: id, type: string, required: true, description: "The process id."}
-      - {flag: config, type: object, required: true, description: "The whole desired definition."}
+      - {flag: config, type: object, required: true, shape_topic: process-config,
+         description: "The whole desired definition, in the shape of the guidance topic process-config."}
       - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and report; change nothing."}
       - {flag: allow-remove, type: boolean, expose: allow_remove, description: "Permit this edit to remove actions or variables the process has."}
       - {flag: keep-layout, type: boolean, expose: keep_layout, description: "Keep the canvas positions and place only new actions."}
@@ -372,7 +387,9 @@ tools:
     title: Create a form
     description: >
       Create a form from one config that holds the WHOLE definition: assignees, elements
-      and queries. Load the guidance topic forms before your first use, and pass dry_run
+      and queries. The shape of config is not in this tool list: before your first use,
+      load the guidance topics form-config (the schema and a working example) and forms
+      with procesio_get_guidance. Do not guess property names. Pass dry_run
       to see the validation and an outline of what would be built. The answer never holds
       the whole form: it lists the elements by name. A form is created published and
       open to anyone without a login, unless the config says otherwise: isPrivate true
@@ -382,7 +399,8 @@ tools:
     read_only: false
     fixed: {brief: true}
     args:
-      - {flag: config, type: object, required: true, description: "The form definition."}
+      - {flag: config, type: object, required: true, shape_topic: form-config,
+         description: "The form definition, in the shape of the guidance topic form-config."}
       - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and validate; create nothing."}
 
   - name: procesio_get_form_element_events
@@ -558,7 +576,10 @@ tools:
     description: >
       Replace the definition of an existing form. The config you send is the DESIRED
       STATE and replaces everything: what you leave out is removed, and that is refused
-      unless allow_remove is set. To add controls without restating the form, use
+      unless allow_remove is set. The config has the shape of the guidance topic
+      form-config, the same as for procesio_create_form: load it with
+      procesio_get_guidance before your first use. What procesio_get_form returns is not
+      a config. To add controls without restating the form, use
       procesio_add_form_elements. The answer never holds the whole form: it lists the
       elements by name.
     target: {tool: procesio, action: form-edit}
@@ -566,7 +587,8 @@ tools:
     fixed: {brief: true}
     args:
       - {flag: id, type: string, required: true, description: "The form id."}
-      - {flag: config, type: object, required: true, description: "The whole desired definition."}
+      - {flag: config, type: object, required: true, shape_topic: form-config,
+         description: "The whole desired definition, in the shape of the guidance topic form-config."}
       - {flag: dry-run, type: boolean, expose: dry_run, description: "Build and report; change nothing."}
       - {flag: allow-remove, type: boolean, expose: allow_remove, description: "Permit this edit to remove items the form has."}
 
@@ -663,9 +685,11 @@ tools:
     description: >
       Read one topic of the guidance on how to build and test in PROCESIO: the method,
       the recipes and the known pitfalls. Load the topic that fits the task before you
-      build. Start with playbook for a process and forms for a form.
+      build. Start with playbook for a process and forms for a form. Before you create
+      or replace a whole definition, also load the shape of its config: process-config
+      or form-config.
     target: {agent: procesio, action: guidance}
     read_only: true
     max_response_bytes: 120000
     args:
-      - {flag: topic, type: string, required: true, description: "Processes: playbook, best-practices, visual-organization, datastore, scheduling, environments, reliability, boundary. Forms: forms (the index), forms-anatomy, forms-process, forms-interaction, forms-code, forms-dom, forms-motion, forms-deploy, forms-redesign, forms-pitfalls. House style: patterns (the index), patterns-processes, patterns-forms, patterns-integrations, patterns-database, patterns-optimizing."}
+      - {flag: topic, type: string, required: true, description: "Config shapes (JSON Schema and a working example): process-config, form-config. Processes: playbook, best-practices, visual-organization, datastore, scheduling, environments, reliability, boundary. Forms: forms (the index), forms-anatomy, forms-process, forms-interaction, forms-code, forms-dom, forms-motion, forms-deploy, forms-redesign, forms-pitfalls. House style: patterns (the index), patterns-processes, patterns-forms, patterns-integrations, patterns-database, patterns-optimizing."}

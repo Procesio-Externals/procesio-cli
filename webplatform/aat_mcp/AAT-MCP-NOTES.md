@@ -278,6 +278,17 @@ Rules that matter when touching it:
 - **A structured argument's schema has one home.** `schema_from_manifest: true` takes it
   from the action's manifest, which takes it from the code that validates. A copy in the
   declaration would drift.
+- **A structured argument's schema must reach the caller.** A named tool is called from
+  the tool list alone, and the instructions tell the model not to look a named tool up.
+  An argument that the action checks against a schema, declared as a bare `object`, is
+  then a shape the model guesses: it writes `name` for `title` or `data_type` for `type`
+  and learns the shape from validation errors, one layer per attempt. A small schema goes
+  into the tool list (`schema_from_manifest`). A large one (the whole-definition `config`
+  of a process or a form, ten kilobytes and more) would ride in every model request, so
+  the argument names the guidance topic that serves it (`shape_topic`): the description
+  tells the model to load the topic first, and a failed call names it again in place of
+  "the schema is in the tool list". A conformance test fails for a published schema that
+  takes neither path.
 - **Every answer says `read_only` and `dry_run`.** A caller that must know whether a call
   changed anything reads those. Inferring it from a tool's name and the layout of its
   arguments stops working the moment the names are typed.
