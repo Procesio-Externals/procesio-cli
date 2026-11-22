@@ -6,6 +6,8 @@ PROD/QA/STAGING. This tool calls each one an **environment**, named `<Client>-<E
 Each environment has its own host URLs and its own credentials - there is no data path
 between them.
 
+**In a platform turn the environment is already chosen.** The deployment injects the `platform` profile - the Web API address and the user's account for it - so use it as it is: do not ask which environment to use, and do not run `set-environment` or `add-environment`.
+
 ## When the user says "work on PROCESIO Main-QA" (or DEV, or a client env)
 
 That is a **switch the default environment** request. Do:

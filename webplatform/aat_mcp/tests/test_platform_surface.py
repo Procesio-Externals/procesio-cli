@@ -159,6 +159,79 @@ def test_a_schema_taken_from_the_manifest_is_the_manifest_s():
     assert changes["description"] == "The changes, applied in order."
 
 
+def _structured_args():
+    """(tool, declared argument, schema) for every declared argument whose action publishes a
+    schema for it in the manifest."""
+    found = []
+    for spec in SPECS:
+        published = {a.name: a.json_schema for a in _action(spec).args if a.json_schema}
+        for arg in spec.get("args") or []:
+            if arg["flag"] in published:
+                found.append((spec, arg, published[arg["flag"]]))
+    return found
+
+
+def test_a_structured_argument_never_leaves_its_shape_to_a_guess():
+    """A named tool is called from the tool list alone. An argument that the action checks
+    against a schema, declared here as a bare object, is a shape the caller has to guess: it
+    then learns the property names from validation errors, one layer per attempt. So the
+    schema is in the tool list, or the argument names the guidance topic that serves it."""
+    found = _structured_args()
+    assert {s["name"] for s, _, _ in found} >= {
+        "procesio_create_process", "procesio_edit_process", "procesio_create_form",
+        "procesio_edit_form", "procesio_edit_process_nodes"}
+    guessed = [f"{s['name']}.{a['flag']}" for s, a, _ in found
+               if not (a.get("schema_from_manifest") or a.get("shape_topic"))]
+    assert not guessed, (
+        f"{guessed}: the action publishes a schema for this argument and the tool passes none "
+        "of it on. Say schema_from_manifest: true (a small schema) or shape_topic: <guidance "
+        "topic> (a large one).")
+
+
+def test_a_shape_topic_serves_the_schema_that_the_action_checks_against():
+    from agents.procesio import knowledge
+    topics = [(s, a, schema) for s, a, schema in _structured_args() if a.get("shape_topic")]
+    assert topics
+    for spec, arg, schema in topics:
+        shape = knowledge.config_shape(arg["shape_topic"])
+        assert shape["schema"] == schema, (spec["name"], arg["shape_topic"])
+        content = knowledge.load(arg["shape_topic"])["content"]
+        assert json.dumps(schema, ensure_ascii=False, separators=(",", ":")) in content
+
+
+def test_a_shape_topic_fits_in_the_answer_of_the_tool_that_serves_it():
+    """A topic over the cap comes back as a preview, and the shape is lost again."""
+    from agents.procesio import knowledge
+    cap = platform_server._BY_NAME[platform_server.guidance_tool()]["max_response_bytes"]
+    for spec in SPECS:
+        for topic in platform_server.shape_topics(spec).values():
+            assert len(json.dumps(knowledge.load(topic), ensure_ascii=False)) < cap, topic
+
+
+def test_a_tool_with_a_shape_topic_tells_the_caller_to_load_it():
+    built = {t["name"]: t for t in platform_server.TYPED_TOOLS}
+    guidance = platform_server.guidance_tool()
+    assert guidance == "procesio_get_guidance"
+    offered = built[guidance]["inputSchema"]["properties"]["topic"]["description"]
+    seen = 0
+    for spec in SPECS:
+        for name, topic in platform_server.shape_topics(spec).items():
+            seen += 1
+            tool = built[spec["name"]]
+            assert topic in tool["description"] and guidance in tool["description"], spec["name"]
+            assert topic in tool["inputSchema"]["properties"][name]["description"], spec["name"]
+            assert topic in offered and topic in built[guidance]["description"], topic
+    assert seen == 4
+
+
+def test_the_platform_s_own_format_is_not_offered_as_a_config():
+    """procesio_get_process returns the platform's object, which the edit refuses."""
+    built = {t["name"]: t for t in platform_server.TYPED_TOOLS}
+    assert "NOT a config" in built["procesio_get_process"]["description"]
+    assert "send it back" not in built["procesio_get_process"]["description"]
+    assert "procesio_get_process returns is refused" in built["procesio_edit_process"]["description"]
+
+
 def test_every_tool_is_named_for_its_domain_and_says_what_it_does():
     names = [t["name"] for t in platform_server.TYPED_TOOLS]
     assert len(names) == len(set(names))
@@ -438,9 +511,9 @@ def test_arguments_that_are_not_an_object_are_read_as_none_given(ran, arguments)
 
 @pytest.mark.parametrize("name, arguments, read_only, dry_run", [
     ("procesio_list_processes", {}, True, False),
-    ("procesio_create_process", {"config": {"name": "x"}}, False, False),
-    ("procesio_create_process", {"config": {"name": "x"}, "dry_run": True}, False, True),
-    ("procesio_create_process", {"config": {"name": "x"}, "dry_run": False}, False, False),
+    ("procesio_create_process", {"config": {"title": "x"}}, False, False),
+    ("procesio_create_process", {"config": {"title": "x"}, "dry_run": True}, False, True),
+    ("procesio_create_process", {"config": {"title": "x"}, "dry_run": False}, False, False),
     ("procesio_edit_process_nodes", {"id": "p", "changes": [{}], "dry_run": True}, False, True),
 ])
 def test_every_answer_says_whether_the_call_reads_only_and_whether_it_was_a_dry_run(
@@ -475,6 +548,27 @@ def test_a_failed_call_says_it_too_and_keeps_the_tool_s_error(ran):
     assert payload["error"]["message"] == "change 1: node not found"
     assert "does not mean you lack access" in payload["hint"]
     assert "do not look it up" in payload["hint"]
+
+
+@pytest.mark.parametrize("name, arguments, topic", [
+    ("procesio_create_process", {"config": {"name": "x"}}, "process-config"),
+    ("procesio_edit_process", {"id": "p", "config": {"name": "x"}}, "process-config"),
+    ("procesio_create_form", {"config": {"title": "x"}}, "form-config"),
+    ("procesio_edit_form", {"id": "f", "config": {"title": "x"}}, "form-config"),
+])
+def test_a_failed_call_names_the_topic_when_the_shape_is_not_in_the_tool_list(ran, name, arguments, topic):
+    """Sending the model back to the tool list for a shape that is not there leaves it to
+    guess the next property name."""
+    ran.answer = {"ok": False, "data": None, "returncode": 2,
+                  "error": {"code": "invalid_argument",
+                            "message": "config does not satisfy the schema:\n  - (root): "
+                                       "Additional properties are not allowed"}}
+    payload, is_error = platform_server.call_typed(name, arguments)
+    assert is_error and "does not mean you lack access" in payload["hint"]
+    assert f"`config` is the guidance topic {topic}" in payload["hint"]
+    assert "procesio_get_guidance" in payload["hint"]
+    assert "do not look it up" not in payload["hint"]
+    assert "schema is in the tool list" not in payload["hint"]
 
 
 def test_a_refused_call_and_a_raised_one_say_it_as_well(ran, monkeypatch):

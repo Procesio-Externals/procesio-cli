@@ -156,8 +156,13 @@ def get_code(client, args) -> dict:
     if args.js_out:
         with open(args.js_out, "w", encoding="utf-8") as f:
             f.write(js)
-    return {"id": args.id, "name": form.get("name"), "css": css, "javascript": js,
-            "css_bytes": len(css), "javascript_bytes": len(js)}
+    # `note` goes before the code: a caller that keeps only the start of a long answer still gets it
+    result = {"id": args.id, "name": form.get("name"), "note": formlint.SANDBOX_NOTE,
+              "css_bytes": len(css), "javascript_bytes": len(js)}
+    warnings = formlint.lint_form_code_sandbox(js)
+    if warnings:
+        result["warnings"] = warnings
+    return {**result, "css": css, "javascript": js}
 
 
 def set_code(client, args) -> dict:
@@ -207,7 +212,8 @@ def set_code(client, args) -> dict:
         "previous": {"css": previous["CSS"], "javascript": previous["JAVASCRIPT"]},
         "elements": len(form["data"].get("elements") or []),
     }
-    warnings = formlint.lint_form_code_scope(css, js) + formlint.lint_form_code_runtime(css, js)
+    warnings = (formlint.lint_form_code_scope(css, js) + formlint.lint_form_code_runtime(css, js)
+                + formlint.lint_form_code_sandbox(js))
     if warnings:
         result["warnings"] = warnings
     if args.dry_run:
@@ -272,7 +278,10 @@ def _set_args(p: argparse.ArgumentParser) -> None:
 ACTIONS = {
     "form-get-code": ActionDef(
         func=get_code, add_args=_get_args, needs_client=True,
-        description="Read a form's global CSS + JavaScript (decrypts Data.code).",
+        description="Read a form's global CSS + JavaScript (decrypts Data.code). The answer carries "
+                    "a `note` on where that JavaScript runs (a sandbox iframe, not the page), and "
+                    "`warnings` when the stored JavaScript works on the DOM only through its own "
+                    "`document`.",
     ),
     "form-set-code": ActionDef(
         func=set_code, add_args=_set_args, needs_client=True,
@@ -281,7 +290,10 @@ ACTIONS = {
                     "write and fails with not_persisted if the server kept other code (PROCESIO has been seen "
                     "answering 2xx while dropping the form's Data). --clear removes the code "
                     "entirely WITHOUT decrypting it, which is the only repair for a blob the stored "
-                    "form-code-key cannot open. Returns `warnings` when the code mounts UI on "
+                    "form-code-key cannot open. The JavaScript runs in a hidden sandbox iframe, not "
+                    "in the page: reach the form through window.parent.document. Returns `warnings` "
+                    "when the code works on the DOM only through its own `document` (nothing it "
+                    "does is visible), or mounts UI on "
                     "document.body or styles :root/html/body without propagating the form's CSS "
                     "scope attribute (those styles do not apply)."),
 }

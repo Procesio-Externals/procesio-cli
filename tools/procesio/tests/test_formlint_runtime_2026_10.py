@@ -34,7 +34,7 @@ def test_quoted_deserialze_is_flagged(code):
 
 
 @pytest.mark.parametrize("code", ["const v = deserialze(amount);",
-                                  "document.querySelector('.amount input').value",
+                                  "window.parent.document.querySelector('.amount input').value",
                                   "const kind = 'numbered list';"])
 def test_current_usage_is_clean(code):
     assert formlint.lint_form_code_runtime(None, code) == []

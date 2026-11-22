@@ -14,7 +14,8 @@ def test_topics_present():
         "forms", "forms-anatomy", "forms-code", "forms-dom", "forms-interaction",
         "forms-motion", "forms-process", "forms-deploy", "forms-pitfalls", "forms-redesign",
         "patterns", "patterns-processes", "patterns-forms", "patterns-integrations",
-        "patterns-database", "patterns-optimizing"}
+        "patterns-database", "patterns-optimizing",
+        "process-config", "form-config"}
 
 
 def test_each_topic_loads_real_content():
@@ -58,6 +59,38 @@ def test_the_process_integration_chapter_carries_the_map_row_contract():
     assert "inputMap" in body and "outputMap" in body
     assert "11223344-5566-7788-99aa-aabbccddeeff" in body       # the FIELDS_NS constant
     assert "isList" in body                                      # the row object shape
+
+
+def test_a_config_topic_serves_the_schema_and_a_config_that_works():
+    """A whole-definition writer takes one `config` object. A caller that reaches it through
+    a named tool sees a bare object, so this topic is the only place it can read the shape.
+    Served from the files the component validates and tests against, never from a copy."""
+    import json
+    from tools.procesio.dto import framework, registry
+    for topic, name in (("process-config", "process"), ("form-config", "form")):
+        component = registry.all_components()[name]
+        shape = knowledge.config_shape(topic)
+        assert shape["schema"] == component.load_schema()
+        framework.validate_config(component, shape["example"])     # the example is accepted
+        content = knowledge.load(topic)["content"]
+        assert json.dumps(shape["schema"], ensure_ascii=False, separators=(",", ":")) in content
+        assert json.dumps(shape["example"], ensure_ascii=False, indent=2) in content
+        assert "NOT the object that reading" in content
+
+
+def test_the_process_config_topic_names_the_properties_a_caller_guesses_wrong():
+    """The guesses measured without it: `name` for the title, `data_type` / `dataType` for a
+    variable's type, `is_list` for isList, an action without its id."""
+    schema = knowledge.config_shape("process-config")["schema"]
+    assert schema["required"] == ["title"] and schema["additionalProperties"] is False
+    variable, action = schema["$defs"]["variable"], schema["$defs"]["action"]
+    assert {"name", "type", "isList", "direction"} <= set(variable["properties"])
+    assert variable["additionalProperties"] is False
+    assert action["required"] == ["id", "action"]
+
+
+def test_all_leaves_the_config_shapes_out():
+    assert not {d["topic"] for d in knowledge.load_all()} & set(knowledge.CONFIG_TOPICS)
 
 
 def test_unknown_topic_raises():

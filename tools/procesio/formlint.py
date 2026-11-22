@@ -34,6 +34,10 @@ a debugging session to find (see PROCESIO-API-NOTES.md and FORM-DEV-GUIDE/08):
   SIGNATURE spot on a locked setup, a MEMBER with no user, two FILLERs, a spot off the page,
   a PDF kept inline. The server stores all of these; they only fail when someone tries to sign.
 
+* **Form JavaScript written for the wrong document** — form code and event scripts run in a
+  hidden sandbox iframe, so a script that looks up or mounts elements through its own `document`
+  and never through `window.parent.document` does nothing visible. Saved without a word.
+
 Pure and side-effect-free: each returns a list of human-readable warning strings.
 Warnings, never blockers — the caller attaches them to its result JSON.
 """
@@ -426,17 +430,92 @@ def lint_form_code_runtime(css: str | None, js: str | None, where: str = "form c
     return out
 
 
+# Form JavaScript (the form-level code and every RUN_JAVASCRIPT event) runs in a hidden sandbox
+# iframe that the runtime builds for the run and removes afterwards (form-runtime
+# services/triggers/javascript/Sandbox.ts). `document` there is the iframe's own page, which holds
+# nothing but the script: a lookup finds no form element, and what the script mounts is never on
+# screen. The server stores such code without a word and the form shows no error, so the only
+# symptom is "nothing happens". See FORM-DEV-GUIDE/02-CODE-INJECTION.md §3-§4.
+_JS_COMMENT = re.compile(r"/\*.*?\*/|(?<![:\\\w\"'`])//[^\n]*", re.S)
+_OWN_DOCUMENT = re.compile(
+    r"(?<![.\w$])(?:(?:window|self|globalThis)\s*\.\s*)?document\s*\.\s*"
+    r"(?:getElementById|getElementsBy\w+|querySelector(?:All)?|body|documentElement|head|forms|"
+    r"activeElement|addEventListener)\b")
+_PARENT_DOCUMENT = re.compile(r"(?<![\w$])(?:parent|top)\s*\.\s*document\b|\bframeElement\b")
+# `var W = window.parent && window.parent !== window ? window.parent : window;` - the name the
+# parent window is kept under, so that `W.document` counts as reaching the page.
+_PARENT_ALIAS = re.compile(
+    r"([A-Za-z_$][\w$]*)\s*=(?!=)[^;\n]*?(?<![.\w$])(?:window\s*\.\s*)?(?:parent|top)\b")
+
+
+def uses_only_sandbox_document(js: str | None) -> bool:
+    """True when the script works on the DOM through its own `document` and never reaches the
+    document of the page that shows the form.
+
+    A script that keeps the parent window only to hang a value on it (`P.__state = ...`) still
+    counts: the DOM calls are what must reach the page. A script that reaches the parent document
+    anywhere is left alone, because the documented pattern injects a runtime into the parent and
+    that runtime's own `document` is the right one."""
+    code = _JS_COMMENT.sub("", js or "")
+    if not _OWN_DOCUMENT.search(code):
+        return False
+    if _PARENT_DOCUMENT.search(code):
+        return False
+    for alias in set(_PARENT_ALIAS.findall(code)):
+        if re.search(rf"(?<![.\w$]){re.escape(alias)}\s*\.\s*document\b", code):
+            return False
+    return True
+
+
+_SANDBOX_ADVICE = ("Form JavaScript runs in a hidden sandbox iframe, and `document` there is the "
+                   "iframe's own page: a lookup finds no form element and what the script mounts "
+                   "is never on screen. Reach the form through window.parent.document, and put "
+                   "code that must outlive the run in a runtime installed in the parent page "
+                   "(FORM-DEV-GUIDE/02-CODE-INJECTION.md §3-§4).")
+
+
+# Carried by the answers that READ form JavaScript (form-get-code, form-get-element-events). A
+# rule stated only in the guidance reaches a caller that loads the guidance; the read is the one
+# step every edit of a script starts with, so the rule is repeated there, in a few lines.
+SANDBOX_NOTE = ("Form JavaScript runs in a hidden sandbox iframe that the runtime removes after the "
+                "run: `document` is the iframe's own page, not the form. Reach the form through "
+                "window.parent.document, and put code that must outlive the run (listeners, timers, "
+                "a game loop) in a runtime installed once in the parent page. Guide: "
+                "FORM-DEV-GUIDE/02-CODE-INJECTION.md (guidance topic forms-code).")
+
+
+def lint_form_code_sandbox(js: str | None, where: str = "form code") -> list[str]:
+    """One warning when the script reads or changes the DOM only through the sandbox's document."""
+    if not uses_only_sandbox_document(js):
+        return []
+    return [f"{where} works on the page through `document` and never through "
+            f"window.parent.document. {_SANDBOX_ADVICE}"]
+
+
 def lint_event_scripts(data: Any) -> list[str]:
-    """lint_form_code_runtime over every RUN_JAVASCRIPT event of the form's elements."""
+    """The script lints over every RUN_JAVASCRIPT event of the form's elements. The sandbox lint
+    is reported once for the form, naming the scripts, so a form with many handlers written the
+    same way does not repeat the advice for each."""
     out: list[str] = []
+    sandboxed: list[str] = []
     for el in _elements(data):
         for c in el.get("configs") or []:
             for ev in slot_events(c.get("key"), c.get("value")):
                 if ev.get("action") == "RUN_JAVASCRIPT":
                     code = (ev.get("config") or {}).get("code")
-                    for w in lint_form_code_runtime(None, code, f"the {c.get('key')} script of {_label(el)}"):
+                    where = f"the {c.get('key')} script of {_label(el)}"
+                    for w in lint_form_code_runtime(None, code, where):
                         if w not in out:
                             out.append(w)
+                    if uses_only_sandbox_document(code) and where not in sandboxed:
+                        sandboxed.append(where)
+    if sandboxed:
+        shown = ", ".join(sandboxed[:8])
+        if len(sandboxed) > 8:
+            shown += f", and {len(sandboxed) - 8} more"
+        verb = "works" if len(sandboxed) == 1 else "work"
+        out.append(f"{shown} {verb} on the page through `document` and never through "
+                   f"window.parent.document. {_SANDBOX_ADVICE}")
     return out
 
 

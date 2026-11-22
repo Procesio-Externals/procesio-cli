@@ -175,7 +175,8 @@ def test_conditions_in_a_bare_list_slot_are_checked():
 
 
 def test_scripts_in_a_bare_list_slot_are_checked():
-    js = {"action": "RUN_JAVASCRIPT", "config": {"code": "document.querySelector('input[type=number]')"}}
+    js = {"action": "RUN_JAVASCRIPT",
+          "config": {"code": "window.parent.document.querySelector('input[type=number]')"}}
     data = {"elements": [_el("btn", configs=[_cfg("name", "go"), _cfg("onClickEvents", [js])])]}
     warns = formlint.lint_event_scripts(data)
     assert len(warns) == 1 and "type=number" in warns[0] and "'go'" in warns[0]

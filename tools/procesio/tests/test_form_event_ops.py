@@ -153,7 +153,7 @@ def test_lookup_by_id_and_a_helpful_miss():
     assert out["elementId"] == "E1"
 
     s = FakeSession(queue=[FakeResp(200, _form())])
-    with pytest.raises(UsageError, match="no element with id or name"):
+    with pytest.raises(UsageError, match="no element with id, name or DOM id"):
         _call("form-set-element-event",
               ["--id", "F1", "--element", "nope", "--on", "input",
                "--action", "RUN_PROCESS", "--config", json.dumps(_CFG)], s)

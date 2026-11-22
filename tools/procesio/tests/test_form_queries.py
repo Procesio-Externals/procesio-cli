@@ -550,17 +550,28 @@ def test_no_write_action_of_this_module_carries_a_read_verb():
 # -- form-set-element-event: operation QUERY -----------------------------------
 
 def test_set_element_event_wires_a_saved_query_by_name():
-    s = FakeSession(queue=[FakeResp(200, _form()), FakeResp(200, {})])
+    from tools.procesio.dto.form import fieldpath
+    form = _form()
+    form["data"]["dataModel"] = {"id": "dm"}
+    form["data"]["elements"] += [
+        {"id": "i1", "type": "input", "configs": [
+            {"id": "n1", "key": "name", "value": "product"}, {"id": "v1", "key": "value"}]},
+        {"id": "i2", "type": "input", "configs": [
+            {"id": "n2", "key": "name", "value": "found"}, {"id": "v2", "key": "value"}]}]
+    s = FakeSession(queue=[FakeResp(200, form), FakeResp(200, {})])
     config = {"query": "Find product",
-              "inputMap": [{"id": 0, "left": "@product", "right": "path"}],
-              "outputMap": [{"id": 0, "left": "rows", "right": "path2"}]}
+              "inputMap": [{"id": 0, "left": "@product", "right": "product"}],
+              "outputMap": [{"id": 0, "left": "count", "right": "found"}]}
     out = _call("form-set-element-event",
                 ["--id", "F1", "--element", "find", "--on", "click",
                  "--action", "RUN_DATA_STORE_OPERATION", "--operation", "query",
                  "--config", json.dumps(config)], s)
+    ns = fieldpath.FIELDS_NS
     assert out["event"]["config"] == {
-        "dataStoreId": None, "operation": "QUERY", "inputMap": config["inputMap"],
-        "outputMap": config["outputMap"], "filters": [], "queryId": QID}
+        "dataStoreId": None, "operation": "QUERY",
+        "inputMap": [{"id": 0, "left": "@product", "right": f"dm.{ns}.i1.v1"}],
+        "outputMap": [{"id": 0, "left": "count", "right": f"dm.{ns}.i2.v2"}],
+        "filters": [], "queryId": QID}
     assert s.calls[1]["json"]["Queries"] == [_wire()]
 
 

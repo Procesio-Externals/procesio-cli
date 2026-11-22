@@ -67,6 +67,13 @@ the ANAF/Query production process (matching the reference hand-arrangement's int
 Not zero-guaranteed in general - a structural crossing no compact/local move can remove is left
 as-is.
 
+**Cost.** Phase B scores many candidate moves per node. It keeps the crossing total running and
+recounts only the crossings of the node being moved, which picks the same moves as recounting
+every pair of edges (a full recount per candidate grew roughly with the cube of the flow: about
+two minutes for a 150-action process). Even so it grows roughly with the square of the flow, so
+above `MINCROSS_MAX_NODES` (300) movable nodes the whole pass is skipped: the process saves and
+runs the same, and its canvas only keeps more crossings.
+
 **Cluster consecutive horizontal actions (`--cluster` / `cluster=True`) - opt-in.** A long
 run of consecutive `1-in/1-out` actions (top-level, NOT inside a For-Each), `>= CLUSTER_MIN`
 (5) nodes, is folded from one long horizontal row into a compact **serpentine grid** - down

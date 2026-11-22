@@ -27,7 +27,7 @@ DEFAULTS = {
     "FE_START_PAD": 32, "FE_TOP": 78, "FE_RIGHT_PAD": 100, "FE_BOTTOM_PAD": 125,
     "CLUSTER": False, "CLUSTER_MIN": 5, "CLUSTER_WRAP": 4,
     "MINIMIZE_CROSSINGS": True, "MINCROSS_ITERS": 6, "MINCROSS_RANGE": 6,
-    "MINCROSS_MOVE_PENALTY": 0.25, "MINCROSS_LEN_PENALTY": 0.0,
+    "MINCROSS_MOVE_PENALTY": 0.25, "MINCROSS_LEN_PENALTY": 0.0, "MINCROSS_MAX_NODES": 300,
 }
 
 
@@ -913,7 +913,8 @@ def _loop_curl(rset: set, typed: list, P: dict, o: dict) -> dict | None:
 
 def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, movable: set,
                         regions: list | None = None) -> dict:
-    """OPTIONAL (off by default): best-effort edge-crossing reduction, in two phases.
+    """Best-effort edge-crossing reduction, in two phases. On by default (MINIMIZE_CROSSINGS in
+    DEFAULTS, and adapter.layout_flow turns it on for every save).
 
     PHASE A -- region re-placement: each off-spine sub-region (the error region, dead-end
     folds) is RE-LAID-OUT compactly (a chain collapses to one row) and offered up FLUSH just
@@ -932,7 +933,18 @@ def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, mova
     Counts ALL drawn edges (normal + error). Strictly-better-only + monotone bounded score =>
     never worse than the input, and it terminates. Containers/children stay fixed. Not zero-
     guaranteed -- structural crossings a compact/local move can't remove (a container-exit edge)
-    are left as-is by design."""
+    are left as-is by design.
+
+    COST. Phase B scores every candidate move of one node. Moving one node changes only the
+    crossings of that node's own edges, so the total is kept running and only those edges are
+    recounted (`inc_cross`): the same scores, so the same moves, as recounting every pair of edges
+    each time. A full recount per candidate made a save grow roughly with the cube of the flow
+    (about two minutes at 150 actions, past the tool's time limit long before 1000).
+
+    Even recounted incrementally, Phase B still grows roughly with the square of the flow, so
+    above MINCROSS_MAX_NODES edge-bearing movable nodes (the work set `order`, not every movable
+    node) the whole pass is skipped and the base layout is returned unchanged. The flow still
+    saves and runs the same; only more of its edges may cross on the canvas."""
     by_id = {n["id"]: n for n in nodes}
     edges = [(s, d) for s, d, t in typed
              if t in (0, 1) and s in positions and d in positions and s != d]
@@ -942,6 +954,17 @@ def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, mova
         inc[s].append(i)
         inc[d].append(i)
     P = positions
+    # Phase B fine-tunes only the free, edge-bearing nodes: a node inside a region is owned by
+    # Phase A, and an isolated node has no crossings to fix, so `order` is Phase B's entire work
+    # set. The cost cap is keyed on it, not on raw `movable` -- an isolated node costs Phase B
+    # nothing and must not trip the skip. Phase A's region re-placement also recounts every
+    # crossing (O(edges^2)) a few times per region, so above the cap it is skipped with Phase B:
+    # at a flow big enough to skip the quadratic Phase B, re-placing regions is not affordable
+    # either. Above the cap the base layout is returned unchanged.
+    region_nodes = set().union(*[set(r) for r in (regions or [])]) if regions else set()
+    order = sorted(m for m in movable if m in P and inc.get(m) and m not in region_nodes)
+    if len(order) > o.get("MINCROSS_MAX_NODES", DEFAULTS["MINCROSS_MAX_NODES"]):
+        return positions
 
     def rp(nid):
         # RENDER point of a node for crossing tests: the designer attaches edges to an area
@@ -967,6 +990,21 @@ def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, mova
             a, b = rp(s), rp(d)
             for j in range(i + 1, len(edges)):
                 s2, d2 = edges[j]
+                if s2 in (s, d) or d2 in (s, d):
+                    continue
+                if _seg_int(a, b, rp(s2), rp(d2)):
+                    n += 1
+        return n
+
+    def inc_cross(nid):
+        # Crossings that involve one of `nid`'s own edges. A pair of two of its edges shares
+        # `nid` and is never counted, so total_cross() == (crossings among the other edges)
+        # + inc_cross(nid), and moving `nid` changes only the second term.
+        n = 0
+        for i in inc.get(nid, ()):
+            s, d = edges[i]
+            a, b = rp(s), rp(d)
+            for s2, d2 in edges:
                 if s2 in (s, d) or d2 in (s, d):
                     continue
                 if _seg_int(a, b, rp(s2), rp(d2)):
@@ -1033,11 +1071,9 @@ def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, mova
     PEN = o.get("MINCROSS_MOVE_PENALTY", 0.5)
     R = o.get("MINCROSS_RANGE", 6)
     DX, DY = o["DX"], o["DY"]
-    region_nodes = set().union(*[set(r) for r in (regions or [])]) if regions else set()
     startp = {nid: dict(P[nid]) for nid in movable if nid in P}
-    # Phase A owns each region's compact internal layout; Phase B must NOT drag a region node
-    # (e.g. a decisional) out of place chasing a crossing -- it only fine-tunes free nodes.
-    order = sorted(m for m in movable if m in P and inc.get(m) and m not in region_nodes)
+    # `order` and `region_nodes` were computed before Phase A (the work set the cap guards);
+    # Phase B fine-tunes only `order`, never a region node Phase A already placed.
 
     def disp():
         # QUADRATIC per-node displacement: a 1-step nudge is cheap (fine-tuning, this phase's
@@ -1073,11 +1109,13 @@ def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, mova
         return (all(x >= P[p]["x"] - DX * 0.25 for p in mono_pred.get(nid, []))
                 and all(x <= P[s2]["x"] + DX * 0.25 for s2 in mono_succ.get(nid, [])))
 
+    total = total_cross()                 # kept current below: only the moved node is recounted
     for _ in range(o.get("MINCROSS_ITERS", 6)):
         improved = False
         for nid in order:
             cur = dict(P[nid])
-            best_score = total_cross() + PEN * disp() + (LEN * elen() if LEN else 0.0)
+            rest = total - inc_cross(nid)     # crossings that no position of `nid` can change
+            best_score = total + PEN * disp() + (LEN * elen() if LEN else 0.0)
             best_p = cur
             for kx in range(-R, R + 1):
                 for ky in range(-R, R + 1):
@@ -1087,10 +1125,11 @@ def _minimize_crossings(positions: dict, nodes: list, typed: list, o: dict, mova
                     if overlaps(nid, x, y) or not mono_ok(nid, x):
                         continue
                     P[nid] = {"x": x, "y": y}
-                    sc = total_cross() + PEN * disp() + (LEN * elen() if LEN else 0.0)
+                    sc = rest + inc_cross(nid) + PEN * disp() + (LEN * elen() if LEN else 0.0)
                     if sc < best_score - 1e-9:
                         best_score, best_p = sc, {"x": x, "y": y}
             P[nid] = best_p
+            total = rest + inc_cross(nid)
             if best_p != cur:
                 improved = True
         if not improved:
